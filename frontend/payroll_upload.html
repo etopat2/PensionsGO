@@ -1,1 +1,241 @@
-<!-- payroll_upload.html HTML scaffold -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
+  <title>Payroll Upload History - PensionsGo</title>
+
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
+  <link rel="stylesheet" href="css/styles.css?v=20260507c" />
+  <link rel="stylesheet" href="css/menu.css?v=20260504d" />
+  <link rel="stylesheet" href="css/overlay.css?v=20260504a" />
+  <link rel="stylesheet" href="css/auth.css?v=20260504a" />
+  <link rel="stylesheet" href="css/payroll_upload.css?v=20260504a" />
+
+  <script type="module" src="js/main.js?v=20260528b"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script defer src="js/payroll_upload.js?v=20260216e"></script>
+</head>
+<body>
+  <main class="payroll-history-main">
+    <section class="payroll-history-shell">
+      <header class="payroll-history-header">
+        <div>
+          <h1>Payroll Upload History</h1>
+          <p>Drill down each upload to review matched and unmatched rows for correction workflows.</p>
+        </div>
+        <div class="payroll-history-header-actions">
+          <a href="dashboard.html" class="btn-action btn-history-back">Back to Dashboard</a>
+        </div>
+      </header>
+
+      <div id="payrollHistoryAccessNotice" class="payroll-history-access hidden"></div>
+
+      <section class="payroll-history-filters" id="payrollHistoryFilters">
+        <label for="historyYear">Year</label>
+        <select id="historyYear">
+          <option value="">All</option>
+        </select>
+
+        <label for="historyMonth">Month</label>
+        <select id="historyMonth">
+          <option value="">All</option>
+          <option value="01">January</option>
+          <option value="02">February</option>
+          <option value="03">March</option>
+          <option value="04">April</option>
+          <option value="05">May</option>
+          <option value="06">June</option>
+          <option value="07">July</option>
+          <option value="08">August</option>
+          <option value="09">September</option>
+          <option value="10">October</option>
+          <option value="11">November</option>
+          <option value="12">December</option>
+        </select>
+
+        <label for="historyFinancialYear">Financial Year</label>
+        <select id="historyFinancialYear">
+          <option value="">All</option>
+        </select>
+
+        <label for="historyQuarter">Quarter</label>
+        <select id="historyQuarter">
+          <option value="">All</option>
+          <option value="Q1">Q1</option>
+          <option value="Q2">Q2</option>
+          <option value="Q3">Q3</option>
+          <option value="Q4">Q4</option>
+        </select>
+
+        <label for="historySearch">Search</label>
+        <input type="text" id="historySearch" placeholder="File name, notes, uploader..." />
+
+        <button type="button" class="btn-action" id="historyRefreshBtn">Refresh</button>
+      </section>
+
+      <section class="payroll-history-summary" id="historySummaryCards"></section>
+
+      <section class="payroll-history-grid">
+        <article class="payroll-cycle-panel">
+          <div class="panel-heading">
+            <h2>Upload Cycles</h2>
+            <span id="cyclePageLabel">Page 1 of 1</span>
+          </div>
+
+          <div id="cycleList" class="cycle-list">
+            <p class="state-message">Loading payroll upload cycles...</p>
+          </div>
+
+          <div class="panel-pagination">
+            <button type="button" class="btn-action" id="cyclePrevBtn">Previous</button>
+            <button type="button" class="btn-action" id="cycleNextBtn">Next</button>
+          </div>
+        </article>
+
+        <article class="payroll-detail-panel">
+          <div id="cycleDetailsEmpty" class="state-message">Select an upload cycle to view matched and unmatched row details.</div>
+
+          <div id="cycleDetailsContent" class="hidden">
+            <header class="detail-header">
+              <div>
+                <h2 id="detailCycleTitle">Cycle</h2>
+                <p id="detailCycleMeta">-</p>
+              </div>
+              <div class="detail-header-actions">
+                <a id="detailSourceFile" class="btn-action btn-history-source" href="#" target="_blank" rel="noopener noreferrer">Source File</a>
+                <button type="button" id="detailExportXlsxBtn" class="btn-action btn-history-export hidden">Export XLSX</button>
+                <button type="button" id="detailEditMonthBtn" class="btn-action btn-history-edit hidden">Edit Month</button>
+                <a id="detailPaymentRegisterFile" class="btn-action btn-history-register hidden" href="#" target="_blank" rel="noopener noreferrer">Payment Register PDF</a>
+              </div>
+            </header>
+
+            <section class="detail-summary" id="detailSummary"></section>
+
+            <section class="detail-filters">
+              <div class="status-tabs" role="tablist" aria-label="Entry status filter">
+                <button type="button" class="status-tab active" data-status="all">All</button>
+                <button type="button" class="status-tab" data-status="matched">Matched</button>
+                <button type="button" class="status-tab" data-status="unmatched">Unmatched</button>
+              </div>
+
+              <input type="text" id="detailSearch" placeholder="Supplier no, beneficiary, file no..." />
+              <button type="button" class="btn-action" id="detailRefreshBtn">Refresh</button>
+            </section>
+
+            <div class="detail-table-wrap">
+              <table class="detail-table">
+                <thead>
+                  <tr>
+                    <th>Supplier Number</th>
+                    <th>Beneficiary (Upload)</th>
+                    <th>Amount (UGX)</th>
+                    <th>Status</th>
+                    <th>Matched File</th>
+                    <th>Registry Name</th>
+                    <th>Reason</th>
+                  </tr>
+                </thead>
+                <tbody id="detailTableBody">
+                  <tr><td colspan="7">Loading cycle details...</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="panel-pagination">
+              <span id="detailPageLabel">Page 1 of 1</span>
+              <button type="button" class="btn-action" id="detailPrevBtn">Previous</button>
+              <button type="button" class="btn-action" id="detailNextBtn">Next</button>
+            </div>
+          </div>
+        </article>
+      </section>
+    </section>
+  </main>
+
+  <div id="replaceCycleModal" class="payroll-modal hidden" role="dialog" aria-modal="true" aria-labelledby="replaceCycleTitle">
+    <div class="payroll-modal-panel">
+      <header class="payroll-modal-header">
+        <h3 id="replaceCycleTitle">Replace Payroll Cycle</h3>
+        <button type="button" class="payroll-modal-close" id="replaceCycleCloseBtn" aria-label="Close">&times;</button>
+      </header>
+      <div class="payroll-modal-body">
+        <p class="replace-cycle-note">
+          Upload a corrected payroll file to replace the selected cycle. The cycle period is retained and rows are re-matched to registry records.
+        </p>
+        <div id="replaceCycleContext" class="replace-cycle-context"></div>
+
+        <form id="replaceCycleForm" class="replace-cycle-form" novalidate>
+          <input type="hidden" id="replaceCycleId" name="cycle_id" />
+
+          <label for="replacePayrollFile">Replacement Payroll File (.csv, .xlsx, .xlxl)</label>
+          <input type="file" id="replacePayrollFile" name="payroll_file" accept=".csv,.xlsx,.xlxl" required />
+
+          <label for="replacePaymentRegisterFile">Replacement Payment Register (.pdf) <span>(Optional)</span></label>
+          <input type="file" id="replacePaymentRegisterFile" name="payment_register_file" accept=".pdf" />
+
+          <div class="replace-cycle-actions">
+            <button type="button" class="btn-action btn-secondary" id="replaceCycleDownloadTemplateBtn">Download Template</button>
+            <button type="button" class="btn-action btn-neutral" id="replaceCycleCancelBtn">Cancel</button>
+            <button type="submit" class="btn-action btn-replace" id="replaceCycleSubmitBtn">Replace Payroll</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="editCyclePeriodModal" class="payroll-modal hidden" role="dialog" aria-modal="true" aria-labelledby="editCyclePeriodTitle">
+    <div class="payroll-modal-panel">
+      <header class="payroll-modal-header">
+        <h3 id="editCyclePeriodTitle">Edit Payroll Month</h3>
+        <button type="button" class="payroll-modal-close" id="editCyclePeriodCloseBtn" aria-label="Close">&times;</button>
+      </header>
+      <div class="payroll-modal-body">
+        <p class="replace-cycle-note">
+          Update the payroll month/year for this upload cycle. Financial year and quarter are recalculated automatically.
+        </p>
+        <div id="editCyclePeriodContext" class="replace-cycle-context"></div>
+
+        <form id="editCyclePeriodForm" class="replace-cycle-form" novalidate>
+          <input type="hidden" id="editCyclePeriodId" name="cycle_id" />
+
+          <label for="editCyclePayrollYear">Payroll Year</label>
+          <input type="number" id="editCyclePayrollYear" name="payroll_year" min="2000" max="2100" required />
+
+          <label for="editCyclePayrollMonth">Payroll Month</label>
+          <select id="editCyclePayrollMonth" name="payroll_month" required>
+            <option value="1">January</option>
+            <option value="2">February</option>
+            <option value="3">March</option>
+            <option value="4">April</option>
+            <option value="5">May</option>
+            <option value="6">June</option>
+            <option value="7">July</option>
+            <option value="8">August</option>
+            <option value="9">September</option>
+            <option value="10">October</option>
+            <option value="11">November</option>
+            <option value="12">December</option>
+          </select>
+
+          <div class="replace-cycle-actions">
+            <button type="button" class="btn-action btn-neutral" id="editCyclePeriodCancelBtn">Cancel</button>
+            <button type="submit" class="btn-action btn-history-edit" id="editCyclePeriodSubmitBtn">Save Month</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+
+
+

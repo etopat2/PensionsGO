@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
+  <title>Claims & Arrears - PensionsGo</title>
+  <link rel="stylesheet" href="css/color-variables.css?v=20260504a" />
+  <link rel="stylesheet" href="css/styles.css?v=20260507c" />
+  <link rel="stylesheet" href="css/profile.css?v=20260504a" />
+  <link rel="stylesheet" href="css/menu.css?v=20260504d" />
+  <link rel="stylesheet" href="css/overlay.css?v=20260504a" />
+  <link rel="stylesheet" href="css/claims.css?v=20260504a" />
+</head>
+<body>
+  <main class="claims-wrapper">
+    <div class="claims-header">
+      <div>
+        <h2>Claims & Arrears Dashboard</h2>
+        <p class="claims-subtitle">
+          Track pension arrears, payments, suspension saved amounts, and strategic estate/full pension indicators.
+        </p>
+      </div>
+      <div class="claims-actions">
+        <a class="claims-link-btn" href="claim_form.html">New Claim Entry</a>
+        <button class="claims-btn" id="openClaimsPaymentModalBtn" type="button">Record Payment</button>
+        <button class="claims-btn" id="openClaimsBulkPaymentModalBtn" type="button">Upload Payments</button>
+        <button class="claims-btn" id="openGratuityScheduleUploadModalBtn" type="button">Upload Gratuity Schedule</button>
+        <button class="claims-btn" id="openSuspensionUploadModalBtn" type="button">Upload Suspended Amounts</button>
+        <button class="claims-btn" id="openClaimsExportFilterBtn" type="button">Arrears Export Builder</button>
+        <a class="claims-link-btn" href="budgeting.html">Budget Forecast</a>
+        <div class="claims-collapse-all">
+          <button class="claims-btn" id="claimsCollapseAllBtn" type="button">Collapse All</button>
+          <button class="claims-btn" id="claimsExpandAllBtn" type="button">Expand All</button>
+        </div>
+        <button class="claims-btn" id="refreshClaimsBtn" type="button">Refresh</button>
+      </div>
+    </div>
+
+    <section id="claimsFeedback" class="claims-toast" style="display:none;"></section>
+
+    <section class="claims-filter-row">
+      <input id="claimsSearchInput" list="claimsSearchList" type="text" placeholder="Search by file number, name, or supplier number..." />
+      <datalist id="claimsSearchList"></datalist>
+      <select id="claimsTypeFilter">
+        <option value="">All Claim Types</option>
+      </select>
+      <select id="claimsStatusFilter">
+        <option value="">All Statuses</option>
+        <option value="Pending">Pending</option>
+        <option value="Partially Paid">Partially Paid</option>
+        <option value="Paid">Paid</option>
+        <option value="Waived">Waived</option>
+      </select>
+      <select id="claimsClaimStatusFilter">
+        <option value="">All Claim Status</option>
+        <option value="Complete">Complete</option>
+        <option value="Incomplete">Incomplete</option>
+        <option value="Invalid">Invalid</option>
+        <option value="Valid">Valid</option>
+      </select>
+      <select id="claimsYearFilter">
+        <option value="">All Years</option>
+      </select>
+      <select id="claimsQuarterFilter">
+        <option value="">All Quarters</option>
+        <option value="Q1">Q1</option>
+        <option value="Q2">Q2</option>
+        <option value="Q3">Q3</option>
+        <option value="Q4">Q4</option>
+      </select>
+    </section>
+    <section id="claimsBeneficiarySummary" class="claims-beneficiary-summary" style="display:none;">
+      <div class="claims-beneficiary-header">
+        <h4 id="claimsBeneficiaryName">Beneficiary</h4>
+        <span id="claimsBeneficiaryRegNo" class="claims-badge"></span>
+      </div>
+      <div class="claims-beneficiary-grid">
+        <div><strong>Supplier No.</strong><span id="claimsBeneficiarySupplier">-</span></div>
+        <div><strong>Contact</strong><span id="claimsBeneficiaryContact">-</span></div>
+        <div><strong>District of Residence</strong><span id="claimsBeneficiaryAddress">-</span></div>
+        <div><strong>Outstanding</strong><span id="claimsBeneficiaryOutstanding">UGX 0.00</span></div>
+      </div>
+    </section>
+
+    <section id="claimsSummaryCards" class="claims-card-grid"></section>
+
+    <section class="claims-layout-two">
+      <article class="claims-panel" data-collapsible="true">
+        <header class="claims-panel-head">
+          <div>
+            <h3>By Claim Type</h3>
+            <span class="claims-panel-muted">Expected vs paid trend</span>
+          </div>
+          <div class="claims-panel-tools">
+            <button class="claims-btn claims-collapse-btn" type="button" data-collapse-btn>Collapse</button>
+          </div>
+        </header>
+        <div class="claims-panel-body">
+          <div id="claimsByTypeBars" class="claims-type-bars"></div>
+        </div>
+      </article>
+
+      <article class="claims-panel" data-collapsible="true">
+        <header class="claims-panel-head">
+          <div>
+            <h3>Quarterly / Yearly Aggregation</h3>
+            <span class="claims-panel-muted">Financial period totals</span>
+          </div>
+          <div class="claims-panel-tools">
+            <button class="claims-btn claims-export-btn claims-export-xlsx" type="button" data-claims-export="xlsx" data-table-target="claimsPeriodTable" data-export-title="Claims Period Aggregation">Export XLSX</button>
+            <button class="claims-btn claims-export-btn claims-export-pdf" type="button" data-claims-export="pdf" data-table-target="claimsPeriodTable" data-export-title="Claims Period Aggregation">Export PDF</button>
+            <button class="claims-btn claims-collapse-btn" type="button" data-collapse-btn>Collapse</button>
+          </div>
+        </header>
+        <div class="claims-panel-body">
+          <div class="claims-table-wrap">
+            <table class="claims-table" id="claimsPeriodTable">
+              <thead>
+                <tr>
+                  <th>Period</th>
+                  <th>Entries</th>
+                  <th>Expected</th>
+                  <th>Paid</th>
+                  <th>Balance</th>
+                </tr>
+              </thead>
+              <tbody id="claimsPeriodTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="claims-layout-two" style="margin-top:0.75rem;">
+      <article class="claims-panel" data-collapsible="true">
+        <header class="claims-panel-head">
+          <div>
+            <h3>Balance Composition</h3>
+            <span class="claims-panel-muted">Stacked view by claim type</span>
+          </div>
+          <div class="claims-panel-tools">
+            <button class="claims-btn claims-collapse-btn" type="button" data-collapse-btn>Collapse</button>
+          </div>
+        </header>
+        <div class="claims-panel-body">
+          <div id="execStackedBar" class="claims-stacked-bar"></div>
+          <div id="execStackedLegend" class="claims-stacked-legend"></div>
+        </div>
+      </article>
+
+      <article class="claims-panel" data-collapsible="true" data-collapsed="true">
+        <header class="claims-panel-head">
+          <div>
+            <h3>Quarter Trend</h3>
+            <span class="claims-panel-muted">Mini cards for latest quarters</span>
+          </div>
+          <div class="claims-panel-tools">
+            <button class="claims-btn claims-collapse-btn" type="button" data-collapse-btn>Collapse</button>
+          </div>
+        </header>
+        <div class="claims-panel-body">
+          <div id="execMiniTrends" class="claims-mini-trends"></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="claims-panel" id="strategicClaimsPanel" data-collapsible="true" data-collapsed="true" style="margin-top:0.75rem; display:none;">
+      <header class="claims-panel-head">
+        <div>
+          <h3>Estate Expiry & Full Pension Due</h3>
+          <span class="claims-panel-muted">Visible to Admin / OC / Deputy OC</span>
+        </div>
+        <div class="claims-panel-tools">
+          <button class="claims-btn claims-collapse-btn" type="button" data-collapse-btn>Collapse</button>
+        </div>
+      </header>
+      <div class="claims-panel-body">
+        <div class="claims-strategic-grid">
+          <article class="claims-strategic-card">
+            <h4>Estate Expiry</h4>
+            <div class="claims-strategic-totals">
+              <span>Total: <strong id="estateExpiredTotal">0</strong></span>
+              <span>Male: <strong id="estateExpiredMale">0</strong></span>
+              <span>Female: <strong id="estateExpiredFemale">0</strong></span>
+            </div>
+            <div class="claims-panel-tools" style="margin-top:0.55rem;">
+              <button class="claims-btn claims-export-btn claims-export-xlsx" type="button" data-claims-export="xlsx" data-table-target="estateExpiredTable" data-export-title="Estate Expiry Claims Report">Export XLSX</button>
+              <button class="claims-btn claims-export-btn claims-export-pdf" type="button" data-claims-export="pdf" data-table-target="estateExpiredTable" data-export-title="Estate Expiry Claims Report">Export PDF</button>
+            </div>
+            <div class="claims-table-wrap" style="margin-top:0.55rem;">
+              <table class="claims-table" id="estateExpiredTable">
+                <thead>
+                  <tr>
+                    <th>File Number</th>
+                    <th>Name</th>
+                    <th>Date of Death</th>
+                    <th>Estate Expiry Date</th>
+                  </tr>
+                </thead>
+                <tbody id="estateExpiredRows"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="claims-strategic-card">
+            <h4>Due for Full Pension</h4>
+            <div class="claims-strategic-totals">
+              <span>Total: <strong id="fullPensionDueTotal">0</strong></span>
+              <span>Male: <strong id="fullPensionDueMale">0</strong></span>
+              <span>Female: <strong id="fullPensionDueFemale">0</strong></span>
+            </div>
+            <div class="claims-panel-tools" style="margin-top:0.55rem;">
+              <button class="claims-btn claims-export-btn claims-export-xlsx" type="button" data-claims-export="xlsx" data-table-target="fullPensionDueTable" data-export-title="Full Pension Due Claims Report">Export XLSX</button>
+              <button class="claims-btn claims-export-btn claims-export-pdf" type="button" data-claims-export="pdf" data-table-target="fullPensionDueTable" data-export-title="Full Pension Due Claims Report">Export PDF</button>
+            </div>
+            <div class="claims-table-wrap" style="margin-top:0.55rem;">
+              <table class="claims-table" id="fullPensionDueTable">
+                <thead>
+                  <tr>
+                    <th>File Number</th>
+                    <th>Name</th>
+                    <th>Retirement Label</th>
+                    <th>Date On 15 Years</th>
+                  </tr>
+                </thead>
+                <tbody id="fullPensionDueRows"></tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="claims-panel" data-collapsible="true" style="margin-top:0.75rem;">
+      <header class="claims-panel-head">
+        <div>
+          <h3>Arrears Ledger</h3>
+          <span class="claims-panel-muted" id="claimsLedgerMeta">Latest records</span>
+        </div>
+        <div class="claims-panel-tools">
+          <button class="claims-btn claims-export-btn claims-export-xlsx" type="button" data-claims-export="xlsx" data-table-target="claimsLedgerTable" data-export-title="Claims Arrears Ledger">Export XLSX</button>
+          <button class="claims-btn claims-export-btn claims-export-pdf" type="button" data-claims-export="pdf" data-table-target="claimsLedgerTable" data-export-title="Claims Arrears Ledger">Export PDF</button>
+          <button class="claims-btn claims-collapse-btn" type="button" data-collapse-btn>Collapse</button>
+        </div>
+      </header>
+      <div class="claims-panel-body">
+        <div class="claims-table-wrap">
+          <table class="claims-table" id="claimsLedgerTable">
+            <thead>
+              <tr>
+                <th>File No.</th>
+                <th>Title</th>
+                <th>Name</th>
+                <th>Claim Type</th>
+                <th>Period</th>
+                <th>Status</th>
+                <th>Claim Status</th>
+                <th>Accountability</th>
+                <th>Expected</th>
+                <th>Paid</th>
+                <th>Balance</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="claimsLedgerTableBody"></tbody>
+          </table>
+        </div>
+        <div class="claims-pagination">
+          <button class="claims-btn" type="button" id="claimsPrevPageBtn">Previous</button>
+          <span class="claims-page-indicator" id="claimsPageIndicator">Page 1</span>
+          <button class="claims-btn" type="button" id="claimsNextPageBtn">Next</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="claims-panel" data-collapsible="true" data-collapsed="true" style="margin-top:0.75rem;">
+      <header class="claims-panel-head">
+        <div>
+          <h3>Recent Payments</h3>
+          <span class="claims-panel-muted">Review, correct, or deregister payment entries</span>
+        </div>
+        <div class="claims-panel-tools">
+          <button class="claims-btn claims-export-btn claims-export-xlsx" type="button" data-claims-export="xlsx" data-table-target="claimsPaymentsTable" data-export-title="Claims Recent Payments">Export XLSX</button>
+          <button class="claims-btn claims-export-btn claims-export-pdf" type="button" data-claims-export="pdf" data-table-target="claimsPaymentsTable" data-export-title="Claims Recent Payments">Export PDF</button>
+          <button class="claims-btn claims-collapse-btn" type="button" data-collapse-btn>Collapse</button>
+        </div>
+      </header>
+      <div class="claims-panel-body">
+        <div class="claims-table-wrap">
+          <table class="claims-table" id="claimsPaymentsTable">
+            <thead>
+              <tr>
+                <th>Payment Date</th>
+                <th>File No.</th>
+                <th>Title</th>
+                <th>Name</th>
+                <th>Claim Type</th>
+                <th>Amount</th>
+                <th>Accountability</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="claimsPaymentsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="claims-panel" data-collapsible="true" data-collapsed="true" style="margin-top:0.75rem;">
+      <header class="claims-panel-head">
+        <div>
+          <h3>Suspension Upload History</h3>
+          <span class="claims-panel-muted">Track suspended payroll amounts saved outside the arrears claims ledger.</span>
+        </div>
+        <div class="claims-panel-tools">
+          <button class="claims-btn claims-export-btn claims-export-xlsx" type="button" data-claims-export="xlsx" data-table-target="claimsSuspensionCyclesTable" data-export-title="Claims Suspension Upload History">Export XLSX</button>
+          <button class="claims-btn claims-export-btn claims-export-pdf" type="button" data-claims-export="pdf" data-table-target="claimsSuspensionCyclesTable" data-export-title="Claims Suspension Upload History">Export PDF</button>
+          <button class="claims-btn claims-collapse-btn" type="button" data-collapse-btn>Collapse</button>
+        </div>
+      </header>
+      <div class="claims-panel-body">
+        <div class="claims-table-wrap">
+          <table class="claims-table" id="claimsSuspensionCyclesTable">
+            <thead>
+              <tr>
+                <th>Period</th>
+                <th>Reason Summary</th>
+                <th>Rows</th>
+                <th>Matched</th>
+                <th>Unmatched</th>
+                <th>Saved Amount</th>
+                <th>Uploaded At</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="suspensionCyclesTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="claims-panel" data-collapsible="true" data-collapsed="true" style="margin-top:0.75rem;">
+      <header class="claims-panel-head">
+        <div>
+          <h3>Monthly Gratuity Schedule Analysis</h3>
+          <span class="claims-panel-muted">Track monthly gratuity schedules, pension-arrears coverage, and remaining gaps.</span>
+        </div>
+        <div class="claims-panel-tools">
+          <button class="claims-btn claims-export-btn claims-export-xlsx" type="button" data-claims-export="xlsx" data-table-target="claimsGratuityCyclesTable" data-export-title="Claims Monthly Gratuity Schedule History">Export XLSX</button>
+          <button class="claims-btn claims-export-btn claims-export-pdf" type="button" data-claims-export="pdf" data-table-target="claimsGratuityCyclesTable" data-export-title="Claims Monthly Gratuity Schedule History">Export PDF</button>
+          <button class="claims-btn claims-collapse-btn" type="button" data-collapse-btn>Collapse</button>
+        </div>
+      </header>
+      <div class="claims-panel-body">
+        <div class="claims-table-wrap">
+          <table class="claims-table" id="claimsGratuityCyclesTable">
+            <thead>
+              <tr>
+                <th>Period</th>
+                <th>Rows</th>
+                <th>Matched</th>
+                <th>Gratuity Component</th>
+                <th>Pension Allocation</th>
+                <th>Unallocated</th>
+                <th>Uploaded At</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="gratuityScheduleCyclesTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="claims-modal-overlay" id="claimsPaymentModal">
+    <div class="claims-modal">
+      <header class="claims-modal-header">
+        <h3 id="claimsPaymentModalTitle">Record Arrears Payment</h3>
+      </header>
+      <div class="claims-modal-body">
+        <form id="claimsPaymentForm" class="claims-form-grid">
+          <input type="hidden" id="paymentIdInput" />
+          <input type="hidden" id="paymentRegNo" />
+          <div class="claims-col-span-2">
+            <label for="paymentBeneficiaryDisplay">Beneficiary (File No. - Name)</label>
+            <input id="paymentBeneficiaryDisplay" list="claimsPaymentBeneficiaryList" type="text" placeholder="Type file number or name..." />
+            <datalist id="claimsPaymentBeneficiaryList"></datalist>
+          </div>
+          <div>
+            <label for="paymentClaimType">Claim Type</label>
+            <select id="paymentClaimType">
+              <option value="Pension Arrears">Pension Arrears</option>
+              <option value="Gratuity Arrears">Gratuity Arrears</option>
+              <option value="Full Pension">Full Pension</option>
+              <option value="Full Pension Arrears">Full Pension Arrears</option>
+              <option value="Pension and Gratuity Arrears">Pension and Gratuity Arrears</option>
+              <option value="Underpayment Claim">Underpayment Claim</option>
+            </select>
+          </div>
+          <div>
+            <label for="paymentAmountInput">Amount (UGX)</label>
+            <input id="paymentAmountInput" type="number" min="1" step="0.01" required data-money-input data-money-fixed-decimals="2" />
+          </div>
+          <div>
+            <label for="paymentDateInput">Payment Date</label>
+            <input id="paymentDateInput" type="date" required />
+          </div>
+          <div>
+            <label for="paymentRefInput">Reference Number</label>
+            <input id="paymentRefInput" type="text" maxlength="120" />
+          </div>
+          <div>
+            <label for="paymentNotesInput">Notes</label>
+            <input id="paymentNotesInput" type="text" maxlength="255" />
+          </div>
+          <div class="claims-col-span-2">
+            <div class="claims-inline-note">
+              If payment falls outside the financial year in which any arrears accrued, the system will mark it for accountability submission automatically.
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="claims-modal-footer">
+        <button class="claims-btn" id="closePaymentModalBtn" type="button">Cancel</button>
+        <button class="claims-btn claims-btn-primary" id="savePaymentBtn" type="button">Save Payment</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="claims-modal-overlay" id="claimsBulkPaymentModal">
+    <div class="claims-modal">
+      <header class="claims-modal-header">
+        <h3>Upload Bulk Payment Records</h3>
+      </header>
+      <div class="claims-modal-body">
+        <form id="claimsBulkPaymentForm" class="claims-form-grid" enctype="multipart/form-data">
+          <div class="claims-col-span-2">
+            <div class="claims-inline-note">
+              Upload CSV or XLSX with supplier-number matched payment rows. Supported columns include Supplier Number, Claim Type, Amount, Payment Date, Reference Number, and Notes.
+            </div>
+          </div>
+          <div class="claims-col-span-2">
+            <label for="claimsBulkPaymentFileInput">Payment File (.csv / .xlsx)</label>
+            <input id="claimsBulkPaymentFileInput" type="file" accept=".csv,.xlsx,.xlxl" />
+          </div>
+          <div class="claims-col-span-2 claims-inline-actions">
+            <button class="claims-btn" id="downloadBulkPaymentTemplateBtn" type="button">Download Template</button>
+          </div>
+          <div>
+            <label for="claimsBulkPaymentDefaultDate">Default Payment Date</label>
+            <input id="claimsBulkPaymentDefaultDate" type="date" />
+          </div>
+          <div>
+            <label for="claimsBulkPaymentDefaultType">Default Claim Type</label>
+            <select id="claimsBulkPaymentDefaultType">
+              <option value="Pension Arrears">Pension Arrears</option>
+              <option value="Gratuity Arrears">Gratuity Arrears</option>
+              <option value="Full Pension">Full Pension</option>
+              <option value="Full Pension Arrears">Full Pension Arrears</option>
+              <option value="Pension and Gratuity Arrears">Pension and Gratuity Arrears</option>
+              <option value="Underpayment Claim">Underpayment Claim</option>
+            </select>
+          </div>
+        </form>
+      </div>
+      <div class="claims-modal-footer">
+        <button class="claims-btn" id="closeBulkPaymentModalBtn" type="button">Cancel</button>
+        <button class="claims-btn claims-btn-primary" id="saveBulkPaymentBtn" type="button">Upload Payments</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="claims-modal-overlay" id="claimsEditEntryModal">
+    <div class="claims-modal">
+      <header class="claims-modal-header">
+        <h3>Edit Arrears Record</h3>
+      </header>
+      <div class="claims-modal-body">
+        <form id="claimsEditEntryForm" class="claims-form-grid">
+          <input type="hidden" id="editLedgerId" />
+          <div class="claims-col-span-2">
+            <label for="editBeneficiaryDisplay">Beneficiary</label>
+            <input id="editBeneficiaryDisplay" type="text" readonly />
+          </div>
+          <div>
+            <label for="editClaimTypeInput">Claim Type</label>
+            <select id="editClaimTypeInput">
+              <option value="Pension Arrears">Pension Arrears</option>
+              <option value="Gratuity Arrears">Gratuity Arrears</option>
+              <option value="Full Pension">Full Pension</option>
+              <option value="Full Pension Arrears">Full Pension Arrears</option>
+              <option value="Pension and Gratuity Arrears">Pension and Gratuity Arrears</option>
+              <option value="Underpayment Claim">Underpayment Claim</option>
+            </select>
+          </div>
+          <div>
+            <label for="editExpectedAmountInput">Expected Amount (UGX)</label>
+            <input id="editExpectedAmountInput" type="number" min="0" step="0.01" data-money-input data-money-fixed-decimals="2" />
+          </div>
+          <div>
+            <label for="editPeriodYearInput">Period Year</label>
+            <input id="editPeriodYearInput" type="number" min="2000" max="2200" />
+          </div>
+          <div>
+            <label for="editPeriodMonthInput">Period Month</label>
+            <select id="editPeriodMonthInput">
+              <option value="1">January</option>
+              <option value="2">February</option>
+              <option value="3">March</option>
+              <option value="4">April</option>
+              <option value="5">May</option>
+              <option value="6">June</option>
+              <option value="7">July</option>
+              <option value="8">August</option>
+              <option value="9">September</option>
+              <option value="10">October</option>
+              <option value="11">November</option>
+              <option value="12">December</option>
+            </select>
+          </div>
+          <div>
+            <label for="editReasonInput">Reason</label>
+            <input id="editReasonInput" type="text" maxlength="255" />
+          </div>
+          <div class="claims-col-span-2">
+            <label for="editNotesInput">Notes</label>
+            <textarea id="editNotesInput" rows="3"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="claims-modal-footer">
+        <button class="claims-btn" id="closeEditEntryModalBtn" type="button">Cancel</button>
+        <button class="claims-btn claims-btn-primary" id="saveEditEntryBtn" type="button">Update Record</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="claims-modal-overlay" id="claimsSuspensionUploadModal">
+    <div class="claims-modal">
+      <header class="claims-modal-header">
+        <h3>Upload Suspended Amounts</h3>
+      </header>
+      <div class="claims-modal-body">
+        <form id="claimsSuspensionUploadForm" class="claims-form-grid" enctype="multipart/form-data">
+          <div>
+            <label for="claimsSuspensionYearInput">Year</label>
+            <input id="claimsSuspensionYearInput" type="number" min="2000" max="2200" />
+          </div>
+          <div>
+            <label for="claimsSuspensionMonthInput">Month</label>
+            <select id="claimsSuspensionMonthInput">
+              <option value="1">January</option>
+              <option value="2">February</option>
+              <option value="3">March</option>
+              <option value="4">April</option>
+              <option value="5">May</option>
+              <option value="6">June</option>
+              <option value="7">July</option>
+              <option value="8">August</option>
+              <option value="9">September</option>
+              <option value="10">October</option>
+              <option value="11">November</option>
+              <option value="12">December</option>
+            </select>
+          </div>
+          <div class="claims-col-span-2">
+            <label for="claimsSuspensionFileInput">Suspension File (.csv / .xlsx)</label>
+            <input id="claimsSuspensionFileInput" type="file" accept=".csv,.xlsx,.xlxl" />
+            <small class="claims-panel-muted">Required columns should include file number or supplier number, beneficiary name, amount, and a row-level reason for suspension.</small>
+          </div>
+          <div class="claims-col-span-2 claims-inline-actions">
+            <button class="claims-btn" id="downloadSuspensionUploadTemplateBtn" type="button">Download Template</button>
+          </div>
+          <div class="claims-col-span-2">
+            <label for="claimsSuspensionNotesInput">Notes</label>
+            <textarea id="claimsSuspensionNotesInput" rows="2"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="claims-modal-footer">
+        <button class="claims-btn" id="closeSuspensionUploadModalBtn" type="button">Cancel</button>
+        <button class="claims-btn claims-btn-primary" id="saveSuspensionUploadBtn" type="button">Upload File</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="claims-modal-overlay" id="claimsGratuityScheduleUploadModal">
+    <div class="claims-modal claims-upload-modal">
+      <header class="claims-modal-header">
+        <h3>Upload Monthly Gratuity Schedule</h3>
+      </header>
+      <div class="claims-modal-body">
+        <form id="claimsGratuityScheduleUploadForm" class="claims-form-grid" enctype="multipart/form-data">
+          <div class="claims-col-span-2">
+            <div class="claims-inline-note">
+              Upload the monthly gratuity schedule received from Public Service. The system will split each row into gratuity coverage, pension-arrears months covered, small surplus for review, and remaining arrears not yet scheduled.
+            </div>
+          </div>
+          <div>
+            <label for="claimsGratuityScheduleYearInput">Year</label>
+            <input id="claimsGratuityScheduleYearInput" type="number" min="2000" max="2200" />
+          </div>
+          <div>
+            <label for="claimsGratuityScheduleMonthInput">Month</label>
+            <select id="claimsGratuityScheduleMonthInput">
+              <option value="1">January</option>
+              <option value="2">February</option>
+              <option value="3">March</option>
+              <option value="4">April</option>
+              <option value="5">May</option>
+              <option value="6">June</option>
+              <option value="7">July</option>
+              <option value="8">August</option>
+              <option value="9">September</option>
+              <option value="10">October</option>
+              <option value="11">November</option>
+              <option value="12">December</option>
+            </select>
+          </div>
+          <div class="claims-col-span-2">
+            <label for="claimsGratuityScheduleFileInput">Schedule File (.csv / .xlsx)</label>
+            <input id="claimsGratuityScheduleFileInput" type="file" accept=".csv,.xlsx,.xlxl" />
+          </div>
+          <div class="claims-col-span-2 claims-inline-actions">
+            <button class="claims-btn" id="downloadGratuityScheduleTemplateBtn" type="button">Download Template</button>
+          </div>
+          <div class="claims-col-span-2">
+            <label for="claimsGratuityScheduleNotesInput">Notes</label>
+            <textarea id="claimsGratuityScheduleNotesInput" rows="3" placeholder="Optional notes about the schedule batch or reporting month."></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="claims-modal-footer">
+        <button class="claims-btn" id="closeGratuityScheduleUploadModalBtn" type="button">Cancel</button>
+        <button class="claims-btn claims-btn-primary" id="saveGratuityScheduleUploadBtn" type="button">Upload Schedule</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="claims-modal-overlay" id="claimsAccountabilityModal">
+    <div class="claims-modal">
+      <header class="claims-modal-header">
+        <h3>Submit Accountability</h3>
+      </header>
+      <div class="claims-modal-body">
+        <form id="claimsAccountabilityForm" class="claims-form-grid" enctype="multipart/form-data">
+          <input type="hidden" id="accountabilityPaymentId" />
+          <input type="hidden" id="accountabilityRegNo" />
+          <div class="claims-col-span-2">
+            <div class="claims-modal-summary">
+              <div><strong>Beneficiary</strong><span id="accountabilityBeneficiaryName">-</span></div>
+              <div><strong>File Number</strong><span id="accountabilityBeneficiaryRegNo">-</span></div>
+              <div><strong>Supplier Number</strong><span id="accountabilitySupplierNo">-</span></div>
+              <div><strong>Outstanding Balance</strong><span id="accountabilityOutstanding">UGX 0.00</span></div>
+            </div>
+          </div>
+          <div>
+            <label for="accountabilityClaimType">Arrears Type Paid</label>
+            <select id="accountabilityClaimType">
+              <option value="Pension Arrears">Pension Arrears</option>
+              <option value="Gratuity Arrears">Gratuity Arrears</option>
+              <option value="Full Pension">Full Pension</option>
+              <option value="Full Pension Arrears">Full Pension Arrears</option>
+              <option value="Pension and Gratuity Arrears">Pension and Gratuity Arrears</option>
+              <option value="Underpayment Claim">Underpayment Claim</option>
+            </select>
+          </div>
+          <div>
+            <label for="accountabilityPaymentFy">Payment Financial Year</label>
+            <input id="accountabilityPaymentFy" type="text" readonly />
+          </div>
+          <div class="claims-col-span-2">
+            <label for="accountabilityFiles">Filled Accountability Form(s)</label>
+            <input id="accountabilityFiles" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" />
+          </div>
+          <div class="claims-col-span-2">
+            <label for="accountabilityNotes">Notes</label>
+            <textarea id="accountabilityNotes" rows="3" placeholder="Add reference notes for the accountability pack."></textarea>
+          </div>
+          <div class="claims-col-span-2">
+            <div class="claims-inline-note claims-inline-note-warning">
+              Accountability is required because part or all of the settled arrears falls outside the payment financial year.
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="claims-modal-footer">
+        <button class="claims-btn" id="closeAccountabilityModalBtn" type="button">Cancel</button>
+        <button class="claims-btn claims-btn-primary" id="saveAccountabilityBtn" type="button">Submit Accountability</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="claims-modal-overlay" id="suspensionEntriesModal">
+    <div class="claims-modal" style="width:min(920px, 96vw);">
+      <header class="claims-modal-header">
+        <div>
+          <h3 id="suspensionEntriesTitle">Suspension Upload Entries</h3>
+        </div>
+        <div class="claims-panel-tools">
+          <button class="claims-btn claims-export-btn claims-export-xlsx" type="button" data-claims-export="xlsx" data-table-target="suspensionEntriesTable" data-export-title="Suspension Upload Entries">Export XLSX</button>
+          <button class="claims-btn claims-export-btn claims-export-pdf" type="button" data-claims-export="pdf" data-table-target="suspensionEntriesTable" data-export-title="Suspension Upload Entries">Export PDF</button>
+        </div>
+      </header>
+      <div class="claims-modal-body">
+        <div class="claims-table-wrap">
+          <table class="claims-table" id="suspensionEntriesTable">
+            <thead>
+              <tr>
+                <th>File No.</th>
+                <th>Supplier No.</th>
+                <th>Name</th>
+                <th>Amount</th>
+                <th>Reason</th>
+                <th>Matched</th>
+              </tr>
+            </thead>
+            <tbody id="suspensionEntriesBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="claims-modal-footer">
+        <button class="claims-btn" id="closeSuspensionEntriesBtn" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="claims-modal-overlay" id="gratuityScheduleEntriesModal">
+    <div class="claims-modal" style="width:min(1120px, 97vw);">
+      <header class="claims-modal-header">
+        <div>
+          <h3 id="gratuityScheduleEntriesTitle">Monthly Gratuity Schedule Detail</h3>
+          <p class="claims-panel-muted" id="gratuityScheduleEntriesSubtitle" style="margin:0;">Review row-by-row analysis and pension-arrears month allocations.</p>
+        </div>
+        <div class="claims-panel-tools">
+          <button class="claims-btn claims-export-btn claims-export-xlsx" type="button" data-claims-export="xlsx" data-table-target="gratuityScheduleEntriesTable" data-export-title="Monthly Gratuity Schedule Entries">Export Entries XLSX</button>
+          <button class="claims-btn claims-export-btn claims-export-pdf" type="button" data-claims-export="pdf" data-table-target="gratuityScheduleEntriesTable" data-export-title="Monthly Gratuity Schedule Entries">Export Entries PDF</button>
+          <button class="claims-btn claims-export-btn claims-export-xlsx" type="button" data-claims-export="xlsx" data-table-target="gratuityScheduleAllocationsTable" data-export-title="Monthly Gratuity Schedule Allocations">Export Allocations XLSX</button>
+          <button class="claims-btn claims-export-btn claims-export-pdf" type="button" data-claims-export="pdf" data-table-target="gratuityScheduleAllocationsTable" data-export-title="Monthly Gratuity Schedule Allocations">Export Allocations PDF</button>
+        </div>
+      </header>
+      <div class="claims-modal-body">
+        <div class="claims-modal-summary claims-modal-summary-wide">
+          <div><strong>Total Scheduled</strong><span id="gratuityScheduleSummaryTotal">UGX 0.00</span></div>
+          <div><strong>Matched Rows</strong><span id="gratuityScheduleSummaryMatched">0</span></div>
+          <div><strong>Gratuity Component</strong><span id="gratuityScheduleSummaryGratuity">UGX 0.00</span></div>
+          <div><strong>Pension Allocation</strong><span id="gratuityScheduleSummaryAllocated">UGX 0.00</span></div>
+          <div><strong>Unallocated</strong><span id="gratuityScheduleSummaryUnallocated">UGX 0.00</span></div>
+          <div><strong>Remaining Arrears</strong><span id="gratuityScheduleSummaryRemaining">UGX 0.00</span></div>
+        </div>
+
+        <p class="claims-panel-muted" style="margin:0.85rem 0 0.35rem;">Row analysis</p>
+        <div class="claims-table-wrap">
+          <table class="claims-table" id="gratuityScheduleEntriesTable">
+            <thead>
+              <tr>
+                <th>Row</th>
+                <th>File No.</th>
+                <th>Supplier No.</th>
+                <th>Name</th>
+                <th>Scheduled</th>
+                <th>Gratuity Est.</th>
+                <th>Monthly Pension</th>
+                <th>Classification</th>
+                <th>Months</th>
+                <th>Remaining</th>
+                <th>Note</th>
+              </tr>
+            </thead>
+            <tbody id="gratuityScheduleEntriesBody"></tbody>
+          </table>
+        </div>
+
+        <p class="claims-panel-muted" style="margin:0.85rem 0 0.35rem;">Pension-arrears month allocation</p>
+        <div class="claims-table-wrap">
+          <table class="claims-table" id="gratuityScheduleAllocationsTable">
+            <thead>
+              <tr>
+                <th>File No.</th>
+                <th>Name</th>
+                <th>Period</th>
+                <th>Allocated Amount</th>
+                <th>Monthly Pension</th>
+                <th>Status</th>
+                <th>Note</th>
+              </tr>
+            </thead>
+            <tbody id="gratuityScheduleAllocationsBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="claims-modal-footer">
+        <button class="claims-btn" id="closeGratuityScheduleEntriesBtn" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="claims-modal-overlay" id="claimsExportFilterModal">
+    <div class="claims-modal claims-export-modal" style="width:min(980px, 96vw);">
+      <header class="claims-modal-header">
+        <div>
+          <h3>Custom Arrears Export</h3>
+          <p class="claims-panel-muted" style="margin:0;">Build a tailored arrears summary and export it with exact filters.</p>
+        </div>
+        <button class="claims-modal-close" id="closeClaimsExportFilterBtnTop" type="button" aria-label="Close">
+          &times;
+        </button>
+      </header>
+      <div class="claims-modal-body">
+        <form id="claimsExportFilterForm" class="claims-form-grid">
+          <div class="claims-col-span-2">
+            <div class="claims-inline-note">
+              Use the filters below to focus on specific claim types, periods, pensioners, and retirement categories. Preview before exporting.
+            </div>
+          </div>
+          <div class="claims-col-span-2">
+            <label>Claim Types (Columns)</label>
+            <div class="claims-checkbox-grid" id="claimsExportClaimTypes">
+              <label><input type="checkbox" value="Pension Arrears" checked /> Pension Arrears</label>
+              <label><input type="checkbox" value="Gratuity Arrears" checked /> Gratuity Arrears</label>
+              <label><input type="checkbox" value="Full Pension" checked /> Full Pension</label>
+              <label><input type="checkbox" value="Full Pension Arrears" checked /> Full Pension Arrears</label>
+              <label><input type="checkbox" value="Pension and Gratuity Arrears" checked /> Pension and Gratuity Arrears</label>
+              <label><input type="checkbox" value="Underpayment Claim" checked /> Underpayment Claim</label>
+            </div>
+          </div>
+          <div>
+            <label for="claimsExportAggregationMode">Aggregation Mode</label>
+            <select id="claimsExportAggregationMode">
+              <option value="by_pensioner">By Pensioner</option>
+              <option value="by_pensioner_period">By Pensioner + Month</option>
+            </select>
+          </div>
+          <div>
+            <label for="claimsExportTypeMode">Column Mode</label>
+            <select id="claimsExportTypeMode">
+              <option value="by_type">Show Selected Claim Types</option>
+              <option value="total_only">Aggregate All Types</option>
+            </select>
+          </div>
+          <div id="claimsExportFinancialYearWrap">
+            <label for="claimsExportFinancialYear">Financial Year</label>
+            <select id="claimsExportFinancialYear">
+              <option value="">Select Financial Year</option>
+            </select>
+          </div>
+          <div id="claimsExportQuarterWrap">
+            <label for="claimsExportQuarter">Quarter</label>
+            <select id="claimsExportQuarter">
+              <option value="">Select Quarter</option>
+              <option value="Q1">Q1</option>
+              <option value="Q2">Q2</option>
+              <option value="Q3">Q3</option>
+              <option value="Q4">Q4</option>
+            </select>
+          </div>
+          <div id="claimsExportYearWrap">
+            <label for="claimsExportYear">Year</label>
+            <select id="claimsExportYear">
+              <option value="">Select Year</option>
+            </select>
+          </div>
+          <div id="claimsExportMonthWrap">
+            <label for="claimsExportMonth">Month</label>
+            <select id="claimsExportMonth">
+              <option value="">Select Month</option>
+              <option value="1">January</option>
+              <option value="2">February</option>
+              <option value="3">March</option>
+              <option value="4">April</option>
+              <option value="5">May</option>
+              <option value="6">June</option>
+              <option value="7">July</option>
+              <option value="8">August</option>
+              <option value="9">September</option>
+              <option value="10">October</option>
+              <option value="11">November</option>
+              <option value="12">December</option>
+            </select>
+          </div>
+          <div id="claimsExportFromYearWrap">
+            <label for="claimsExportFromYear">From Year</label>
+            <select id="claimsExportFromYear">
+              <option value="">Select Year</option>
+            </select>
+          </div>
+          <div id="claimsExportFromMonthWrap">
+            <label for="claimsExportFromMonth">From Month</label>
+            <select id="claimsExportFromMonth">
+              <option value="">Select Month</option>
+              <option value="1">January</option>
+              <option value="2">February</option>
+              <option value="3">March</option>
+              <option value="4">April</option>
+              <option value="5">May</option>
+              <option value="6">June</option>
+              <option value="7">July</option>
+              <option value="8">August</option>
+              <option value="9">September</option>
+              <option value="10">October</option>
+              <option value="11">November</option>
+              <option value="12">December</option>
+            </select>
+          </div>
+          <div id="claimsExportToYearWrap">
+            <label for="claimsExportToYear">To Year</label>
+            <select id="claimsExportToYear">
+              <option value="">Select Year</option>
+            </select>
+          </div>
+          <div id="claimsExportToMonthWrap">
+            <label for="claimsExportToMonth">To Month</label>
+            <select id="claimsExportToMonth">
+              <option value="">Select Month</option>
+              <option value="1">January</option>
+              <option value="2">February</option>
+              <option value="3">March</option>
+              <option value="4">April</option>
+              <option value="5">May</option>
+              <option value="6">June</option>
+              <option value="7">July</option>
+              <option value="8">August</option>
+              <option value="9">September</option>
+              <option value="10">October</option>
+              <option value="11">November</option>
+              <option value="12">December</option>
+            </select>
+          </div>
+          <div>
+            <label for="claimsExportPeriodScope">Period Scope</label>
+            <select id="claimsExportPeriodScope">
+              <option value="all">All Periods</option>
+              <option value="financial_year">Financial Year</option>
+              <option value="quarter">Quarter</option>
+              <option value="year">Year</option>
+              <option value="month">Month</option>
+              <option value="range">Month Range</option>
+            </select>
+          </div>
+          <div id="claimsExportPeriodValueWrap">
+            <label for="claimsExportPeriodValue">Select Period</label>
+            <select id="claimsExportPeriodValue">
+              <option value="">Select Period</option>
+            </select>
+          </div>
+          <div id="claimsExportPeriodRangeWrap" class="claims-col-span-2 claims-period-range">
+            <div>
+              <label for="claimsExportPeriodFrom">From Month</label>
+              <select id="claimsExportPeriodFrom">
+                <option value="">Start Month</option>
+              </select>
+            </div>
+            <div>
+              <label for="claimsExportPeriodTo">To Month</label>
+              <select id="claimsExportPeriodTo">
+                <option value="">End Month</option>
+              </select>
+            </div>
+          </div>
+          <div class="claims-col-span-2">
+            <label for="claimsExportSearch">Pensioner / File Search</label>
+            <input id="claimsExportSearch" type="text" placeholder="File number, name, or supplier number" />
+          </div>
+          <div>
+            <label for="claimsExportRetirementType">Retirement Type</label>
+            <select id="claimsExportRetirementType">
+              <option value="">All Types</option>
+              <option value="mandatory">Mandatory Retirement</option>
+              <option value="early">Early Retirement</option>
+              <option value="death">Death</option>
+              <option value="aor">Discharge (A.O.R)</option>
+              <option value="medical">Discharge (Medical)</option>
+              <option value="marriage">Discharge (Marriage)</option>
+              <option value="cbe">Discharge (C.B.E)</option>
+              <option value="ube">Discharge (U.B.E)</option>
+              <option value="public">Discharge (Public Interest)</option>
+              <option value="contract">End of Contract</option>
+              <option value="tx">Discharge (T.X)</option>
+              <option value="voluntary">Voluntary</option>
+              <option value="oldAge">Old Age</option>
+              <option value="abolition">Abolition of Office</option>
+            </select>
+          </div>
+          <div>
+            <label for="claimsExportLivingStatus">Living Status</label>
+            <select id="claimsExportLivingStatus">
+              <option value="">All</option>
+              <option value="Alive">Alive</option>
+              <option value="Deceased">Deceased</option>
+            </select>
+          </div>
+          <div class="claims-col-span-2">
+            <label>Record Status</label>
+            <div class="claims-checkbox-row" id="claimsExportStatus">
+              <label><input type="checkbox" value="Pending" checked /> Pending</label>
+              <label><input type="checkbox" value="Partially Paid" checked /> Partially Paid</label>
+              <label><input type="checkbox" value="Paid" /> Paid</label>
+              <label><input type="checkbox" value="Waived" /> Waived</label>
+            </div>
+          </div>
+          <div class="claims-col-span-2">
+            <label>Claim Status</label>
+            <div class="claims-checkbox-row" id="claimsExportClaimStatus">
+              <label><input type="checkbox" value="Complete" /> Complete</label>
+              <label><input type="checkbox" value="Incomplete" checked /> Incomplete</label>
+              <label><input type="checkbox" value="Invalid" /> Invalid</label>
+              <label><input type="checkbox" value="Valid" checked /> Valid</label>
+            </div>
+          </div>
+          <div class="claims-col-span-2">
+            <label>Extra Columns</label>
+            <div class="claims-checkbox-row" id="claimsExportExtraColumns">
+              <label><input type="checkbox" value="supplierNo" /> Supplier No</label>
+              <label><input type="checkbox" value="retirementType" /> Retirement Type</label>
+              <label><input type="checkbox" value="livingStatus" /> Living Status</label>
+            </div>
+          </div>
+          <div>
+            <label>Outstanding Filter</label>
+            <div class="claims-toggle-row">
+              <input id="claimsExportOutstandingOnly" type="checkbox" checked />
+              <span>Outstanding balances only</span>
+            </div>
+          </div>
+          <div>
+            <label>Subtotal Column</label>
+            <div class="claims-toggle-row">
+              <input id="claimsExportIncludeSubtotal" type="checkbox" checked />
+              <span>Include subtotal per pensioner</span>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="claims-modal-footer claims-modal-footer--dense">
+        <button class="claims-btn" id="closeClaimsExportFilterBtn" type="button">Close</button>
+        <button class="claims-btn" id="resetClaimsExportFiltersBtn" type="button">Reset</button>
+        <button class="claims-btn claims-btn-primary" id="previewClaimsExportBtn" type="button">Preview</button>
+        <button class="claims-btn claims-export-btn claims-export-xlsx" id="exportClaimsSummaryXlsxBtn" type="button">Export XLSX</button>
+        <button class="claims-btn claims-export-btn claims-export-pdf" id="exportClaimsSummaryPdfBtn" type="button">Export PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="claims-modal-overlay" id="claimsExportPreviewModal">
+    <div class="claims-modal claims-export-modal" style="width:min(1100px, 96vw);">
+      <header class="claims-modal-header">
+        <div>
+          <h3>Arrears Export Preview</h3>
+          <p class="claims-panel-muted" id="claimsExportPreviewMeta" style="margin:0;">Preview the filtered arrears summary before export.</p>
+        </div>
+        <button class="claims-modal-close" id="closeClaimsExportPreviewBtnTop" type="button" aria-label="Close">
+          &times;
+        </button>
+      </header>
+      <div class="claims-modal-body">
+        <div class="claims-table-wrap">
+          <table class="claims-table claims-export-preview" id="claimsExportPreviewTable">
+            <thead id="claimsExportPreviewHead"></thead>
+            <tbody id="claimsExportPreviewBody"></tbody>
+          </table>
+        </div>
+        <div class="claims-pagination claims-preview-pagination">
+          <button class="claims-btn" type="button" id="claimsExportPreviewPrevBtn">Previous</button>
+          <span class="claims-page-indicator" id="claimsExportPreviewPage">Page 1</span>
+          <button class="claims-btn" type="button" id="claimsExportPreviewNextBtn">Next</button>
+        </div>
+        <p class="claims-panel-muted" id="claimsExportPreviewNote" style="margin-top:0.6rem; display:none;"></p>
+      </div>
+      <div class="claims-modal-footer claims-modal-footer--dense">
+        <button class="claims-btn" id="closeClaimsExportPreviewBtn" type="button">Close</button>
+        <button class="claims-btn claims-export-btn claims-export-xlsx" id="exportClaimsSummaryXlsxBtnPreview" type="button">Export XLSX</button>
+        <button class="claims-btn claims-export-btn claims-export-pdf" id="exportClaimsSummaryPdfBtnPreview" type="button">Export PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js?v=20260528b"></script>
+  <script src="js/modules/retirement-types.js"></script>
+  <script src="js/claims.js?v=20260330a"></script>
+</body>
+</html>
+
+
+

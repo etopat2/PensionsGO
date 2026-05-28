@@ -3,16 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
   <title>Edit User - PensionsGo</title>
 
   <!-- Stylesheets -->
-  <link rel="stylesheet" href="css/menu.css">
-  <link rel="stylesheet" href="css/users.css">
-  <link rel="stylesheet" href="css/auth.css">
-  <link rel="stylesheet" href="css/color-variables.css">
-  <link rel="stylesheet" href="css/overlay.css">
-  <link rel="stylesheet" href="css/styles.css">  
-  <link rel="stylesheet" href="css/profile.css">
+  <link rel="stylesheet" href="css/menu.css?v=20260504d">
+  <link rel="stylesheet" href="css/users.css?v=20260504a">
+  <link rel="stylesheet" href="css/auth.css?v=20260504a">
+  <link rel="stylesheet" href="css/color-variables.css?v=20260504a">
+  <link rel="stylesheet" href="css/overlay.css?v=20260504a">
+  <link rel="stylesheet" href="css/styles.css?v=20260507c">  
+  <link rel="stylesheet" href="css/profile.css?v=20260504a">
 </head>
 
 <body>
@@ -55,7 +60,13 @@
               <option value="Mr.">Mr.</option>
               <option value="Mrs.">Mrs.</option>
               <option value="Ms.">Ms.</option>
+              <option value="Miss">Miss</option>
               <option value="Dr.">Dr.</option>
+              <option value="Prof.">Prof.</option>
+              <option value="Hon.">Hon.</option>
+              <option value="Rev.">Rev.</option>
+              <option value="Fr.">Fr.</option>
+              <option value="Sr.">Sr.</option>
             </select>
           </div>
 
@@ -72,14 +83,13 @@
           </div>
 
           <div class="form-group">
-            <label for="phoneNo">Phone Number (International Format)</label>
+            <label for="phoneNo">Phone Number</label>
             <input type="tel" id="phoneNo" name="phoneNo" 
-              placeholder="+256700123456"
-              pattern="^\+[1-9][0-9]{7,14}$"
-              title="Enter valid international number (e.g., +256700123456)"
+              placeholder="+256700123456 or 0770123456"
+              title="Enter international or local Uganda format (e.g., +256700123456, 0770123456, 0312123456, 0800123456)"
               required>
             <small style="display: block; margin-top: 0.3rem; color: var(--muted-color);">
-              Must be in international format, e.g. <b>+256700123456</b>
+              Accepted: international format and Uganda local format (e.g. <b>+256700123456</b>, <b>0770123456</b>, <b>0312123456</b>, <b>0800123456</b>).
             </small>
           </div>
         </div>
@@ -92,17 +102,6 @@
           <label for="userRole">User Role</label>
           <select id="userRole" name="userRole" required>
             <option value="">Select Role</option>
-            <option value="admin">Admin</option>
-            <option value="clerk">Clerk</option>
-            <option value="oc_pen">OC Pen</option>
-            <option value="writeup_officer">Writeup Officer</option>
-            <option value="file_creator">File Creator</option>
-            <option value="data_entry">Data Entry</option>
-            <option value="assessor">Assessor</option>
-            <option value="auditor">Auditor</option>
-            <option value="approver">Approver</option>
-            <option value="user">User</option>
-            <option value="pensioner">Pensioner</option>
           </select>
         </div>
       </div>
@@ -126,8 +125,8 @@
           <div class="form-group">
             <label for="confirmPassword">Confirm Password</label>
             <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Confirm new password">
-            <div id="passwordMatch" class="password-match">✓ Passwords match</div>
-            <div id="passwordMismatch" class="password-mismatch">✗ Passwords do not match</div>
+            <div id="passwordMatch" class="password-match">&#10003; Passwords match</div>
+            <div id="passwordMismatch" class="password-mismatch">&#10007; Passwords do not match</div>
           </div>
         </div>
       </div>
@@ -179,7 +178,10 @@
   </div>
 
   <!-- Footer dynamically inserted by main.js -->
-  <script type="module" src="js/main.js"></script>
+  <script type="module" src="js/main.js?v=20260528b"></script>
   <script src="js/edit_user.js"></script>
 </body>
 </html>
+
+
+

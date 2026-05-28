@@ -1,0 +1,215 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1250" viewBox="0 0 1800 1250" role="img" aria-labelledby="title desc">
+  <title id="title">UPS PensionsGo Real System Architecture</title>
+  <desc id="desc">Architecture diagram representing the actual PensionsGo codebase: browser/PWA client, frontend pages and modules, PHP API layer, security bootstrap, pension domain APIs, MySQL database schema groups, file storage, backups, logs, and future integration extension points.</desc>
+  <defs>
+    <style>
+      .bg { fill: #fbfaf7; }
+      .title { font: 700 34px Arial, sans-serif; fill: #6d1116; }
+      .subtitle { font: 400 17px Arial, sans-serif; fill: #4c4c4c; }
+      .layer { fill: #ffffff; stroke: #d8cfbd; stroke-width: 1.4; rx: 18; }
+      .layer-label { font: 700 18px Arial, sans-serif; fill: #6d1116; }
+      .box { fill: #ffffff; stroke: #b8a98d; stroke-width: 1.35; rx: 12; }
+      .box-public { fill: #f8f1df; stroke: #bf952d; stroke-width: 1.5; rx: 12; }
+      .box-client { fill: #f7f2ec; stroke: #b8a98d; stroke-width: 1.35; rx: 12; }
+      .box-security { fill: #f8e9eb; stroke: #9a2930; stroke-width: 1.5; rx: 12; }
+      .box-api { fill: #fffdf8; stroke: #b8a98d; stroke-width: 1.35; rx: 12; }
+      .box-data { fill: #edf5f9; stroke: #5b8198; stroke-width: 1.5; rx: 12; }
+      .box-store { fill: #eef5ed; stroke: #6f9568; stroke-width: 1.5; rx: 12; }
+      .box-future { fill: #f6f6f6; stroke: #777; stroke-width: 1.4; stroke-dasharray: 6 5; rx: 12; }
+      .box-title { font: 700 14.5px Arial, sans-serif; fill: #2d2d2d; }
+      .box-text { font: 400 12px Arial, sans-serif; fill: #424242; }
+      .tiny { font: 400 11px Arial, sans-serif; fill: #555; }
+      .count { font: 700 12px Arial, sans-serif; fill: #6d1116; }
+      .arrow { stroke: #6d1116; stroke-width: 2.2; fill: none; marker-end: url(#arrowhead); }
+      .arrow-muted { stroke: #70695f; stroke-width: 1.8; fill: none; marker-end: url(#arrow-muted); }
+      .arrow-dash { stroke: #777; stroke-width: 1.7; fill: none; stroke-dasharray: 7 5; marker-end: url(#arrow-grey); }
+      .pill { fill: #6d1116; rx: 15; }
+      .pill-text { font: 700 12px Arial, sans-serif; fill: #fff; }
+    </style>
+    <marker id="arrowhead" markerWidth="12" markerHeight="8" refX="10" refY="4" orient="auto">
+      <path d="M0,0 L12,4 L0,8 z" fill="#6d1116" />
+    </marker>
+    <marker id="arrow-muted" markerWidth="12" markerHeight="8" refX="10" refY="4" orient="auto">
+      <path d="M0,0 L12,4 L0,8 z" fill="#70695f" />
+    </marker>
+    <marker id="arrow-grey" markerWidth="12" markerHeight="8" refX="10" refY="4" orient="auto">
+      <path d="M0,0 L12,4 L0,8 z" fill="#777" />
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#000000" flood-opacity="0.10" />
+    </filter>
+  </defs>
+
+  <rect class="bg" width="1800" height="1250" />
+
+  <text class="title" x="900" y="54" text-anchor="middle">UPS PensionsGo Real System Architecture</text>
+  <text class="subtitle" x="900" y="84" text-anchor="middle">Functional PHP/MySQL web application with PWA client, pension workflow APIs, registry, claims, payroll, messaging, live chat, reporting, and governance tooling</text>
+
+  <rect class="layer" x="60" y="118" width="1680" height="104" filter="url(#shadow)" />
+  <text class="layer-label" x="86" y="150">User Roles and Access Channels</text>
+  <rect class="box-public" x="96" y="164" width="255" height="40" />
+  <text class="box-title" x="223.5" y="189" text-anchor="middle">Public Users</text>
+  <rect class="box-public" x="383" y="164" width="255" height="40" />
+  <text class="box-title" x="510.5" y="189" text-anchor="middle">Pensioners</text>
+  <rect class="box-public" x="670" y="164" width="255" height="40" />
+  <text class="box-title" x="797.5" y="189" text-anchor="middle">Operational Staff</text>
+  <rect class="box-public" x="957" y="164" width="255" height="40" />
+  <text class="box-title" x="1084.5" y="189" text-anchor="middle">Supervisors / Leadership</text>
+  <rect class="box-public" x="1244" y="164" width="255" height="40" />
+  <text class="box-title" x="1371.5" y="189" text-anchor="middle">Administrators</text>
+  <rect class="box-public" x="1531" y="164" width="173" height="40" />
+  <text class="box-title" x="1617.5" y="189" text-anchor="middle">Security Admin</text>
+
+  <path class="arrow" d="M900 222 L900 262" />
+
+  <rect class="layer" x="60" y="262" width="1680" height="185" filter="url(#shadow)" />
+  <text class="layer-label" x="86" y="294">Browser / Frontend Runtime</text>
+  <rect class="box-client" x="96" y="314" width="300" height="88" />
+  <text class="box-title" x="246" y="338" text-anchor="middle">41 HTML Screens</text>
+  <text class="box-text" x="116" y="362">Public, auth, dashboards, registry,</text>
+  <text class="box-text" x="116" y="382">claims, payroll, tasks, admin pages</text>
+  <rect class="box-client" x="425" y="314" width="300" height="88" />
+  <text class="box-title" x="575" y="338" text-anchor="middle">CSS and Visual Assets</text>
+  <text class="box-text" x="445" y="362">Responsive layouts, forms, dashboards,</text>
+  <text class="box-text" x="445" y="382">icons, images, audio notifications</text>
+  <rect class="box-client" x="754" y="314" width="300" height="88" />
+  <text class="box-title" x="904" y="338" text-anchor="middle">main.js Application Controller</text>
+  <text class="box-text" x="774" y="362">Session state, headers/footers, UI shell,</text>
+  <text class="box-text" x="774" y="382">device token, auth bridge, hard refresh</text>
+  <rect class="box-client" x="1083" y="314" width="300" height="88" />
+  <text class="box-title" x="1233" y="338" text-anchor="middle">10 Shared JS Modules</text>
+  <text class="box-text" x="1103" y="362">PWA, footer, header interactions,</text>
+  <text class="box-text" x="1103" y="382">UI feedback, selectors, live chat, session worker</text>
+  <rect class="box-client" x="1412" y="314" width="292" height="88" />
+  <text class="box-title" x="1558" y="338" text-anchor="middle">PWA Shell</text>
+  <text class="box-text" x="1432" y="362">manifest.webmanifest, service-worker.js,</text>
+  <text class="box-text" x="1432" y="382">offline.html, cache/version handling</text>
+
+  <rect class="box" x="365" y="415" width="1070" height="20" />
+  <text class="tiny" x="900" y="429" text-anchor="middle">Client-to-server communication: Fetch/AJAX JSON and FormData over same-origin HTTP/HTTPS using PHP session cookies, CSRF token, and X-Device-Token header</text>
+
+  <path class="arrow" d="M900 447 L900 487" />
+
+  <rect class="layer" x="60" y="487" width="1680" height="164" filter="url(#shadow)" />
+  <text class="layer-label" x="86" y="519">PHP Server Bootstrap, Security, and Shared Services</text>
+  <rect class="box-security" x="96" y="540" width="260" height="80" />
+  <text class="box-title" x="226" y="564" text-anchor="middle">backend/config.php</text>
+  <text class="box-text" x="116" y="588">DB connection, settings, security headers,</text>
+  <text class="box-text" x="116" y="607">self-migration/bootstrap helpers</text>
+  <rect class="box-security" x="385" y="540" width="260" height="80" />
+  <text class="box-title" x="515" y="564" text-anchor="middle">SessionManager / TimeoutManager</text>
+  <text class="box-text" x="405" y="588">Session lifecycle, timeout settings,</text>
+  <text class="box-text" x="405" y="607">device conflict and keep-alive checks</text>
+  <rect class="box-security" x="674" y="540" width="260" height="80" />
+  <text class="box-title" x="804" y="564" text-anchor="middle">Security Controls</text>
+  <text class="box-text" x="694" y="588">CSRF, origin validation, upload limits,</text>
+  <text class="box-text" x="694" y="607">admin reauth, file scanning hooks</text>
+  <rect class="box-security" x="963" y="540" width="260" height="80" />
+  <text class="box-title" x="1093" y="564" text-anchor="middle">Governance Services</text>
+  <text class="box-text" x="983" y="588">RBAC, role permissions, user overrides,</text>
+  <text class="box-text" x="983" y="607">audit/user/workflow logging</text>
+  <rect class="box-security" x="1252" y="540" width="220" height="80" />
+  <text class="box-title" x="1362" y="564" text-anchor="middle">Runtime Admin Tools</text>
+  <text class="box-text" x="1272" y="588">Backups, cleanup, analytics digest,</text>
+  <text class="box-text" x="1272" y="607">storage/message snapshots</text>
+  <rect class="box-security" x="1501" y="540" width="203" height="80" />
+  <text class="box-title" x="1602.5" y="564" text-anchor="middle">Versioning / PWA API</text>
+  <text class="box-text" x="1521" y="588">app_version.json, pwa_version.php,</text>
+  <text class="box-text" x="1521" y="607">update/cache fingerprinting</text>
+
+  <path class="arrow" d="M900 651 L900 691" />
+
+  <rect class="layer" x="60" y="691" width="1680" height="276" filter="url(#shadow)" />
+  <text class="layer-label" x="86" y="723">Backend API Surface: 264 PHP API Files Grouped by Domain</text>
+
+  <rect class="box-api" x="96" y="744" width="250" height="72" />
+  <text class="box-title" x="221" y="767" text-anchor="middle">Auth, Users, Roles</text>
+  <text class="box-text" x="116" y="790">login/logout, CSRF, sessions, users,</text>
+  <text class="box-text" x="116" y="808">roles, permissions, active sessions</text>
+  <rect class="box-api" x="375" y="744" width="250" height="72" />
+  <text class="box-title" x="500" y="767" text-anchor="middle">Staff Due &amp; App Workflow</text>
+  <text class="box-text" x="395" y="790">staff due, application queue/status,</text>
+  <text class="box-text" x="395" y="808">register/submit/update workflow</text>
+  <rect class="box-api" x="654" y="744" width="250" height="72" />
+  <text class="box-title" x="779" y="767" text-anchor="middle">Registry &amp; Documents</text>
+  <text class="box-text" x="674" y="790">file registry CRUD, imports, recycle bin,</text>
+  <text class="box-text" x="674" y="808">document upload/view/delete</text>
+  <rect class="box-api" x="933" y="744" width="250" height="72" />
+  <text class="box-title" x="1058" y="767" text-anchor="middle">File Movement</text>
+  <text class="box-text" x="953" y="790">record movement, return files, movement</text>
+  <text class="box-text" x="953" y="808">history, summaries, overdue custody</text>
+  <rect class="box-api" x="1212" y="744" width="250" height="72" />
+  <text class="box-title" x="1337" y="767" text-anchor="middle">Claims &amp; Arrears</text>
+  <text class="box-text" x="1232" y="790">arrears ledger, payments, accountability,</text>
+  <text class="box-text" x="1232" y="808">gratuity and suspension uploads</text>
+  <rect class="box-api" x="1491" y="744" width="213" height="72" />
+  <text class="box-title" x="1597.5" y="767" text-anchor="middle">Payroll</text>
+  <text class="box-text" x="1511" y="790">payroll cycles, CSV/PDF upload,</text>
+  <text class="box-text" x="1511" y="808">matching and audit logs</text>
+
+  <rect class="box-api" x="96" y="842" width="250" height="72" />
+  <text class="box-title" x="221" y="865" text-anchor="middle">Pensioner Service</text>
+  <text class="box-text" x="116" y="888">lookup, dashboard, life certificates,</text>
+  <text class="box-text" x="116" y="906">death reports, contact visibility</text>
+  <rect class="box-api" x="375" y="842" width="250" height="72" />
+  <text class="box-title" x="500" y="865" text-anchor="middle">Tasks &amp; Collaboration</text>
+  <text class="box-text" x="395" y="888">tasks, comments, delegation, alerts,</text>
+  <text class="box-text" x="395" y="906">completion queues, messages, live chat</text>
+  <rect class="box-api" x="654" y="842" width="250" height="72" />
+  <text class="box-title" x="779" y="865" text-anchor="middle">Dashboards &amp; Reports</text>
+  <text class="box-text" x="674" y="888">summary cards, exports, analytics,</text>
+  <text class="box-text" x="674" y="906">system status, data management</text>
+  <rect class="box-api" x="933" y="842" width="250" height="72" />
+  <text class="box-title" x="1058" y="865" text-anchor="middle">Content &amp; Feedback</text>
+  <text class="box-text" x="953" y="888">FAQ, terms, feedback management,</text>
+  <text class="box-text" x="953" y="906">podcast/videos, public settings</text>
+  <rect class="box-api" x="1212" y="842" width="250" height="72" />
+  <text class="box-title" x="1337" y="865" text-anchor="middle">Admin &amp; Reference Data</text>
+  <text class="box-text" x="1232" y="888">banks, titles, prison units, districts,</text>
+  <text class="box-text" x="1232" y="906">regions, app settings</text>
+  <rect class="box-api" x="1491" y="842" width="213" height="72" />
+  <text class="box-title" x="1597.5" y="865" text-anchor="middle">Import / Export</text>
+  <text class="box-text" x="1511" y="888">templates, bulk imports, XLS/PDF,</text>
+  <text class="box-text" x="1511" y="906">backup/restore artifacts</text>
+
+  <rect class="box" x="470" y="932" width="860" height="20" />
+  <text class="tiny" x="900" y="946" text-anchor="middle">Every API request enters through backend/api/*.php and includes backend/config.php for database access, security checks, settings, logging, and schema support.</text>
+
+  <path class="arrow" d="M900 967 L900 1007" />
+
+  <rect class="layer" x="60" y="1007" width="1680" height="145" filter="url(#shadow)" />
+  <text class="layer-label" x="86" y="1039">Persistence and Runtime Storage</text>
+  <rect class="box-data" x="96" y="1060" width="300" height="64" />
+  <text class="box-title" x="246" y="1083" text-anchor="middle">MySQL / MariaDB Schema</text>
+  <text class="box-text" x="116" y="1105">83 tables in database/schema.sql</text>
+  <rect class="box-data" x="425" y="1060" width="300" height="64" />
+  <text class="box-title" x="575" y="1083" text-anchor="middle">Core Pension Data</text>
+  <text class="box-text" x="445" y="1105">users, staff due, registry, tasks, app queue,</text>
+  <text class="box-text" x="445" y="1122">file movement, life certificates</text>
+  <rect class="box-data" x="754" y="1060" width="300" height="64" />
+  <text class="box-title" x="904" y="1083" text-anchor="middle">Financial / Service Data</text>
+  <text class="box-text" x="774" y="1105">claims, arrears, payments, payroll cycles,</text>
+  <text class="box-text" x="774" y="1122">gratuity, suspension, retained payments</text>
+  <rect class="box-data" x="1083" y="1060" width="300" height="64" />
+  <text class="box-title" x="1233" y="1083" text-anchor="middle">Governance / Observability</text>
+  <text class="box-text" x="1103" y="1105">roles, permissions, sessions, audit logs,</text>
+  <text class="box-text" x="1103" y="1122">user logs, analytics, system logs</text>
+  <rect class="box-store" x="1412" y="1060" width="292" height="64" />
+  <text class="box-title" x="1558" y="1083" text-anchor="middle">Filesystem Storage</text>
+  <text class="box-text" x="1432" y="1105">backend/uploads, backups, logs, temp,</text>
+  <text class="box-text" x="1432" y="1122">exports, attachments, documents</text>
+
+  <path class="arrow-muted" d="M1510 402 C1660 450 1660 522 1602 540" />
+  <path class="arrow-muted" d="M226 620 C226 680 221 704 221 744" />
+  <path class="arrow-muted" d="M1093 620 C1093 684 1337 704 1337 744" />
+  <path class="arrow-muted" d="M1362 620 C1362 684 779 812 779 842" />
+
+  <rect class="box-future" x="60" y="1167" width="1180" height="48" />
+  <text class="box-title" x="82" y="1193">Extension Points Not Required by Current Prototype</text>
+  <text class="box-text" x="365" y="1193">National ID services, government payment platforms, SMS/email gateways, GovHub/API exchange, institutional HR or accounting systems</text>
+  <path class="arrow-dash" d="M1240 1191 L1410 1125" />
+
+  <rect class="pill" x="60" y="1222" width="196" height="22" />
+  <text class="pill-text" x="158" y="1237" text-anchor="middle">Submission Architecture Diagram</text>
+  <text class="tiny" x="1740" y="1237" text-anchor="end">Inventory basis: 41 frontend HTML pages | 264 backend API PHP files | 10 shared JS modules | 83 schema tables</text>
+</svg>

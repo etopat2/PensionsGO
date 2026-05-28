@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
+  <title>Pensioner Dashboard - PensionsGo</title>
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <link rel="stylesheet" href="css/styles.css?v=20260507c" />
+  <link rel="stylesheet" href="css/profile.css?v=20260504a" />
+  <link rel="stylesheet" href="css/menu.css?v=20260504d" />
+  <link rel="stylesheet" href="css/overlay.css?v=20260504a" />
+  <link rel="stylesheet" href="css/pensioner_board.css?v=20260504a" />
+  <script type="module" src="js/main.js?v=20260528b"></script>
+  <script defer src="js/modules/district_selector.js?v=20260429a"></script>
+  <script defer src="js/modules/retirement-types.js"></script>
+  <script defer src="js/pensioner_board.js"></script>
+</head>
+<body>
+  <main class="pensioner-board-main">
+    <section class="pensioner-hero">
+      <div class="pensioner-hero-copy">
+        <span class="pensioner-kicker">Pensioner Portal</span>
+        <h1 id="pensionerHeroName">Loading your dashboard...</h1>
+        <p id="pensionerHeroMeta">Your pension record, payroll standing, application progress, and current compliance status are shown below.</p>
+      </div>
+      <div class="pensioner-hero-actions">
+        <button type="button" class="pensioner-action-btn" id="refreshPensionerDashboardBtn">Refresh</button>
+        <a class="pensioner-action-btn secondary" href="pensioner_lookup.html" id="openPensionerLookupBtn">Find Pensioners</a>
+        <a class="pensioner-action-btn secondary" href="edit_user.html">Edit Profile</a>
+      </div>
+    </section>
+
+    <section id="pensionerBoardFeedback" class="pensioner-feedback" hidden></section>
+
+    <section class="pensioner-summary-grid" id="pensionerSummaryGrid">
+      <article class="pensioner-summary-card">
+        <span class="pensioner-summary-label">Payroll Status</span>
+        <strong class="pensioner-summary-value" id="pensionerPayrollStatus">Loading...</strong>
+        <span class="pensioner-summary-note" id="pensionerPayrollNote">Please wait while payroll data loads.</span>
+      </article>
+      <article class="pensioner-summary-card">
+        <span class="pensioner-summary-label">Monthly Amount</span>
+        <strong class="pensioner-summary-value" id="pensionerMonthlyAmount">UGX 0.00</strong>
+        <span class="pensioner-summary-note" id="pensionerMonthlySource">Latest payroll position</span>
+      </article>
+      <article class="pensioner-summary-card">
+        <span class="pensioner-summary-label">Account Status</span>
+        <strong class="pensioner-summary-value" id="pensionerAccountStatus">Loading...</strong>
+        <span class="pensioner-summary-note" id="pensionerAccountReason">Account standing is being checked.</span>
+      </article>
+      <article class="pensioner-summary-card">
+        <span class="pensioner-summary-label">Life Certificate</span>
+        <strong class="pensioner-summary-value" id="pensionerLifeStatus">Loading...</strong>
+        <span class="pensioner-summary-note" id="pensionerLifeAdvice">Current-year compliance status.</span>
+      </article>
+    </section>
+
+    <section class="pensioner-module-launchpad">
+      <div class="pensioner-panel-head">
+        <div>
+          <h2>Detailed Records</h2>
+          <p>Review your pension record through clearly separated work areas covering profile, application progress, benefits, compliance, claims, and lifecycle history.</p>
+        </div>
+      </div>
+      <div class="pensioner-launch-grid" id="pensionerLaunchGrid">
+        <button type="button" class="pensioner-launch-card" data-pensioner-tab="profile">
+          <strong>Profile</strong>
+          <span>Identity, contacts, bank details, file references</span>
+        </button>
+        <button type="button" class="pensioner-launch-card" data-pensioner-tab="application">
+          <strong>Application Progress</strong>
+          <span>Workflow step, application status, milestone history</span>
+        </button>
+        <button type="button" class="pensioner-launch-card" data-pensioner-tab="benefits">
+          <strong>Benefits Snapshot</strong>
+          <span>Salary, pension values, gratuity, service history</span>
+        </button>
+        <button type="button" class="pensioner-launch-card" data-pensioner-tab="compliance">
+          <strong>Payroll & Compliance</strong>
+          <span>Payroll status, account standing, life certificate</span>
+        </button>
+        <button type="button" class="pensioner-launch-card" data-pensioner-tab="claims" id="pensionerClaimsLaunchBtn">
+          <strong>Claims & Arrears</strong>
+          <span>Outstanding claims, arrears position, recent balances</span>
+        </button>
+        <button type="button" class="pensioner-launch-card" data-pensioner-tab="lifecycle">
+          <strong>Lifecycle & Documents</strong>
+          <span>Retirement data, pension category, indexed documents</span>
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <div class="pensioner-modal-overlay" id="pensionerDetailsModal" hidden>
+    <div class="pensioner-modal-panel" role="dialog" aria-modal="true" aria-labelledby="pensionerModalTitle">
+      <div class="pensioner-modal-header">
+        <div>
+          <h2 id="pensionerModalTitle">Pensioner Details</h2>
+          <p id="pensionerModalSubtitle">Browse the sections below to review the details relevant to your account.</p>
+        </div>
+        <button type="button" class="pensioner-modal-close" id="closePensionerDetailsModal" aria-label="Close">&times;</button>
+      </div>
+      <div class="pensioner-modal-tabs" id="pensionerModalTabs">
+        <button type="button" class="pensioner-tab-btn active" data-tab="profile">Profile</button>
+        <button type="button" class="pensioner-tab-btn" data-tab="application">Application</button>
+        <button type="button" class="pensioner-tab-btn" data-tab="benefits">Benefits</button>
+        <button type="button" class="pensioner-tab-btn" data-tab="compliance">Payroll & Compliance</button>
+        <button type="button" class="pensioner-tab-btn" data-tab="claims" id="pensionerClaimsTabBtn">Claims</button>
+        <button type="button" class="pensioner-tab-btn" data-tab="lifecycle">Lifecycle & Documents</button>
+      </div>
+      <div class="pensioner-mobile-tab-nav" id="pensionerMobileTabNav" aria-label="Mobile section navigation">
+        <button type="button" class="pensioner-mobile-tab-btn" id="pensionerMobilePrevTabBtn">Previous</button>
+        <label class="pensioner-mobile-tab-select-wrap" for="pensionerMobileTabSelect">
+          <span>Section</span>
+          <select id="pensionerMobileTabSelect">
+            <option value="profile">Profile</option>
+            <option value="application">Application</option>
+            <option value="benefits">Benefits</option>
+            <option value="compliance">Payroll & Compliance</option>
+            <option value="claims">Claims</option>
+            <option value="lifecycle">Lifecycle & Documents</option>
+          </select>
+        </label>
+        <button type="button" class="pensioner-mobile-tab-btn" id="pensionerMobileNextTabBtn">Next</button>
+      </div>
+      <div class="pensioner-modal-body">
+        <section class="pensioner-tab-panel active" data-tab-panel="profile">
+          <div class="pensioner-panel pensioner-profile-panel">
+            <div class="pensioner-profile-shell">
+              <div class="pensioner-profile-hero">
+                <div class="pensioner-avatar-wrap">
+                  <img id="pensionerProfilePhoto" class="pensioner-avatar" src="../backend/api/get_image.php?file=default-user.png&type=profile" alt="Profile" />
+                </div>
+                <div class="pensioner-profile-meta">
+                  <h3 id="pensionerProfileName">Beneficiary</h3>
+                  <div class="pensioner-badge-row">
+                    <span class="pensioner-chip" id="pensionerRegNoChip">File: --</span>
+                    <span class="pensioner-chip" id="pensionerSupplierChip">Supplier: --</span>
+                  </div>
+                </div>
+              </div>
+              <div class="pensioner-detail-grid" id="pensionerProfileGrid"></div>
+              <div class="pensioner-profile-tools">
+                <button type="button" class="pensioner-action-btn secondary slim" id="openPensionerProfileEditBtn">Update Contact Record</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="pensioner-tab-panel" data-tab-panel="application">
+          <div class="pensioner-panel">
+            <div class="pensioner-status-highlight">
+              <div>
+                <span class="pensioner-mini-label">Current Step</span>
+                <strong id="pensionerCurrentStep">Loading...</strong>
+              </div>
+              <div>
+                <span class="pensioner-mini-label">Application Status</span>
+                <strong id="pensionerApplicationStatus">Loading...</strong>
+              </div>
+            </div>
+            <div class="pensioner-step-list" id="pensionerStepList"></div>
+          </div>
+        </section>
+
+        <section class="pensioner-tab-panel" data-tab-panel="benefits">
+          <div class="pensioner-panel">
+            <div class="pensioner-benefits-grid" id="pensionerBenefitsGrid"></div>
+          </div>
+        </section>
+
+        <section class="pensioner-tab-panel" data-tab-panel="compliance">
+          <div class="pensioner-panel">
+            <div class="pensioner-detail-grid" id="pensionerComplianceGrid"></div>
+          </div>
+        </section>
+
+        <section class="pensioner-tab-panel" data-tab-panel="claims">
+          <div class="pensioner-panel" id="pensionerClaimsPanel">
+            <div class="pensioner-claims-summary" id="pensionerClaimsSummary"></div>
+            <div class="pensioner-claims-list" id="pensionerClaimsList"></div>
+          </div>
+        </section>
+
+        <section class="pensioner-tab-panel" data-tab-panel="lifecycle">
+          <div class="pensioner-modal-stack">
+            <div class="pensioner-panel">
+              <div class="pensioner-detail-grid" id="pensionerLifecycleGrid"></div>
+            </div>
+            <div class="pensioner-panel" id="pensionerDocumentsPanel">
+              <div class="pensioner-document-stat">
+                <strong id="pensionerDocumentCount">0</strong>
+                <span>document(s) indexed against your record</span>
+              </div>
+              <div class="pensioner-documents-list" id="pensionerDocumentsList"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+      <div class="pensioner-modal-footer">
+        <button type="button" class="pensioner-action-btn secondary" id="closePensionerDetailsFooterBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="pensioner-profile-edit-overlay" id="pensionerProfileEditModal" hidden>
+    <div class="pensioner-profile-edit-modal" role="dialog" aria-modal="true" aria-labelledby="pensionerProfileEditTitle">
+      <div class="pensioner-profile-edit-modal-head">
+        <div>
+          <h3 id="pensionerProfileEditTitle">Update Contact Record</h3>
+          <p id="pensionerProfileEditSubtitle">Update the contact and retirement-location details that the pensions office keeps against your registry record.</p>
+        </div>
+        <button type="button" class="pensioner-modal-close" id="closePensionerProfileEditModal" aria-label="Close">&times;</button>
+      </div>
+      <form class="pensioner-profile-edit-form" id="pensionerProfileEditForm">
+        <input type="hidden" id="pensionerEditRegNo" />
+        <div class="pensioner-profile-edit-grid">
+          <label class="pensioner-form-field">
+            <span>District of Residence</span>
+            <input type="text" id="pensionerEditDistrict" placeholder="Select district of residence" />
+          </label>
+          <label class="pensioner-form-field">
+            <span>Phone Number</span>
+            <input type="tel" id="pensionerEditPhone" placeholder="+2567..." />
+          </label>
+          <label class="pensioner-form-field">
+            <span>Email Address</span>
+            <input type="email" id="pensionerEditEmail" placeholder="name@example.com" />
+          </label>
+          <label class="pensioner-form-field" id="pensionerEditStationField">
+            <span>Station / Retirement Location</span>
+            <input type="text" id="pensionerEditStation" placeholder="Select station or retirement location" />
+          </label>
+          <label class="pensioner-form-field" id="pensionerEditNextOfKinField">
+            <span>Next of Kin</span>
+            <input type="text" id="pensionerEditNextOfKin" placeholder="Next of kin name" />
+          </label>
+          <label class="pensioner-form-field" id="pensionerEditNextOfKinContactField">
+            <span>Next of Kin Contact</span>
+            <input type="tel" id="pensionerEditNextOfKinContact" placeholder="+2567..." />
+          </label>
+        </div>
+        <div class="pensioner-profile-edit-actions">
+          <button type="button" class="pensioner-action-btn secondary slim" id="cancelPensionerProfileEditBtn">Cancel</button>
+          <button type="submit" class="pensioner-action-btn slim" id="savePensionerProfileEditBtn">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
+
+
+

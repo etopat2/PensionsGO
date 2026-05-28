@@ -4,17 +4,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
   <title>PensionsGo - Login</title>
 
   <!-- ================= CSS FILES ================= -->
-  <link rel="stylesheet" href="css/styles.css" />
-  <link rel="stylesheet" href="css/overlay.css" />
-  <link rel="stylesheet" href="css/forms.css" />
-  <link rel="stylesheet" href="css/auth.css" />
+  <link rel="stylesheet" href="css/styles.css?v=20260507c" />
+  <link rel="stylesheet" href="css/overlay.css?v=20260504a" />
+  <link rel="stylesheet" href="css/forms.css?v=20260504a" />
+  <link rel="stylesheet" href="css/auth.css?v=20260504a" />
 
   <!-- ================= JS FILES ================= -->
-  <script defer src="js/auth.js"></script>
-  <script type="module" src="js/main.js"></script>
+  <script defer src="js/auth.js?v=20260526a"></script>
+  <script type="module" src="js/main.js?v=20260528b"></script>
 </head>
 
 <body>
@@ -25,12 +30,16 @@
       <!-- Information Section -->
       <section class="main-info">
         <h2>Portal Login</h2>
+        <div id="loginBanner" class="login-banner hidden"></div>
         <p>
           Please enter your login details below to access the PensionsGo portal.
         </p>
         <p>
-          <strong>Note:</strong> Staff can log in using their <b>email</b> or <b>registered phone number</b>
-          (formatted in international standard, e.g. <code>+256700123456</code>).
+          <strong>Note:</strong> Users can log in using their <b>email</b> or <b>registered phone number</b>
+          (international or Uganda local format, e.g. <code>+256700123456</code>, <code>0770123456</code>, <code>0312123456</code>, <code>0800123456</code>).
+        </p>
+        <p class="admin-note">
+          <em>For password resets, please contact your system administrator.</em>
         </p>
       </section>
 
@@ -38,7 +47,7 @@
       <section class="form-section">
         <h2>Login</h2>
 
-        <form id="loginForm" autocomplete="off">
+        <form id="loginForm" autocomplete="on" method="POST">
           
           <!-- Username (Email or Phone) -->
           <div class="form-group">
@@ -47,7 +56,8 @@
               type="text"
               id="email"
               name="email"
-              placeholder="Enter your email or phone number (e.g. +256700123456)"
+              autocomplete="email"
+              placeholder="Enter email or phone (e.g. +256700123456, 0770123456)"
               required
             />
           </div>
@@ -59,6 +69,7 @@
               type="password"
               id="password"
               name="password"
+              autocomplete="current-password"
               placeholder="Enter your password"
               required
             />
@@ -75,3 +86,6 @@
   </main>
 </body>
 </html>
+
+
+

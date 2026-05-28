@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#6d1116" />
+    <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+    <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
+    <title>UPS PensionsGo - Terms of Use</title>
+
+    <link rel="stylesheet" href="css/styles.css?v=20260507c" />
+    <link rel="stylesheet" href="css/terms.css?v=20260504a" />
+
+    <script type="module" src="js/main.js?v=20260528b"></script>
+    <script defer src="js/terms.js"></script>
+</head>
+<body class="terms-page">
+    <main class="terms-main">
+        <div class="terms-shell">
+            <section class="terms-hero">
+                <div class="terms-hero-copy">
+                    <span class="terms-kicker">Terms of Use</span>
+                    <h1>Rules for responsible use of UPS PensionsGo.</h1>
+                    <p class="terms-hero-lead">
+                        These terms explain how the platform is used, what standards apply to accounts and data,
+                        and how users treat operational, pensioner, and public information within the service.
+                    </p>
+                    <div class="terms-hero-actions">
+                        <a href="faq.html" class="terms-secondary-action">View FAQs</a>
+                        <a href="feedback.html" class="terms-secondary-action">Send Feedback</a>
+                        <a href="login.html" class="terms-primary-action" id="termsAccessPlatformBtn">Access the Platform</a>
+                    </div>
+                    <dl class="terms-hero-meta">
+                        <div>
+                            <dt>Service</dt>
+                            <dd>UPS PensionsGo</dd>
+                        </div>
+                        <div>
+                            <dt>Effective Date</dt>
+                            <dd>11 March 2026</dd>
+                        </div>
+                        <div>
+                            <dt>Scope</dt>
+                            <dd>Public users, pensioners, operational staff, and administrators</dd>
+                        </div>
+                    </dl>
+                </div>
+                <aside class="terms-hero-panel">
+                    <article class="terms-hero-card">
+                        <span class="terms-panel-label">Plain-language summary</span>
+                        <h2>Use the platform lawfully, accurately, and only within your authorized role.</h2>
+                        <p>
+                            This service manages sensitive pension information. That means users must protect credentials,
+                            avoid misuse, submit accurate information, and respect access boundaries at all times.
+                        </p>
+                    </article>
+                    <div class="terms-snapshot-grid">
+                        <article class="terms-snapshot-card">
+                            <strong>Accountability</strong>
+                            <span>Every critical action may be logged for operational governance and audit.</span>
+                        </article>
+                        <article class="terms-snapshot-card">
+                            <strong>Role control</strong>
+                            <span>Access is role-based and may be restricted further by specific permissions.</span>
+                        </article>
+                        <article class="terms-snapshot-card">
+                            <strong>Data care</strong>
+                            <span>Users must handle pension records, documents, and exports with discipline.</span>
+                        </article>
+                        <article class="terms-snapshot-card">
+                            <strong>Service updates</strong>
+                            <span>Terms, features, and operational rules may be updated when governance requires it.</span>
+                        </article>
+                    </div>
+                </aside>
+            </section>
+
+            <section class="terms-overview-grid">
+                <article class="terms-overview-card">
+                    <h2>Accounts and access</h2>
+                    <p>Who uses the service, how login access works, and what users protect.</p>
+                </article>
+                <article class="terms-overview-card">
+                    <h2>Data and records</h2>
+                    <p>How records, documents, and exported data are handled and protected.</p>
+                </article>
+                <article class="terms-overview-card">
+                    <h2>Acceptable conduct</h2>
+                    <p>What behavior is prohibited and when the service may suspend or restrict access.</p>
+                </article>
+            </section>
+
+            <section class="terms-layout">
+                <aside class="terms-side-panel">
+                    <div class="terms-side-card">
+                        <label class="terms-search-field" for="termsSearch">
+                            <span>Search the terms</span>
+                            <input type="search" id="termsSearch" placeholder="Search by topic or keyword">
+                        </label>
+                        <div class="terms-chip-row" id="termsChipRow">
+                            <button type="button" class="terms-chip active" data-topic="all">All Clauses</button>
+                            <button type="button" class="terms-chip" data-topic="accounts">Accounts</button>
+                            <button type="button" class="terms-chip" data-topic="operations">Operations</button>
+                            <button type="button" class="terms-chip" data-topic="data">Data & Records</button>
+                            <button type="button" class="terms-chip" data-topic="security">Security</button>
+                            <button type="button" class="terms-chip" data-topic="content">Content</button>
+                        </div>
+                    </div>
+
+                    <nav class="terms-side-card terms-nav-card" aria-label="Terms sections">
+                        <span class="terms-panel-label">On this page</span>
+                        <ul class="terms-nav-list" id="termsNavList"></ul>
+                    </nav>
+                </aside>
+
+                <section class="terms-content-panel">
+                    <div class="terms-panel-head">
+                        <div>
+                            <span class="terms-panel-label">Detailed Terms</span>
+                            <h2>Operational terms for using the platform</h2>
+                        </div>
+                        <div class="terms-panel-actions">
+                            <button type="button" class="terms-toggle-all-btn" id="termsToggleAllBtn" aria-expanded="false">Show All Clauses</button>
+                        </div>
+                    </div>
+
+                    <div id="termsSections"></div>
+
+                    <div class="terms-empty-state" id="termsEmptyState" hidden>
+                        <h3>No matching clauses found.</h3>
+                        <p>Try a broader keyword or return to <strong>All Clauses</strong>.</p>
+                    </div>
+                </section>
+            </section>
+
+            <section class="terms-help-strip">
+                <div>
+                    <span class="terms-panel-label">Need clarification?</span>
+                    <h2>Use guided help channels.</h2>
+                    <p>If something in these terms is unclear, use the feedback page for clarification or consult the FAQs for process-level guidance.</p>
+                </div>
+                <div class="terms-help-actions">
+                    <a href="feedback.html" class="terms-primary-action">Open Feedback</a>
+                    <a href="faq.html" class="terms-secondary-action">Read FAQs</a>
+                </div>
+            </section>
+        </div>
+    </main>
+</body>
+</html>
+
+
+

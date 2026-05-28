@@ -1,10 +1,9 @@
 <?php
-// ============================================================================
+// 
 // get_unread_count.php
 // Purpose: Get unread message count for header display (Admin + Users)
 // Fixed: Unread counts now properly track recipient reads instead of sender
-// ============================================================================
-
+// 
 require_once __DIR__ . '/../config.php';
 header('Content-Type: application/json');
 
@@ -14,9 +13,19 @@ if (!isset($_SESSION['userId'])) {
     exit;
 }
 
+if (!currentUserCanAccessMessagingModule()) {
+    echo json_encode([
+        'success' => true,
+        'unread_count' => 0,
+        'direct_unread' => 0,
+        'broadcast_unread' => 0
+    ]);
+    exit;
+}
+
 try {
     $userId = $_SESSION['userId'];
-    $userRole = $_SESSION['userRole'] ?? '';
+    $userRole = getSessionEffectiveRoleKey($conn);
 
     // Count unread direct or group messages (FIXED: Only count messages where user is recipient)
     $directStmt = $conn->prepare("

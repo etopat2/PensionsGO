@@ -1,0 +1,9 @@
+backend/config.local.php
+backend/backups/*
+!backend/backups/.htaccess
+backend/cache/*
+!backend/cache/.htaccess
+backend/exports/*
+!backend/exports/.htaccess
+backend/logs/*
+!backend/logs/.htaccess

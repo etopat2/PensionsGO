@@ -1,0 +1,800 @@
+{
+  "total": 175,
+  "used_outside_settings_ui": [
+    "app_name",
+    "app_tagline",
+    "support_email",
+    "support_phone",
+    "public_footer_org_name",
+    "public_footer_address",
+    "public_footer_tech_support_email",
+    "public_footer_social_facebook",
+    "public_footer_social_twitter",
+    "public_footer_social_instagram",
+    "public_footer_social_linkedin",
+    "public_footer_developer_name",
+    "public_footer_developer_email",
+    "public_footer_developer_phone",
+    "default_user_role",
+    "login_banner",
+    "maintenance_mode",
+    "timezone",
+    "date_format",
+    "time_format",
+    "currency",
+    "session_timeout_minutes",
+    "grace_period_minutes",
+    "task_due_business_days",
+    "task_grace_business_days",
+    "task_alerts_enabled",
+    "task_alert_due_soon_hours",
+    "task_alert_stalled_hours",
+    "task_alert_escalation_hours",
+    "task_skip_weekends",
+    "task_skip_ug_holidays",
+    "payroll_reconcile_debounce_seconds",
+    "max_concurrent_sessions",
+    "allow_multiple_devices",
+    "auto_logout_on_conflict",
+    "login_attempt_limit",
+    "lockout_minutes",
+    "password_min_length",
+    "password_expiry_days",
+    "password_require_uppercase",
+    "password_require_lowercase",
+    "password_require_number",
+    "password_require_special",
+    "session_idle_warning_minutes",
+    "security_alert_email",
+    "security_alert_sms",
+    "security_block_developer_tools",
+    "security_block_context_menu",
+    "security_block_copy",
+    "security_block_cut",
+    "security_block_paste",
+    "security_block_text_selection",
+    "security_block_drag",
+    "security_enforce_csrf",
+    "security_validate_origin",
+    "security_allowed_origins",
+    "security_admin_reauth_window_minutes",
+    "security_max_upload_size_mb",
+    "security_max_zip_uncompressed_mb",
+    "security_max_import_rows",
+    "security_max_zip_entries",
+    "log_retention_days",
+    "enable_activity_logs",
+    "enable_audit_logs",
+    "enable_notifications",
+    "notify_email_enabled",
+    "notify_sms_enabled",
+    "notify_push_enabled",
+    "notify_sender_name",
+    "notify_sender_email",
+    "notify_test_recipient",
+    "notify_system_alerts_enabled",
+    "notify_task_alerts_enabled",
+    "notify_user_activity_enabled",
+    "notify_broadcast_enabled",
+    "notify_quiet_hours_start",
+    "notify_quiet_hours_end",
+    "notify_admin_digest_enabled",
+    "notify_digest_time",
+    "notify_queue_worker_enabled",
+    "notify_queue_process_on_request",
+    "notify_queue_batch_size",
+    "notify_queue_retry_limit",
+    "notify_queue_retry_delay_minutes",
+    "notify_queue_min_interval_seconds",
+    "message_retention_days",
+    "message_archive_after_days",
+    "message_allow_soft_delete",
+    "message_storage_quota_mb",
+    "message_compress_enabled",
+    "message_backup_enabled",
+    "attachment_max_size_mb",
+    "attachment_allowed_types",
+    "attachment_scan_enabled",
+    "attachment_retention_days",
+    "attachment_dedupe_enabled",
+    "attachment_compress_enabled",
+    "storage_warning_threshold_mb",
+    "storage_critical_threshold_mb",
+    "storage_cleanup_backup_before_delete",
+    "storage_cleanup_dry_run_default",
+    "storage_cleanup_sessions_days",
+    "storage_cleanup_notification_days",
+    "storage_cleanup_imports_days",
+    "storage_cleanup_exports_days",
+    "storage_cleanup_backups_days",
+    "storage_cleanup_orphan_documents_days",
+    "backup_retention_days",
+    "export_retention_days",
+    "backup_include_uploads_default",
+    "document_preview_enabled",
+    "document_naming_scheme",
+    "staff_due_verification_escalation_days",
+    "system_logs_enabled",
+    "system_logs_capture_warnings",
+    "system_logs_capture_errors",
+    "system_logs_capture_security_events",
+    "system_logs_capture_integrations",
+    "system_logs_min_level",
+    "analytics_auto_digest_enabled",
+    "analytics_digest_frequency",
+    "analytics_digest_time",
+    "analytics_digest_recipient",
+    "feedback_public_enabled",
+    "feedback_staff_enabled",
+    "feedback_pensioner_enabled",
+    "feedback_email_notifications_enabled",
+    "feedback_allow_assignment",
+    "feedback_allow_export",
+    "feedback_response_sla_days",
+    "pensioner_login_enabled",
+    "pensioner_dashboard_enable_claims",
+    "pensioner_dashboard_enable_documents",
+    "pensioner_dashboard_enable_status_explanations",
+    "pensioner_dashboard_enable_activity_log",
+    "pensioner_lookup_enabled",
+    "pensioner_lookup_require_consent",
+    "pensioner_lookup_log_activity",
+    "podcast_enabled",
+    "podcast_public_enabled",
+    "podcast_staff_enabled",
+    "podcast_pensioner_enabled",
+    "podcast_show_public_about_button",
+    "podcast_log_views",
+    "podcast_allow_metadata_edit",
+    "podcast_allow_video_replace",
+    "podcast_allow_delete"
+  ],
+  "unused_outside_settings_ui": [
+    "document_storage_enabled",
+    "document_max_size_mb",
+    "document_allowed_types",
+    "document_retention_days",
+    "document_archive_after_days",
+    "document_classification_required",
+    "document_dedupe_enabled",
+    "document_access_audit_enabled",
+    "document_link_registry_required",
+    "workflow_logs_enabled",
+    "workflow_logs_retention_days",
+    "workflow_logs_include_comments",
+    "workflow_logs_capture_assignment",
+    "workflow_logs_export_enabled",
+    "task_delegation_logs_enabled",
+    "task_delegation_retention_days",
+    "task_delegation_require_reason",
+    "task_delegation_escalation_enabled",
+    "task_delegation_export_enabled",
+    "system_logs_retention_days",
+    "analytics_refresh_interval_minutes",
+    "analytics_dashboard_snapshots_enabled",
+    "analytics_snapshot_retention_days",
+    "analytics_export_enabled",
+    "analytics_show_predictive_cards",
+    "analytics_include_financial_forecasts",
+    "analytics_include_operational_kpis",
+    "analytics_anomaly_detection_enabled"
+  ],
+  "usage": {
+    "app_name": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "app_tagline": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "support_email": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\runtime_admin_tools.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\submit_feedback.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\feedback.js",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "support_phone": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\feedback.js",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "public_footer_org_name": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "public_footer_address": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "public_footer_tech_support_email": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "public_footer_social_facebook": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "public_footer_social_twitter": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "public_footer_social_instagram": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "public_footer_social_linkedin": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "public_footer_developer_name": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "public_footer_developer_email": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "public_footer_developer_phone": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "default_user_role": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\register_user.php"
+    ],
+    "login_banner": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "maintenance_mode": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\login.php"
+    ],
+    "timezone": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "date_format": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "time_format": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "currency": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\runtime_admin_tools.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_claims_aggregation_preview.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_dashboard_general_statistics.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\calculator.js",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\claims.js",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\dashboard.js"
+    ],
+    "session_timeout_minutes": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\cleanup_session.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_session_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\login.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\SessionManager.php"
+    ],
+    "grace_period_minutes": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\cleanup_session.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_session_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\login.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\SessionManager.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\TimeoutManager.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "task_due_business_days": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "task_grace_business_days": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "task_alerts_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "task_alert_due_soon_hours": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "task_alert_stalled_hours": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "task_alert_escalation_hours": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "task_skip_weekends": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "task_skip_ug_holidays": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "payroll_reconcile_debounce_seconds": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "max_concurrent_sessions": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_session_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\login.php"
+    ],
+    "allow_multiple_devices": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_session_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\login.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\SessionManager.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\auth.js",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "auto_logout_on_conflict": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_session_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\login.php"
+    ],
+    "login_attempt_limit": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\login.php"
+    ],
+    "lockout_minutes": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\login.php"
+    ],
+    "password_min_length": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\register_user.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\update_pensioner_password_admin.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\update_user.php"
+    ],
+    "password_expiry_days": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\login.php"
+    ],
+    "password_require_uppercase": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\register_user.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\update_pensioner_password_admin.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\update_user.php"
+    ],
+    "password_require_lowercase": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\register_user.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\update_pensioner_password_admin.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\update_user.php"
+    ],
+    "password_require_number": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\register_user.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\update_pensioner_password_admin.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\update_user.php"
+    ],
+    "password_require_special": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\register_user.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\update_pensioner_password_admin.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\update_user.php"
+    ],
+    "session_idle_warning_minutes": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_session_settings.php"
+    ],
+    "security_alert_email": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\runtime_admin_tools.php"
+    ],
+    "security_alert_sms": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "security_block_developer_tools": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "security_block_context_menu": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "security_block_copy": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "security_block_cut": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "security_block_paste": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "security_block_text_selection": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "security_block_drag": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "security_enforce_csrf": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "security_validate_origin": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "security_allowed_origins": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "security_admin_reauth_window_minutes": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "security_max_upload_size_mb": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "security_max_zip_uncompressed_mb": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "security_max_import_rows": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "security_max_zip_entries": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "log_retention_days": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\cleanup_session.php"
+    ],
+    "enable_activity_logs": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_pensioner_dashboard.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\record_podcast_view.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\search_pensioners.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\SessionManager.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\update_pensioner_lookup_visibility.php"
+    ],
+    "enable_audit_logs": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "enable_notifications": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "notify_email_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\runtime_admin_tools.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\delegate_task.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\send_message.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\update_feedback_submission.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\update_task_status.php"
+    ],
+    "notify_sms_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "notify_push_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "notify_sender_name": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "notify_sender_email": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "notify_test_recipient": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\runtime_admin_tools.php"
+    ],
+    "notify_system_alerts_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "notify_task_alerts_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "notify_user_activity_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "notify_broadcast_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\send_message.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "notify_quiet_hours_start": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "notify_quiet_hours_end": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\main.js"
+    ],
+    "notify_admin_digest_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\runtime_admin_tools.php"
+    ],
+    "notify_digest_time": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\runtime_admin_tools.php"
+    ],
+    "notify_queue_worker_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "notify_queue_process_on_request": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "notify_queue_batch_size": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "notify_queue_retry_limit": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "notify_queue_retry_delay_minutes": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "notify_queue_min_interval_seconds": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "message_retention_days": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_messages.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_message_detail.php"
+    ],
+    "message_archive_after_days": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_messages.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_message_detail.php"
+    ],
+    "message_allow_soft_delete": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\delete_message.php"
+    ],
+    "message_storage_quota_mb": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_storage_usage.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\send_message.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\messages.js"
+    ],
+    "message_compress_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\send_message.php"
+    ],
+    "message_backup_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\runtime_admin_tools.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\delete_message.php"
+    ],
+    "attachment_max_size_mb": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\send_message.php"
+    ],
+    "attachment_allowed_types": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\send_message.php"
+    ],
+    "attachment_scan_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\runtime_admin_tools.php"
+    ],
+    "attachment_retention_days": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_message_detail.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_msg_image.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\view_message_attachment.php"
+    ],
+    "attachment_dedupe_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\delete_message.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\send_message.php"
+    ],
+    "attachment_compress_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\send_message.php"
+    ],
+    "storage_warning_threshold_mb": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "storage_critical_threshold_mb": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "storage_cleanup_backup_before_delete": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\run_data_cleanup.php"
+    ],
+    "storage_cleanup_dry_run_default": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\run_data_cleanup.php"
+    ],
+    "storage_cleanup_sessions_days": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\data_management_common.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\run_data_cleanup.php"
+    ],
+    "storage_cleanup_notification_days": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\data_management_common.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\run_data_cleanup.php"
+    ],
+    "storage_cleanup_imports_days": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\data_management_common.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\run_data_cleanup.php"
+    ],
+    "storage_cleanup_exports_days": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\data_management_common.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\run_data_cleanup.php"
+    ],
+    "storage_cleanup_backups_days": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\data_management_common.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\run_data_cleanup.php"
+    ],
+    "storage_cleanup_orphan_documents_days": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\data_management_common.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\run_data_cleanup.php"
+    ],
+    "backup_retention_days": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_data_management_overview.php"
+    ],
+    "export_retention_days": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_data_management_overview.php"
+    ],
+    "backup_include_uploads_default": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_data_management_overview.php"
+    ],
+    "document_storage_enabled": [],
+    "document_max_size_mb": [],
+    "document_allowed_types": [],
+    "document_retention_days": [],
+    "document_archive_after_days": [],
+    "document_classification_required": [],
+    "document_dedupe_enabled": [],
+    "document_preview_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\view_message_attachment.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\view_payroll_document.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\view_staff_document.php"
+    ],
+    "document_access_audit_enabled": [],
+    "document_link_registry_required": [],
+    "document_naming_scheme": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\upload_document.php"
+    ],
+    "workflow_logs_enabled": [],
+    "workflow_logs_retention_days": [],
+    "staff_due_verification_escalation_days": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "workflow_logs_include_comments": [],
+    "workflow_logs_capture_assignment": [],
+    "workflow_logs_export_enabled": [],
+    "task_delegation_logs_enabled": [],
+    "task_delegation_retention_days": [],
+    "task_delegation_require_reason": [],
+    "task_delegation_escalation_enabled": [],
+    "task_delegation_export_enabled": [],
+    "system_logs_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "system_logs_retention_days": [],
+    "system_logs_capture_warnings": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "system_logs_capture_errors": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "system_logs_capture_security_events": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "system_logs_capture_integrations": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "system_logs_min_level": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\config.php"
+    ],
+    "analytics_refresh_interval_minutes": [],
+    "analytics_dashboard_snapshots_enabled": [],
+    "analytics_snapshot_retention_days": [],
+    "analytics_export_enabled": [],
+    "analytics_auto_digest_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\runtime_admin_tools.php"
+    ],
+    "analytics_digest_frequency": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\runtime_admin_tools.php"
+    ],
+    "analytics_digest_time": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\runtime_admin_tools.php"
+    ],
+    "analytics_digest_recipient": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\runtime_admin_tools.php"
+    ],
+    "analytics_show_predictive_cards": [],
+    "analytics_include_financial_forecasts": [],
+    "analytics_include_operational_kpis": [],
+    "analytics_anomaly_detection_enabled": [],
+    "feedback_public_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\submit_feedback.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\feedback.js"
+    ],
+    "feedback_staff_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\submit_feedback.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\feedback.js"
+    ],
+    "feedback_pensioner_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\submit_feedback.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\frontend\\js\\feedback.js"
+    ],
+    "feedback_email_notifications_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\delegate_task.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\submit_feedback.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\update_feedback_submission.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\update_task_status.php"
+    ],
+    "feedback_allow_assignment": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\delegate_task.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_feedback_management.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_feedback_submission_detail.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\update_feedback_submission.php"
+    ],
+    "feedback_allow_export": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_feedback_management.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\run_dashboard_data_export.php"
+    ],
+    "feedback_response_sla_days": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_feedback_management.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_feedback_submission_detail.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\update_feedback_submission.php"
+    ],
+    "pensioner_login_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\login.php"
+    ],
+    "pensioner_dashboard_enable_claims": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_pensioner_dashboard.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php"
+    ],
+    "pensioner_dashboard_enable_documents": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_pensioner_dashboard.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php"
+    ],
+    "pensioner_dashboard_enable_status_explanations": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_pensioner_dashboard.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php"
+    ],
+    "pensioner_dashboard_enable_activity_log": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_pensioner_dashboard.php"
+    ],
+    "pensioner_lookup_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_pensioner_dashboard.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_pensioner_lookup_context.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\search_pensioners.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\update_pensioner_lookup_visibility.php"
+    ],
+    "pensioner_lookup_require_consent": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_pensioner_dashboard.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_pensioner_lookup_context.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\search_pensioners.php"
+    ],
+    "pensioner_lookup_log_activity": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_pensioner_lookup_context.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\search_pensioners.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\update_pensioner_lookup_visibility.php"
+    ],
+    "podcast_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_podcast_admin.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_podcast_feed.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_podcast_feed.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php"
+    ],
+    "podcast_public_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_podcast_admin.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_podcast_feed.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_podcast_feed.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php"
+    ],
+    "podcast_staff_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_podcast_admin.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_podcast_feed.php"
+    ],
+    "podcast_pensioner_enabled": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_podcast_admin.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_podcast_feed.php"
+    ],
+    "podcast_show_public_about_button": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_podcast_admin.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_podcast_feed.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_public_settings.php"
+    ],
+    "podcast_log_views": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_podcast_admin.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_podcast_feed.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\record_podcast_view.php"
+    ],
+    "podcast_allow_metadata_edit": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_podcast_admin.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\save_podcast_video.php"
+    ],
+    "podcast_allow_video_replace": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_podcast_admin.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\save_podcast_video.php"
+    ],
+    "podcast_allow_delete": [
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\delete_podcast_video.php",
+      "c:\\\\xampp\\\\htdocs\\\\PROJECTS\\\\PensionApp\\backend\\api\\get_podcast_admin.php"
+    ]
+  }
+}

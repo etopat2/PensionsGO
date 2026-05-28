@@ -1,19 +1,9 @@
-# Disable directory listing
 Options -Indexes
-
-# Block access to sensitive files
-<FilesMatch "^(\.env|config\.php|composer\.json|composer\.lock)$">
-  Order allow,deny
-  Deny from all
-</FilesMatch>
-
-# Prevent access to this .htaccess file itself
-<Files .htaccess>
-  Order allow,deny
-  Deny from all
-</Files>
-
-# Enable CORS for API access (optional)
-<IfModule mod_headers.c>
-  Header set Access-Control-Allow-Origin "*"
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule ^(?:backups|cache|exports|logs)(?:/|$) - [F,L]
+RewriteRule ^uploads/(?:documents|messages|payroll|suspensions|accountability_forms)(?:/|$) - [F,L]
 </IfModule>
+<FilesMatch "^(config\.php|config\.local\.php|config\.local\.example\.php)$">
+    Require all denied
+</FilesMatch>

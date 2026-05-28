@@ -1,0 +1,190 @@
+UPS PENSIONSGO PODCAST INTRO
+LUMA LABS PROMPT PACK
+Generated: 2026-03-25
+
+PURPOSE
+-------
+Create a modern, professional, visually impactful 10-second intro for videos uploaded to the UPS PensionsGo podcast and video section. The intro should be generated as two separate 5-second clips that join seamlessly into one continuous branded sequence.
+
+BRAND GROUNDING
+---------------
+Use the Uganda Prisons Service visual direction already reflected in the app and supporting official references.
+
+Brand palette to use consistently:
+- Deep maroon: #8B0000 or #6D1116
+- Authority blue: #003366
+- Heritage gold: #D4AF37
+- Warm ivory / parchment: #F6F2EB or #FFF7E8
+- Optional metallic charcoal accents: #2B2B2B
+
+Brand tone:
+- authoritative but human
+- secure, modern, service-oriented
+- premium civic-tech look
+- disciplined motion, not flashy chaos
+
+Visual language to preserve:
+- clean heraldic geometry
+- subtle gold trims and metallic highlights
+- modern dashboard-like infographics
+- elegant particles, light trails, and glass panels
+- national-service gravitas without looking military-aggressive
+
+TYPOGRAPHY DIRECTION
+--------------------
+Use a modern, high-legibility, government-tech visual style:
+- bold geometric sans serif for the main lockup
+- clean condensed sans for small supporting text
+- minimal text on screen
+- if text appears, keep it large, centered, and extremely short
+- prioritize a final title lockup such as: UPS PensionsGo
+- avoid long paragraphs or fast-changing text because AI text rendering may break
+
+INFOGRAPHICS, PATTERNS, AND ICONIC MOTIFS
+-----------------------------------------
+Use these as recurring animated design elements across both clips:
+- glowing grid lines inspired by workflow maps
+- abstract pension record cards sliding in perspective
+- thin gold data lines moving like verified process routes
+- shield-inspired arcs and circular insignia rings
+- subtle waveform or broadcast pulse motif to connect with podcast/video content
+- holographic document outlines, check marks, folders, and secure-lock icons
+- soft blueprint-style overlays and clean dashboard nodes
+- light particles that gather into a crest-like centerpiece
+- faint Uganda-inspired territorial contour or map-like linework only if elegant and abstract
+
+3D CHARACTER DIRECTION
+----------------------
+If character animation is used, keep it brief and tasteful:
+- use one or two stylized premium 3D characters only
+- one dignified Uganda Prisons Service officer silhouette or semi-realistic ceremonial figure
+- one pensioner or civilian silhouette representing service delivery and trust
+- characters should feel polished, respectful, and modern
+- no weapons, no aggressive marching, no comedic acting
+- use confident gesture language: guiding, presenting, welcoming, acknowledging
+- keep characters secondary to the motion-graphics brand reveal
+
+GENERAL INTRO ARCHITECTURE
+--------------------------
+Total duration: 10 seconds
+Output format: 16:9 landscape
+Break the intro into two linked clips of 5 seconds each.
+
+Clip 1 function:
+- establish the premium branded world
+- introduce the motion language
+- build anticipation
+- end with a strong forward-moving transition tunnel or emblem portal
+
+Clip 2 function:
+- continue from the exact motion path and camera direction of clip 1
+- reveal the full branded environment
+- resolve into the final hero lockup
+- leave the last 0.5 to 0.8 seconds stable enough for joining to the main video
+
+CONTINUITY RULES FOR BOTH CLIPS
+-------------------------------
+These are critical because the two clips must feel like one uninterrupted intro:
+- use the same color palette in both clips
+- use the same lens feel, lighting direction, and render style
+- use the same environment family: maroon-blue cinematic space with gold data accents
+- keep camera movement flowing left-to-right or forward-through-center consistently
+- clip 1 must end by moving through a glowing gold-and-maroon circular emblem tunnel
+- clip 2 must begin inside that same glowing emblem tunnel, same angle, same speed, same lighting
+- use the same material language: brushed metal, smoked glass, polished gold, soft fog, volumetric light
+- if Luma supports seeds, reference frames, or style references, reuse the same settings for both clips
+
+MASTER STYLE LOCK FOR LUMA
+--------------------------
+Use this style block in both prompts:
+
+"Modern premium civic-tech brand intro for Uganda Prisons Service pension platform, deep maroon and navy blue environment with heritage gold highlights and warm ivory accents, elegant broadcast-quality motion graphics, cinematic volumetric lighting, polished metallic materials, subtle glass HUD overlays, clean infographic animation, restrained premium energy, secure government digital service aesthetic, sophisticated camera movement, visually clear, professional, modern East African public-service identity, high detail, cinematic, 4K, 16:9, no clutter, no cheap stock look, no chaotic motion, no corrupted text, no cartoon look, no violence."
+
+PROMPT FOR CLIP 1 OF 2
+----------------------
+Title: UPS PensionsGo intro - Part 1
+Duration target: 5 seconds
+
+Prompt:
+"Create a 5-second cinematic intro opener for a professional pension administration video platform. Begin in a dark premium maroon-to-navy environment with floating gold particles and faint ivory mist. Sleek gold data lines sweep across the frame like secure workflow routes. Abstract holographic pension record cards, document icons, shield arcs, and broadcast waveform rings appear in layers, forming a polished civic-tech visual system. A subtle premium 3D Uganda Prisons Service-inspired ceremonial officer figure appears for a brief half-second as a dignified silhouette presenting the system, then fades into the motion graphics. The camera glides forward through elegant rings, dashboard nodes, and blueprint-style overlays. The environment should feel authoritative, modern, secure, and nationally significant, with refined maroon, blue, and gold lighting. End by accelerating smoothly into a glowing circular emblem tunnel made of gold lines and maroon energy, perfectly centered, with the camera moving forward through the tunnel so the last frame is inside that portal. Highly cinematic, premium, visually impactful, polished, modern, professional, 4K, 16:9."
+
+Desired shot behavior:
+- 0.0 to 1.4 seconds: premium atmosphere reveal, particles, grid, gold lines
+- 1.4 to 3.2 seconds: infographic build, shield arcs, record-card motion, one brief dignified character reveal
+- 3.2 to 5.0 seconds: camera commits forward into the glowing emblem tunnel
+
+End frame requirement:
+- final frame must be inside the glowing gold-maroon portal
+- bright center opening
+- motion still pushing forward
+- same tunnel geometry must be reusable as the start of clip 2
+
+PROMPT FOR CLIP 2 OF 2
+----------------------
+Title: UPS PensionsGo intro - Part 2
+Duration target: 5 seconds
+
+Prompt:
+"Create the second 5-second clip of the same intro sequence, matching the exact style, color palette, camera direction, lighting, materials, and motion of Part 1. Start already inside the same glowing gold-and-maroon emblem tunnel, continuing the same forward camera movement seamlessly as if no cut occurred. The camera exits the tunnel into a grand polished digital brand space with floating glass panels, gold signal paths, subtle waveform pulses, secure document icons, and refined blueprint overlays. Briefly show a premium stylized civilian or pensioner silhouette and a dignified Uganda Prisons Service-inspired figure in the far midground as symbols of trusted public service, then let them dissolve into particles. The motion graphics converge toward a central crest-inspired formation of concentric gold rings, shield geometry, and luminous lines. Resolve into a clean hero end-frame with a premium title lockup area reading UPS PensionsGo, or a clean centered space designed for the title if text rendering is unstable. Hold the final frame steady and elegant for at least the last 0.7 seconds. The result must feel like a direct continuation of Part 1, cinematic, modern, secure, visually striking, broadcast-ready, 4K, 16:9."
+
+Desired shot behavior:
+- 0.0 to 1.2 seconds: continue inside tunnel, same motion and speed
+- 1.2 to 3.3 seconds: emerge into brand world, show holographic overlays and service symbolism
+- 3.3 to 5.0 seconds: form hero lockup and hold steady for clean handoff
+
+End frame requirement:
+- centered, elegant, premium
+- title-safe area in the middle
+- maroon-blue background with gold accents still alive but calm
+- stable enough to cut directly into the main podcast video
+
+NEGATIVE PROMPT / AVOID LIST
+----------------------------
+Avoid the following in both clips:
+- low-resolution visuals
+- distorted faces or extra limbs
+- noisy or chaotic transitions
+- comedic acting
+- prison bars as the main visual theme
+- dark oppressive mood
+- war or combat imagery
+- inaccurate uniforms or aggressive military behavior
+- oversaturated neon colors
+- purple-dominant palettes
+- cheap glitch effects
+- long text blocks
+- malformed logos, broken crests, unreadable typography
+- social media influencer style
+- childish cartoon style
+
+ASSEMBLY NOTES
+--------------
+When generating in Luma:
+- use the same reference image, seed, style image, or shot reference for both clips if the tool allows it
+- generate clip 1 first
+- use the last frame of clip 1 as a visual reference for clip 2 if Luma allows frame-to-frame continuation
+- choose the cleanest clip 1 ending and enforce clip 2 to start from that exact tunnel moment
+- if text quality is weak, render the final lockup area without text and add exact text in video editing later
+- add the real Uganda Prisons Service or UPS PensionsGo logo in post if absolute logo accuracy is required
+
+OPTIONAL SHORT TITLE VARIANTS FOR THE FINAL FRAME
+-------------------------------------------------
+- UPS PensionsGo
+- PensionsGo Media Centre
+- UPS Podcast and Video Guidance
+- Uganda Prisons Service PensionsGo
+
+RECOMMENDED MUSIC / SOUND DIRECTION
+-----------------------------------
+Use this only if the video tool supports sound design notes:
+- deep cinematic pulse
+- soft rising synth textures
+- restrained orchestral brass swell
+- subtle digital chimes and gold shimmer accents
+- confident final resolve, not dramatic tension
+
+SOURCE NOTES USED FOR BRAND DIRECTION
+-------------------------------------
+1. Local app branding indicates the Uganda Prisons Service scheme uses maroon, blue, and gold.
+2. Official Uganda Prisons source material also describes traditional prisons colors as maroon, yellow, and blue.
+3. The app theme and presentation assets further reinforce a premium maroon-gold-cream direction for digital outputs.

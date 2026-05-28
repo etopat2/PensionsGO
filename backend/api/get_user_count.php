@@ -4,7 +4,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../config.php';
 
 // Verify admin access
-if (!isset($_SESSION['userId']) || $_SESSION['userRole'] !== 'admin') {
+if (!isset($_SESSION['userId']) || !sessionRoleIn($conn, ['admin'])) {
     echo json_encode([
         'success' => false,
         'message' => 'Admin access required'

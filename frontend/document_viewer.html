@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
+  <title>Document Viewer - PensionsGo</title>
+  <link rel="stylesheet" href="css/color-variables.css?v=20260504a" />
+  <link rel="stylesheet" href="css/styles.css?v=20260507c" />
+  <link rel="stylesheet" href="css/profile.css?v=20260504a" />
+  <link rel="stylesheet" href="css/menu.css?v=20260504d" />
+  <link rel="stylesheet" href="css/document_viewer.css?v=20260504a" />
+  <script type="module" src="js/main.js?v=20260528b"></script>
+  <script defer src="js/document_viewer.js?v=20260410c"></script>
+</head>
+<body>
+  <main class="document-viewer-page">
+    <section class="document-viewer-shell">
+      <section class="document-viewer-header">
+        <div class="document-viewer-title-group">
+          <p class="document-viewer-eyebrow">Secure Document Viewer</p>
+          <h1 id="documentViewerTitle">Document Preview</h1>
+          <p id="documentViewerSubtitle" class="document-viewer-subtitle">Preview common file types without leaving the app workspace.</p>
+        </div>
+        <div class="document-viewer-actions">
+          <button type="button" id="documentViewerBackBtn" class="btn-secondary">Back</button>
+          <a id="documentViewerDownloadBtn" class="btn-primary" href="#" download>Download Original</a>
+        </div>
+      </section>
+
+      <section id="documentViewerState" class="document-viewer-state hidden" aria-live="polite"></section>
+
+      <section id="documentViewerFrameWrap" class="document-viewer-frame-wrap hidden">
+        <iframe
+          id="documentViewerFrame"
+          class="document-viewer-frame"
+          title="Secure document viewer"
+          loading="eager"
+          referrerpolicy="same-origin"></iframe>
+      </section>
+    </section>
+  </main>
+</body>
+</html>
+
+
+

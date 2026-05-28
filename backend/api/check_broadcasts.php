@@ -1,13 +1,26 @@
 <?php
-// ============================================================================
+// 
 // check_broadcasts.php 
-// ============================================================================
+// 
 require_once __DIR__ . '/../config.php';
 
 header('Content-Type: application/json');
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 if (!isset($_SESSION['userId'])) {
     echo json_encode(['success' => false, 'message' => 'Session expired']);
+    exit;
+}
+
+if (!currentUserCanAccessMessagingModule()) {
+    echo json_encode([
+        'success' => true,
+        'has_new' => false,
+        'latest_broadcast' => null
+    ]);
     exit;
 }
 
@@ -30,13 +43,14 @@ try {
         LEFT JOIN tb_user_broadcast_status ubs ON (bm.broadcast_id = ubs.broadcast_id AND ubs.user_id = ?)
         WHERE bm.is_active = TRUE
         AND (ubs.is_seen IS NULL OR ubs.is_seen = FALSE)
+        AND m.sender_id <> ?
         AND (bm.target_roles IS NULL OR JSON_CONTAINS(bm.target_roles, ?))
         ORDER BY m.created_at DESC
         LIMIT 1
     ");
 
     $roleJson = json_encode($userRole);
-    $stmt->bind_param("ss", $userId, $roleJson);
+    $stmt->bind_param("sss", $userId, $userId, $roleJson);
     $stmt->execute();
     $result = $stmt->get_result();
 
@@ -51,3 +65,4 @@ try {
     error_log("Error checking broadcasts: " . $e->getMessage());
     echo json_encode(['success' => false, 'message' => 'Server error']);
 }
+

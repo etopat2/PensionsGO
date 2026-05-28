@@ -1,8 +1,7 @@
-// ====================================================================
+// 
 // security.js
 // Reusable security module for protected pages
-// ====================================================================
-
+// 
 class SecurityManager {
     constructor(options = {}) {
         this.options = {
@@ -36,9 +35,10 @@ class SecurityManager {
         if (this.options.preventDevTools) {
             this.preventDevTools();
         }
-        if (this.options.detectDevTools) {
-            this.detectDevTools();
-        }
+        // Automatic developer-tools detection is intentionally disabled.
+        // Browser chrome size heuristics and debugger timing checks create false positives.
+        // Shortcut blocking is handled centrally in main.js.
+        this.options.detectDevTools = false;
     }
 
     // Prevent right-click context menu
@@ -92,48 +92,11 @@ class SecurityManager {
         });
     }
 
-    // SAFE VERSION: Detect if developer tools are open
+    // Automatic developer-tools detection is disabled.
+    // These heuristics are noisy and cannot be treated as a security boundary.
     detectDevTools() {
-        // Only run if not already detected
-        if (this.devToolsDetected) return;
-
-        const checkDevTools = () => {
-            // If already detected, stop checking
-            if (this.devToolsDetected) {
-                this.stopDevToolsDetection();
-                return;
-            }
-
-            const threshold = 160;
-            const width = window.outerWidth - window.innerWidth;
-            const height = window.outerHeight - window.innerHeight;
-
-            if (width > threshold || height > threshold) {
-                this.devToolsDetected = true;
-                this.logSecurityEvent('dev_tools_detected', 'Developer tools detected open');
-                this.handleSecurityViolation();
-                this.stopDevToolsDetection();
-                return;
-            }
-
-            // SAFE debugger check - only run occasionally
-            if (Math.random() < 0.1) { // Only 10% of the time
-                const start = Date.now();
-                debugger;
-                if (Date.now() - start > 100) {
-                    this.devToolsDetected = true;
-                    this.logSecurityEvent('debugger_detected', 'Debugger detected');
-                    this.handleSecurityViolation();
-                    this.stopDevToolsDetection();
-                }
-            }
-        };
-
-        // Run checks less frequently
-        this.devToolsCheckInterval = setInterval(checkDevTools, 3000); // Reduced frequency
-
-        // Also check on resize
-        window.addEventListener('resize', checkDevTools);
+        this.stopDevToolsDetection();
+        this.devToolsDetected = false;
     }
 
     // Stop dev tools detection
@@ -152,6 +115,10 @@ class SecurityManager {
 
     // Show security warning
     showSecurityWarning(message) {
+        const lowered = String(message || '').toLowerCase();
+        if (lowered.includes('developer tools detected') || lowered.includes('security violation detected')) {
+            return;
+        }
         const warning = document.createElement('div');
         warning.style.cssText = `
             position: fixed;

@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
+  <title>Pension File Registry - PensionsGo</title>
+  <link rel="stylesheet" href="css/color-variables.css?v=20260504b">
+  <link rel="stylesheet" href="css/styles.css?v=20260507c">
+  <link rel="stylesheet" href="css/profile.css?v=20260504a">
+  <link rel="stylesheet" href="css/menu.css?v=20260504d">
+  <link rel="stylesheet" href="css/overlay.css?v=20260504a">
+  <link rel="stylesheet" href="css/pension_file_registry.css?v=20260528c">
+  <script type="module" src="js/main.js?v=20260528b"></script>
+  <script defer src="js/modules/filterable_select.js?v=20260429a"></script>
+  <script defer src="js/modules/district_selector.js?v=20260429a"></script>
+  <script defer src="js/modules/retirement-types.js"></script>
+  <script defer src="js/pension_file_registry.js?v=20260430a"></script>
+</head>
+<body>
+  <main class="registry-wrapper">
+    <section class="registry-header">
+      <div class="registry-header-copy">
+        <h2>Pension File Registry</h2>
+      </div>
+      <div class="registry-header-actions">
+        <button id="registryDeleteQueueBtn" class="btn-secondary hidden" type="button">
+          <span>Delete Queue</span>
+          <span id="registryDeleteQueueCount" class="queue-badge hidden" aria-label="Pending delete requests">0</span>
+        </button>
+        <button id="registryLifeCertBtn" class="btn-secondary hidden" type="button">
+          <span>Life Certificate</span>
+        </button>
+        <button id="registryAddFileBtn" class="btn-primary hidden" type="button">Add File</button>
+        <button id="registryRefreshBtn" class="btn-secondary" type="button">Refresh</button>
+      </div>
+    </section>
+
+    <section class="registry-toolbar">
+      <label class="toolbar-field toolbar-field-search">
+        <span>Search</span>
+        <input type="text" id="registrySearchInput" placeholder="Search file no, box no, name, station, NIN...">
+      </label>
+      <label class="toolbar-field">
+        <span>Box Number</span>
+        <select id="registryBoxNumberFilter" data-filterable-select>
+          <option value="">All Box Numbers</option>
+        </select>
+      </label>
+      <label class="toolbar-field registry-filter-availability">
+        <span>Availability</span>
+        <select id="registryAvailabilityFilter">
+          <option value="">All</option>
+          <option value="in_shelf">In Shelf</option>
+          <option value="out_of_shelf">Out of Shelf</option>
+        </select>
+      </label>
+      <label class="toolbar-field registry-filter-pay-type">
+        <span>Pay Type</span>
+        <select id="registryPayTypeFilter">
+          <option value="">All</option>
+          <option value="Pensioner">Pensioner</option>
+          <option value="One-off Payment">One-off Payment</option>
+        </select>
+      </label>
+      <label class="toolbar-field registry-filter-sort">
+        <span>Sort</span>
+        <select id="registrySortSelect">
+          <option value="recent">Most Recent</option>
+          <option value="name_asc">Name (A-Z)</option>
+          <option value="reg_asc">File Number (A-Z)</option>
+        </select>
+      </label>
+      <label class="toolbar-field registry-filter-page-size">
+        <span>Page Size</span>
+        <select id="registryPageSize">
+          <option value="12">12</option>
+          <option value="24" selected>24</option>
+          <option value="48">48</option>
+        </select>
+      </label>
+    </section>
+
+    <section id="registryGrid" class="registry-grid">
+      <div class="app-state-message app-state-neutral">Loading pension file registry...</div>
+    </section>
+
+    <section class="registry-pagination" id="registryPagination" hidden>
+      <div class="registry-pagination-summary" id="registryPaginationSummary"></div>
+      <div class="registry-pagination-controls" id="registryPaginationControls"></div>
+    </section>
+  </main>
+
+  <div id="registryDetailsModal" class="registry-modal-overlay hidden" aria-hidden="true">
+    <div class="registry-modal-backdrop" data-close-modal="details"></div>
+    <section class="registry-modal-panel" role="dialog" aria-modal="true" aria-labelledby="registryDetailsTitle">
+      <header class="registry-modal-header">
+        <h3 id="registryDetailsTitle">File Details</h3>
+        <button type="button" class="registry-modal-close" data-close-modal="details" aria-label="Close">&times;</button>
+      </header>
+      <div id="registryDetailsBody" class="registry-modal-body"></div>
+      <footer class="registry-modal-footer">
+        <button type="button" class="btn-secondary hidden" id="registryDetailsLifeCertBtn">Life Cert</button>
+        <button type="button" class="btn-secondary hidden" id="registryDetailsEditBtn">Edit</button>
+        <button type="button" class="btn-confirm hidden" id="registryDetailsDeleteBtn">Delete</button>
+        <button type="button" class="btn-cancel" data-close-modal="details">Close</button>
+      </footer>
+    </section>
+  </div>
+
+  <div id="registryEditModal" class="registry-modal-overlay hidden" aria-hidden="true">
+    <div class="registry-modal-backdrop" data-close-modal="edit"></div>
+    <section class="registry-modal-panel registry-edit-panel" role="dialog" aria-modal="true" aria-labelledby="registryEditTitle">
+      <header class="registry-modal-header">
+        <div class="registry-modal-header-copy">
+          <h3 id="registryEditTitle">Edit Registry Record</h3>
+          <p id="registryEditModeHint" class="registry-modal-subtitle">Update identity, service, benefits, and registry tracking details for the selected pension file.</p>
+        </div>
+        <div class="registry-modal-header-actions">
+          <button type="button" class="btn-secondary hidden" id="registryOpenBulkUploadBtn">Upload Bulk</button>
+          <button type="button" class="registry-modal-close" data-close-modal="edit" aria-label="Close">&times;</button>
+        </div>
+      </header>
+      <form id="registryEditForm" class="registry-edit-form">
+        <input type="hidden" id="editRecordId">
+        <div id="registryEditFormBanner" class="registry-edit-form-banner">
+          <div>
+            <strong id="registryEditFormBannerTitle">Registry Update Workspace</strong>
+            <p id="registryEditFormBannerText">Use the sections below to maintain the pension file profile. Leave Box Number blank during creation to let the registry allocate one automatically.</p>
+          </div>
+        </div>
+        <div class="registry-edit-tabs" role="tablist" aria-label="Edit registry sections">
+          <button type="button" class="registry-edit-tab is-active" data-edit-tab="identity" data-valid-state="neutral" role="tab" aria-selected="true"><span>Identity Profile</span><span class="registry-edit-tab-status" aria-hidden="true"></span></button>
+          <button type="button" class="registry-edit-tab" data-edit-tab="service" data-valid-state="neutral" role="tab" aria-selected="false"><span>Service Profile</span><span class="registry-edit-tab-status" aria-hidden="true"></span></button>
+          <button type="button" class="registry-edit-tab" data-edit-tab="benefits" data-valid-state="neutral" role="tab" aria-selected="false"><span>Benefits Snapshot</span><span class="registry-edit-tab-status" aria-hidden="true"></span></button>
+          <button type="button" class="registry-edit-tab" data-edit-tab="contact" data-valid-state="neutral" role="tab" aria-selected="false"><span>Contact & Banking</span><span class="registry-edit-tab-status" aria-hidden="true"></span></button>
+          <button type="button" class="registry-edit-tab" data-edit-tab="registry" data-valid-state="neutral" role="tab" aria-selected="false"><span>Registry Tracking</span><span class="registry-edit-tab-status" aria-hidden="true"></span></button>
+          <button type="button" class="registry-edit-tab" data-edit-tab="documents" data-valid-state="neutral" role="tab" aria-selected="false"><span>Uploaded Documents</span><span class="registry-edit-tab-status" aria-hidden="true"></span></button>
+        </div>
+        <div class="registry-edit-panels">
+          <section class="registry-edit-panel-group is-active" data-edit-panel="identity" role="tabpanel">
+            <div class="edit-grid">
+              <label class="edit-field">
+                <span>File Number</span>
+                <input type="text" id="editRegNo" data-text-case="upper" placeholder="PEN/" autocomplete="off" pattern="^PEN\/(?:[1-9][0-9]{0,4}|[A-Z]\/[1-9][0-9]{0,3})$" readonly>
+              </label>
+              <label class="edit-field">
+                <span>Computer Number</span>
+                <input type="text" id="editComputerNo">
+              </label>
+              <label class="edit-field">
+                <span>Supplier Number</span>
+                <input type="text" id="editSupplierNo">
+              </label>
+              <label class="edit-field">
+                <span>Title/Rank</span>
+                <input type="text" id="editTitle" list="editTitleOptions" placeholder="Select existing title" autocomplete="off">
+              </label>
+              <datalist id="editTitleOptions"></datalist>
+              <label class="edit-field">
+                <span>Surname</span>
+                <input type="text" id="editSName" required>
+              </label>
+              <label class="edit-field">
+                <span>First Name</span>
+                <input type="text" id="editFName" required>
+              </label>
+              <label class="edit-field">
+                <span>Gender</span>
+                <select id="editGender">
+                  <option value="">N/A</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                </select>
+              </label>
+              <label class="edit-field">
+                <span>NIN</span>
+                <input type="text" id="editNIN">
+              </label>
+              <label class="edit-field">
+                <span>TIN</span>
+                <input type="text" id="editTIN">
+              </label>
+              <label class="edit-field">
+                <span>Telephone</span>
+                <input type="text" id="editTelNo">
+              </label>
+              <label class="edit-field edit-field-span-2">
+                <span>District of Residence</span>
+                <input type="text" id="editAddress">
+              </label>
+            </div>
+          </section>
+
+          <section class="registry-edit-panel-group" data-edit-panel="service" role="tabpanel">
+            <div class="edit-grid">
+              <label class="edit-field">
+                <span>Date of Birth</span>
+                <input type="date" id="editBirthDate">
+              </label>
+              <label class="edit-field">
+                <span>Date of Enlistment</span>
+                <input type="date" id="editEnlistmentDate">
+              </label>
+              <label class="edit-field">
+                <span>Date of Retirement</span>
+                <input type="date" id="editRetirementDate">
+              </label>
+              <label class="edit-field">
+                <span>Retirement Type</span>
+                <select id="editRetirementType">
+                  <option value="">Select retirement type</option>
+                  <option value="mandatory">Mandatory Retirement</option>
+                  <option value="early">Early Retirement</option>
+                  <option value="death">Death</option>
+                  <option value="aor">Discharge (A.O.R)</option>
+                  <option value="medical">Discharge (Medical)</option>
+                  <option value="marriage">Discharge (Marriage)</option>
+                  <option value="cbe">Discharge (C.B.E)</option>
+                  <option value="ube">Discharge (U.B.E)</option>
+                  <option value="public">Discharge (Public Interest)</option>
+                  <option value="contract">End of Contract</option>
+                  <option value="tx">Discharge (T.X)</option>
+                  <option value="voluntary">Voluntary</option>
+                  <option value="oldAge">Old Age</option>
+                  <option value="abolition">Abolition of Office</option>
+                </select>
+              </label>
+              <label class="edit-field">
+                <span>Living Status</span>
+                <select id="editLivingStatus">
+                  <option value="">N/A</option>
+                  <option value="Alive">Alive</option>
+                  <option value="Deceased">Deceased</option>
+                </select>
+              </label>
+              <label class="edit-field">
+                <span>Life Certificate</span>
+                <select id="editLifeCertificate">
+                  <option value="Not Submitted">Not Submitted</option>
+                  <option value="Submitted">Submitted</option>
+                  <option value="Exempt">Exempt</option>
+                </select>
+              </label>
+              <label class="edit-field">
+                <span>Payroll Status</span>
+                <select id="editPayrollStatus">
+                  <option value="Not on Payroll">Not on Payroll</option>
+                  <option value="On Payroll">On Payroll</option>
+                </select>
+              </label>
+              <label class="edit-field">
+                <span>Pay Type</span>
+                <select id="editPayType" disabled title="Auto-determined from the retirement label and, where required, service dates.">
+                  <option value="">Auto-determined from retirement label and, where required, service dates</option>
+                  <option value="Pensioner">Pensioner</option>
+                  <option value="One-off Payment">One-off Payment</option>
+                </select>
+              </label>
+              <div class="edit-field edit-field-span-2 registry-inline-hint" id="registryRetirementPolicyHint" data-state="neutral" hidden></div>
+            </div>
+          </section>
+
+          <section class="registry-edit-panel-group" data-edit-panel="benefits" role="tabpanel">
+            <div class="edit-grid">
+              <label class="edit-field">
+                <span>Monthly Salary (UGX)</span>
+                <input type="number" id="editMonthlySalary" min="0" step="0.01" data-money-input data-money-fixed-decimals="2">
+              </label>
+              <label class="edit-field">
+                <span>Length of Service (Months)</span>
+                <input type="number" id="editLengthOfService" min="0" step="1">
+              </label>
+              <label class="edit-field">
+                <span>Annual Salary (UGX)</span>
+                <input type="number" id="editAnnualSalary" min="0" step="0.01" data-money-input data-money-fixed-decimals="2">
+              </label>
+              <label class="edit-field">
+                <span>Reduced Pension (UGX)</span>
+                <input type="number" id="editReducedPension" min="0" step="0.01" data-money-input data-money-fixed-decimals="2">
+              </label>
+              <label class="edit-field">
+                <span>Full Pension (UGX)</span>
+                <input type="number" id="editFullPension" min="0" step="0.01" data-money-input data-money-fixed-decimals="2">
+              </label>
+              <label class="edit-field">
+                <span>Commuted Gratuity (UGX)</span>
+                <input type="number" id="editGratuity" min="0" step="0.01" data-money-input data-money-fixed-decimals="2">
+              </label>
+              <label class="edit-field">
+                <span>Date On 15 Years</span>
+                <input type="date" id="editDateOn15yrs" readonly>
+              </label>
+              <label class="edit-field edit-field-span-2">
+                <span>Period To 15 Years</span>
+                <input type="text" id="editPeriodTo15yrs" readonly>
+              </label>
+              <label class="edit-field edit-field-span-2">
+                <span>Period From 15 Years</span>
+                <input type="text" id="editPeriodFrom15yrs" readonly>
+              </label>
+            </div>
+          </section>
+
+          <section class="registry-edit-panel-group" data-edit-panel="contact" role="tabpanel">
+            <div class="edit-grid">
+              <label class="edit-field edit-field-span-2">
+                <span>Applicant Email</span>
+                <input type="email" id="editApplicantEmail">
+              </label>
+              <label class="edit-field">
+                <span>Bank Name</span>
+                <select id="editBankName" data-filterable-select>
+                  <option value="">Select bank</option>
+                </select>
+              </label>
+              <label class="edit-field">
+                <span>Bank Account</span>
+                <input type="text" id="editBankAccount">
+              </label>
+              <label class="edit-field">
+                <span>Bank Branch</span>
+                <input type="text" id="editBankBranch">
+              </label>
+              <label class="edit-field">
+                <span>Next of Kin</span>
+                <input type="text" id="editNextOfKin">
+              </label>
+              <label class="edit-field">
+                <span>Next of Kin Contact</span>
+                <input type="text" id="editNextOfKinContact">
+              </label>
+            </div>
+          </section>
+
+          <section class="registry-edit-panel-group" data-edit-panel="registry" role="tabpanel">
+            <div class="edit-grid">
+              <label class="edit-field">
+                <span>Box Number</span>
+                <input type="text" id="editBoxNo">
+              </label>
+              <label class="edit-field">
+                <span>Availability</span>
+                <select id="editAvailabilityStatus">
+                  <option value="in_shelf">In Shelf</option>
+                  <option value="out_of_shelf">Out of Shelf</option>
+                </select>
+              </label>
+              <label class="edit-field edit-field-span-2">
+                <span>Availability Reason</span>
+                <input type="text" id="editAvailabilityReason">
+              </label>
+              <label class="edit-field edit-field-span-2">
+                <span>Other Notes</span>
+                <textarea id="editOther" rows="2"></textarea>
+              </label>
+            </div>
+          </section>
+
+          <section class="registry-edit-panel-group" data-edit-panel="documents" role="tabpanel">
+            <section class="registry-doc-manager" aria-labelledby="registryDocManagerTitle">
+              <div class="registry-doc-manager-head">
+                <div>
+                  <h4 id="registryDocManagerTitle">Document Manager</h4>
+                  <p>Upload new supporting files, adjust classification, replace outdated attachments, or remove documents that should no longer sit on this registry record.</p>
+                </div>
+                <span id="registryDocumentModeBadge" class="registry-meta-chip">New Upload</span>
+              </div>
+              <input type="hidden" id="registryDocumentTargetId">
+              <div class="registry-doc-manager-grid">
+                <label class="edit-field">
+                  <span>Document Type</span>
+                  <select id="registryDocumentType">
+                    <option value="">Select document type</option>
+                  </select>
+                </label>
+                <label class="edit-field edit-field-span-2">
+                  <span>Select File</span>
+                  <input type="file" id="registryDocumentFile" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.txt,.csv">
+                </label>
+              </div>
+              <p id="registryDocumentHint" class="edit-section-note">Choose a document type and a file to upload it to this pension file record.</p>
+              <div class="registry-doc-manager-actions">
+                <button type="button" class="btn-secondary" id="registryDocumentResetBtn">Clear Draft</button>
+                <button type="button" class="btn-confirm" id="registryDocumentSaveBtn">Upload Document</button>
+              </div>
+            </section>
+            <div id="editDocumentsList" class="registry-doc-list edit-doc-list">
+              <div class="app-state-message app-state-neutral">No documents uploaded.</div>
+            </div>
+          </section>
+        </div>
+        <div class="registry-modal-footer">
+          <button type="button" class="btn-cancel" data-close-modal="edit">Cancel</button>
+          <button type="submit" class="btn-confirm" id="registryEditSubmitBtn">Save Changes</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div id="registryBulkUploadModal" class="registry-modal-overlay hidden" aria-hidden="true">
+    <div class="registry-modal-backdrop" data-close-modal="bulk-upload"></div>
+    <section class="registry-modal-panel registry-bulk-upload-panel" role="dialog" aria-modal="true" aria-labelledby="registryBulkUploadTitle">
+      <header class="registry-modal-header">
+        <div class="registry-modal-header-copy">
+          <h3 id="registryBulkUploadTitle">Bulk Upload Pension Files</h3>
+          <p class="registry-modal-subtitle">Upload approved registry data from CSV or XLSX, run a dry check first, then apply the import once the report is clean.</p>
+        </div>
+        <div class="registry-modal-header-actions">
+          <button type="button" class="registry-modal-close" data-close-modal="bulk-upload" aria-label="Close">&times;</button>
+        </div>
+      </header>
+      <form id="registryBulkUploadForm" class="registry-bulk-upload-form">
+        <div class="registry-modal-body">
+          <div class="registry-bulk-upload-summary">
+            <span class="registry-meta-chip">Dataset: <strong>Pension File Registry</strong></span>
+            <span class="registry-meta-chip">Accepted Files: <strong>CSV, XLSX</strong></span>
+            <span class="registry-meta-chip">Match Key: <strong>File Number</strong></span>
+          </div>
+
+          <div class="registry-bulk-upload-note">
+            <div class="registry-bulk-upload-note-icon" aria-hidden="true">i</div>
+            <div>
+              <strong>Upload workflow</strong>
+              <p>Download the template, keep the headers intact, run a dry check, then apply the import. Blank incoming values will not overwrite populated registry values.</p>
+            </div>
+          </div>
+
+          <div class="registry-bulk-upload-grid">
+            <section class="registry-bulk-upload-card">
+              <div class="registry-bulk-upload-card-head">
+                <div>
+                  <h4>Template &amp; Source File</h4>
+                  <p>Use the official template so the system can validate and merge records correctly.</p>
+                </div>
+                <button type="button" class="btn-secondary" id="registryBulkDownloadTemplateBtn">Download CSV Template</button>
+              </div>
+              <label class="edit-field">
+                <span>Import File</span>
+                <input type="file" id="registryBulkUploadFile" name="import_file" accept=".csv,.xlsx,.xlxl" required>
+              </label>
+              <p class="registry-bulk-upload-helper">Supported files: `.csv`, `.xlsx`. Existing rows are merged safely; conflicts are flagged for review instead of silently overwriting values.</p>
+            </section>
+
+            <section class="registry-bulk-upload-card">
+              <div class="registry-bulk-upload-card-head">
+                <div>
+                  <h4>Quality Rules</h4>
+                  <p>These are the key checks performed during the dry validation pass.</p>
+                </div>
+              </div>
+              <ul class="registry-bulk-upload-list">
+                <li>File Number is the primary matching key.</li>
+                <li>Titles must exist in the approved titles catalogue.</li>
+                <li>Box Number is auto-assigned when left blank.</li>
+                <li>Life Certificate and pay type values are normalized automatically.</li>
+                <li>Conflicting populated values are reported for manual review.</li>
+              </ul>
+            </section>
+          </div>
+
+          <div id="registryBulkUploadReport" class="registry-bulk-upload-report hidden"></div>
+        </div>
+        <div class="registry-modal-footer">
+          <button type="button" class="btn-cancel" data-close-modal="bulk-upload">Close</button>
+          <button type="button" class="btn-secondary" id="registryBulkDryRunBtn">Run Dry Check</button>
+          <button type="submit" class="btn-confirm" id="registryBulkImportBtn">Import Data</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div id="registryDeleteQueueModal" class="registry-modal-overlay hidden" aria-hidden="true">
+    <div class="registry-modal-backdrop" data-close-modal="delete-queue"></div>
+    <section class="registry-modal-panel registry-delete-queue-panel" role="dialog" aria-modal="true" aria-labelledby="registryDeleteQueueTitle">
+      <header class="registry-modal-header">
+        <h3 id="registryDeleteQueueTitle">Registry Delete Requests</h3>
+        <button type="button" class="registry-modal-close" data-close-modal="delete-queue" aria-label="Close">&times;</button>
+      </header>
+      <div class="registry-modal-tools delete-queue-tools">
+        <button type="button" id="toggleDeleteHistoryBtn" class="delete-history-toggle-btn">Show Deleted History</button>
+      </div>
+      <div id="registryDeleteQueueBody" class="registry-modal-body">
+        <div class="app-state-message app-state-neutral">Loading requests...</div>
+      </div>
+      <div id="registryDeleteHistoryWrap" class="registry-modal-body delete-history-wrap hidden">
+        <div id="registryDeleteHistoryBody" class="delete-history-body">
+          <div class="app-state-message app-state-neutral">History is hidden.</div>
+        </div>
+      </div>
+      <footer class="registry-modal-footer">
+        <button type="button" class="btn-cancel" data-close-modal="delete-queue">Close</button>
+      </footer>
+    </section>
+  </div>
+
+  <div id="registryLifeCertModal" class="registry-modal-overlay hidden" aria-hidden="true">
+    <div class="registry-modal-backdrop" data-close-modal="life-cert"></div>
+    <section class="registry-modal-panel registry-life-cert-panel" role="dialog" aria-modal="true" aria-labelledby="registryLifeCertTitle">
+      <header class="registry-modal-header">
+        <h3 id="registryLifeCertTitle">Receive Life Certificate</h3>
+        <button type="button" class="registry-modal-close" data-close-modal="life-cert" aria-label="Close">&times;</button>
+      </header>
+      <div id="lifeCertActionTools" class="registry-modal-body">
+        <p class="life-cert-subtitle">Mark a beneficiary as submitted for the selected year.</p>
+        <form id="registryLifeCertForm" class="life-cert-action-stack">
+          <label class="edit-field">
+            <span>File Number</span>
+            <input type="text" id="registryLifeCertRegNo" list="registryLifeCertRegNoList" placeholder="Enter file number" autocomplete="off" data-text-case="upper" required>
+          </label>
+          <datalist id="registryLifeCertRegNoList"></datalist>
+          <label class="edit-field">
+            <span>Submission Year</span>
+            <input type="number" id="registryLifeCertYear" min="2000" max="2100" required>
+          </label>
+          <label class="edit-field">
+            <span>Notes</span>
+            <input type="text" id="registryLifeCertNotes" placeholder="Optional notes">
+          </label>
+          <section class="life-cert-profile">
+            <div class="life-cert-profile-header">
+              <h4>Beneficiary Details</h4>
+              <button type="button" class="btn-secondary" id="registryLifeCertEditBtn">Edit Details</button>
+            </div>
+            <p id="registryLifeCertProfileHint" class="life-cert-profile-hint">Select a file number to load details.</p>
+            <div class="edit-grid life-cert-profile-grid">
+              <label class="edit-field edit-field-span-2">
+                <span>Pensioner Name</span>
+                <input type="text" id="registryLifeCertPensionerName" readonly>
+              </label>
+              <label class="edit-field">
+                <span>Phone Number</span>
+                <input type="text" id="registryLifeCertPhone" readonly>
+              </label>
+              <label class="edit-field edit-field-span-2">
+                <span>District of Residence</span>
+                <input type="text" id="registryLifeCertAddress" readonly>
+              </label>
+              <label class="edit-field">
+                <span>Next of Kin</span>
+                <input type="text" id="registryLifeCertNok" readonly>
+              </label>
+              <label class="edit-field">
+                <span>Next of Kin Contact</span>
+                <input type="text" id="registryLifeCertNokContact" readonly>
+              </label>
+              <label class="edit-field">
+                <span>Bank Name</span>
+                <input type="text" id="registryLifeCertBankName" readonly>
+              </label>
+              <label class="edit-field">
+                <span>Bank Account</span>
+                <input type="text" id="registryLifeCertBankAccount" readonly>
+              </label>
+              <label class="edit-field">
+                <span>Bank Branch</span>
+                <input type="text" id="registryLifeCertBankBranch" readonly>
+              </label>
+            </div>
+          </section>
+          <div class="registry-modal-footer life-cert-footer">
+            <button type="button" class="btn-cancel" data-close-modal="life-cert">Cancel</button>
+            <button type="submit" class="btn-confirm" id="registryLifeCertSubmitBtn">Mark Submitted</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  </div>
+</body>
+</html>
+
+
+

@@ -3,9 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
 
     <!-- Security Meta Tags -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com data:; img-src 'self' data:;">
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
     <meta http-equiv="X-XSS-Protection" content="1; mode=block">
     <meta name="referrer" content="strict-origin-when-cross-origin">
@@ -13,28 +18,34 @@
     <title>Admin Dashboard - PensionsGo Management System</title>
     
     <!-- CSS Imports -->
-    <link rel="stylesheet" href="../frontend/css/color-variables.css">
-    <link rel="stylesheet" href="../frontend/css/admin-dashboard.css">
-    <link rel="stylesheet" href="../frontend/css/styles.css">
-    <link rel="stylesheet" href="../frontend/css/auth.css">
-    <link rel="stylesheet" href="../frontend/css/profile.css">
-    <link rel="stylesheet" href="../frontend/css/overlay.css">
-    <link rel="stylesheet" href="../frontend/css/broadcast_popup.css">
-    <link rel="stylesheet" href="../frontend/css/menu.css">
-    <link rel="stylesheet" href="../frontend/css/admin-dashboard/user-activity-logs.css">
-    <link rel="stylesheet" href="../frontend/css/admin-dashboard/mobile-sidebar.css">
+     
+    <link rel="stylesheet" href="../frontend/css/admin-dashboard.css?v=20260528b">
+    <link rel="stylesheet" href="../frontend/css/color-variables.css?v=20260504b">
+    <link rel="stylesheet" href="../frontend/css/admin-dashboard/user-activity-logs.css?v=20260504a">
+    <link rel="stylesheet" href="../frontend/css/admin-dashboard/mobile-sidebar.css?v=20260504a">
+    
+    <link rel="stylesheet" href="../frontend/css/auth.css?v=20260504a">
+    <link rel="stylesheet" href="../frontend/css/profile.css?v=20260504a">
+    <link rel="stylesheet" href="../frontend/css/overlay.css?v=20260504a">
+    <link rel="stylesheet" href="../frontend/css/broadcast_popup.css?v=20260504a">
+    <link rel="stylesheet" href="../frontend/css/menu.css?v=20260504d">
+    <link rel="stylesheet" href="../frontend/css/styles.css?v=20260507c">
+    <link rel="stylesheet" href="../frontend/css/dashboard.css?v=20260504b">
+    
+
+    
 </head>
 <body>
     <!-- Security Overlay (Hidden by default) -->
     <div id="securityOverlay" class="security-overlay" style="display: none;">
         <div class="security-modal">
-            <div class="security-icon">🔒</div>
+            <div class="security-icon">&#128274;</div>
             <h3>Security Verification Required</h3>
             <p id="securityMessage">Please verify your identity to access admin features</p>
             <div class="security-actions">
                 <button id="verifyAdmin" class="security-btn security-btn-primary">
                     <span class="btn-text">Verify as Admin</span>
-                    <span class="btn-spinner" style="display: none;">🔄</span>
+                    <span class="btn-spinner" style="display: none;">&#128260;</span>
                 </button>
                 <button id="cancelAccess" class="security-btn security-btn-secondary">Cancel</button>
             </div>
@@ -44,10 +55,10 @@
     <!-- Admin Access Denied Overlay -->
     <div id="adminAccessDenied" class="access-denied-overlay" style="display: none;">
         <div class="access-denied-content">
-            <div class="access-denied-icon">🚫</div>
+            <div class="access-denied-icon">&#128683;</div>
             <h2>Admin Access Required</h2>
             <p>You do not have the required administrator privileges to access this dashboard.</p>
-            <p class="access-denied-details">This area is restricted to users with the 'admin' role only.</p>
+            <p class="access-denied-details">This area is restricted to administrator and super administrator roles only.</p>
             <div class="access-denied-actions">
                 <button id="goToDashboard" class="access-denied-btn">Go to Dashboard</button>
                 <button id="logoutFromDenied" class="access-denied-btn secondary">Logout</button>
@@ -63,17 +74,8 @@
             <aside class="admin-sidebar" id="adminSidebar">
                 <div class="sidebar-header">
                     <div class="admin-brand">
-                        <div class="brand-icon">⚙️</div>
+                        <div class="brand-icon">&#9881;</div>
                         <h2>Admin Console</h2>
-                    </div>
-                    <div class="admin-info">
-                        <div class="admin-avatar" id="adminAvatar">
-                            <img src="../backend/uploads/profiles/default-user.png" alt="Admin Avatar" onerror="this.src='../images/default-user.png'">
-                        </div>
-                        <div class="admin-details">
-                            <span class="admin-name" id="adminName">Loading...</span>
-                            <span class="admin-role" id="adminRole">Administrator</span>
-                        </div>
                     </div>
                 </div>
 
@@ -82,7 +84,7 @@
                         <!-- Dashboard Overview -->
                         <li class="nav-item">
                             <a href="#dashboard" class="nav-link active" data-section="dashboard">
-                                <span class="nav-icon">📊</span>
+                                <span class="nav-icon">&#128202;</span>
                                 <span class="nav-text">Dashboard Overview</span>
                             </a>
                         </li>
@@ -90,7 +92,7 @@
                         <!-- User Management -->
                         <li class="nav-item">
                             <a href="#user-management" class="nav-link" data-section="user-management">
-                                <span class="nav-icon">👥</span>
+                                <span class="nav-icon">&#128101;</span>
                                 <span class="nav-text">User Management</span>
                                 <span class="nav-badge" id="userCountBadge">0</span>
                             </a>
@@ -99,23 +101,35 @@
                         <!-- System Settings -->
                         <li class="nav-item has-submenu">
                             <a href="#system-settings" class="nav-link" data-section="system-settings">
-                                <span class="nav-icon">⚙️</span>
+                                <span class="nav-icon">&#9881;</span>
                                 <span class="nav-text">System Settings</span>
-                                <span class="nav-arrow">▼</span>
+                                <span class="nav-arrow">&#9660;</span>
                             </a>
                             <ul class="submenu">
                                 <li><a href="#app-settings" class="submenu-link" data-section="app-settings">App Settings</a></li>
                                 <li><a href="#security-settings" class="submenu-link" data-section="security-settings">Security Settings</a></li>
+                                <li><a href="#access-control" class="submenu-link" data-section="access-control">Access Control</a></li>
+                                <li><a href="#role-settings" class="submenu-link" data-section="role-settings">Role Governance</a></li>
                                 <li><a href="#notification-settings" class="submenu-link" data-section="notification-settings">Notifications</a></li>
+                                <li><a href="#notification-queue" class="submenu-link" data-section="notification-queue">Notification Queue</a></li>
+                                <li><a href="#podcast-settings" class="submenu-link" data-section="podcast-settings">Podcast</a></li>
+                                <li><a href="#title-settings" class="submenu-link" data-section="title-settings">Titles</a></li>
+                                <li><a href="#bank-settings" class="submenu-link" data-section="bank-settings">Banks</a></li>
+                                <li><a href="#unit-settings" class="submenu-link" data-section="unit-settings">Prison Units</a></li>
+                                <li><a href="#prison-district-settings" class="submenu-link" data-section="prison-district-settings">Prison Districts</a></li>
+                                <li><a href="#prison-region-settings" class="submenu-link" data-section="prison-region-settings">Prison Regions</a></li>
+                                <li><a href="#political-district-settings" class="submenu-link" data-section="political-district-settings">Political Districts</a></li>
+                                <li><a href="#faq-settings" class="submenu-link" data-section="faq-settings">FAQ Knowledge Base</a></li>
+                                <li><a href="#terms-settings" class="submenu-link" data-section="terms-settings">Terms of Use</a></li>
                             </ul>
                         </li>
 
                         <!-- Data Management -->
                         <li class="nav-item has-submenu">
                             <a href="#data-management" class="nav-link" data-section="data-management">
-                                <span class="nav-icon">💾</span>
+                                <span class="nav-icon">&#128190;</span>
                                 <span class="nav-text">Data Management</span>
-                                <span class="nav-arrow">▼</span>
+                                <span class="nav-arrow">&#9660;</span>
                             </a>
                             <ul class="submenu">
                                 <li><a href="#data-backup" class="submenu-link" data-section="data-backup">Backup & Restore</a></li>
@@ -128,14 +142,15 @@
                         <!-- Storage Management -->
                         <li class="nav-item has-submenu">
                             <a href="#storage-management" class="nav-link" data-section="storage-management">
-                                <span class="nav-icon">💽</span>
+                                <span class="nav-icon">&#128189;</span>
                                 <span class="nav-text">Storage Management</span>
-                                <span class="nav-arrow">▼</span>
+                                <span class="nav-arrow">&#9660;</span>
                             </a>
                             <ul class="submenu">
                                 <li><a href="#storage-overview" class="submenu-link" data-section="storage-overview">Storage Overview</a></li>
                                 <li><a href="#message-storage" class="submenu-link" data-section="message-storage">Message Storage</a></li>
                                 <li><a href="#attachment-storage" class="submenu-link" data-section="attachment-storage">Attachments</a></li>
+                                <li><a href="#document-storage" class="submenu-link" data-section="document-storage">Document Storage</a></li>
                                 <li><a href="#storage-cleanup" class="submenu-link" data-section="storage-cleanup">Cleanup Tools</a></li>
                             </ul>
                         </li>
@@ -143,10 +158,10 @@
                         <!-- Activity Logs -->
                         <li class="nav-item has-submenu">
                             <a href="#activity-logs" class="nav-link" data-section="activity-logs">
-                                <span class="nav-icon">📋</span>
+                                <span class="nav-icon">&#128203;</span>
                                 <span class="nav-text">Activity Logs</span>
                                 <span class="nav-badge" id="logCountBadge">0</span>
-                                <span class="nav-arrow">▼</span>
+                                <span class="nav-arrow">&#9660;</span>
                             </a>
                             <ul class="submenu">
                                 <li><a href="#user-logs" class="submenu-link" data-section="user-logs">User Activity Logs</a></li>
@@ -159,7 +174,7 @@
                         <!-- Analysis & Reporting -->
                         <li class="nav-item">
                             <a href="#analysis-reporting" class="nav-link" data-section="analysis-reporting">
-                                <span class="nav-icon">📈</span>
+                                <span class="nav-icon">&#128200;</span>
                                 <span class="nav-text">Analysis & Reporting</span>
                             </a>
                         </li>
@@ -167,7 +182,7 @@
                         <!-- Audit Trail -->
                         <li class="nav-item">
                             <a href="#audit-trail" class="nav-link" data-section="audit-trail">
-                                <span class="nav-icon">🔍</span>
+                                <span class="nav-icon">&#128269;</span>
                                 <span class="nav-text">Audit Trail</span>
                             </a>
                         </li>
@@ -175,9 +190,9 @@
                         <!-- System Health -->
                         <li class="nav-item">
                             <a href="#system-health" class="nav-link" data-section="system-health">
-                                <span class="nav-icon">❤️</span>
+                                <span class="nav-icon">&#10084;</span>
                                 <span class="nav-text">System Health</span>
-                                <span class="health-indicator" id="systemHealthIndicator">●</span>
+                                <span class="health-indicator" id="systemHealthIndicator">&#9679;</span>
                             </a>
                         </li>
                     </ul>
@@ -207,16 +222,12 @@
                     </div>
                     <div class="content-actions">
                         <button id="refreshData" class="action-btn" title="Refresh Data">
-                            <span class="action-icon">🔄</span>
-                            Refresh
-                        </button>
-                        <button id="exportData" class="action-btn" title="Export Current View">
-                            <span class="action-icon">📥</span>
-                            Export
+                            <span class="action-icon">&#128260;</span> Refresh
                         </button>
                         <div class="admin-search">
-                            <input type="text" id="adminSearch" placeholder="Search admin features..." class="search-input">
-                            <span class="search-icon">🔍</span>
+                            <input type="search" id="adminSearch" name="admin_feature_search" placeholder="Search settings, controls, or reports..." class="search-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" readonly>
+                            <span class="search-icon">&#128269;</span>
+                            <div id="adminSearchResults" class="admin-search-results" hidden></div>
                         </div>
                     </div>
                 </div>
@@ -224,28 +235,22 @@
                 <div class="content-body" id="contentBody">
                     <!-- Content will be dynamically loaded based on section selection -->
                     <div class="welcome-message">
-                        <div class="welcome-icon">👋</div>
+                        <div class="welcome-icon">&#128075;</div>
                         <h1>Welcome to Admin Console</h1>
                         <p>Select a section from the sidebar to manage system settings and view reports.</p>
                         <div class="welcome-stats">
                             <div class="stat-card">
-                                <div class="stat-icon">👥</div>
-                                <div class="stat-info">
-                                    <span class="stat-value" id="welcomeUserCount">0</span>
+                                <div class="stat-icon">&#128101;</div><div class="stat-info"><span class="stat-value" id="welcomeUserCount">0</span>
                                     <span class="stat-label">Total Users</span>
                                 </div>
                             </div>
                             <div class="stat-card">
-                                <div class="stat-icon">📋</div>
-                                <div class="stat-info">
-                                    <span class="stat-value" id="welcomeLogCount">0</span>
+                                <div class="stat-icon">&#128203;</div><div class="stat-info"><span class="stat-value" id="welcomeLogCount">0</span>
                                     <span class="stat-label">Today's Logs</span>
                                 </div>
                             </div>
                             <div class="stat-card">
-                                <div class="stat-icon">⚡</div>
-                                <div class="stat-info">
-                                    <span class="stat-value" id="welcomeActiveSessions">0</span>
+                                <div class="stat-icon">&#9889;</div><div class="stat-info"><span class="stat-value" id="welcomeActiveSessions">0</span>
                                     <span class="stat-label">Active Sessions</span>
                                 </div>
                             </div>
@@ -257,69 +262,14 @@
     </div>
 
     <!-- JavaScript Imports -->
-    <script type="module" src="../frontend/js/main.js"></script>
-    <script src="../frontend/js/admin-dashboard.js"></script>
+    <script type="module" src="../frontend/js/main.js?v=20260528b"></script>
+    <script src="../frontend/js/admin-dashboard.js?v=20260528b"></script>
     <script src="../frontend/js/security-admin.js"></script>
     <!-- <script src="../frontend/js/security.js"></script> -->
 
-    <!-- Simple initialization script -->
-    <script>
-    // Simple initialization to ensure dashboard loads
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('🚀 Admin dashboard page loaded');
-        
-        // Check if adminDashboard was initialized
-        setTimeout(function() {
-            if (!window.adminDashboard) {
-                console.warn('AdminDashboard not auto-initialized, checking admin access manually...');
-                checkAdminAccessManually();
-            }
-        }, 1000);
-    });
-
-    function checkAdminAccessManually() {
-        fetch('../backend/api/verify_admin.php', {
-            credentials: 'include'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.is_admin) {
-                document.getElementById('adminDashboard').style.display = 'block';
-                document.getElementById('securityOverlay').style.display = 'none';
-                
-                // Update basic info
-                const currentUser = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
-                document.getElementById('adminName').textContent = currentUser.name || 'Administrator';
-                
-                console.log('✅ Admin access verified manually');
-            } else {
-                document.getElementById('adminAccessDenied').style.display = 'flex';
-            }
-        })
-        .catch(error => {
-            console.error('Manual admin verification failed:', error);
-            document.getElementById('securityOverlay').style.display = 'flex';
-        });
-    }
-
-    // Setup security overlay buttons
-    document.addEventListener('DOMContentLoaded', function() {
-        document.getElementById('verifyAdmin')?.addEventListener('click', function() {
-            location.reload();
-        });
-
-        document.getElementById('cancelAccess')?.addEventListener('click', function() {
-            window.location.href = 'dashboard.html';
-        });
-
-        document.getElementById('goToDashboard')?.addEventListener('click', function() {
-            window.location.href = 'dashboard.html';
-        });
-
-        document.getElementById('logoutFromDenied')?.addEventListener('click', function() {
-            window.location.href = '../backend/api/logout.php';
-        });
-    });
-    </script>
 </body>
 </html>
+
+
+
+

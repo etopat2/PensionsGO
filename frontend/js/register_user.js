@@ -9,29 +9,99 @@ document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('registerForm');
   const submitBtn = form.querySelector('button[type="submit"]');
 
-  const titles = ['Mr.', 'Mrs.', 'Ms.', 'Dr.'];
-  const roles = [
-    'admin', 'clerk', 'oc_pen', 'writeup_officer',
-    'file_creator', 'data_entry', 'assessor',
-    'auditor', 'approver', 'user', 'pensioner'
+  const titles = [
+    'Mr.',
+    'Mrs.',
+    'Ms.',
+    'Miss',
+    'Dr.',
+    'Prof.',
+    'Hon.',
+    'Rev.',
+    'Fr.',
+    'Sr.'
+  ];
+  const staticRoles = [
+    { key: 'admin', label: 'Administrator' },
+    { key: 'clerk', label: 'Clerk' },
+    { key: 'oc_pen', label: 'OC/Pension' },
+    { key: 'writeup_officer', label: 'Writeup Officer' },
+    { key: 'file_creator', label: 'File Creator' },
+    { key: 'data_entry', label: 'Data Entrant' },
+    { key: 'assessor', label: 'Assessor' },
+    { key: 'auditor', label: 'Auditor' },
+    { key: 'approver', label: 'Approver' },
+    { key: 'user', label: 'User' },
+    { key: 'pensioner', label: 'Pensioner' }
   ];
 
-  // ===== Populate dropdowns dynamically =====
+  // Populate dropdowns dynamically
+  const currentRawRole = String(
+    sessionStorage.getItem('userRole')
+    || localStorage.getItem('userRole')
+    || ''
+  ).toLowerCase();
+  const isSuperAdmin = currentRawRole === 'super_admin';
+
+  const filterAssignableRoles = (roles) => roles.filter((role) => {
+    const key = String(role?.key || '').toLowerCase();
+    if (key === 'super_admin') return false;
+    if (key === 'admin') return isSuperAdmin;
+    return true;
+  });
+
   const populateSelect = (id, items) => {
     const el = document.getElementById(id);
     if (!el) return;
     el.innerHTML = '<option value="" disabled selected>-- Select --</option>';
-    items.forEach(item => {
+    const normalizedItems = id === 'userRole' ? filterAssignableRoles(items) : items;
+    normalizedItems.forEach(item => {
       const opt = document.createElement('option');
-      opt.value = item;
-      opt.textContent = item;
+      if (typeof item === 'string') {
+        opt.value = item;
+        opt.textContent = item;
+      } else {
+        opt.value = item.key;
+        opt.textContent = item.label;
+      }
       el.appendChild(opt);
     });
   };
   populateSelect('userTitle', titles);
-  populateSelect('userRole', roles);
 
-  // ===== Utility to show inline messages =====
+  const loadRoles = async () => {
+    try {
+      const response = await fetch('../backend/api/get_roles.php?active_only=1', {
+        credentials: 'include',
+        cache: 'no-store'
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success || !Array.isArray(data.roles) || data.roles.length === 0) {
+        populateSelect('userRole', staticRoles);
+        return;
+      }
+
+      const roles = data.roles
+        .filter(role => role && role.role_key)
+        .map(role => ({
+          key: String(role.role_key).toLowerCase(),
+          label: String(role.role_label || role.role_key)
+        }));
+
+      if (!roles.length) {
+        populateSelect('userRole', staticRoles);
+        return;
+      }
+      populateSelect('userRole', roles);
+    } catch (error) {
+      console.warn('Unable to load dynamic roles:', error);
+      populateSelect('userRole', staticRoles);
+    }
+  };
+
+  loadRoles();
+
+  // Utility to show inline messages
   const showMessage = (msg, type = 'info') => {
     let box = document.getElementById('registerMessageBox');
     if (!box) {
@@ -43,16 +113,24 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => { box.innerHTML = ''; }, 8000);
   };
 
-  // ===== Password and email validation =====
+  // Password and email validation
   const passwordValid = (pwd) => (
     /[a-z]/.test(pwd) && /[A-Z]/.test(pwd) && /\d/.test(pwd) && pwd.length >= 6
   );
 
   const emailValid = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  const phoneValid = (phone) => /^\+[1-9][0-9]{7,14}$/.test(phone);
+  const normalizePhone = (value) => {
+    const input = String(value || "").trim().replace(/[\s().-]/g, "");
+    if (!input) return null;
+    if (/^00[1-9]\d{7,14}$/.test(input)) return `+${input.slice(2)}`;
+    if (/^\+[1-9]\d{7,14}$/.test(input)) return input;
+    if (/^0\d{9}$/.test(input)) return `+256${input.slice(1)}`;
+    if (/^[1-9]\d{7,14}$/.test(input)) return `+${input}`;
+    return null;
+  };
 
-  // ===== Form submission =====
+  // Form submission
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     submitBtn.disabled = true;
@@ -77,11 +155,13 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    if (!phoneValid(phone)) {
-      showMessage('❌ Enter a valid phone number in international format (e.g., +256700123456).', 'error');
+    const normalizedPhone = normalizePhone(phone);
+    if (!normalizedPhone) {
+      showMessage('❌ Enter a valid phone number (e.g., +256700123456, 0770123456, 0312123456, 0800123456).', 'error');
       submitBtn.disabled = false;
       return;
     }
+    formData.set('phoneNo', normalizedPhone);
 
     // --- Send to backend ---
     try {
@@ -106,3 +186,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+

@@ -1,9 +1,8 @@
 <?php
-// ============================================================================
+// 
 // get_message_users.php
-// Purpose: Fetch users for messaging (excluding pensioners)
-// ============================================================================
-
+// Purpose: Fetch users for messaging (excluding end-user and pensioner accounts)
+// 
 require_once __DIR__ . '/../config.php';
 
 if (!isset($_SESSION['userId'])) {
@@ -12,10 +11,16 @@ if (!isset($_SESSION['userId'])) {
     exit;
 }
 
+if (!currentUserCanAccessMessagingModule()) {
+    header('HTTP/1.1 403 Forbidden');
+    echo json_encode(['success' => false, 'message' => 'Access denied']);
+    exit;
+}
+
 header('Content-Type: application/json');
 
 try {
-    // Prepare and execute the SQL statement - exclude pensioners
+    // Internal messaging is limited to staff-facing accounts.
     $stmt = $conn->prepare("
         SELECT 
             userId, 
@@ -26,7 +31,7 @@ try {
             userRole, 
             userPhoto 
         FROM tb_users 
-        WHERE userRole != 'pensioner'
+        WHERE userRole NOT IN ('pensioner', 'user')
         AND userId != ?
         ORDER BY userName
     ");

@@ -1,0 +1,1291 @@
+erDiagram
+  tb_analytics_digest_runs {
+    bigint digest_id PK
+    date digest_date
+    string run_type
+    string digest_frequency
+    string recipient
+    string subject
+    string status
+    text summary_json
+    text notes
+    string created_by
+    string created_by_name
+    string created_by_role
+    datetime created_at
+  }
+  tb_analytics_snapshots {
+    bigint snapshot_id PK
+    string snapshot_type
+    text snapshot_payload
+    datetime created_at
+  }
+  tb_application_queue {
+    int queue_id PK
+    int staffdue_id FK
+    string regNo
+    string current_stage
+    string status
+    string verified_by FK
+    datetime verified_at
+    string submitted_by FK
+    datetime submitted_at
+    text notes
+    timestamp updated_at
+  }
+  tb_appnstatus {
+    int id PK
+    string regNo FK
+    string computerNo
+    string verification
+    string writeUp
+    string fileCreation
+    string entrantAllocation
+    string dataCapture
+    string assessment
+    string audit
+    string approval
+    string payrollAccess
+    text other
+    timestamp timeStamp
+    datetime verification_at
+    string verification_by
+    text verification_comment
+    datetime writeUp_at
+    string writeUp_by
+    text writeUp_comment
+    datetime fileCreation_at
+    string fileCreation_by
+    text fileCreation_comment
+    datetime entrantAllocation_at
+    string entrantAllocation_by
+    text entrantAllocation_comment
+    datetime dataCapture_at
+    string dataCapture_by
+    text dataCapture_comment
+    datetime assessment_at
+    string assessment_by
+    text assessment_comment
+    datetime audit_at
+    string audit_by
+    text audit_comment
+    datetime approval_at
+    string approval_by
+    text approval_comment
+  }
+  tb_appnsubmissions {
+    int id PK
+    string regNo FK
+    string title
+    string sName
+    string fName
+    string appnType
+    string contact
+    text address
+    date retirementDate
+    string retirementType
+    date submissionDate
+    text comment
+  }
+  tb_app_settings {
+    string setting_key PK
+    text setting_value
+    timestamp updated_at
+  }
+  tb_arrearstracking {
+    int id PK
+    string regNo
+    string arrearsType
+    decimal amount
+    date periodStart
+    date periodEnd
+    timestamp recordedAt
+    string recordedBy FK
+  }
+  tb_arrears_accountability_files {
+    int file_id PK
+    int submission_id FK
+    string file_name
+    string file_path
+    string mime_type
+    int file_size
+    timestamp created_at
+  }
+  tb_arrears_accountability_submissions {
+    int submission_id PK
+    string regNo FK
+    string claim_type
+    int payment_id FK
+    string status
+    text notes
+    string submitted_by FK
+    timestamp submitted_at
+  }
+  tb_arrears_ledger {
+    int ledger_id PK
+    string regNo FK
+    string claim_type
+    int period_year
+    int period_month
+    string financial_year_label
+    string quarter_label
+    decimal expected_amount
+    decimal paid_amount
+    decimal balance_amount
+    string status
+    string source_type
+    int reference_cycle_id
+    string reason
+    text notes
+    string recorded_by FK
+    timestamp recorded_at
+    timestamp updated_at
+    datetime settled_at
+    bool accountability_required
+    string accountability_status
+    string claim_status
+  }
+  tb_arrears_payments {
+    int payment_id PK
+    string regNo FK
+    string claim_type
+    decimal amount
+    decimal applied_amount
+    decimal unapplied_amount
+    date payment_date
+    string reference_no
+    text notes
+    string recorded_by FK
+    timestamp created_at
+    string payment_financial_year_label
+    bool accountability_required
+    string accountability_status
+    datetime accountability_submitted_at
+    int latest_submission_id FK
+  }
+  tb_arrears_payment_allocations {
+    int allocation_id PK
+    int payment_id FK
+    int ledger_id FK
+    string regNo
+    string claim_type
+    decimal applied_amount
+    string accrual_financial_year_label
+    string payment_financial_year_label
+    bool requires_accountability
+    string accountability_status
+    int accountability_submission_id FK
+    datetime accountability_submitted_at
+    timestamp created_at
+  }
+  tb_audit_logs {
+    int audit_id PK
+    string actor_id
+    string actor_name
+    string actor_role
+    string action
+    string entity_type
+    string entity_id
+    text details
+    timestamp created_at
+  }
+  tb_backup_logs {
+    int backup_id PK
+    string backup_label
+    string backup_type
+    string backup_scope
+    string file_name
+    string file_path
+    bigint file_size_bytes
+    string checksum_sha256
+    bool include_uploads
+    timestamp backup_time
+    string status
+    text notes
+    string created_by
+    string created_by_name
+    string created_by_role
+    timestamp restored_at
+    string restored_by
+  }
+  tb_broadcast_messages {
+    int broadcast_id PK
+    int message_id FK
+    text target_roles
+    bool is_active
+    timestamp created_at
+  }
+  tb_budgetforecast {
+    int id PK
+    int financialYear
+    decimal estimatedPensionAmount
+    decimal estimatedGratuityAmount
+    string createdBy FK
+    timestamp createdAt
+    decimal estimatedPensionArrears
+    decimal estimatedFullPensionArrears
+    decimal estimatedGratuityArrears
+    decimal estimatedUnderpaymentClaims
+    decimal estimatedSuspensionArrears
+    text notes
+  }
+  tb_claimstatus {
+    int id PK
+    string regNo
+    string computerNo
+    string supplierNo
+    string appnType
+    date verificationDate
+    string appnStatus
+    text comment
+  }
+  tb_data_export_runs {
+    int export_id PK
+    string dataset_key
+    string dataset_label
+    string export_format
+    string file_name
+    string file_path
+    bigint file_size_bytes
+    text filters_json
+    string status
+    text notes
+    timestamp created_at
+    string created_by FK
+    string created_by_name
+    string created_by_role
+  }
+  tb_data_import_runs {
+    int import_run_id PK
+    string dataset_key
+    string dataset_label
+    string source_file_name
+    string source_extension
+    string execution_mode
+    string run_status
+    int total_rows
+    int inserted_rows
+    int merged_rows
+    int skipped_exact_rows
+    int conflict_rows
+    int invalid_rows
+    int failed_rows
+    text report_json
+    string created_by FK
+    string created_by_name
+    string created_by_role
+    timestamp started_at
+    timestamp completed_at
+  }
+  tb_faq_entries {
+    int faq_id PK
+    string question
+    text answer
+    text bullets
+    string category
+    string audience_label
+    bool is_featured
+    int sort_order
+    bool is_active
+    timestamp created_at
+    timestamp updated_at
+  }
+  tb_feedback_activity {
+    int activity_id PK
+    int submission_id FK
+    string action
+    string actor_id FK
+    string actor_name
+    string actor_role
+    string from_status
+    string to_status
+    text note
+    text field_changes
+    timestamp created_at
+  }
+  tb_feedback_submissions {
+    int submission_id PK
+    string reference_no
+    string feedback_type
+    string audience
+    string full_name
+    string email_address
+    string phone_number
+    string subject
+    text message
+    string page_context
+    string submitted_by_user_id FK
+    string submitted_by_role
+    string status
+    timestamp submitted_at
+    timestamp updated_at
+    string priority
+    string assigned_to_user_id FK
+    string assigned_to_name
+    string assigned_to_role
+    timestamp assigned_at
+    timestamp reviewed_at
+    string reviewed_by_user_id FK
+    string reviewed_by_name
+    string reviewed_by_role
+    timestamp resolved_at
+    string resolved_by_user_id FK
+    string resolved_by_name
+    string resolved_by_role
+    timestamp closed_at
+    string closed_by_user_id FK
+    string closed_by_name
+    string closed_by_role
+    text resolution_summary
+  }
+  tb_fileregistry {
+    int id PK
+    string computerNo
+    string supplierNo
+    string regNo
+    string title
+    string sName
+    string fName
+    string gender
+    string livingStatus
+    string lifeCertificate
+    string boxNo
+    date birthDate
+    date enlistmentDate
+    date retirementDate
+    string retirementType
+    string TIN
+    string NIN
+    text address
+    string payrollStatus
+    string payType
+    date dateOn15yrs
+    string periodTo15yrs
+    string periodFrom15yrs
+    date dateOfDeath
+    date deathNotificationDate
+    string deathNotifierName
+    string deathNotifierContact
+    date estateExpiryDate
+    string estateStatus
+    timestamp timeStamp
+    text other
+    string availability_status
+    text availability_reason
+    string telNo
+    string applicant_email
+    string next_of_kin
+    string next_of_kin_contact
+    string bank_name
+    string bank_account
+    string bank_branch
+    bool lookup_contact_opt_in
+    datetime lookup_contact_updated_at
+    decimal monthlySalary
+    int lengthOfService
+    decimal annualSalary
+    decimal reducedPension
+    decimal fullPension
+    decimal gratuity
+    bool is_deleted
+    datetime deleted_at
+    string deleted_by
+    string deleted_by_name
+    string deleted_by_role
+    text delete_reason
+    bool workflow_auto_arrears_enabled
+    datetime workflow_auto_arrears_enabled_at
+    string workflow_auto_arrears_source
+  }
+  tb_file_movements {
+    int movement_id PK
+    string regNo
+    int file_id FK
+    string from_office
+    string to_office
+    text reason
+    string delivered_by
+    string received_by
+    datetime moved_at
+    datetime expected_return_at
+    datetime returned_at
+  }
+  tb_file_registry_delete_requests {
+    int request_id PK
+    int registry_id FK
+    string regNo
+    string requested_by FK
+    string requested_by_name
+    string requested_by_role
+    text reason
+    string status
+    string processed_by FK
+    string processed_by_name
+    string processed_by_role
+    text processed_note
+    timestamp created_at
+    datetime processed_at
+    string staff_name
+    string staff_title
+  }
+  tb_file_registry_recycle_bin {
+    int recycle_id PK
+    int registry_id FK
+    string regNo
+    string staff_name
+    string staff_title
+    int delete_request_id FK
+    text delete_reason
+    string deleted_by FK
+    string deleted_by_name
+    string deleted_by_role
+    timestamp deleted_at
+    text record_snapshot
+    bool restored
+    string restored_by FK
+    string restored_by_name
+    string restored_by_role
+    datetime restored_at
+  }
+  tb_file_scan_logs {
+    bigint scan_id PK
+    string storage_context
+    string file_name
+    string file_path
+    string file_hash
+    string mime_type
+    string scan_engine
+    string scan_status
+    text findings
+    string scanned_by
+    string scanned_by_name
+    string scanned_by_role
+    datetime scanned_at
+  }
+  tb_gratuity_schedule_allocations {
+    int allocation_id PK
+    int cycle_id FK
+    int entry_id FK
+    string matched_regNo
+    int ledger_id FK
+    int period_year
+    int period_month
+    string claim_type
+    decimal allocated_amount
+    decimal monthly_pension_amount
+    string allocation_status
+    string note
+    timestamp created_at
+  }
+  tb_gratuity_schedule_cycles {
+    int cycle_id PK
+    int schedule_year
+    int schedule_month
+    string financial_year_label
+    string quarter_label
+    string uploaded_by FK
+    string source_file
+    string source_file_original_name
+    string source_file_mime
+    text notes
+    int total_rows
+    int matched_rows
+    int unmatched_rows
+    int exact_gratuity_rows
+    int partial_gratuity_rows
+    int small_surplus_rows
+    int pension_arrears_rows
+    int review_rows
+    decimal total_scheduled_amount
+    decimal total_gratuity_component
+    decimal total_small_surplus_amount
+    decimal total_pension_surplus_amount
+    decimal total_allocated_pension_amount
+    decimal total_unallocated_amount
+    decimal total_remaining_arrears_amount
+    timestamp created_at
+    bool is_deleted
+  }
+  tb_gratuity_schedule_entries {
+    int entry_id PK
+    int cycle_id FK
+    int row_number
+    string regNo
+    string supplierNo
+    string beneficiary_name
+    decimal scheduled_amount
+    string matched_regNo
+    int matched_registry_id FK
+    string matched_name
+    decimal registry_gratuity_estimate
+    decimal latest_monthly_pension
+    string monthly_pension_source
+    decimal open_pension_arrears_amount
+    int open_pension_arrears_months
+    decimal gratuity_component_amount
+    decimal pension_surplus_amount
+    decimal small_surplus_amount
+    decimal allocated_pension_amount
+    int scheduled_full_months
+    int allocated_months
+    int unallocated_scheduled_months
+    decimal unallocated_scheduled_amount
+    int remaining_arrears_months
+    decimal remaining_arrears_amount
+    string classification
+    string matching_basis
+    string analysis_note
+    text raw_payload
+    bool is_matched
+    timestamp created_at
+  }
+  tb_ip_geolocation {
+    string ip_address PK
+    string city
+    string region
+    string country
+    string country_code
+    decimal latitude
+    decimal longitude
+    string timezone
+    string org
+    string asn
+    string location_label
+    text raw_json
+    timestamp last_lookup
+  }
+  tb_lifecertificates {
+    int id PK
+    string computerNo
+    string regNo
+    string sName
+    string fName
+    string nextOfKin
+    string nokContact
+    timestamp timeStamp
+  }
+  tb_life_certificate_submissions {
+    int submission_id PK
+    string regNo FK
+    int submission_year
+    string status
+    datetime submitted_at
+    string submitted_by FK
+    text notes
+    timestamp created_at
+    timestamp updated_at
+  }
+  tb_messages {
+    int message_id PK
+    string sender_id FK
+    string subject
+    text message_text
+    string message_type
+    int parent_message_id FK
+    bool is_urgent
+    timestamp created_at
+    timestamp updated_at
+    bool is_deleted
+    bool is_deleted_by_sender
+    timestamp deleted_by_sender_at
+  }
+  tb_message_attachments {
+    int attachment_id PK
+    int message_id FK
+    string file_name
+    string file_path
+    int file_size
+    string mime_type
+    timestamp uploaded_at
+    string file_hash
+    bool is_compressed
+  }
+  tb_message_recipients {
+    int recipient_id PK
+    int message_id FK
+    string recipient_user_id FK
+    bool is_read
+    timestamp read_at
+    bool is_deleted
+    timestamp deleted_at
+    timestamp created_at
+  }
+  tb_message_storage_snapshots {
+    bigint snapshot_id PK
+    date snapshot_date
+    string snapshot_type
+    string status
+    string file_name
+    string file_path
+    bigint file_size_bytes
+    int message_count
+    int attachment_count
+    bigint total_storage_bytes
+    text notes
+    string created_by
+    string created_by_name
+    string created_by_role
+    datetime created_at
+  }
+  tb_notification_digest_runs {
+    bigint digest_id PK
+    date digest_date
+    string run_type
+    string recipient
+    string subject
+    string status
+    text summary_json
+    text notes
+    string created_by
+    string created_by_name
+    string created_by_role
+    datetime created_at
+  }
+  tb_notification_queue {
+    int notification_id PK
+    string channel
+    string recipient
+    string subject
+    text message
+    string status
+    text meta
+    timestamp created_at
+    int attempts
+    datetime processing_started_at
+    datetime last_attempted_at
+    datetime sent_at
+    datetime failed_at
+    text last_error
+    string provider_reference
+  }
+  tb_payrolls {
+    int id PK
+    int payrollYear
+    int payrollMonth
+    string record_type
+    text file_path
+    string uploaded_by FK
+    timestamp uploaded_at
+  }
+  tb_pensioner_death_reports {
+    int report_id PK
+    int registry_id FK
+    string regNo
+    date date_of_death
+    string notifier_name
+    string notifier_contact
+    date notification_date
+    text notes
+    string recorded_by
+    string recorded_by_name
+    string recorded_by_role
+    timestamp created_at
+    timestamp updated_at
+  }
+  tb_payroll_arrears {
+    int id PK
+    int payrollYear
+    int payrollMonth
+    string supplierNo
+    decimal amount
+    string status
+  }
+  tb_payroll_audit_logs {
+    int audit_id PK
+    int cycle_id FK
+    string action
+    string actor_user_id FK
+    string actor_role
+    string ip_address
+    text details
+    timestamp created_at
+  }
+  tb_payroll_gratuity {
+    int id PK
+    int payrollYear
+    int payrollMonth
+    string supplierNo
+    decimal amount
+    string status
+  }
+  tb_payroll_pension {
+    int id PK
+    int payrollYear
+    int payrollMonth
+    string supplierNo
+    decimal amount
+    string status
+  }
+  tb_payroll_suspended {
+    int id PK
+    int payrollYear
+    int payrollMonth
+    string supplierNo
+    decimal amount
+    string status
+  }
+  tb_payroll_upload_cycles {
+    int cycle_id PK
+    int payroll_year
+    int payroll_month
+    string financial_year_label
+    string quarter_label
+    string uploaded_by FK
+    string source_file
+    text notes
+    timestamp created_at
+    string source_file_original_name
+    string source_file_mime
+    string payment_register_file
+    string payment_register_original_name
+    string payment_register_mime
+    bool is_deleted
+    string deleted_by FK
+    datetime deleted_at
+  }
+  tb_payroll_upload_entries {
+    int entry_id PK
+    int cycle_id FK
+    string supplierNo
+    string beneficiary_name
+    decimal amount
+    string matched_regNo
+    int matched_registry_id FK
+    bool is_matched
+    timestamp created_at
+  }
+  tb_podcast_videos {
+    int podcast_id PK
+    string title
+    text description
+    string audience
+    string youtube_url
+    string youtube_id
+    text tags
+    bool is_featured
+    bool is_published
+    int sort_order
+    string created_by
+    string updated_by
+    timestamp created_at
+    timestamp updated_at
+  }
+  tb_podcast_views {
+    int view_id PK
+    int podcast_id FK
+    string viewer_id FK
+    string viewer_role
+    string session_id
+    timestamp viewed_at
+  }
+  tb_poldistricts {
+    int Id PK
+    text polDistrict
+    text polRegion
+  }
+  tb_pridistricts {
+    int Id PK
+    text priDistrict
+    text priRegion
+  }
+  tb_priregions {
+    int Id PK
+    text priRegion
+  }
+  tb_priunits {
+    int Id PK
+    text priUnit
+    text polDistrict
+    text priDistrict
+    text priRegion
+    text polRegion
+  }
+  tb_registry_payroll_monthly_status {
+    int status_id PK
+    string regNo
+    int payroll_year
+    int payroll_month
+    string financial_year_label
+    string quarter_label
+    string payroll_status
+    decimal amount
+    string supplierNo
+    int cycle_id FK
+    timestamp updated_at
+  }
+  tb_retained_payments {
+    int id PK
+    string supplierNo
+    date month
+    decimal retainedAmount
+    string recorded_by FK
+    timestamp recorded_at
+  }
+  tb_roles {
+    string role_key PK
+    string role_label
+    text role_description
+    string clone_from_role FK
+    bool is_active
+    bool is_system
+    timestamp created_at
+    timestamp updated_at
+  }
+  tb_role_permissions {
+    int role_permission_id PK
+    string role_key FK
+    string permission_key
+    bool is_allowed
+    text notes
+    string updated_by
+    timestamp created_at
+    timestamp updated_at
+  }
+  tb_session_metrics {
+    int metric_id PK
+    timestamp metric_time
+    int active_sessions
+    int concurrent_conflicts
+    int avg_session_duration
+    int timeout_errors
+    int network_errors
+    int grace_period_uses
+    int device_conflicts
+    int successful_logins
+    int failed_logins
+  }
+  tb_session_settings {
+    string user_id PK, FK
+    int max_concurrent_sessions
+    int session_timeout
+    bool allow_multiple_devices
+    bool auto_logout_on_conflict
+    int inactivity_warning_minutes
+    int grace_period_minutes
+    timestamp created_at
+    timestamp updated_at
+  }
+  tb_staffdue {
+    int id PK
+    string regNo
+    string computerNo
+    string title
+    string sName
+    string fName
+    string gender
+    string prisonUnit
+    text NIN
+    string telNo
+    date birthDate
+    date enlistmentDate
+    date retirementDate
+    text financialYear
+    string retirementType
+    decimal monthlySalary
+    int lengthOfService
+    decimal annualSalary
+    decimal reducedPension
+    decimal fullPension
+    decimal gratuity
+    string submissionStatus
+    string appnStatus
+    datetime submission_at
+    string submission_by
+    datetime appn_status_at
+    string appn_status_by
+    text appn_status_reason
+    text address
+    string TIN
+    string next_of_kin
+    string next_of_kin_contact
+    string bank_name
+    string bank_account
+    string bank_branch
+    string applicant_email
+    bool documents_uploaded
+    string livingStatus
+    string payType
+    bool is_deleted
+    datetime deleted_at
+    string deleted_by
+    string deleted_by_name
+    string deleted_by_role
+    text delete_reason
+    timestamp timeStamp
+  }
+  tb_staff_documents {
+    int document_id PK
+    int staffdue_id FK
+    string regNo
+    string doc_type
+    string file_name
+    string file_path
+    int file_size
+    string mime_type
+    string uploaded_by FK
+    timestamp uploaded_at
+    string file_hash
+    bool is_archived
+    datetime archived_at
+  }
+  tb_staff_due_delete_requests {
+    int request_id PK
+    int staffdue_id FK
+    string regNo
+    string staff_name
+    string staff_title
+    string requested_by FK
+    string requested_by_name
+    string requested_by_role
+    text reason
+    string status
+    string processed_by FK
+    string processed_by_name
+    string processed_by_role
+    text processed_note
+    timestamp created_at
+    datetime processed_at
+  }
+  tb_suspension_upload_cycles {
+    int suspension_cycle_id PK
+    int suspension_year
+    int suspension_month
+    string financial_year_label
+    string quarter_label
+    string uploaded_by FK
+    string source_file
+    string source_file_original_name
+    string source_file_mime
+    text notes
+    bool is_deleted
+    timestamp created_at
+    string reason_label
+  }
+  tb_suspension_upload_entries {
+    int entry_id PK
+    int suspension_cycle_id FK
+    string regNo
+    string supplierNo
+    string beneficiary_name
+    decimal amount
+    string reason
+    string matched_regNo
+    int matched_registry_id
+    bool is_matched
+    timestamp created_at
+  }
+  tb_system_logs {
+    bigint log_id PK
+    string log_level
+    string log_category
+    string event_code
+    text message
+    text context_json
+    string actor_id
+    string actor_name
+    string actor_role
+    string ip_address
+    datetime created_at
+  }
+  tb_system_log_resolutions {
+    bigint resolution_id PK
+    bigint log_id FK
+    string resolution_status
+    text resolution_note
+    string resolved_by_id
+    string resolved_by_name
+    string resolved_by_role
+    datetime resolved_at
+  }
+  tb_tasks {
+    int taskId PK
+    string createdBy FK
+    string sentTo FK
+    text details
+    text other
+    timestamp timeStamp
+    string created_by
+    string assigned_to
+    string assigned_role
+    string task_type
+    string task_title
+    text task_description
+    string status
+    string priority
+    int related_staff_id
+    string related_reg_no
+    datetime due_at
+    text declined_reason
+    text metadata
+    datetime updated_at
+    datetime completed_at
+    int parent_task_id
+  }
+  tb_task_alerts {
+    int alert_id PK
+    int task_id FK
+    string alert_type
+    string severity
+    string alert_status
+    string assigned_to
+    string assigned_role
+    string related_reg_no
+    datetime due_at
+    datetime triggered_at
+    datetime acknowledged_at
+    string acknowledged_by
+    datetime resolved_at
+    string resolved_by
+    datetime last_evaluated_at
+    text metadata
+    timestamp created_at
+    timestamp updated_at
+  }
+  tb_task_comments {
+    int comment_id PK
+    int task_id FK
+    string author_id
+    string author_name
+    string author_role
+    text comment
+    timestamp created_at
+  }
+  tb_task_completion_queue {
+    int queue_id PK
+    string owner_user_id FK
+    string owner_role
+    int task_id FK
+    string task_type
+    string task_title
+    string related_reg_no
+    string required_assignment_role
+    string next_assigned_to
+    string next_assigned_role
+    string next_priority
+    text action_note
+    string queue_status
+    int processed_task_id FK
+    text last_error
+    timestamp created_at
+    timestamp updated_at
+    datetime processed_at
+  }
+  tb_task_delegation_logs {
+    bigint log_id PK
+    int task_id
+    string from_user_id
+    string from_user_name
+    string from_user_role
+    string to_user_id
+    string to_user_name
+    string to_user_role
+    text note
+    string priority
+    datetime created_at
+  }
+  tb_workflow_logs {
+    bigint log_id PK
+    int task_id
+    int staffdue_id
+    string regNo
+    string action
+    string from_status
+    string to_status
+    string actor_id
+    string actor_name
+    string actor_role
+    text note
+    text metadata_json
+    datetime created_at
+  }
+  tb_terms_clauses {
+    int clause_id PK
+    string title
+    text body
+    string topics
+    string section_key
+    int sort_order
+    bool is_active
+    timestamp created_at
+    timestamp updated_at
+  }
+  tb_titles {
+    int title_id PK
+    string title_name
+    string category
+    string level
+    bool is_active
+    timestamp created_at
+  }
+  tb_banks {
+    int bank_id PK
+    string bank_name
+    string short_name
+    string bank_code
+    int display_order
+    bool is_active
+    timestamp created_at
+    timestamp updated_at
+  }
+  tb_uganda_public_holidays {
+    date holiday_date PK
+    string holiday_name
+    bool is_active
+    timestamp created_at
+  }
+  tb_users {
+    int Id PK
+    string userId
+    string userTitle
+    string userName
+    string userRole
+    string userEmail
+    string phoneNo
+    string userPassword
+    string userPhoto
+    timestamp timeStamp
+    text other
+    timestamp password_updated_at
+  }
+  tb_user_broadcast_status {
+    int status_id PK
+    string user_id FK
+    int broadcast_id FK
+    bool is_seen
+    timestamp seen_at
+    timestamp created_at
+    bool is_deleted
+    timestamp deleted_at
+  }
+  tb_user_logs {
+    int log_id PK
+    string user_id
+    string user_name
+    string user_role
+    string activity_type
+    string ip_address
+    text user_agent
+    string device_type
+    string location
+    string session_id
+    datetime login_time
+    datetime logout_time
+    int duration_seconds
+    text details
+    timestamp created_at
+  }
+  tb_user_permissions {
+    int permission_id PK
+    string user_id FK
+    string permission_key
+    bool is_allowed
+    text notes
+    string granted_by
+    timestamp created_at
+    timestamp updated_at
+  }
+  tb_user_sessions {
+    int id PK
+    string session_id
+    string user_id FK
+    string device_id
+    string session_type
+    timestamp login_time
+    timestamp last_activity
+    timestamp grace_period_until
+    bool is_active
+    string termination_reason
+    text user_agent
+    string ip_address
+  }
+  tb_user_settings {
+    string user_id PK, FK
+    string setting_key PK
+    text setting_value
+    timestamp updated_at
+  }
+  tb_arrears_accountability_submissions ||--o{ tb_arrears_accountability_files : submission_id
+  tb_arrears_accountability_submissions ||--o{ tb_arrears_payments : latest_submission_id
+  tb_arrears_accountability_submissions ||--o{ tb_arrears_payment_allocations : accountability_submission_id
+  tb_arrears_ledger ||--o{ tb_arrears_payment_allocations : ledger_id
+  tb_arrears_ledger ||--o{ tb_gratuity_schedule_allocations : ledger_id
+  tb_arrears_payments ||--o{ tb_arrears_accountability_submissions : payment_id
+  tb_arrears_payments ||--o{ tb_arrears_payment_allocations : payment_id
+  tb_broadcast_messages ||--o{ tb_user_broadcast_status : broadcast_id
+  tb_feedback_submissions ||--o{ tb_feedback_activity : submission_id
+  tb_fileregistry ||--o{ tb_arrears_accountability_submissions : regNo
+  tb_fileregistry ||--o{ tb_arrears_ledger : regNo
+  tb_fileregistry ||--o{ tb_arrears_payments : regNo
+  tb_fileregistry ||--o{ tb_file_movements : file_id
+  tb_fileregistry ||--o{ tb_file_registry_delete_requests : registry_id
+  tb_fileregistry ||--o{ tb_file_registry_recycle_bin : registry_id
+  tb_fileregistry ||--o{ tb_gratuity_schedule_entries : matched_registry_id
+  tb_fileregistry ||--o{ tb_life_certificate_submissions : regNo
+  tb_fileregistry ||--o{ tb_pensioner_death_reports : registry_id
+  tb_fileregistry ||--o{ tb_payroll_upload_entries : matched_registry_id
+  tb_file_registry_delete_requests ||--o{ tb_file_registry_recycle_bin : delete_request_id
+  tb_gratuity_schedule_cycles ||--o{ tb_gratuity_schedule_allocations : cycle_id
+  tb_gratuity_schedule_cycles ||--o{ tb_gratuity_schedule_entries : cycle_id
+  tb_gratuity_schedule_entries ||--o{ tb_gratuity_schedule_allocations : entry_id
+  tb_messages ||--o{ tb_broadcast_messages : message_id
+  tb_messages ||--o{ tb_messages : parent_message_id
+  tb_messages ||--o{ tb_message_attachments : message_id
+  tb_messages ||--o{ tb_message_recipients : message_id
+  tb_payroll_upload_cycles ||--o{ tb_payroll_audit_logs : cycle_id
+  tb_payroll_upload_cycles ||--o{ tb_payroll_upload_entries : cycle_id
+  tb_payroll_upload_cycles ||--o{ tb_registry_payroll_monthly_status : cycle_id
+  tb_podcast_videos ||--o{ tb_podcast_views : podcast_id
+  tb_roles ||--o{ tb_roles : clone_from_role
+  tb_roles ||--o{ tb_role_permissions : role_key
+  tb_staffdue ||--o{ tb_application_queue : staffdue_id
+  tb_staffdue ||--o{ tb_appnstatus : regNo
+  tb_staffdue ||--o{ tb_appnsubmissions : regNo
+  tb_staffdue ||--o{ tb_staff_documents : staffdue_id
+  tb_staffdue ||--o{ tb_staff_due_delete_requests : staffdue_id
+  tb_suspension_upload_cycles ||--o{ tb_suspension_upload_entries : suspension_cycle_id
+  tb_system_logs ||--o{ tb_system_log_resolutions : log_id
+  tb_tasks ||--o{ tb_task_alerts : task_id
+  tb_tasks ||--o{ tb_task_comments : task_id
+  tb_tasks ||--o{ tb_task_completion_queue : processed_task_id
+  tb_tasks ||--o{ tb_task_completion_queue : task_id
+  tb_users ||--o{ tb_application_queue : submitted_by
+  tb_users ||--o{ tb_application_queue : verified_by
+  tb_users ||--o{ tb_arrearstracking : recordedBy
+  tb_users ||--o{ tb_arrears_accountability_submissions : submitted_by
+  tb_users ||--o{ tb_arrears_ledger : recorded_by
+  tb_users ||--o{ tb_arrears_payments : recorded_by
+  tb_users ||--o{ tb_budgetforecast : createdBy
+  tb_users ||--o{ tb_data_export_runs : created_by
+  tb_users ||--o{ tb_data_import_runs : created_by
+  tb_users ||--o{ tb_feedback_activity : actor_id
+  tb_users ||--o{ tb_feedback_submissions : assigned_to_user_id
+  tb_users ||--o{ tb_feedback_submissions : closed_by_user_id
+  tb_users ||--o{ tb_feedback_submissions : resolved_by_user_id
+  tb_users ||--o{ tb_feedback_submissions : reviewed_by_user_id
+  tb_users ||--o{ tb_feedback_submissions : submitted_by_user_id
+  tb_users ||--o{ tb_file_registry_delete_requests : processed_by
+  tb_users ||--o{ tb_file_registry_delete_requests : requested_by
+  tb_users ||--o{ tb_file_registry_recycle_bin : deleted_by
+  tb_users ||--o{ tb_file_registry_recycle_bin : restored_by
+  tb_users ||--o{ tb_gratuity_schedule_cycles : uploaded_by
+  tb_users ||--o{ tb_life_certificate_submissions : submitted_by
+  tb_users ||--o{ tb_messages : sender_id
+  tb_users ||--o{ tb_message_recipients : recipient_user_id
+  tb_users ||--o{ tb_payrolls : uploaded_by
+  tb_users ||--o{ tb_payroll_audit_logs : actor_user_id
+  tb_users ||--o{ tb_payroll_upload_cycles : deleted_by
+  tb_users ||--o{ tb_payroll_upload_cycles : uploaded_by
+  tb_users ||--o{ tb_podcast_views : viewer_id
+  tb_users ||--o{ tb_retained_payments : recorded_by
+  tb_users ||--o{ tb_session_settings : user_id
+  tb_users ||--o{ tb_staff_documents : uploaded_by
+  tb_users ||--o{ tb_staff_due_delete_requests : processed_by
+  tb_users ||--o{ tb_staff_due_delete_requests : requested_by
+  tb_users ||--o{ tb_suspension_upload_cycles : uploaded_by
+  tb_users ||--o{ tb_tasks : createdBy
+  tb_users ||--o{ tb_tasks : sentTo
+  tb_users ||--o{ tb_task_completion_queue : owner_user_id
+  tb_users ||--o{ tb_user_broadcast_status : user_id
+  tb_users ||--o{ tb_user_permissions : user_id
+  tb_users ||--o{ tb_user_sessions : user_id
+  tb_users ||--o{ tb_user_settings : user_id

@@ -1,3 +1,4 @@
 <?php
-// PHP logic for api/upload_payroll_csv.php
+// Backward-compatible alias.
+require_once __DIR__ . '/upload_payroll_cycle.php';
 ?>

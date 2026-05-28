@@ -1,16 +1,26 @@
-// ============================================================
-// EDIT USER SCRIPT
+// 
+// Edit User Script
 // Handles user profile editing, validation, image upload,
 // password change, and admin/user confirmation flow.
-// Now includes phone number in international format (+256...)
-// ============================================================
-
+// Supports flexible phone number input (international + Uganda local formats)
+// 
 // Redirect if not logged in
 if (sessionStorage.getItem('isLoggedIn') !== 'true') {
   window.location.replace('login.html');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    function resolveCurrentUserId() {
+        const sessionId = sessionStorage.getItem('userId');
+        if (sessionId) return sessionId;
+        try {
+            const stored = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
+            return stored.id || stored.userId || '';
+        } catch (_error) {
+            return '';
+        }
+    }
+
     // Handle redirect if no user_id in query
     if (handleProfileMenuRedirect()) return;
 
@@ -32,6 +42,43 @@ document.addEventListener('DOMContentLoaded', () => {
     const passwordMismatch = document.getElementById('passwordMismatch');
     const roleSection = document.getElementById('roleSection');
     const phoneNoInput = document.getElementById('phoneNo');
+    const userRoleSelect = document.getElementById('userRole');
+    const userTitleSelect = document.getElementById('userTitle');
+    const officialTitles = [
+        'Mr.',
+        'Mrs.',
+        'Ms.',
+        'Miss',
+        'Dr.',
+        'Prof.',
+        'Hon.',
+        'Rev.',
+        'Fr.',
+        'Sr.'
+    ];
+    const staticRoles = [
+        { key: 'admin', label: 'Administrator' },
+        { key: 'clerk', label: 'Clerk' },
+        { key: 'oc_pen', label: 'OC/Pension' },
+        { key: 'writeup_officer', label: 'Writeup Officer' },
+        { key: 'file_creator', label: 'File Creator' },
+        { key: 'data_entry', label: 'Data Entrant' },
+        { key: 'assessor', label: 'Assessor' },
+        { key: 'auditor', label: 'Auditor' },
+        { key: 'approver', label: 'Approver' },
+        { key: 'user', label: 'User' },
+        { key: 'pensioner', label: 'Pensioner' }
+    ];
+
+    function normalizePhone(value) {
+        const input = String(value || '').trim().replace(/[\s().-]/g, '');
+        if (!input) return null;
+        if (/^00[1-9]\d{7,14}$/.test(input)) return `+${input.slice(2)}`;
+        if (/^\+[1-9]\d{7,14}$/.test(input)) return input;
+        if (/^0\d{9}$/.test(input)) return `+256${input.slice(1)}`;
+        if (/^[1-9]\d{7,14}$/.test(input)) return `+${input}`;
+        return null;
+    }
 
     // Modal elements
     const passwordModal = document.getElementById('passwordModal');
@@ -49,12 +96,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Determine logged-in user
     const currentUser = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
-    const isAdmin = currentUser.role === 'admin';
+    const currentUserId = resolveCurrentUserId();
+    if (!currentUser.id && currentUserId) {
+        currentUser.id = currentUserId;
+    }
+    const currentEffectiveRole = String(
+        currentUser.effectiveRole
+        || localStorage.getItem('userRoleEffective')
+        || currentUser.role
+        || ''
+    ).toLowerCase();
+    const isAdmin = currentEffectiveRole === 'admin' || currentEffectiveRole === 'super_admin' || currentUser.role === 'super_admin';
+    const currentRawRole = String(
+        sessionStorage.getItem('userRole')
+        || localStorage.getItem('userRole')
+        || currentUser.role
+        || ''
+    ).toLowerCase();
+    const isSuperAdmin = currentRawRole === 'super_admin';
 
     // Hide role section for non-admin users
     if (!isAdmin && roleSection) {
         roleSection.style.display = 'none';
-        const userRoleSelect = document.getElementById('userRole');
         if (userRoleSelect) {
             userRoleSelect.disabled = true;
             userRoleSelect.removeAttribute('required');
@@ -64,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize
     initializeForm();
 
-    // ========================== EVENT LISTENERS ==========================
+    // Event Listeners
     if (passwordToggle) passwordToggle.addEventListener('click', togglePasswordFields);
     if (newPassword) newPassword.addEventListener('input', checkPasswordMatch);
     if (confirmPassword) confirmPassword.addEventListener('input', checkPasswordMatch);
@@ -79,17 +142,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target === adminModal) adminModal.style.display = 'none';
     });
 
-    // ========================== INITIALIZATION ==========================
-
+    // Initialization
     function handleProfileMenuRedirect() {
         const userIdFromUrl = new URLSearchParams(window.location.search).get('user_id');
         if (!userIdFromUrl) {
-            const currentUser = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
-            if (currentUser.id) {
-                window.location.href = `edit_user.html?user_id=${currentUser.id}`;
+            const resolvedId = resolveCurrentUserId();
+            if (resolvedId) {
+                window.location.href = `edit_user.html?user_id=${encodeURIComponent(resolvedId)}`;
                 return true;
             }
-            alert('Unable to determine user ID. Please login again.');
+            appAlert('Unable to determine user ID. Please login again.');
             window.location.href = 'login.html';
             return true;
         }
@@ -98,7 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function initializeForm() {
         if (!userId) {
-            alert('No user ID provided. Redirecting...');
+            appAlert('No user ID provided. Redirecting...');
             window.location.href = 'profile.html';
             return;
         }
@@ -108,10 +170,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
             currentUserData = await fetchUserData(userId);
             if (!currentUserData) throw new Error('User not found');
+            const targetRole = String(currentUserData.userRole || '').toLowerCase();
+            if ((targetRole === 'admin' || targetRole === 'super_admin') && !isSuperAdmin) {
+                appAlert('Only the super administrator can modify administrator accounts.');
+                window.location.href = 'users.html';
+                return;
+            }
+            populateTitleOptions(currentUserData.userTitle || '');
+            await loadRoleOptions(currentUserData.userRole || '');
 
             // Non-admins can only edit their own profile
-            if (!isAdmin && currentUserData.userId !== currentUser.id) {
-                alert('You can only edit your own profile.');
+            if (!isAdmin && currentUserData.userId !== currentUserId) {
+                appAlert('You can only edit your own profile.');
                 window.location.href = 'profile.html';
                 return;
             }
@@ -123,7 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
             saveBtn.disabled = false;
         } catch (err) {
             console.error('Init error:', err);
-            alert('Error loading user data.');
+            appAlert('Error loading user data.');
             window.location.href = 'profile.html';
         }
     }
@@ -132,6 +202,77 @@ document.addEventListener('DOMContentLoaded', () => {
         const res = await fetch(`../backend/api/get_user.php?userId=${id}`);
         const data = await res.json();
         return data.success ? data.user : null;
+    }
+
+    async function loadRoleOptions(selectedRole = '') {
+        if (!userRoleSelect) return;
+
+        const applyOptions = (roles) => {
+            userRoleSelect.innerHTML = '<option value="">Select Role</option>';
+            roles.filter((role) => {
+                const key = String(role?.key || '').toLowerCase();
+                if (key === 'super_admin') return selectedRole === 'super_admin';
+                if (key === 'admin') return isSuperAdmin || selectedRole === 'admin';
+                return true;
+            }).forEach((role) => {
+                const option = document.createElement('option');
+                option.value = role.key;
+                option.textContent = role.label;
+                userRoleSelect.appendChild(option);
+            });
+            if (selectedRole) {
+                userRoleSelect.value = String(selectedRole).toLowerCase();
+            }
+        };
+
+        try {
+            const response = await fetch('../backend/api/get_roles.php?active_only=1', {
+                credentials: 'include',
+                cache: 'no-store'
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success || !Array.isArray(data.roles) || !data.roles.length) {
+                applyOptions(staticRoles);
+                return;
+            }
+
+            const roleOptions = data.roles
+                .filter((role) => role && role.role_key)
+                .map((role) => ({
+                    key: String(role.role_key).toLowerCase(),
+                    label: String(role.role_label || role.role_key)
+                }));
+
+            applyOptions(roleOptions.length ? roleOptions : staticRoles);
+        } catch (error) {
+            console.warn('Unable to load roles dynamically:', error);
+            applyOptions(staticRoles);
+        }
+    }
+
+    function populateTitleOptions(selectedTitle = '') {
+        if (!userTitleSelect) return;
+
+        const normalizedSelected = String(selectedTitle || '').trim();
+        userTitleSelect.innerHTML = '<option value="">Select Title</option>';
+
+        officialTitles.forEach((title) => {
+            const option = document.createElement('option');
+            option.value = title;
+            option.textContent = title;
+            userTitleSelect.appendChild(option);
+        });
+
+        if (normalizedSelected && !officialTitles.includes(normalizedSelected)) {
+            const fallbackOption = document.createElement('option');
+            fallbackOption.value = normalizedSelected;
+            fallbackOption.textContent = normalizedSelected;
+            userTitleSelect.appendChild(fallbackOption);
+        }
+
+        if (normalizedSelected) {
+            userTitleSelect.value = normalizedSelected;
+        }
     }
 
     function populateForm(u) {
@@ -179,8 +320,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return `images/${path}`;
     }
 
-    // ========================== VALIDATION ==========================
-
+    // Validation
     function togglePasswordFields() {
         isPasswordChangeRequested = !isPasswordChangeRequested;
         passwordFields.classList.toggle('visible', isPasswordChangeRequested);
@@ -195,29 +335,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function validateForm() {
         // Validate phone number format
-        if (phoneNoInput && !/^\+[1-9][0-9]{7,14}$/.test(phoneNoInput.value.trim())) {
-            alert('Please enter a valid international phone number (e.g. +256700123456)');
-            return false;
+        if (phoneNoInput) {
+            const normalizedPhone = normalizePhone(phoneNoInput.value);
+            if (!normalizedPhone) {
+                appAlert('Please enter a valid phone number (e.g. +256700123456, 0770123456, 0312123456, 0800123456)');
+                return false;
+            }
+            phoneNoInput.value = normalizedPhone;
         }
 
         // Password checks
         if (isPasswordChangeRequested) {
             const np = newPassword.value, cp = confirmPassword.value;
-            if (!np || !cp) return alert('Please fill both password fields'), false;
-            if (np !== cp) return alert('Passwords do not match'), false;
+            if (!np || !cp) return appAlert('Please fill both password fields'), false;
+            if (np !== cp) return appAlert('Passwords do not match'), false;
             if (!/[a-z]/.test(np) || !/[A-Z]/.test(np) || !/\d/.test(np) || np.length < 6)
-                return alert('Password must contain uppercase, lowercase, numbers (min 6 chars)'), false;
+                return appAlert('Password must contain uppercase, lowercase, numbers (min 6 chars)'), false;
         }
         return true;
     }
 
-    // ========================== HANDLERS ==========================
-
+    // Handlers
     function handleProfilePictureChange(e) {
         const file = e.target.files[0];
         if (!file) return;
-        if (!file.type.match('image.*')) return alert('Please select a valid image');
-        if (file.size > 5 * 1024 * 1024) return alert('Max image size 5MB');
+        if (!file.type.match('image.*')) return appAlert('Please select a valid image');
+        if (file.size > 5 * 1024 * 1024) return appAlert('Max image size 5MB');
 
         newProfilePicture = file;
         const reader = new FileReader();
@@ -227,7 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleFormSubmit(e) {
         e.preventDefault();
-        if (!hasFormChanges()) return alert('No changes to save.');
+        if (!hasFormChanges()) return appAlert('No changes to save.');
         if (!validateForm()) return;
 
         (isAdmin ? adminModal : passwordModal).style.display = 'flex';
@@ -235,7 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function confirmChangesWithPassword() {
         const pwd = currentPassword.value;
-        if (!pwd) return alert('Please enter your current password');
+        if (!pwd) return appAlert('Please enter your current password');
 
         confirmWithPassword.innerHTML = '<span class="loading"></span> Verifying...';
         const valid = await verifyCurrentPassword(pwd);
@@ -244,7 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await saveUserChanges();
             closeAllModals();
         } else {
-            alert('Invalid password.');
+            appAlert('Invalid password.');
             currentPassword.value = '';
         }
         confirmWithPassword.textContent = 'Confirm Changes';
@@ -269,11 +412,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json();
 
             if (data.success) {
-                alert('User updated successfully!');
+                appAlert('User updated successfully!');
                 window.location.href = isAdmin ? 'users.html' : 'profile.html';
             } else throw new Error(data.message);
         } catch (err) {
-            alert('Error saving user data.');
+            appAlert('Error saving user data.');
             console.error(err);
         } finally {
             saveBtn.textContent = 'Save Changes';
@@ -282,17 +425,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function verifyCurrentPassword(password) {
+        if (!currentUserId) {
+            appAlert('Unable to determine user ID. Please login again.');
+            window.location.href = 'login.html';
+            return false;
+        }
         const res = await fetch('../backend/api/verify_password.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: currentUser.id, password })
+            body: JSON.stringify({ userId: currentUserId, password })
         });
         const data = await res.json();
         return data.success;
     }
 
-    function handleCancel() {
-        if (hasFormChanges() && !confirm('Discard unsaved changes?')) return;
+    async function handleCancel() {
+        if (hasFormChanges()) {
+            const shouldDiscard = await appConfirm('Discard unsaved changes?', {
+                title: 'Unsaved Changes',
+                confirmText: 'Discard'
+            });
+            if (!shouldDiscard) return;
+        }
         window.location.href = isAdmin ? 'users.html' : 'profile.html';
     }
 
@@ -301,3 +455,5 @@ document.addEventListener('DOMContentLoaded', () => {
         currentPassword.value = '';
     }
 });
+
+

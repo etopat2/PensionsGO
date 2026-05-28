@@ -1,38 +1,219 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
-
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PensionsGo - FAQs</title>
+<meta name="theme-color" content="#6d1116" />
+    <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+    <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
+    <title>UPS PensionsGo - Frequently Asked Questions</title>
 
-    <!-- Stylesheets -->
-    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/styles.css?v=20260507c" />
+    <link rel="stylesheet" href="css/faq.css?v=20260504a" />
 
-    <!-- JS Scripts -->
-
-    <script type="module" src="js/main.js"></script>
-
+    <script type="module" src="js/main.js?v=20260528b"></script>
+    <script defer src="js/faq.js"></script>
 </head>
-
-<body>
-    <!-- ================= HEADER (Injected by JS) ================= -->
-
-
-    <!-- ================= MAIN CONTENT ================= -->
-    <main>
-        <div class="main-wrapper">
-            <section class="main-info">
-                <h2>Frequently Asked Questions</h2>
-                <p>The Pension Workflow Automation System for Uganda Prisons Service.</p>
-                <p>This portal helps you estimate retirement benefits and access pension information.</p>
+<body class="faq-page">
+    <main class="faq-main">
+        <div class="faq-shell">
+            <section class="faq-hero">
+                <div class="faq-hero-copy">
+                    <span class="faq-kicker">Frequently Asked Questions</span>
+                    <h1>Clear answers for pension workflow, records, and pensioner support.</h1>
+                    <p class="faq-hero-lead">
+                        This page explains how UPS PensionsGo supports applications, benefits estimation,
+                        registry operations, claims, payroll visibility, and pensioner access.
+                    </p>
+                    <div class="faq-search-wrap">
+                        <label class="faq-search-label" for="faqSearch">Search the knowledge base</label>
+                        <input type="search" id="faqSearch" class="faq-search-input" placeholder="Type a question, topic, or keyword">
+                    </div>
+                    <div class="faq-chip-row" id="faqChipRow">
+                        <button class="faq-chip active" data-category="all" type="button">All Topics</button>
+                        <button class="faq-chip" data-category="applications" type="button">Applications</button>
+                        <button class="faq-chip" data-category="benefits" type="button">Benefits</button>
+                        <button class="faq-chip" data-category="registry" type="button">Registry & Tracking</button>
+                        <button class="faq-chip" data-category="claims" type="button">Claims & Payroll</button>
+                        <button class="faq-chip" data-category="pensioners" type="button">Pensioner Access</button>
+                        <button class="faq-chip" data-category="security" type="button">Security & Access</button>
+                    </div>
+                </div>
+                <aside class="faq-hero-panel">
+                    <div class="faq-hero-card">
+                        <span class="faq-panel-label">Quick guidance</span>
+                        <h2>Use the platform with less uncertainty.</h2>
+                        <p>
+                            Start with the search, narrow the topic by category, and open any answer for a fuller explanation.
+                            For deeper public guidance, the video library is also available.
+                        </p>
+                    </div>
+                    <div class="faq-coverage-grid">
+                        <article class="faq-coverage-card">
+                            <strong id="faqEntryCount">0</strong>
+                            <span>Knowledge answers</span>
+                        </article>
+                        <article class="faq-coverage-card">
+                            <strong id="faqCategoryCount">0</strong>
+                            <span>Core topics</span>
+                        </article>
+                        <article class="faq-coverage-card">
+                            <strong id="faqAudienceCount">0</strong>
+                            <span>Guided user groups</span>
+                        </article>
+                    </div>
+                    <div class="faq-action-stack">
+                        <a href="benefits_calculator.html" class="faq-primary-action">Open Benefits Calculator</a>
+                        <a href="podcast.html" class="faq-secondary-action">Watch Public Pension Videos</a>
+                        <a href="about.html" class="faq-secondary-action">Learn About the Platform</a>
+                    </div>
+                </aside>
             </section>
 
+            <section class="faq-overview-grid">
+                <article class="faq-overview-card">
+                    <h2>Applications</h2>
+                    <p>Understand submission, verification, workflow movement, and status visibility.</p>
+                </article>
+                <article class="faq-overview-card">
+                    <h2>Benefits and claims</h2>
+                    <p>See how estimates, arrears, accountability, and payroll-linked processes are treated.</p>
+                </article>
+                <article class="faq-overview-card">
+                    <h2>Records and access</h2>
+                    <p>Review registry controls, pensioner accounts, security rules, and user-level visibility.</p>
+                </article>
+            </section>
 
+            <section class="faq-layout">
+                <aside class="faq-side-panel">
+                    <div class="faq-side-card">
+                        <span class="faq-panel-label">Knowledge guide</span>
+                        <p>
+                            Ask natural questions such as <em>life certificate</em>, <em>arrears accountability</em>,
+                            <em>bank details</em>, or <em>registry delete request</em>. The guide will surface the strongest
+                            answer first and then suggest related guidance.
+                        </p>
+                        <div class="faq-popular-searches" id="faqPopularSearches">
+                            <button type="button" class="faq-popular-search" data-query="life certificate">Life certificate</button>
+                            <button type="button" class="faq-popular-search" data-query="arrears accountability">Arrears accountability</button>
+                            <button type="button" class="faq-popular-search" data-query="gratuity">Gratuity</button>
+                            <button type="button" class="faq-popular-search" data-query="file movement">File movement</button>
+                            <button type="button" class="faq-popular-search" data-query="bank details">Bank details</button>
+                            <button type="button" class="faq-popular-search" data-query="pensioner directory">Pensioner directory</button>
+                        </div>
+                    </div>
+                    <div class="faq-side-card">
+                        <span class="faq-panel-label">Browse by audience</span>
+                        <ul class="faq-audience-list">
+                            <li>
+                                <button type="button" class="faq-audience-filter active" data-audience="all" aria-pressed="true">
+                                    <strong>All audiences</strong>
+                                    <span>View the full knowledge base without narrowing by user group.</span>
+                                </button>
+                            </li>
+                            <li>
+                                <button type="button" class="faq-audience-filter" data-audience="pensioners" aria-pressed="false">
+                                    <strong>Pensioners</strong>
+                                    <span>Track status, view account standing, and understand benefits.</span>
+                                </button>
+                            </li>
+                            <li>
+                                <button type="button" class="faq-audience-filter" data-audience="staff" aria-pressed="false">
+                                    <strong>Operational staff</strong>
+                                    <span>Work through workflow stages, records, and compliance tasks.</span>
+                                </button>
+                            </li>
+                            <li>
+                                <button type="button" class="faq-audience-filter" data-audience="supervisors" aria-pressed="false">
+                                    <strong>Supervisors and administrators</strong>
+                                    <span>Monitor controls, reports, exports, settings, and cleanup tools.</span>
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="faq-side-card">
+                        <span class="faq-panel-label">Need direct help?</span>
+                        <p>
+                            If your question is not answered here, contact the systems administrator or the designated pensions office for operational assistance.
+                        </p>
+                        <a href="mailto:etopat2@gmail.com" class="faq-primary-action faq-side-action">Contact Support</a>
+                    </div>
+                </aside>
+
+                <section class="faq-content-panel">
+                    <div class="faq-toolbar">
+                        <div>
+                            <span class="faq-panel-label">Knowledge Base</span>
+                            <h2>Frequently asked questions</h2>
+                        </div>
+                        <div class="faq-toolbar-actions">
+                            <button type="button" id="faqExpandAllBtn" class="faq-toolbar-btn">Expand All</button>
+                            <button type="button" id="faqCollapseAllBtn" class="faq-toolbar-btn">Collapse All</button>
+                        </div>
+                    </div>
+
+                    <p class="faq-results-summary" id="faqResultsSummary">Showing all frequently asked questions.</p>
+
+                    <section class="faq-assistant-panel" id="faqAssistantPanel" aria-live="polite">
+                        <article class="faq-assistant-primary">
+                            <span class="faq-panel-label">Guided answer</span>
+                            <h3 id="faqAssistantTitle">Start with a question or topic.</h3>
+                            <p id="faqAssistantSummary">
+                                Search in natural language and the knowledge guide will highlight the strongest answer first,
+                                then list related guidance below.
+                            </p>
+                            <ul class="faq-assistant-bullets" id="faqAssistantBullets" hidden></ul>
+                            <div class="faq-assistant-meta">
+                                <span id="faqAssistantCategory">All topics</span>
+                                <span id="faqAssistantAudience">Public guidance</span>
+                            </div>
+                            <div class="faq-assistant-actions">
+                                <button type="button" class="faq-toolbar-btn" id="faqOpenBestMatchBtn">Open Best Match</button>
+                                <button type="button" class="faq-toolbar-btn" id="faqClearSearchBtn">Clear Search</button>
+                            </div>
+                        </article>
+                        <aside class="faq-assistant-related">
+                            <span class="faq-panel-label">Related guidance</span>
+                            <div class="faq-suggested-list" id="faqSuggestedList"></div>
+                        </aside>
+                    </section>
+
+                    <div class="faq-list" id="faqList">
+                        <div class="faq-loading" id="faqLoadingState">
+                            <div class="loading-spinner"></div>
+                            <p>Loading knowledge base...</p>
+                        </div>
+                    </div>
+
+                    <div class="faq-empty-state" id="faqEmptyState" hidden>
+                        <h3>No matching questions found.</h3>
+                        <p>Try a broader search term or switch back to <strong>All Topics</strong>.</p>
+                    </div>
+                </section>
+            </section>
+
+            <section class="faq-help-strip">
+                <div>
+                    <span class="faq-panel-label">Still need clarification?</span>
+                    <h2>Use the public guidance tools or contact support.</h2>
+                    <p>
+                        The FAQ answers common questions, but some issues still require operational review. Use
+                        the public video guidance area for additional explanation.
+                    </p>
+                </div>
+                <div class="faq-help-actions">
+                    <a href="podcast.html" class="faq-secondary-action">Open Public Videos</a>
+                    <a href="about.html" class="faq-secondary-action">About the Platform</a>
+                    <a href="mailto:etopat2@gmail.com" class="faq-primary-action">Contact Support</a>
+                </div>
+            </section>
         </div>
     </main>
-
-    <!-- ================= FOOTER (Injected by JS) ================= -->
 </body>
-
 </html>
+
+
+

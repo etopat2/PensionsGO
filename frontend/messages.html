@@ -3,6 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
 
     <!-- Prevent browser caching of protected pages -->
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
@@ -11,16 +16,16 @@
     
     <title>Messages - PensionsGo</title>
     
-    <link rel="stylesheet" href="../frontend/css/overlay.css">
-    <link rel="stylesheet" href="../frontend/css/styles.css">
-    <link rel="stylesheet" href="../frontend/css/profile.css">
-    <link rel="stylesheet" href="../frontend/css/menu.css">
-    <link rel="stylesheet" href="../frontend/css/messages.css">
+    <link rel="stylesheet" href="../frontend/css/overlay.css?v=20260504a">
+    <link rel="stylesheet" href="../frontend/css/styles.css?v=20260507c">
+    <link rel="stylesheet" href="../frontend/css/profile.css?v=20260504a">
+    <link rel="stylesheet" href="../frontend/css/menu.css?v=20260504d">
+    <link rel="stylesheet" href="../frontend/css/messages.css?v=20260527u">
     
           
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css?v=20260504a">
 
-    <script type="module" src="../frontend/js/main.js" ></script>
+    <script type="module" src="../frontend/js/main.js?v=20260528b" ></script>
 </head>
 <body>
     <div id="app">
@@ -72,6 +77,16 @@
                         <div class="list-header">
                             <h3 id="listTitle">Inbox</h3>
                             <div class="list-actions">
+                                <div class="batch-selection-controls">
+                                    <label class="select-all-toggle" for="selectAllMessages">
+                                        <input type="checkbox" id="selectAllMessages">
+                                        <span>Select page</span>
+                                    </label>
+                                    <button class="btn-batch-delete" id="batchDeleteBtn" disabled>
+                                        <i class="fas fa-trash"></i>
+                                        <span id="batchDeleteLabel">Delete Selected</span>
+                                    </button>
+                                </div>
                                 <div class="search-box">
                                     <i class="fas fa-search"></i>
                                     <input type="text" id="messageSearch" placeholder="Search messages...">
@@ -85,6 +100,7 @@
                                         <option value="unread">Unread</option>
                                         <option value="urgent">Urgent</option>
                                         <option value="with-attachments">With Attachments</option>
+                                        <option value="archived">Archived</option>
                                     </select>
                                 </div>
                             </div>
@@ -234,6 +250,9 @@
         </div>
     </div>
 
-    <script type="module" src="js/messages.js"></script>
+    <script type="module" src="js/messages.js?v=20260528c"></script>
 </body>
 </html>
+
+
+

@@ -3,15 +3,20 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
     <title>My Profile - PensionsGo</title>
 
     <!-- ====== Stylesheets ====== -->
-    <link rel="stylesheet" href="css/menu.css" />
-    <link rel="stylesheet" href="css/users.css" />
-    <link rel="stylesheet" href="css/auth.css" />
-    <link rel="stylesheet" href="css/styles.css" />
-    <link rel="stylesheet" href="css/overlay.css" />
-    <link rel="stylesheet" href="css/profile.css" />
+    <link rel="stylesheet" href="css/menu.css?v=20260504d" />
+    <link rel="stylesheet" href="css/users.css?v=20260504a" />
+    <link rel="stylesheet" href="css/auth.css?v=20260504a" />
+    <link rel="stylesheet" href="css/styles.css?v=20260507c" />
+    <link rel="stylesheet" href="css/overlay.css?v=20260504a" />
+    <link rel="stylesheet" href="css/profile.css?v=20260504a" />
 </head>
 
 <body>
@@ -36,11 +41,11 @@
 
                         <!-- Full Name + Title + Role -->
                         <div class="profile-info-item name-role-row">
-                            <div class="info-icon">👤</div>
+                            <div class="info-icon">&#128100;</div>
                             <div class="info-content">
                                 <div class="name-role-container">
                                     <div class="name-section">
-                                        <!-- 👇 This will now dynamically show Title instead of static label -->
+                                        <!-- This now dynamically shows the title instead of a static label. -->
                                         <div id="profileTitleLabel" class="info-label">Loading...</div>
                                         <div id="profileName" class="info-value">Loading...</div>
                                     </div>
@@ -56,7 +61,7 @@
 
                         <!-- Email -->
                         <div class="profile-info-item">
-                            <div class="info-icon">📧</div>
+                            <div class="info-icon">&#128231;</div>
                             <div class="info-content">
                                 <div class="info-label">Email Address</div>
                                 <div id="profileEmail" class="info-value">Loading...</div>
@@ -65,7 +70,7 @@
 
                         <!-- Phone -->
                         <div class="profile-info-item">
-                            <div class="info-icon">📞</div>
+                            <div class="info-icon">&#128222;</div>
                             <div class="info-content">
                                 <div class="info-label">Phone Number</div>
                                 <div id="profilePhone" class="info-value">Loading...</div>
@@ -73,13 +78,29 @@
                         </div>
                     </div>
 
+                    <div class="profile-directory-card" id="pensionerLookupVisibilityCard" hidden>
+                        <div class="profile-directory-head">
+                            <div>
+                                <div class="info-label">Pensioner Directory Visibility</div>
+                                <div id="pensionerLookupVisibilityStatus" class="info-value">Loading...</div>
+                                <p id="pensionerLookupVisibilityHelp" class="profile-directory-help">Control whether fellow pensioners can find your contact details in the pensioner directory.</p>
+                            </div>
+                            <button type="button" id="pensionerLookupVisibilityToggle" class="profile-visibility-toggle" aria-pressed="false" aria-label="Toggle pensioner directory visibility">
+                                <span class="profile-visibility-track" aria-hidden="true">
+                                    <span class="profile-visibility-thumb"></span>
+                                </span>
+                                <span class="profile-visibility-text" id="pensionerLookupVisibilityToggleText">Off</span>
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Profile Actions -->
                     <div class="profile-actions">
                         <button id="editProfileBtn" class="profile-btn profile-btn-primary">
-                            ✏️ Edit Profile
+                            &#9998; Edit Profile
                         </button>
                         <button id="backToDashboardBtn" class="profile-btn profile-btn-secondary">
-                            ← Back to Dashboard
+                            &#8592; Back to Dashboard
                         </button>
                     </div>
                 </div>
@@ -90,7 +111,10 @@
     <!-- Footer will be dynamically inserted by main.js -->
 
     <!-- ====== Scripts ====== -->
-    <script type="module" src="js/main.js"></script>
+    <script type="module" src="js/main.js?v=20260528b"></script>
     <script src="js/profile.js"></script>
 </body>
 </html>
+
+
+

@@ -1,18 +1,20 @@
-// ====================================================================
-// modules/header_interactions.js - COMPREHENSIVE HEADER INTERACTIONS
-// Handles desktop, mobile, and hybrid touch+mouse devices
-// Manages all header interactions with mutual exclusion and proper image loading
-// ====================================================================
+﻿/**
+ * 
+ * header_interactions.js - Enhanced with SessionManager Integration
+ * 
+ * Complete Replacement
+ * 
+ */
 
 // Global state management
 let openDropdown = null;
 let isProcessingClick = false;
+let sessionManager = null;
 
-// ====================================================================
-// MAIN INITIALIZATION
-// ====================================================================
+// 
+// Main Initialization //
 export function initHeaderInteractions() {
-  console.log("🔄 Initializing comprehensive header interactions");
+  console.log("[init] Initializing enhanced header interactions");
 
   setTimeout(() => {
     initializeHeaderInteractions();
@@ -20,8 +22,11 @@ export function initHeaderInteractions() {
 }
 
 function initializeHeaderInteractions() {
-  console.log("🎯 Starting comprehensive header interactions");
+  console.log("[init] Starting enhanced header interactions");
 
+  // Get session manager from global scope
+  sessionManager = window.sessionManager || null;
+  
   let isMobile = window.innerWidth <= 768;
   window.addEventListener("resize", () => {
     isMobile = window.innerWidth <= 768;
@@ -33,48 +38,162 @@ function initializeHeaderInteractions() {
   initializeMenuVisibility();
   initializeDynamicCounts();
   initializeMenuLinks();
+  initializeSessionInfoDisplay();
 
   window.addEventListener("userLoggedOut", handleUserLoggedOut);
 
-  console.log("🎊 Comprehensive header interactions initialized successfully");
+  console.log("[ok] Enhanced header interactions initialized successfully");
 }
 
-// ====================================================================
-// 🔐 Global Logout Handler
-// ====================================================================
+// 
+// Enhanced Logout Handler
+// 
 window.logoutUser = async function logoutUser() {
   try {
-    console.log("🚪 Initiating logout process...");
-    const response = await fetch("../backend/api/logout.php", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-    });
+    console.log("[init] Initiating enhanced logout process...");
+    
+    // Show confirmation modal
+    const confirmation = await showEnhancedLogoutConfirmation();
+    const confirmed = typeof confirmation === 'object' ? confirmation.confirmed : confirmation;
+    if (!confirmed) return;
 
-    let data;
-    try {
-      data = await response.json();
-    } catch (e) {
-      console.warn("Logout: Non-JSON response, fallback redirect.");
-      data = { success: true };
+    const options = (typeof confirmation === 'object' ? confirmation.options : null) || window.lastLogoutOptions || {};
+    const clearLocalData = options.clearLocalData !== false;
+    
+    // Get CSRF token
+    const csrfToken = typeof window.fetchCsrfToken === 'function'
+      ? await window.fetchCsrfToken()
+      : (document.querySelector('meta[name="csrf-token"]')?.content || '');
+    
+    // Use global performEnhancedLogout if available
+    if (window.performEnhancedLogout) {
+      const result = await window.performEnhancedLogout('user_initiated', 'User clicked logout', {
+        clearLocalData,
+        logoutAllDevices: false
+      });
+      
+      if (result.success) {
+        console.log("[ok] Enhanced logout successful");
+        window.location.replace(`login.html?logout=success&t=${Date.now()}`);
+      } else {
+        throw new Error(result.message);
+      }
+    } else {
+      // Fallback to original logout
+      const response = await fetch("../backend/api/logout.php", {
+        method: "POST",
+        credentials: "include",
+        headers: (window.withDeviceTokenHeaders ? window.withDeviceTokenHeaders({ 
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken || ""
+        }) : {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken || ""
+        }),
+        body: JSON.stringify({
+          logout_type: 'user_initiated',
+          logout_reason: 'User clicked logout button',
+          csrf_token: csrfToken
+        })
+      });
+
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        console.warn("Logout: Non-JSON response, fallback redirect.");
+        data = { success: true };
+      }
+
+      localStorage.removeItem("loggedInUser");
+      localStorage.removeItem("userRole");
+      localStorage.removeItem("userRoleEffective");
+      localStorage.removeItem("sessionSettings");
+      sessionStorage.clear();
+      window.dispatchEvent(new Event("userLoggedOut"));
+
+      console.log("[ok] Logout successful:", data.message || "Session ended");
+      window.location.replace(`login.html?logout=success&t=${Date.now()}`);
     }
-
-    localStorage.removeItem("loggedInUser");
-    localStorage.removeItem("userRole");
-    sessionStorage.clear();
-    window.dispatchEvent(new Event("userLoggedOut"));
-
-    console.log("✅ Logout successful:", data.message || "Session ended");
-    window.location.href = "login.html";
   } catch (err) {
-    console.error("❌ Logout error:", err);
-    window.location.href = "login.html";
+    console.error("[error] Logout error:", err);
+    window.location.replace(`login.html?logout=error&t=${Date.now()}`);
   }
 };
 
-// ====================================================================
-// Event Delegation - FIXED: Profile dropdown menu item interactions
-// ====================================================================
+// Enhanced logout confirmation
+async function showEnhancedLogoutConfirmation() {
+  return new Promise((resolve) => {
+    const modal = document.createElement('div');
+    modal.className = 'auth-modal-overlay';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'headerLogoutModalTitle');
+    modal.innerHTML = `
+      <div class="auth-modal">
+        <div class="auth-modal-header">
+          <h3 id="headerLogoutModalTitle">Confirm Logout</h3>
+        </div>
+        <div class="auth-modal-body">
+          <p>Are you sure you want to log out?</p>
+          <div class="logout-options">
+            <label>
+              <input type="checkbox" id="clearLocalData" checked>
+              Clear local data (recommended)
+            </label>
+          </div>
+        </div>
+        <div class="auth-modal-footer logout-actions">
+          <button class="auth-btn auth-btn-danger" id="confirmLogout">Yes, Logout</button>
+          <button class="auth-btn auth-btn-secondary" id="cancelLogout">Cancel</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    document.body.classList.add('modal-open');
+    requestAnimationFrame(() => {
+      modal.querySelector('#confirmLogout')?.focus();
+    });
+    
+    const cancelBtn = modal.querySelector('#cancelLogout');
+    const confirmBtn = modal.querySelector('#confirmLogout');
+    
+    cancelBtn.addEventListener('click', () => {
+      modal.remove();
+      document.body.classList.remove('modal-open');
+      window.lastLogoutOptions = null;
+      resolve({ confirmed: false, options: {} });
+    });
+    
+    confirmBtn.addEventListener('click', () => {
+      const clearLocalData = modal.querySelector('#clearLocalData')?.checked ?? true;
+
+      window.lastLogoutOptions = {
+        clearLocalData,
+        logoutAllSessions: false
+      };
+      
+      modal.remove();
+      document.body.classList.remove('modal-open');
+      resolve({ confirmed: true, options: window.lastLogoutOptions });
+    });
+    
+    // Close on overlay click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.remove();
+        document.body.classList.remove('modal-open');
+        window.lastLogoutOptions = null;
+        resolve({ confirmed: false, options: {} });
+      }
+    });
+  });
+}
+
+// 
+// Event Delegation - Enhanced
+// 
 function initializeEventDelegation() {
   let lastTouchTime = 0;
   const TOUCH_DELAY = 300;
@@ -102,7 +221,7 @@ function initializeEventDelegation() {
     const profileToggle = document.getElementById("profileDropdownToggle");
     const profilePicture = document.getElementById("profilePicture");
 
-    // Check if click is on profile dropdown menu items - MOVED TO TOP
+    // Check if click is on profile dropdown menu items
     const profileMenuItem = e.target.closest && e.target.closest('#profileDropdownMenu a');
     if (profileMenuItem) {
       e.preventDefault();
@@ -136,34 +255,59 @@ function initializeEventDelegation() {
   }
 }
 
-// ====================================================================
-// Profile Dropdown Menu Item Handler - NEW
-// ====================================================================
+// 
+// Enhanced Profile Dropdown Menu Item Handler
+// 
 function handleProfileMenuItemClick(menuItem) {
   if (!menuItem) return;
   
-  console.log("📱 Profile dropdown menu item clicked:", menuItem.textContent.trim());
+  console.log("[info] Profile dropdown menu item clicked:", menuItem.textContent.trim());
+  const storedUser = getStoredUserData();
+  const normalizedRole = normalizeEquivalentRole((
+    sessionStorage.getItem("userRoleEffective") ||
+    storedUser.effectiveRole ||
+    storedUser.roleEffective ||
+    localStorage.getItem("userRoleEffective") ||
+    storedUser.role ||
+    localStorage.getItem("userRole") ||
+    ""
+  ).toLowerCase());
   
   if (menuItem.id === "logoutBtn") {
     closeProfileMenu();
-    setTimeout(showLogoutConfirmationModal, 150);
-  } else if (menuItem.href && menuItem.href !== "#" && menuItem.href !== "javascript:void(0)") {
-    // Close menu first, then navigate for better UX
+    setTimeout(() => window.logoutUser(), 150);
+  } else if (menuItem.dataset && menuItem.dataset.hardRefresh === "true") {
+    closeProfileMenu();
+    if (typeof window.performHardRefresh === "function") {
+      window.performHardRefresh();
+    }
+  } else {
+    let targetHref = menuItem.getAttribute("href") || menuItem.href || "";
+    if (menuItem.id === "profileDashboardLink" && normalizedRole === "pensioner") {
+      targetHref = "pensioner_lookup.html";
+    }
+
+    if (!targetHref || targetHref === "#" || targetHref === "javascript:void(0)") {
+      closeProfileMenu();
+      return;
+    }
+
+    // Update session activity before navigation
+    if (sessionManager && typeof sessionManager.updateSessionActivity === 'function') {
+      sessionManager.updateSessionActivity();
+    }
+    
     closeProfileMenu();
     
-    // Use setTimeout to ensure the menu closes before navigation
     setTimeout(() => {
-      window.location.href = menuItem.href;
+      window.location.assign(targetHref);
     }, 200);
-  } else {
-    // Handle other menu items if needed
-    closeProfileMenu();
   }
 }
 
-// ====================================================================
-// Outside Click / Escape - UPDATED: Don't close if clicking on profile menu items
-// ====================================================================
+// 
+// Outside Click / Escape - Enhanced
+// 
 function handleOutsideClick(e) {
   const menuToggle = document.getElementById("menuToggle");
   const dropdownMenu = document.getElementById("dropdownMenu");
@@ -172,9 +316,8 @@ function handleOutsideClick(e) {
 
   if (!dropdownMenu || !profileMenu) return;
 
-  // Check if click is on profile menu item
   const isProfileMenuItem = e.target.closest && e.target.closest('#profileDropdownMenu a');
-  if (isProfileMenuItem) return; // Don't close if clicking on menu items
+  if (isProfileMenuItem) return;
 
   const isOutsideMainMenu =
     !menuToggle.contains(e.target) && !dropdownMenu.contains(e.target);
@@ -193,10 +336,8 @@ function handleOutsideTouch(e) {
 
   if (!dropdownMenu || !profileMenu) return;
 
-  // Check if touch is on profile menu item
   const isProfileMenuItem = e.target.closest && e.target.closest('#profileDropdownMenu a');
   if (isProfileMenuItem) {
-    // For touch devices, prevent default but allow the click to propagate
     e.preventDefault();
     return;
   }
@@ -224,9 +365,9 @@ function handleEscapeKey(e) {
   }
 }
 
-// ====================================================================
+// 
 // Menu Toggles
-// ====================================================================
+// 
 function toggleMainMenu() {
   const dropdownMenu = document.getElementById("dropdownMenu");
   const profileMenu = document.getElementById("profileDropdownMenu");
@@ -253,7 +394,7 @@ function openMainMenu() {
   dropdownMenu.classList.add("visible");
   dropdownMenu.classList.remove("hidden");
   openDropdown = "menu";
-  console.log("✅ Main menu opened");
+  console.log("[ok] Main menu opened");
 }
 
 function closeMainMenu() {
@@ -262,7 +403,7 @@ function closeMainMenu() {
   dropdownMenu.classList.remove("visible");
   dropdownMenu.classList.add("hidden");
   if (openDropdown === "menu") openDropdown = null;
-  console.log("✅ Main menu closed");
+  console.log("[ok] Main menu closed");
 }
 
 function openProfileMenu() {
@@ -271,7 +412,7 @@ function openProfileMenu() {
   profileMenu.classList.add("visible");
   profileMenu.classList.remove("hidden");
   openDropdown = "profile";
-  console.log("✅ Profile menu opened");
+  console.log("[ok] Profile menu opened");
 }
 
 function closeProfileMenu() {
@@ -280,12 +421,12 @@ function closeProfileMenu() {
   profileMenu.classList.remove("visible");
   profileMenu.classList.add("hidden");
   if (openDropdown === "profile") openDropdown = null;
-  console.log("✅ Profile menu closed");
+  console.log("[ok] Profile menu closed");
 }
 
-// ====================================================================
+// 
 // Desktop Hover
-// ====================================================================
+// 
 function initializeDesktopHover() {
   if (window.innerWidth > 768) {
     const menuToggle = document.getElementById("menuToggle");
@@ -327,75 +468,245 @@ function initializeDesktopHover() {
         profileMenuTimeout = setTimeout(closeProfileMenu, 150);
       });
     }
-    console.log("✅ Desktop hover behavior initialized");
+    console.log("[ok] Desktop hover behavior initialized");
   }
 }
 setTimeout(initializeDesktopHover, 1000);
 
-// ====================================================================
-// Profile Display & Menu Visibility
-// ====================================================================
+// 
+// Enhanced Profile Display with Session Info
+// 
 function initializeUserProfileDisplay() {
   updateUserProfile();
+  initializeSessionInfoDisplay();
 }
 
 export function updateUserProfile() {
-  const userData = JSON.parse(localStorage.getItem("loggedInUser") || "{}");
+  const userData = getStoredUserData();
   const profileName = document.getElementById("profileName");
   const profilePicture = document.getElementById("profilePicture");
+  const photoValue = getUserPhotoValue(userData);
 
   if (profileName) {
     profileName.textContent = userData.name || sessionStorage.getItem("userName") || "User";
   }
   if (profilePicture) {
-    const imgSrc = userData.photo
-      ? resolveImagePath(userData.photo)
-      : getDefaultProfileImage();
+    const imgSrc = resolveImagePath(photoValue);
     profilePicture.src = imgSrc;
-    profilePicture.onerror = () => (profilePicture.src = getDefaultProfileImage());
+    profilePicture.onerror = () => {
+      profilePicture.onerror = null;
+      profilePicture.src = getDefaultProfileImage();
+    };
+  }
+}
+
+// Initialize session info display
+function initializeSessionInfoDisplay() {
+  const sessionInfoElement = document.getElementById('sessionInfo');
+  if (!sessionInfoElement) return;
+  
+  // Update session info periodically
+  setInterval(() => {
+    updateSessionInfoDisplay();
+  }, 60000); // Update every minute
+  
+  // Initial update
+  updateSessionInfoDisplay();
+}
+
+function updateSessionInfoDisplay() {
+  const sessionInfoElement = document.getElementById('sessionInfo');
+  if (!sessionInfoElement) return;
+  
+  const lastActivity = sessionStorage.getItem('lastActivity');
+  const sessionTimeout = sessionStorage.getItem('sessionTimeout') || 1800;
+  
+  if (lastActivity) {
+    const elapsed = Math.floor((Date.now() - parseInt(lastActivity)) / 1000);
+    const remaining = Math.max(0, sessionTimeout - elapsed);
+    const minutes = Math.floor(remaining / 60);
+    const seconds = remaining % 60;
+    
+    sessionInfoElement.innerHTML = `
+      <div class="session-info">
+        <small>Session expires in: ${minutes}:${seconds.toString().padStart(2, '0')}</small>
+      </div>
+    `;
   }
 }
 
 function resolveImagePath(imagePath) {
-  if (imagePath.startsWith("http") || imagePath.startsWith("data:")) return imagePath;
-  if (imagePath.includes("uploads/") || imagePath.includes("../uploads/")) {
-    const filename = imagePath.split("/").pop();
-    return `../backend/api/get_image.php?file=${filename}&type=profile`;
+  if (!imagePath || typeof imagePath !== "string") return getDefaultProfileImage();
+
+  const normalized = imagePath.trim();
+  if (!normalized) return getDefaultProfileImage();
+
+  if (normalized.startsWith("http://") || normalized.startsWith("https://") || normalized.startsWith("data:")) {
+    return normalized;
   }
-  return getDefaultProfileImage();
+
+  if (normalized.includes("backend/api/get_image.php")) {
+    return normalized;
+  }
+
+  if (normalized === "images/default-user.png" || normalized.endsWith("/default-user.png")) {
+    return getDefaultProfileImage();
+  }
+
+  // Handle plain filenames and known relative upload paths consistently.
+  const filename = normalized.split(/[\\/]/).pop();
+  if (!filename) return getDefaultProfileImage();
+
+  return `../backend/api/get_image.php?file=${encodeURIComponent(filename)}&type=profile`;
 }
 
 function getDefaultProfileImage() {
-  return "images/default-user.png";
+  return "../backend/api/get_image.php?file=default-user.png&type=profile";
 }
 
-// ====================================================================
+function getStoredUserData() {
+  try {
+    return JSON.parse(localStorage.getItem("loggedInUser") || "{}");
+  } catch (error) {
+    console.warn("Could not parse loggedInUser from localStorage:", error);
+    return {};
+  }
+}
+
+function getUserPhotoValue(userData) {
+  if (!userData || typeof userData !== "object") return "";
+  return (
+    userData.photo ||
+    userData.userPhoto ||
+    userData.user_photo ||
+    sessionStorage.getItem("userPhoto") ||
+    ""
+  );
+}
+
+// 
 // Role-Based Menu Visibility
-// ====================================================================
+// 
 function initializeMenuVisibility() {
   updateMenuVisibility();
 }
 
 export function updateMenuVisibility() {
   const userData = JSON.parse(localStorage.getItem("loggedInUser") || "{}");
-  const role = (userData.role || localStorage.getItem("userRole") || "").toLowerCase();
-  console.log("🎭 Menu visibility for:", role);
+  const role = (
+    sessionStorage.getItem("userRole") ||
+    userData.role ||
+    localStorage.getItem("userRole") ||
+    ""
+  ).toLowerCase();
+  const effectiveRole = (
+    sessionStorage.getItem("userRoleEffective") ||
+    userData.effectiveRole ||
+    userData.roleEffective ||
+    localStorage.getItem("userRoleEffective") ||
+    ""
+  ).toLowerCase();
+  console.log("Menu visibility for:", role, "effective:", effectiveRole);
 
-  const settingsItem = document.getElementById("settingsMenuItem");
-  const usersItem = document.getElementById("usersMenuItem");
+  const normalizedRole = normalizeEquivalentRole(effectiveRole || role);
+  const menuPageMap = {
+    myTasksMenuItem: "tasks.html",
+    messagesMenuItem: "messages.html",
+    settingsMenuItem: "admin_dashboard.html",
+    usersMenuItem: "users.html",
+    staffDueMenuItem: "staff_due.html",
+    pensionRegistryMenuItem: "pension_file_registry.html",
+    applicationStatusMenuItem: "application_status.html",
+    fileTrackingMenuItem: "file_tracking.html",
+    claimFormMenuItem: "claim_form.html",
+    claimsMenuItem: "claims.html",
+    budgetMenuItem: "budgeting.html",
+    benefitsCalculatorMenuItem: "benefits_calculator.html",
+    podcastMenuItem: "podcast.html"
+  };
 
-  const isAdmin = role === "admin";
-  if (settingsItem) settingsItem.style.display = isAdmin ? "block" : "none";
-  if (usersItem) usersItem.style.display = isAdmin ? "block" : "none";
+  Object.entries(menuPageMap).forEach(([itemId, pageName]) => {
+    setMenuItemVisibility(itemId, isHeaderPageAccessibleForRole(pageName, normalizedRole));
+  });
+
+  setMenuItemVisibility("profileViewMenuItem", true);
+  setMenuItemVisibility("profileEditMenuItem", true);
+  setMenuItemVisibility(
+    "profileDashboardMenuItem",
+    normalizedRole === "pensioner" || isHeaderPageAccessibleForRole("dashboard.html", normalizedRole)
+  );
+  setMenuItemVisibility("feedbackMenuItem", true);
+  setMenuItemVisibility("termsMenuItem", true);
+
+  const dashboardHref = getRoleDashboardHref(normalizedRole);
+  const dashboardLink = document.getElementById("profileDashboardLink");
+  const dashboardMenuLink = document.querySelector("#dashboardMenuItem a");
+  if (dashboardLink) {
+    dashboardLink.setAttribute("href", normalizedRole === "pensioner" ? "pensioner_lookup.html" : dashboardHref);
+    dashboardLink.textContent = normalizedRole === "pensioner" ? "Find Pensioners" : "Dashboard";
+  }
+  const dashboardAllowed = isHeaderPageAccessibleForRole("dashboard.html", normalizedRole);
+  setMenuItemVisibility("dashboardMenuItem", dashboardAllowed);
+  if (dashboardMenuLink) {
+    dashboardMenuLink.setAttribute("href", dashboardHref);
+  }
 }
 
-// ====================================================================
+function setMenuItemVisibility(itemId, isVisible) {
+  const element = document.getElementById(itemId);
+  if (!element) return;
+  element.style.display = isVisible ? "" : "none";
+}
+
+function normalizeEquivalentRole(role) {
+  const normalized = (role || "").toLowerCase();
+  if (normalized === "super_admin") {
+    return "admin";
+  }
+  return ["dep_oc", "deputy_oc", "deputy_oc_pen", "deputy_oc_pension"].includes(normalized)
+    ? "oc_pen"
+    : normalized;
+}
+
+function getRoleDashboardHref(role) {
+  if (role === "pensioner") return "pensioner_board.html";
+  return "dashboard.html";
+}
+
+function isHeaderPageAccessibleForRole(pageName, role) {
+  const page = String(pageName || "").trim().toLowerCase();
+  const normalizedRole = normalizeEquivalentRole(role);
+  if (page === "dashboard.html" && normalizedRole && !["user", "pensioner"].includes(normalizedRole)) {
+    return true;
+  }
+  const claimsPages = ["claim_form.html", "claims.html", "budgeting.html"];
+  const sharedToolsPages = ["benefits_calculator.html", "podcast.html", "document_viewer.html"];
+  const rules = {
+    super_admin: () => true,
+    admin: () => true,
+    clerk: (p) => ["file_registry.html", "pension_file_registry.html", "staff_due.html", "add_staff.html", "edit_staff.html", "view_staff.html", "tasks.html", "file_tracking.html", "application_status.html", "profile.html", "messages.html", "reports.html", "dashboard.html", "users.html", "admin_dashboard.html"].concat(claimsPages, sharedToolsPages).includes(p),
+    oc_pen: (p) => ["pension_file_registry.html", "staff_due.html", "add_staff.html", "view_staff.html", "tasks.html", "file_tracking.html", "application_status.html", "profile.html", "messages.html", "reports.html", "dashboard.html"].concat(claimsPages, sharedToolsPages).includes(p),
+    writeup_officer: (p) => ["pension_file_registry.html", "staff_due.html", "add_staff.html", "edit_staff.html", "view_staff.html", "tasks.html", "file_tracking.html", "application_status.html", "profile.html", "messages.html", "reports.html", "dashboard.html"].concat(claimsPages, sharedToolsPages).includes(p),
+    file_creator: (p) => ["pension_file_registry.html", "tasks.html", "file_tracking.html", "application_status.html", "profile.html", "messages.html", "dashboard.html"].concat(claimsPages, sharedToolsPages).includes(p),
+    data_entry: (p) => ["file_registry.html", "pension_file_registry.html", "tasks.html", "staff_due.html", "add_staff.html", "edit_staff.html", "view_staff.html", "file_tracking.html", "application_status.html", "profile.html", "messages.html", "dashboard.html"].concat(claimsPages, sharedToolsPages).includes(p),
+    assessor: (p) => ["pension_file_registry.html", "tasks.html", "file_tracking.html", "application_status.html", "profile.html", "messages.html", "dashboard.html"].concat(claimsPages, sharedToolsPages).includes(p),
+    auditor: (p) => ["pension_file_registry.html", "tasks.html", "file_tracking.html", "application_status.html", "profile.html", "messages.html", "dashboard.html"].concat(claimsPages, sharedToolsPages).includes(p),
+    approver: (p) => ["pension_file_registry.html", "tasks.html", "file_tracking.html", "application_status.html", "profile.html", "messages.html", "dashboard.html"].concat(claimsPages, sharedToolsPages).includes(p),
+    pensioner: (p) => ["pensioner_board.html", "pensioner_lookup.html", "profile.html", "edit_user.html"].concat(sharedToolsPages).includes(p),
+    user: (p) => ["dashboard.html", "pension_file_registry.html", "application_status.html", "profile.html", "faq.html", "about.html"].concat(claimsPages, sharedToolsPages).includes(p)
+  };
+
+  return (rules[normalizedRole] || (() => false))(page);
+}
+
+// 
 // Dynamic Counts (messages/tasks)
-// ====================================================================
+// 
 function initializeDynamicCounts() {
   loadUnreadMessageCount();
   loadTaskCount();
   setInterval(loadUnreadMessageCount, 120000);
+  setInterval(loadTaskCount, 120000);
 }
 
 async function loadUnreadMessageCount() {
@@ -422,81 +733,74 @@ async function loadUnreadMessageCount() {
   }
 }
 
-function loadTaskCount() {}
-
-// ====================================================================
-// Menu Links & Logout Modal - SIMPLIFIED
-// ====================================================================
-function initializeMenuLinks() {
-  // The event delegation now handles profile menu items directly
-  console.log("✅ Profile dropdown menu links configured via event delegation");
+function loadTaskCount() {
+  fetch("../backend/api/get_task_count.php", {
+    credentials: "include"
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      if (!data.success) return;
+      const taskBubble = document.querySelector(".task-bubble");
+      if (!taskBubble) return;
+      const total = Number(data.taskCount) || 0;
+      if (total > 0) {
+        taskBubble.textContent = total > 99 ? "99+" : total;
+        taskBubble.classList.remove("hidden");
+      } else {
+        taskBubble.classList.add("hidden");
+      }
+    })
+    .catch((error) => {
+      console.error("Error loading task count:", error);
+    });
 }
 
-function showLogoutConfirmationModal() {
-  if (document.querySelector(".logout-modal-overlay")) return;
+// 
+// Menu Links & Logout Modal - Enhanced
+// 
+function initializeMenuLinks() {
+  const dropdownMenu = document.getElementById("dropdownMenu");
+  if (dropdownMenu && !dropdownMenu.dataset.publicSessionGuardBound) {
+    dropdownMenu.dataset.publicSessionGuardBound = "true";
+    dropdownMenu.addEventListener("click", (event) => {
+      const link = event.target.closest("a[href]");
+      if (!link) return;
 
-  const overlay = document.createElement("div");
-  overlay.className = "logout-modal-overlay";
-  overlay.innerHTML = `
-    <div class="logout-modal" role="dialog" aria-modal="true">
-      <h3>Confirm Logout</h3>
-      <p>Are you sure you want to logout?</p>
-      <div class="modal-actions">
-        <button class="btn-cancel">Cancel</button>
-        <button class="btn-confirm">Logout</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-
-  overlay.scrollIntoView({ behavior: "smooth", block: "center" });
-  document.body.classList.add("modal-open");
-  document.body.style.overflow = "hidden";
-
-  const cancelBtn = overlay.querySelector(".btn-cancel");
-  const confirmBtn = overlay.querySelector(".btn-confirm");
-
-  function removeModal() {
-    overlay.remove();
-    document.body.classList.remove("modal-open");
-    document.body.style.overflow = "";
+      try {
+        const targetUrl = new URL(link.getAttribute("href"), window.location.href);
+        const targetPage = (targetUrl.pathname.split("/").pop() || "").toLowerCase();
+        if (["feedback.html", "terms.html"].includes(targetPage)) {
+          if (typeof window.rememberLastSecurePage === "function") {
+            window.rememberLastSecurePage(window.location.href);
+          }
+          if (typeof window.rememberAuthenticatedPublicAllowance === "function") {
+            window.rememberAuthenticatedPublicAllowance(targetPage);
+          }
+        }
+      } catch (_error) {
+        // Ignore malformed navigation targets.
+      }
+    });
   }
 
-  cancelBtn.addEventListener("click", removeModal);
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) removeModal();
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") removeModal();
-  });
-
-  confirmBtn.addEventListener("click", async () => {
-    overlay.innerHTML = `
-      <div class="logout-overlay">
-        <div class="spinner"></div>
-        <p>Logging out...</p>
-      </div>
-    `;
-    try {
-      await window.logoutUser();
-    } catch {
-      removeModal();
-      alert("Logout failed. Please try again.");
-    }
-  });
+  console.log("[ok] Profile dropdown menu links configured via event delegation");
 }
 
-// ====================================================================
+// 
 // Logged Out UI Reset & Public API
-// ====================================================================
+// 
 function handleUserLoggedOut() {
   const profileName = document.getElementById("profileName");
   const profilePicture = document.getElementById("profilePicture");
+  const sessionInfo = document.getElementById("sessionInfo");
+  
   if (profileName) profileName.textContent = "User";
   if (profilePicture) profilePicture.src = getDefaultProfileImage();
+  if (sessionInfo) sessionInfo.innerHTML = "";
+  
   closeMainMenu();
   closeProfileMenu();
-  console.log("🚪 User logged out - UI reset");
+  console.log("[info] User logged out - UI reset");
 }
 
 export function refreshHeaderData() {
@@ -504,13 +808,28 @@ export function refreshHeaderData() {
   updateMenuVisibility();
   loadUnreadMessageCount();
   loadTaskCount();
-  console.log("🔄 Header data refreshed");
+  updateSessionInfoDisplay();
+  console.log("[info] Header data refreshed");
 }
 
 export function clearUserData() {
   localStorage.removeItem("loggedInUser");
   localStorage.removeItem("userRole");
+  localStorage.removeItem("userRoleEffective");
+  localStorage.removeItem("sessionSettings");
   sessionStorage.clear();
   handleUserLoggedOut();
-  console.log("🧹 All user data cleared");
+  console.log("[cleanup] All user data cleared");
 }
+
+// Export for testing
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    initHeaderInteractions,
+    updateUserProfile,
+    refreshHeaderData,
+    clearUserData
+  };
+}
+
+

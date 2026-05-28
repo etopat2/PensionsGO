@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
+  <title>Application Status - PensionsGo</title>
+  <link rel="stylesheet" href="css/color-variables.css?v=20260504a">
+  <link rel="stylesheet" href="css/styles.css?v=20260507c">
+  <link rel="stylesheet" href="css/menu.css?v=20260504d">
+  <link rel="stylesheet" href="css/profile.css?v=20260504a">
+  <link rel="stylesheet" href="css/overlay.css?v=20260504a">
+  <link rel="stylesheet" href="css/track-status.css?v=20260504a">
+  <script type="module" src="js/main.js?v=20260528b"></script>
+  <script defer src="js/track-status.js?v=20260215b"></script>
+</head>
+<body>
+  <header id="dynamicHeader"></header>
+
+  <main class="main-wrapper">
+    <section class="track-section">
+      <div class="track-header">
+        <h2>Application Progress Tracker</h2>
+        <p>Search by file number, pensioner name, or phone number to view workflow progress and step details.</p>
+      </div>
+
+      <form id="trackForm" class="track-form">
+        <input type="text" id="trackingId" placeholder="Enter file number, name, or phone" autocomplete="off">
+        <button type="submit" class="btn-secondary">Track</button>
+      </form>
+
+      <div class="track-legend">
+        <span class="legend-item"><i class="legend-dot done"></i> Completed</span>
+        <span class="legend-item"><i class="legend-dot current"></i> In Progress</span>
+        <span class="legend-item"><i class="legend-dot pending"></i> Pending</span>
+      </div>
+
+      <div id="trackingResult" class="tracking-result"></div>
+    </section>
+  </main>
+
+  <div id="stepDetailModal" class="status-modal hidden" aria-hidden="true">
+    <div id="stepDetailBackdrop" class="status-modal-backdrop"></div>
+    <section class="status-modal-panel" role="dialog" aria-modal="true" aria-labelledby="stepModalTitle">
+      <header class="status-modal-header">
+        <h3 id="stepModalTitle">Step Detail</h3>
+        <button type="button" id="stepDetailClose" aria-label="Close">&times;</button>
+      </header>
+      <div id="stepDetailBody" class="status-modal-body"></div>
+    </section>
+  </div>
+
+  <footer id="dynamicFooter"></footer>
+</body>
+</html>
+
+
+

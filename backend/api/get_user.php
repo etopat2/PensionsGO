@@ -1,11 +1,11 @@
 <?php
 /**
- * ============================================================
- * GET USER API
- * ============================================================
+ * 
+ * Get User Api
+ * 
  * Fetches full details for a given user (used in profile page).
  * Includes userTitle and phoneNo for dynamic display.
- * ============================================================
+ * 
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../config.php';
@@ -35,6 +35,10 @@ try {
     $result = $stmt->get_result();
 
     if ($row = $result->fetch_assoc()) {
+        $resolvedRole = resolveRoleKeyFromInput($conn, (string)($row['userRole'] ?? ''), false);
+        if ($resolvedRole === '') {
+            $resolvedRole = 'user';
+        }
         echo json_encode([
             'success' => true,
             'user' => [
@@ -43,7 +47,7 @@ try {
                 'userName' => $row['userName'],
                 'userEmail' => $row['userEmail'],
                 'phoneNo' => $row['phoneNo'],
-                'userRole' => $row['userRole'],
+                'userRole' => $resolvedRole,
                 'userPhoto' => $row['userPhoto'] ?: 'images/default-user.png'
             ]
         ]);
@@ -57,3 +61,4 @@ try {
     $conn->close();
 }
 ?>
+

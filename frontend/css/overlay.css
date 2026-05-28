@@ -1,6 +1,4 @@
-/* ============================================================
-   LOGOUT MODAL & OVERLAY STYLING
-   ============================================================ */
+/* Logout Modal & Overlay Styling*/
 @import url("color-variables.css");
 /* Dimmed background overlay */
 .logout-modal-overlay {
@@ -13,9 +11,22 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 9999;
+  z-index: 3001;
   backdrop-filter: blur(3px);
   animation: fadeIn 0.3s ease;
+}
+
+/* Workflow form modals should sit above header/footer and below dropdown menus */
+.workflow-modal-overlay {
+  z-index: 3001;
+  padding: 1rem;
+}
+
+.workflow-modal-overlay .logout-modal {
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Modal container */
@@ -31,12 +42,36 @@
   animation: slideUp 0.3s ease;
 }
 
+.logout-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+  margin-bottom: 0.9rem;
+  text-align: left;
+}
+
+.logout-modal-header > div {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 /* Modal header text */
 .logout-modal h3 {
   color: var(--heading-color, #333);
   margin-bottom: 0.8rem;
   font-size: 1.3rem;
   font-weight: 700;
+}
+
+.logout-modal-header h3 {
+  margin: 0;
+}
+
+.logout-modal-header p {
+  margin: 0.28rem 0 0;
+  font-size: 0.92rem;
+  color: var(--muted-color, #555);
 }
 
 /* Modal message */
@@ -51,6 +86,12 @@
   display: flex;
   justify-content: center;
   gap: 1rem;
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  background: color-mix(in srgb, var(--card-bg, #fff) 95%, var(--menu-bg-dark, #000) 5%);
+  border-top: 1px solid var(--border-color, #ddd);
+  padding-top: 0.55rem;
 }
 
 .btn-confirm,
@@ -112,38 +153,153 @@
   margin-bottom: 1rem;
 }
 
-/* ============================================================
-   SESSION & ACCESS OVERLAYS
-   ============================================================ */
+/* Session & Access Overlays*/
 .session-overlay {
   position: fixed;
-  top: 0; 
-  left: 0;
-  width: 100%; 
-  height: 100%;
-  background: rgba(0, 0, 0, 0.85);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  z-index: 99999; /* Very high z-index to ensure it's on top */
+  inset: 0;
+  min-height: 100dvh;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  background: rgba(0, 0, 0, 0.75);
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  z-index: var(--z-session-overlay, 2147483647);
   color: #fff;
   font-family: "Segoe UI", Roboto, sans-serif;
   animation: fadeIn 0.3s ease-in-out;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  isolation: isolate;
+  box-sizing: border-box;
 }
 
 .session-overlay-content {
   background: linear-gradient(135deg, rgba(30, 30, 30, 0.95), rgba(50, 50, 50, 0.95));
+  position: relative;
+  z-index: 1;
   padding: 2.5rem 3rem;
   border-radius: 15px;
   text-align: center;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  max-width: 450px;
-  width: 90%;
+  max-width: 480px;
+  width: min(480px, 100%);
+  margin: auto;
   animation: slideUp 0.4s ease-out;
+  max-height: min(88vh, calc(100dvh - 2rem));
+  overflow-y: auto;
+}
+
+.session-warning-overlay,
+.inactivity-warning {
+  position: fixed;
+  inset: 0;
+  min-height: 100dvh;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  background: rgba(0, 0, 0, 0.78);
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  z-index: var(--z-session-overlay, 2147483647);
+  color: #fff;
+  isolation: isolate;
+  box-sizing: border-box;
+}
+
+.session-warning-modal,
+.warning-content {
+  background: linear-gradient(135deg, rgba(32, 32, 32, 0.96), rgba(52, 52, 52, 0.96));
+  position: relative;
+  z-index: 1;
+  padding: 2.25rem 2.5rem;
+  border-radius: 15px;
+  text-align: center;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  width: min(460px, 100%);
+  margin: auto;
+  max-height: min(88vh, calc(100dvh - 2rem));
+  overflow-y: auto;
+}
+
+.session-warning-modal h3,
+.warning-content h3 {
+  margin: 0.75rem 0 0;
+  font-size: 1.55rem;
+  color: #ffcc00;
+}
+
+.session-warning-modal p,
+.warning-content p {
+  margin: 1rem 0 0;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: #e8e8e8;
+}
+
+.warning-icon {
+  display: block;
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
+
+.warning-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+}
+
+.session-warning-modal .warning-btn,
+.warning-content .warning-btn,
+.session-warning-overlay .btn-primary,
+.session-warning-overlay .btn-secondary,
+.inactivity-warning .btn-primary,
+.inactivity-warning .btn-secondary {
+  min-width: 140px;
+  padding: 0.8rem 1.4rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.session-warning-modal .warning-btn.primary,
+.warning-content .warning-btn.primary,
+.session-warning-overlay .btn-primary,
+.inactivity-warning .btn-primary {
+  background: linear-gradient(135deg, #ffcc00, #ffaa00);
+  color: #111;
+  box-shadow: 0 8px 18px rgba(255, 204, 0, 0.25);
+}
+
+.session-warning-modal .warning-btn.secondary,
+.warning-content .warning-btn.secondary,
+.session-warning-overlay .btn-secondary,
+.inactivity-warning .btn-secondary {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.session-warning-modal .warning-btn:hover,
+.warning-content .warning-btn:hover,
+.session-warning-overlay .btn-primary:hover,
+.session-warning-overlay .btn-secondary:hover,
+.inactivity-warning .btn-primary:hover,
+.inactivity-warning .btn-secondary:hover {
+  transform: translateY(-1px);
+}
+
+/* Keep modal sharp while background is blurred */
+.session-expired-blur .session-overlay,
+.session-expired-blur .session-overlay * {
+  filter: none;
 }
 
 .session-icon {
@@ -247,6 +403,25 @@
 
 /* Responsive design */
 @media (max-width: 768px) {
+  .logout-modal {
+    width: min(100%, 420px);
+    padding: 1rem;
+  }
+
+  .logout-modal-header {
+    align-items: flex-start;
+  }
+
+  .modal-actions {
+    flex-wrap: wrap;
+  }
+
+  .modal-actions .btn-confirm,
+  .modal-actions .btn-cancel {
+    flex: 1 1 calc(50% - 0.5rem);
+    min-width: 0;
+  }
+
   .session-overlay-content {
     padding: 2rem 1.5rem;
     margin: 1rem;
@@ -270,20 +445,39 @@
   }
 }
 
-/* ============================================================
-   AUTH MODAL STYLES (for login modal)
-   ============================================================ */
+/* AUTH MODAL STYLES (for login modal) */
 .auth-modal-overlay {
+  position: fixed;
+  inset: 0;
+  min-height: 100dvh;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  background: rgba(0, 0, 0, 0.7);
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  z-index: var(--z-modal-layer, 12000);
+  isolation: isolate;
+  box-sizing: border-box;
+}
+
+/* Spinner overlay used during logout */
+.auth-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(15, 15, 15, 0.8);
+  color: #fff;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   justify-content: center;
+  align-items: center;
   z-index: 10000;
+  text-align: center;
+  font-size: 1.1rem;
+  animation: fadeIn 0.3s ease;
 }
 
 .auth-modal {
@@ -291,14 +485,23 @@
   border-radius: 10px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
   max-width: 400px;
-  width: 90%;
+  width: min(400px, 100%);
+  margin: auto;
+  position: relative;
+  z-index: 1;
   overflow: hidden;
+  max-height: min(90vh, calc(100dvh - 2rem));
+  display: flex;
+  flex-direction: column;
 }
 
 .auth-modal-header {
   background: var(--primary-color);
   color: white;
   padding: 1rem 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 3;
 }
 
 .auth-modal-header h3 {
@@ -309,6 +512,9 @@
 .auth-modal-body {
   padding: 2rem 1.5rem;
   text-align: center;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .auth-modal-footer {
@@ -316,6 +522,15 @@
   border-top: 1px solid #eee;
   display: flex;
   justify-content: flex-end;
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  background: color-mix(in srgb, var(--card-bg, #fff) 95%, var(--menu-bg-dark, #000) 5%);
+}
+
+.auth-modal-footer.logout-actions {
+  justify-content: center;
+  gap: 1rem;
 }
 
 .auth-spinner {
@@ -358,17 +573,14 @@
   background: #5a6268;
 }
 
-/* ============================================================
-   ACCESSIBILITY & POLISH ENHANCEMENTS
-   ============================================================ */
-
+/* Accessibility & Polish Enhancements*/
 /* Prevent text flickering when blur is applied */
 .session-expired-blur * {
   will-change: filter;
 }
 
 /* Ensure overlays always appear above other UI layers */
-header, main, footer, .main-wrapper {
+main, footer, .main-wrapper {
   position: relative;
   z-index: 1;
 }
@@ -384,3 +596,390 @@ header, main, footer, .main-wrapper {
   background: linear-gradient(135deg, rgba(20, 20, 20, 0.95), rgba(40, 40, 40, 0.95));
   color: #eee;
 }
+
+/* 2026 Modal And Overlay Refinement */
+.logout-modal-overlay,
+.workflow-modal-overlay,
+.auth-modal-overlay,
+.admin-modal-overlay,
+.claims-modal-overlay,
+.registry-modal-overlay,
+.workspace-modal-overlay,
+.feedback-modal-overlay,
+.file-history-modal-overlay,
+.global-broadcast-overlay {
+  background: rgba(35, 20, 17, 0.56);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.logout-modal {
+  max-width: 460px;
+  width: min(460px, 100%);
+  padding: 1.35rem;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 88%, #fff 12%);
+  background: linear-gradient(180deg, var(--card-bg), var(--surface-soft));
+  box-shadow: 0 28px 56px rgba(41, 26, 19, 0.24);
+}
+
+.logout-modal-header {
+  margin-bottom: 0.9rem;
+  padding-bottom: 0.72rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent 22%);
+}
+
+.logout-modal h3 {
+  margin-bottom: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--heading-color);
+}
+
+.logout-modal-header p,
+.logout-modal p {
+  color: var(--muted-color);
+  line-height: 1.6;
+}
+
+.modal-actions {
+  gap: 0.65rem;
+  padding-top: 0.75rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(248, 243, 237, 0.96));
+}
+
+.btn-confirm,
+.btn-cancel,
+.warning-actions .warning-btn,
+.session-overlay-buttons .session-btn,
+.security-btn,
+.access-denied-btn {
+  min-height: var(--button-height-md);
+  border-radius: 12px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.btn-confirm,
+.warning-actions .warning-btn.primary,
+.session-warning-overlay .btn-primary,
+.inactivity-warning .btn-primary,
+.security-btn-primary,
+.access-denied-btn {
+  background: linear-gradient(135deg, var(--primary-maroon) 0%, var(--primary-maroon-dark) 100%);
+  color: #fffaf2;
+}
+
+.btn-cancel,
+.warning-actions .warning-btn.secondary,
+.session-warning-overlay .btn-secondary,
+.inactivity-warning .btn-secondary,
+.security-btn-secondary {
+  background: linear-gradient(180deg, var(--card-bg), var(--surface-soft));
+  color: var(--heading-color);
+  border: 1px solid color-mix(in srgb, var(--border-color) 72%, var(--primary-maroon) 28%);
+}
+
+.session-overlay,
+.session-warning-overlay,
+.inactivity-warning {
+  background: rgba(24, 12, 10, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+html.session-state-modal-open,
+body.session-state-modal-open {
+  overflow: hidden !important;
+}
+
+body.session-state-modal-open .document-viewer-frame,
+body.session-state-modal-open .document-viewer-frame-wrap,
+body.session-state-modal-open iframe:not(.session-modal-preserve),
+body.session-state-modal-open object,
+body.session-state-modal-open embed {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.session-overlay,
+.session-warning-overlay,
+.inactivity-warning {
+  position: fixed !important;
+  inset: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+  align-items: center !important;
+  justify-items: center !important;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100vw;
+  padding: clamp(1rem, 3vw, 1.5rem) !important;
+  overflow: auto !important;
+  overscroll-behavior: contain;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  z-index: var(--z-session-overlay, 2147483647) !important;
+  isolation: isolate;
+}
+
+.session-overlay-content,
+.session-warning-modal,
+.warning-content {
+  width: min(100%, 480px);
+  max-height: min(88vh, calc(100dvh - 2rem));
+  margin: auto;
+  overflow-y: auto;
+  position: relative !important;
+  z-index: 1 !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.session-overlay-static .session-overlay-content,
+.session-overlay-static .session-warning-modal,
+.session-overlay-static .warning-content {
+  animation: none !important;
+  transform: translateY(0) scale(1) !important;
+}
+
+.session-overlay-content,
+.session-warning-modal,
+.warning-content {
+  background: linear-gradient(180deg, rgba(255, 254, 251, 0.98), rgba(248, 241, 233, 0.98));
+  color: var(--text-color);
+  border: 1px solid color-mix(in srgb, var(--border-color) 86%, #fff 14%);
+  border-radius: 20px;
+  box-shadow: 0 30px 60px rgba(41, 26, 19, 0.26);
+}
+
+.session-overlay-content h2,
+.session-overlay-content h3,
+.session-warning-modal h3,
+.warning-content h3 {
+  color: var(--heading-color) !important;
+}
+
+.session-overlay-content p,
+.session-warning-modal p,
+.warning-content p {
+  color: var(--muted-color) !important;
+}
+
+.warning-icon {
+  color: var(--primary-gold);
+}
+
+.session-overlay,
+.session-warning-overlay,
+.inactivity-warning {
+  --session-modal-accent: var(--primary-maroon);
+  --session-modal-accent-dark: var(--primary-maroon-dark);
+  --session-modal-accent-soft: color-mix(in srgb, var(--primary-maroon) 12%, #fff 88%);
+  --session-modal-header-text: #fffaf2;
+  --session-modal-body-bg: linear-gradient(180deg, #fffdfa 0%, #f8f1e9 100%);
+}
+
+.session-overlay[data-type="session-expired"],
+.session-overlay.session-expired {
+  --session-modal-accent: #b45309;
+  --session-modal-accent-dark: #7c2d12;
+  --session-modal-accent-soft: #fff7ed;
+}
+
+.session-warning-overlay,
+.inactivity-warning {
+  --session-modal-accent: #d97706;
+  --session-modal-accent-dark: #92400e;
+  --session-modal-accent-soft: #fffbeb;
+}
+
+.session-overlay[data-type="device-conflict"],
+.session-overlay.device-conflict {
+  --session-modal-accent: #b91c1c;
+  --session-modal-accent-dark: #7f1d1d;
+  --session-modal-accent-soft: #fef2f2;
+}
+
+.session-overlay[data-type="access-denied"],
+.session-overlay.access-denied {
+  --session-modal-accent: #6d28d9;
+  --session-modal-accent-dark: #4c1d95;
+  --session-modal-accent-soft: #f5f3ff;
+}
+
+.session-overlay-content,
+.session-warning-modal,
+.warning-content {
+  padding: 0 !important;
+  overflow: hidden;
+  background: var(--session-modal-body-bg) !important;
+}
+
+.session-modal-header {
+  display: grid;
+  justify-items: center;
+  gap: 0.65rem;
+  padding: 1.45rem 1.5rem 1.25rem;
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.2), transparent 30%),
+    linear-gradient(135deg, var(--session-modal-accent) 0%, var(--session-modal-accent-dark) 100%);
+  color: var(--session-modal-header-text);
+  border-bottom: 1px solid color-mix(in srgb, var(--session-modal-accent-dark) 74%, #fff 26%);
+  text-align: center;
+}
+
+.session-modal-body {
+  display: grid;
+  gap: 1.25rem;
+  padding: 1.3rem 1.45rem 1.45rem;
+  background: var(--session-modal-body-bg);
+  text-align: center;
+}
+
+.session-modal-header .session-icon,
+.session-modal-header .warning-icon {
+  display: grid;
+  place-items: center;
+  width: 4.25rem;
+  height: 4.25rem;
+  margin: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--session-modal-accent) !important;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 12px 24px rgba(20, 12, 10, 0.18);
+  font-size: 2.45rem;
+  line-height: 1;
+  animation: none;
+}
+
+.session-modal-header .session-warning-icon {
+  position: relative;
+  width: 4.25rem;
+  height: 4.25rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #111;
+  clip-path: none;
+  animation: sessionWarningIconPulse 1.55s ease-in-out infinite;
+  filter: drop-shadow(0 12px 18px rgba(20, 12, 10, 0.18));
+}
+
+.session-modal-header .session-warning-icon::before,
+.session-modal-header .session-warning-icon::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(50% 4%, 96% 92%, 4% 92%);
+}
+
+.session-modal-header .session-warning-icon::before {
+  background: #000;
+}
+
+.session-modal-header .session-warning-icon::after {
+  inset: 0.2rem;
+  background: #facc15;
+}
+
+.session-modal-header .session-warning-icon span {
+  position: absolute;
+  left: 50%;
+  top: 59%;
+  transform: translate(-50%, -50%);
+  color: #000;
+  font-size: 2.35rem;
+  font-weight: 1000;
+  line-height: 1;
+  z-index: 1;
+}
+
+@keyframes sessionWarningIconPulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 12px 18px rgba(20, 12, 10, 0.18));
+  }
+  50% {
+    transform: scale(1.08);
+    filter: drop-shadow(0 16px 24px rgba(250, 204, 21, 0.34));
+  }
+}
+
+.session-modal-header h2,
+.session-modal-header h3 {
+  margin: 0 !important;
+  color: var(--session-modal-header-text) !important;
+  -webkit-text-fill-color: currentColor !important;
+  background: none !important;
+  font-size: clamp(1.25rem, 1rem + 1vw, 1.65rem);
+  line-height: 1.22;
+  font-weight: 800;
+}
+
+.session-modal-body p {
+  margin: 0 !important;
+  padding: 0.85rem 0.95rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--session-modal-accent) 18%, var(--border-color) 82%);
+  background: color-mix(in srgb, var(--session-modal-accent-soft) 72%, #fff 28%);
+  color: color-mix(in srgb, var(--heading-color) 82%, var(--session-modal-accent-dark) 18%) !important;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.session-overlay-buttons,
+.warning-actions {
+  margin-top: 0;
+}
+
+.session-overlay-buttons .session-btn-primary,
+.warning-actions .warning-btn.primary,
+.session-warning-overlay .btn-primary,
+.inactivity-warning .btn-primary {
+  background: linear-gradient(135deg, var(--session-modal-accent) 0%, var(--session-modal-accent-dark) 100%) !important;
+  color: #fffaf2 !important;
+  box-shadow: 0 12px 22px color-mix(in srgb, var(--session-modal-accent) 24%, transparent);
+}
+
+@media (max-width: 768px) {
+  .logout-modal {
+    padding: 1rem;
+    border-radius: 18px;
+  }
+
+  .session-overlay-content,
+  .session-warning-modal,
+  .warning-content {
+    border-radius: 18px;
+  }
+
+  .session-modal-header {
+    padding: 1.15rem 1rem 1rem;
+  }
+
+  .session-modal-body {
+    padding: 1rem;
+  }
+
+  .session-modal-header .session-icon,
+  .session-modal-header .warning-icon {
+    width: 3.45rem;
+    height: 3.45rem;
+    font-size: 2rem;
+  }
+
+  .session-modal-header .session-warning-icon span {
+    font-size: 1.9rem;
+  }
+
+  .modal-actions {
+    padding-top: 0.65rem;
+  }
+}
+

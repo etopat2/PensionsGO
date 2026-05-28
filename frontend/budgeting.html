@@ -1,1 +1,422 @@
-<!-- budgeting.html HTML scaffold -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
+  <title>Budget Forecast - PensionsGo</title>
+  <link rel="stylesheet" href="css/color-variables.css?v=20260504a" />
+  <link rel="stylesheet" href="css/styles.css?v=20260507c" />
+  <link rel="stylesheet" href="css/profile.css?v=20260504a" />
+  <link rel="stylesheet" href="css/menu.css?v=20260504d" />
+  <link rel="stylesheet" href="css/overlay.css?v=20260504a" />
+  <link rel="stylesheet" href="css/claims.css?v=20260504a" />
+</head>
+<body>
+  <main class="budget-wrapper">
+    <div class="budget-header">
+      <div>
+        <h2>Budget Forecast & Arrears Planning</h2>
+        <p class="budget-subtitle">
+          Compare planned pension/gratuity exposure against live arrears balances by financial year.
+        </p>
+      </div>
+      <div class="budget-actions">
+        <a class="claims-link-btn budget-nav-btn" href="claims.html">Claims Dashboard</a>
+        <a class="claims-link-btn budget-nav-btn" href="claim_form.html">Claim Form</a>
+      </div>
+    </div>
+
+    <section id="budgetFeedback" class="claims-toast" style="display:none;"></section>
+
+    <section class="claims-filter-row" style="grid-template-columns: minmax(180px, 220px) minmax(240px, 1fr) auto auto auto auto;">
+      <select id="budgetFyFilter">
+        <option value="">Select Financial Year</option>
+      </select>
+      <input id="budgetPensionerFilter" list="budgetPensionerFilterList" type="text" placeholder="Filter by pensioner file no. or name..." />
+      <datalist id="budgetPensionerFilterList"></datalist>
+      <div style="display:flex; gap:0.45rem; flex-wrap:wrap; justify-content:flex-end;">
+        <button class="claims-btn budget-refresh-btn" id="refreshBudgetBtn" type="button">Refresh</button>
+        <button class="claims-btn budget-export-btn" id="openBudgetExportBuilderBtn" type="button">Budget Export Builder</button>
+      </div>
+      <button class="claims-btn budget-export-btn budget-export-pdf" id="exportBudgetPdfBtn" type="button">Export PDF</button>
+      <button class="claims-btn budget-export-btn budget-export-xlsx" id="exportBudgetXlsxBtn" type="button">Export XLSX</button>
+      <button class="claims-btn budget-export-btn budget-export-csv" id="exportBudgetCsvBtn" type="button">Export CSV</button>
+    </section>
+
+    <section id="budgetSummaryCards" class="claims-card-grid"></section>
+
+    <section class="claims-layout-two" style="margin-bottom:0.72rem;">
+      <article class="claims-panel">
+        <header class="claims-panel-head">
+          <div>
+            <h3>Scheduled Coverage vs Open Arrears</h3>
+            <span class="claims-panel-muted">Bridge monthly gratuity schedules against the currently open pension and gratuity arrears exposure.</span>
+          </div>
+        </header>
+        <div class="claims-panel-body">
+          <div class="claims-inline-note">
+            Schedule uploads remain analytical until payment is effected through the normal arrears settlement workflow. Effective coverage is capped at the open balance so the bridge does not overstate closure.
+          </div>
+          <div class="claims-table-wrap" style="margin-top:0.75rem;">
+            <table class="claims-table">
+              <tbody id="budgetScheduleBridgeBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </article>
+      <article class="claims-panel">
+        <header class="claims-panel-head">
+          <div>
+            <h3>Schedule Intake Snapshot</h3>
+            <span class="claims-panel-muted">Upload quality, schedule composition, and the latest gratuity batch in the selected financial year.</span>
+          </div>
+        </header>
+        <div class="claims-panel-body">
+          <div class="claims-table-wrap">
+            <table class="claims-table">
+              <tbody id="budgetScheduleSnapshotBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="claims-panel" style="margin-bottom:0.72rem;">
+      <header class="claims-panel-head">
+        <h3>Arrears Matrix By Pensioner</h3>
+        <span class="claims-panel-muted">Outstanding balances by category and beneficiary</span>
+      </header>
+      <div class="claims-panel-body">
+        <div class="claims-table-wrap">
+          <table class="claims-table" id="budgetMatrixTable">
+            <thead>
+              <tr>
+                <th>File No.</th>
+                <th>Title</th>
+                <th>Name</th>
+                <th>Pension Arrears</th>
+                <th>Gratuity Arrears</th>
+                <th>Full Pension Arrears</th>
+                <th>Pension &amp; Gratuity</th>
+                <th>Underpayment</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody id="budgetMatrixBody"></tbody>
+            <tfoot>
+              <tr id="budgetMatrixTotalsRow">
+                <th colspan="3">Subtotals</th>
+                <th>UGX 0.00</th>
+                <th>UGX 0.00</th>
+                <th>UGX 0.00</th>
+                <th>UGX 0.00</th>
+                <th>UGX 0.00</th>
+                <th>UGX 0.00</th>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="claims-layout-two" style="margin-bottom:0.72rem;">
+      <article class="claims-panel">
+        <header class="claims-panel-head">
+          <h3>Current FY Projection</h3>
+          <span class="claims-panel-muted">Remaining months: active pensioners + retirees due in FY</span>
+        </header>
+        <div class="claims-panel-body">
+          <div class="claims-table-wrap">
+            <table class="claims-table">
+              <tbody id="budgetCurrentFyProjectionBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </article>
+      <article class="claims-panel">
+        <header class="claims-panel-head">
+          <h3>Subsequent FY Projection</h3>
+          <span class="claims-panel-muted">Next FY monthly + gratuity exposure</span>
+        </header>
+        <div class="claims-panel-body">
+          <div class="claims-table-wrap">
+            <table class="claims-table">
+              <tbody id="budgetNextFyProjectionBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="claims-layout-two">
+      <article class="claims-panel">
+        <header class="claims-panel-head">
+          <h3>Save Forecast</h3>
+          <span class="claims-panel-muted" id="budgetSaveHint">Manage by authorized users only</span>
+        </header>
+        <div class="claims-panel-body">
+          <form id="budgetForecastForm" class="claims-form-grid">
+            <div>
+              <label for="forecastFyInput">Financial Year (Start)</label>
+              <input id="forecastFyInput" type="number" min="2000" max="2200" required />
+            </div>
+            <div>
+              <label for="forecastPensionInput">Estimated Pension Amount (UGX)</label>
+              <input id="forecastPensionInput" type="number" min="0" step="0.01" required data-money-input data-money-fixed-decimals="2" />
+            </div>
+            <div>
+              <label for="forecastGratuityInput">Estimated Gratuity Amount (UGX)</label>
+              <input id="forecastGratuityInput" type="number" min="0" step="0.01" required data-money-input data-money-fixed-decimals="2" />
+            </div>
+            <div>
+              <label for="forecastPensionArrearsInput">Estimated Pension Arrears (UGX)</label>
+              <input id="forecastPensionArrearsInput" type="number" min="0" step="0.01" required data-money-input data-money-fixed-decimals="2" />
+            </div>
+            <div>
+              <label for="forecastFullArrearsInput">Estimated Full Pension Arrears (UGX)</label>
+              <input id="forecastFullArrearsInput" type="number" min="0" step="0.01" required data-money-input data-money-fixed-decimals="2" />
+            </div>
+            <div>
+              <label for="forecastGratuityArrearsInput">Estimated Gratuity Arrears (UGX)</label>
+              <input id="forecastGratuityArrearsInput" type="number" min="0" step="0.01" required data-money-input data-money-fixed-decimals="2" />
+            </div>
+            <div>
+              <label for="forecastUnderpaymentInput">Estimated Underpayment Claims (UGX)</label>
+              <input id="forecastUnderpaymentInput" type="number" min="0" step="0.01" required data-money-input data-money-fixed-decimals="2" />
+            </div>
+            <div>
+              <label for="forecastSuspensionInput">Estimated Suspended Amount (UGX)</label>
+              <input id="forecastSuspensionInput" type="number" min="0" step="0.01" required data-money-input data-money-fixed-decimals="2" />
+            </div>
+            <div class="claims-col-span-2">
+              <label for="forecastNotesInput">Notes</label>
+              <textarea id="forecastNotesInput" rows="3"></textarea>
+            </div>
+          </form>
+          <div class="claims-form-footer">
+            <button class="claims-btn claims-btn-primary" id="saveForecastBtn" type="button">Save Forecast</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="claims-panel">
+        <header class="claims-panel-head">
+          <h3>Live Actual vs Forecast</h3>
+          <span class="claims-panel-muted">Current financial year comparison</span>
+        </header>
+        <div class="claims-panel-body">
+          <div class="claims-table-wrap">
+            <table class="claims-table">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Forecast</th>
+                  <th>Actual Balance</th>
+                  <th>Variance</th>
+                </tr>
+              </thead>
+              <tbody id="budgetComparisonBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="claims-panel" style="margin-top:0.72rem;">
+      <header class="claims-panel-head">
+        <h3>Forecast History</h3>
+        <span class="claims-panel-muted">Recent saved snapshots</span>
+      </header>
+      <div class="claims-panel-body">
+        <div class="claims-table-wrap">
+          <table class="claims-table">
+            <thead>
+              <tr>
+                <th>Financial Year</th>
+                <th>Pension</th>
+                <th>Gratuity</th>
+                <th>Pension Arrears</th>
+                <th>Full Pension Arrears</th>
+                <th>Gratuity Arrears</th>
+                <th>Underpayment</th>
+                <th>Suspended Amount</th>
+                <th>Saved By</th>
+                <th>Saved At</th>
+              </tr>
+            </thead>
+            <tbody id="budgetHistoryBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="claims-modal-overlay" id="budgetExportFilterModal">
+    <div class="claims-modal claims-export-modal" style="width:min(980px, 96vw);">
+      <header class="claims-modal-header">
+        <div>
+          <h3>Budget Export Builder</h3>
+          <p class="claims-panel-muted" style="margin:0;">Build a focused budget export with precise filters.</p>
+        </div>
+        <button class="claims-modal-close" id="closeBudgetExportFilterBtnTop" type="button" aria-label="Close">
+          &times;
+        </button>
+      </header>
+      <div class="claims-modal-body">
+        <form id="budgetExportFilterForm" class="claims-form-grid">
+          <div class="claims-col-span-2">
+            <div class="claims-inline-note">
+              Filter arrears data by financial year, claim types, and statuses. Preview before exporting.
+            </div>
+          </div>
+          <div>
+            <label for="budgetExportFy">Financial Year</label>
+            <select id="budgetExportFy">
+              <option value="">Select Financial Year</option>
+            </select>
+          </div>
+          <div>
+            <label for="budgetExportPensioner">Pensioner (File No. or Name)</label>
+            <input id="budgetExportPensioner" list="budgetExportPensionerList" type="text" placeholder="Type to search pensioner..." />
+            <datalist id="budgetExportPensionerList"></datalist>
+          </div>
+          <div class="claims-col-span-2">
+            <label>Claim Types</label>
+            <div class="claims-checkbox-grid" id="budgetExportClaimTypes"></div>
+          </div>
+          <div class="claims-col-span-2">
+            <label>Ledger Status</label>
+            <div class="claims-checkbox-grid" id="budgetExportStatuses"></div>
+          </div>
+          <div class="claims-col-span-2">
+            <label>Source Types</label>
+            <div class="claims-checkbox-grid" id="budgetExportSources"></div>
+          </div>
+          <div>
+            <label for="budgetExportMinTotal">Min Total (UGX)</label>
+            <input id="budgetExportMinTotal" type="number" min="0" step="0.01" placeholder="e.g., 1000000" data-money-input data-money-fixed-decimals="2" />
+          </div>
+          <div>
+            <label for="budgetExportMaxTotal">Max Total (UGX)</label>
+            <input id="budgetExportMaxTotal" type="number" min="0" step="0.01" placeholder="Optional cap" data-money-input data-money-fixed-decimals="2" />
+          </div>
+          <div>
+            <label for="budgetExportSort">Sort By</label>
+            <select id="budgetExportSort">
+              <option value="">Name (A-Z)</option>
+              <option value="file">File Number</option>
+              <option value="total_desc">Highest Total First</option>
+            </select>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <label class="claims-checkbox">
+              <input id="budgetExportIncludeZero" type="checkbox" />
+              Include zero-balance rows
+            </label>
+          </div>
+          <div class="claims-col-span-2" style="display:flex; align-items:center; justify-content:space-between; gap:0.75rem; flex-wrap:wrap;">
+            <label class="claims-checkbox" style="display:flex; align-items:center; gap:0.45rem;">
+              <input id="budgetExportSavePreset" type="checkbox" />
+              Save these filters as preset
+            </label>
+            <span class="claims-panel-muted" id="budgetExportPresetStatus">No preset saved yet.</span>
+            <button class="claims-btn" id="clearBudgetExportPresetBtn" type="button">Clear Preset</button>
+          </div>
+        </form>
+      </div>
+      <div class="claims-modal-footer">
+        <button class="claims-btn" id="resetBudgetExportFiltersBtn" type="button">Reset</button>
+        <button class="claims-btn" id="previewBudgetExportBtn" type="button">Preview</button>
+        <button class="claims-btn claims-export-btn claims-export-csv" id="exportBudgetBuilderCsvBtn" type="button">Export CSV</button>
+        <button class="claims-btn claims-export-btn claims-export-xlsx" id="exportBudgetBuilderXlsxBtn" type="button">Export XLSX</button>
+        <button class="claims-btn claims-export-btn claims-export-pdf" id="exportBudgetBuilderPdfBtn" type="button">Export PDF</button>
+        <button class="claims-btn" id="closeBudgetExportFilterBtn" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="claims-modal-overlay" id="budgetExportPreviewModal">
+    <div class="claims-modal claims-export-modal" style="width:min(1100px, 96vw);">
+      <header class="claims-modal-header">
+        <div>
+          <h3>Budget Export Preview</h3>
+          <p class="claims-panel-muted" id="budgetExportPreviewMeta" style="margin:0;">Preview the filtered budget dataset before export.</p>
+        </div>
+        <button class="claims-modal-close" id="closeBudgetExportPreviewBtnTop" type="button" aria-label="Close">
+          &times;
+        </button>
+      </header>
+      <div class="claims-modal-body">
+        <div class="claims-inline-note" id="budgetExportPreviewNote">
+          Showing a snapshot of the filtered matrix and summary values.
+        </div>
+        <div class="claims-table-wrap" style="margin-top:0.75rem;">
+          <table class="claims-table">
+            <thead>
+              <tr>
+                <th>Summary Metric</th>
+                <th>Value (UGX)</th>
+              </tr>
+            </thead>
+            <tbody id="budgetExportPreviewSummaryBody"></tbody>
+          </table>
+        </div>
+        <div class="claims-table-wrap" style="margin-top:0.9rem;">
+          <table class="claims-table">
+            <thead>
+              <tr>
+                <th>File No.</th>
+                <th>Title</th>
+                <th>Name</th>
+                <th>Pension Arrears</th>
+                <th>Gratuity Arrears</th>
+                <th>Full Pension Arrears</th>
+                <th>Pension &amp; Gratuity</th>
+                <th>Underpayment</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody id="budgetExportPreviewMatrixBody"></tbody>
+            <tfoot>
+              <tr id="budgetExportPreviewMatrixTotals"></tr>
+            </tfoot>
+          </table>
+        </div>
+        <div class="claims-pagination" id="budgetExportPreviewPager">
+          <button class="claims-btn" id="budgetExportPreviewPrev" type="button">Previous</button>
+          <span class="claims-page-indicator" id="budgetExportPreviewPageInfo">Page 1 of 1</span>
+          <button class="claims-btn" id="budgetExportPreviewNext" type="button">Next</button>
+        </div>
+        <div class="claims-table-wrap" style="margin-top:0.9rem;">
+          <table class="claims-table">
+            <thead>
+              <tr>
+                <th>Projection Item</th>
+                <th>Amount (UGX)</th>
+              </tr>
+            </thead>
+            <tbody id="budgetExportPreviewProjectionBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="claims-modal-footer">
+        <button class="claims-btn claims-export-btn claims-export-csv" id="exportBudgetPreviewCsvBtn" type="button">Export CSV</button>
+        <button class="claims-btn claims-export-btn claims-export-xlsx" id="exportBudgetPreviewXlsxBtn" type="button">Export XLSX</button>
+        <button class="claims-btn claims-export-btn claims-export-pdf" id="exportBudgetPreviewPdfBtn" type="button">Export PDF</button>
+        <button class="claims-btn" id="closeBudgetExportPreviewBtn" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js?v=20260528b"></script>
+  <script src="js/budgeting.js?v=20260410a"></script>
+</body>
+</html>
+
+
+

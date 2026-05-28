@@ -2,11 +2,11 @@
 <div class="footer-wrapper">
     <section class="contact-info">
         <div class="contact-column contact-left">
-            <h3>Uganda Prisons Service Headquarters</h3>
-            <p>P.O. Box 7182, Kampala (U)</p>
-            <p>
-                Email: <a href="mailto:KZpV4@example.com">KZpV4@example.com</a><br />
-                Phone: <a href="tel:+256123456789">+256 123 456 789</a>
+            <h3 id="footerOrgName">Uganda Prisons Service Headquarters</h3>
+            <p id="footerOrgAddress">P.O. Box 7182, Kampala (U)</p>
+            <p class="footer-contact-lines">
+                <span id="footerSupportEmailRow">Email: <a id="supportEmailLink" href="mailto:KZpV4@example.com">KZpV4@example.com</a></span><br />
+                <span id="footerSupportPhoneRow">Phone: <a id="supportPhoneLink" href="tel:+256123456789">+256 123 456 789</a></span>
             </p>
         </div>
 
@@ -15,21 +15,39 @@
         <div class="contact-column social-media">
             <h3>Connect with Us</h3>
             <ul class="social-links">
-                <li><a href="https://www.facebook.com/UPSRetirement" target="_blank">Facebook</a></li>
-                <li><a href="https://www.twitter.com/UPSRetirement" target="_blank">Twitter</a></li>
-                <li><a href="https://www.instagram.com/UPSRetirement" target="_blank">Instagram</a></li>
-                <li><a href="https://www.linkedin.com/company/UPSRetirement" target="_blank">LinkedIn</a></li>
+                <li id="footerSocialFacebookItem"><a id="footerSocialFacebook" href="https://www.facebook.com/UPSRetirement" target="_blank">Facebook</a></li>
+                <li id="footerSocialTwitterItem"><a id="footerSocialTwitter" href="https://www.twitter.com/UPSRetirement" target="_blank">Twitter</a></li>
+                <li id="footerSocialInstagramItem"><a id="footerSocialInstagram" href="https://www.instagram.com/UPSRetirement" target="_blank">Instagram</a></li>
+                <li id="footerSocialLinkedinItem"><a id="footerSocialLinkedin" href="https://www.linkedin.com/company/UPSRetirement" target="_blank">LinkedIn</a></li>
             </ul>
-            <p>Technical Support: <a href="mailto:etopat2@gmail.com">etopat2@gmail.com</a></p>
+            <p id="footerTechSupportRow">Technical Support: <a id="techSupportEmailLink" href="mailto:etopat2@gmail.com">etopat2@gmail.com</a></p>
         </div>
     </section>
 
     <hr />
 
-    <p>&copy; <span id="currentYear"></span> PensionsGo. All Rights Reserved.</p>
-    <p class="developed-by">
-        Developed by: <a href="mailto:etomet2patrick@gmail.com">Patrick</a> |
-        <a href="tel:+256773959039">
+    <p class="footer-links-inline">
+        <a href="about.html">About</a>
+        <span>|</span>
+        <a href="faq.html">FAQs</a>
+        <span>|</span>
+        <a href="feedback.html">Feedback</a>
+        <span>|</span>
+        <a href="terms.html">Terms</a>
+    </p>
+    <p class="footer-tagline" id="footerTagline">Unified pension administration</p>
+
+    <p class="footer-meta">
+        &copy; <span id="currentYear"></span> <span id="footerAppName">PensionsGo</span>. All Rights Reserved.
+    </p>
+    <p class="footer-version-row">
+        <span id="footerBuildBadge" class="footer-build-badge hidden">Version <span id="footerBuildVersion">--</span></span>
+    </p>
+    <p class="developed-by" id="footerDeveloperRow">
+        <span id="footerDeveloperLabel">Developed by:</span>
+        <a id="footerDeveloperEmailLink" href="mailto:etomet2patrick@gmail.com">Patrick</a>
+        <span id="footerDeveloperPhoneSeparator">|</span>
+        <a id="footerDeveloperPhoneLink" href="tel:+256773959039">
             <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3">
                 <path d="M480-440v-360q0-17 11.5-28.5T520-840h280q17 0 28.5 11.5T840-800v200q0 17-11.5 28.5T800-560H600L480-440Zm80-200h200v-120H560v120Zm0 0v-120 120Zm238 520q-125 0-247-54.5T329-329Q229-429 174.5-551T120-798q0-18 12-30t30-12h162q14 0 25 9.5t13 22.5l26 140q2 16-1 27t-11 19l-97 98q20 37 47.5 71.5T387-386q31 31 65 57.5t72 48.5l94-94q9-9 23.5-13.5T670-390l138 28q14 4 23 14.5t9 23.5v162q0 18-12 30t-30 12ZM241-600l66-66-17-94h-89q5 41 14 81t26 79Zm358 358q39 17 79.5 27t81.5 13v-88l-94-19-67 67ZM241-600Zm358 358Z" />
             </svg>

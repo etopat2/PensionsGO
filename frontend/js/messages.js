@@ -1,8 +1,7 @@
-// ============================================================================
+// 
 // frontend/js/messages.js
 // Complete Messages module with Enhanced Time Formatting & Modal System
-// ============================================================================
-
+// 
 // Redirect if not logged in
 if (sessionStorage.getItem('isLoggedIn') !== 'true') {
   window.location.replace('login.html');
@@ -21,7 +20,12 @@ class MessagesApp {
       checkBroadcasts: "../backend/api/check_broadcasts.php",
       getUsers: "../backend/api/get_message_users.php",
       markBroadcastSeen: "../backend/api/mark_broadcast_seen.php",
-      submitFeedback: "../backend/api/submit_feedback.php"
+      submitFeedback: "../backend/api/submit_feedback.php",
+      liveChatBootstrap: "../backend/api/live_chat_bootstrap.php",
+      liveChatPresence: "../backend/api/live_chat_presence.php",
+      liveChatMessages: "../backend/api/live_chat_messages.php",
+      liveChatSend: "../backend/api/live_chat_send.php",
+      liveChatCall: "../backend/api/live_chat_call.php"
     };
 
     // UI & state
@@ -29,13 +33,33 @@ class MessagesApp {
     this.currentPage = 1;
     this.limit = 20;
     this.messages = [];
+    this.archivedMode = false;
     this.users = [];
     this.selectedMessage = null;
+    this.selectedMessageIds = new Set();
     this.unreadCounts = { direct: 0, broadcast: 0 };
     this.currentBroadcastId = null;
     this.broadcastEscapeHandler = null;
-    this.userRole = localStorage.getItem('userRole') || '';
+    this.userRole = localStorage.getItem('userRoleEffective') || localStorage.getItem('userRole') || '';
     this.userId = sessionStorage.getItem('userId') || '';
+    this.liveChat = {
+      users: [],
+      selectedUser: null,
+      lastMessageIdByUser: {},
+      messagePollTimer: null,
+      presenceTimer: null,
+      callPollTimer: null,
+      signalPollTimer: null,
+      recorder: null,
+      recordedChunks: [],
+      recordingStartedAt: 0,
+      activeCall: null,
+      peerConnection: null,
+      localStream: null,
+      remoteStream: null,
+      lastSignalId: 0,
+      isCallInitiator: false
+    };
     
     // Enhanced recipient and file management
     this.selectedRecipients = [];
@@ -66,12 +90,13 @@ class MessagesApp {
     window.addEventListener('beforeunload', () => {
         this.stopRealTimeUpdates();
         this.stopBroadcastChecker();
+        this.stopLiveChat();
     });
   }
 
-  // -----------------------
+  // 
   // Initialization
-  // -----------------------
+  // 
   async init() {
     if (window.initHeaderInteractions) window.initHeaderInteractions();
     
@@ -79,7 +104,11 @@ class MessagesApp {
     this.checkAdminPermissions();
     
     await this.loadUsers();           // populate compose recipients & roles
-    await this.loadMessages();        // initial load
+    const restoredViewerState = await this.restoreViewerReturnContext();
+    if (!restoredViewerState) {
+      await this.loadMessages();        // initial load
+      await this.handleDeepLink();      // open specific broadcast/message if provided
+    }
     this.setupEventListeners();       // UI controls
     this.setupRecipientSelection();   // Enhanced recipient selection
     this.setupFileAttachments();      // Enhanced file attachments
@@ -87,10 +116,73 @@ class MessagesApp {
     this.startBroadcastChecker();     // broadcast checks
     await this.updateUnreadBadges();  // header + sidebar badges
     this.setupActionButtons();        // reply/forward/delete/mark unread
+    // Live staff chat is initialized globally from main.js so it is available on every authenticated page.
     this.initRealTimeUpdates();       // Initialize real-time time updates
     // Load storage information
     await this.loadStorageInfo();
     console.log("MessagesApp initialized - User Role:", this.userRole);
+  }
+
+  async restoreViewerReturnContext() {
+    const params = new URLSearchParams(window.location.search || '');
+    const returnKey = String(params.get('viewer_return') || '').trim();
+    if (!returnKey || !window.PensionsGoDocumentViewer?.consumeReturnState) {
+      return false;
+    }
+
+    const restoreState = window.PensionsGoDocumentViewer.consumeReturnState(returnKey);
+    params.delete('viewer_return');
+    const nextQuery = params.toString();
+    const cleanUrl = `${window.location.pathname.split('/').pop()}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash || ''}`;
+    window.history.replaceState({}, '', cleanUrl);
+
+    if (!restoreState || restoreState.page !== 'messages') {
+      return false;
+    }
+
+    this.currentType = String(restoreState.currentType || 'inbox');
+    this.currentPage = Number(restoreState.currentPage || 1) || 1;
+    this.archivedMode = Boolean(restoreState.archivedMode);
+
+    document.querySelectorAll(".nav-item").forEach(item => {
+      item.classList.toggle("active", item.dataset.type === this.currentType);
+    });
+    this.updateListTitle();
+
+    await this.loadMessages(this.currentType, this.currentPage);
+
+    const messageId = String(restoreState.messageId || '').trim();
+    if (messageId) {
+      await this.showMessageDetail(messageId);
+    }
+
+    return true;
+  }
+
+  // 
+  // Deep link handling for broadcast/message
+  // 
+  async handleDeepLink() {
+    const params = new URLSearchParams(window.location.search);
+    const messageId = params.get('message_id');
+    const broadcastId = params.get('broadcast_id');
+
+    if (!messageId) return;
+
+    // Switch to broadcast view for clarity
+    this.currentType = 'broadcast';
+    const listTitle = document.getElementById("listTitle");
+    if (listTitle) listTitle.textContent = 'Broadcast';
+    document.querySelectorAll(".nav-item").forEach(item => {
+      item.classList.toggle("active", item.dataset.type === "broadcast");
+    });
+
+    await this.loadMessages('broadcast', 1);
+    await this.showMessageDetail(messageId);
+
+    if (broadcastId) {
+      await this.markBroadcastAsRead(broadcastId);
+    }
   }
 
   // Only restrict broadcast sending capabilities, not viewing
@@ -106,9 +198,9 @@ class MessagesApp {
     console.log('Admin permissions checked - isAdmin:', isAdmin);
   }
 
-  // -----------------------
+  // 
   // SOUND (broadcast)
-  // -----------------------
+  // 
   initSoundOnFirstInteraction() {
     try {
       this.preloadedSound = new Audio(this.BROADCAST_SOUND);
@@ -131,9 +223,9 @@ class MessagesApp {
     this.preloadedSound.play().catch(() => {});
   }
 
-  // -----------------------
+  // 
   // USER LIST (for compose) - Filter out current user
-  // -----------------------
+  // 
   async loadUsers() {
     try {
       const res = await fetch(this.API.getUsers, { credentials: "include" });
@@ -184,9 +276,8 @@ class MessagesApp {
     `).join("");
   }
 
-  // -----------------------
-  // RECIPIENT SELECTION WITH CHIPS
-  // -----------------------
+  // 
+  // Recipient Selection With Chips //
   setupRecipientSelection() {
     const searchInput = document.getElementById('recipientsSearch');
     const dropdown = document.getElementById('recipientsDropdown');
@@ -248,7 +339,7 @@ class MessagesApp {
           <img src="${this.getUserImage(user.userPhoto)}" class="dropdown-avatar">
           <div class="dropdown-user-info">
             <strong>${this.escapeHtml(user.userName)}</strong>
-            <small>${this.escapeHtml(user.userRole)} • ${this.escapeHtml(user.userEmail)}</small>
+            <small>${this.escapeHtml(user.userRole)} - ${this.escapeHtml(user.userEmail)}</small>
           </div>
         </div>
       `).join('');
@@ -339,9 +430,8 @@ class MessagesApp {
     }
   }
 
-  // -----------------------
-  // FILE ATTACHMENTS WITH CUSTOM NAMES
-  // -----------------------
+  // 
+  // File Attachments With Custom Names //
   setupFileAttachments() {
     const fileInput = document.getElementById('fileAttachments');
     const selectedContainer = document.getElementById('selectedFiles');
@@ -426,19 +516,21 @@ class MessagesApp {
     });
   }
 
-  // -----------------------
+  // 
   // MESSAGES: list & pagination
-  // -----------------------
+  // 
   async loadMessages(type = this.currentType, page = this.currentPage) {
     // All users can access broadcast view (only sending is restricted)
     this.currentType = type;
     this.currentPage = page;
+    this.clearMessageSelection();
     const list = document.getElementById("messagesList");
     if (!list) return;
 
     list.innerHTML = `<div class="loading">Loading messages...</div>`;
     try {
-      const url = `${this.API.getMessages}?type=${encodeURIComponent(type)}&page=${page}&limit=${this.limit}`;
+      const archivedParam = this.archivedMode && type !== "broadcast" ? 1 : 0;
+      const url = `${this.API.getMessages}?type=${encodeURIComponent(type)}&page=${page}&limit=${this.limit}&archived=${archivedParam}`;
       const res = await fetch(url, { credentials: "include" });
       const data = await res.json();
       if (!data.success) {
@@ -450,20 +542,15 @@ class MessagesApp {
       if (!this.messages.length) {
         list.innerHTML = `<div class="empty-state"><i class="fas fa-inbox"></i><h3>No messages</h3><p>Your selected folder is empty.</p></div>`;
         this.renderPagination(data.pagination || { page: 1, pages: 1 });
+        this.updateBatchDeleteControls();
         return;
       }
 
       list.innerHTML = this.messages.map(m => this.messageRowHtml(m)).join("");
-      
-      // Add click listeners
-      list.querySelectorAll(".message-item").forEach(el => {
-        el.addEventListener("click", (e) => {
-          const id = el.dataset.messageId;
-          this.showMessageDetail(id);
-        });
-      });
+      this.bindMessageListInteractions(list);
 
       this.renderPagination(data.pagination || { page: 1, pages: 1 });
+      this.updateBatchDeleteControls();
       await this.updateUnreadBadges();
     } catch (err) {
       console.error("loadMessages error", err);
@@ -471,17 +558,20 @@ class MessagesApp {
     }
   }
 
-  // -----------------------
+  // 
   // TIME FORMATTING - Enhanced with relative time for lists & detailed format for detail view
-  // -----------------------
-
+  // 
   /**
    * Format timestamp to "d mmm, yyyy HH:MM:ss" format (with seconds)
    * Used for detailed views where precise timing is important
    */
   formatTime(ts) {
       if (!ts) return "";
-      
+
+      if (window.AppSettingsManager?.formatDateTime) {
+          return window.AppSettingsManager.formatDateTime(ts, { includeSeconds: true });
+      }
+
       const d = new Date(ts);
       const day = d.getDate();
       const month = d.toLocaleDateString('en-US', { month: 'short' });
@@ -504,6 +594,9 @@ class MessagesApp {
       
       // For broadcast messages, always use the detailed format
       if (this.currentType === "broadcast") {
+          if (window.AppSettingsManager?.formatDateTime) {
+              return window.AppSettingsManager.formatDateTime(ts, { includeSeconds: false });
+          }
           const d = new Date(ts);
           const day = d.getDate();
           const month = d.toLocaleDateString('en-US', { month: 'short' });
@@ -583,6 +676,10 @@ class MessagesApp {
 
     return `
     <div class="message-item ${unreadClass} ${m.is_urgent ? "urgent" : ""}" data-message-id="${m.message_id}" data-timestamp="${m.created_at}">
+        <label class="message-select" aria-label="Select message">
+          <input type="checkbox" class="message-select-checkbox" data-message-id="${m.message_id}">
+          <span class="message-select-indicator"></span>
+        </label>
         <img src="${avatarSrc}" alt="${this.escapeHtml(displayName)}" class="message-avatar" />
         <div class="message-content">
         <div class="message-header">
@@ -602,10 +699,183 @@ class MessagesApp {
     `;
   }
 
-  // -----------------------
-  // REAL-TIME TIME UPDATES - For relative time formatting in lists
-  // -----------------------
+  bindMessageListInteractions(list) {
+    if (!list) return;
 
+    list.querySelectorAll(".message-item").forEach((el) => {
+      const checkbox = el.querySelector(".message-select-checkbox");
+      const messageId = String(el.dataset.messageId || "").trim();
+      if (!messageId) return;
+
+      if (checkbox) {
+        checkbox.checked = this.selectedMessageIds.has(messageId);
+        el.classList.toggle("selected", checkbox.checked);
+
+        checkbox.addEventListener("click", (event) => {
+          event.stopPropagation();
+        });
+        checkbox.addEventListener("change", (event) => {
+          this.toggleMessageSelection(messageId, event.target.checked);
+        });
+      }
+
+      el.addEventListener("click", (event) => {
+        if (event.target.closest(".message-select")) {
+          return;
+        }
+        this.showMessageDetail(messageId);
+      });
+    });
+
+    this.syncSelectAllCheckbox();
+  }
+
+  toggleMessageSelection(messageId, isSelected) {
+    const normalizedId = String(messageId || "").trim();
+    if (!normalizedId) return;
+
+    if (isSelected) {
+      this.selectedMessageIds.add(normalizedId);
+    } else {
+      this.selectedMessageIds.delete(normalizedId);
+    }
+
+    const item = document.querySelector(`.message-item[data-message-id="${CSS.escape(normalizedId)}"]`);
+    if (item) {
+      item.classList.toggle("selected", isSelected);
+      const checkbox = item.querySelector(".message-select-checkbox");
+      if (checkbox) checkbox.checked = isSelected;
+    }
+
+    this.updateBatchDeleteControls();
+    this.syncSelectAllCheckbox();
+  }
+
+  clearMessageSelection() {
+    this.selectedMessageIds.clear();
+    this.updateBatchDeleteControls();
+    this.syncSelectAllCheckbox();
+  }
+
+  getVisibleMessageIds() {
+    return Array.from(document.querySelectorAll(".message-item"))
+      .filter((item) => item.style.display !== "none")
+      .map((item) => String(item.dataset.messageId || "").trim())
+      .filter(Boolean);
+  }
+
+  syncSelectAllCheckbox() {
+    const selectAll = document.getElementById("selectAllMessages");
+    if (!selectAll) return;
+
+    const visibleIds = this.getVisibleMessageIds();
+    if (!visibleIds.length) {
+      selectAll.checked = false;
+      selectAll.indeterminate = false;
+      selectAll.disabled = true;
+      return;
+    }
+
+    const selectedVisibleCount = visibleIds.filter((id) => this.selectedMessageIds.has(id)).length;
+    selectAll.disabled = false;
+    selectAll.checked = selectedVisibleCount > 0 && selectedVisibleCount === visibleIds.length;
+    selectAll.indeterminate = selectedVisibleCount > 0 && selectedVisibleCount < visibleIds.length;
+  }
+
+  updateBatchDeleteControls() {
+    const batchDeleteBtn = document.getElementById("batchDeleteBtn");
+    const batchDeleteLabel = document.getElementById("batchDeleteLabel");
+    if (!batchDeleteBtn || !batchDeleteLabel) {
+      return;
+    }
+
+    const count = this.selectedMessageIds.size;
+    batchDeleteBtn.disabled = count === 0;
+    batchDeleteBtn.classList.toggle("active", count > 0);
+    batchDeleteLabel.textContent = count > 0 ? `Delete Selected (${count})` : "Delete Selected";
+  }
+
+  async deleteMessagesByIds(messageIds, options = {}) {
+    const ids = Array.from(new Set((messageIds || []).map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)));
+    if (!ids.length) {
+      this.showWarningModal("No Messages Selected", "Select at least one message to delete.");
+      return false;
+    }
+
+    const loadingModal = this.showLoadingModal(
+      options.loadingTitle || 'Deleting',
+      options.loadingMessage || 'Please wait while we delete the selected message(s)...'
+    );
+
+    try {
+      const res = await fetch(this.API.deleteMessage, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ ids })
+      });
+      const data = await res.json();
+
+      loadingModal.close();
+
+      if (!data.success) {
+        throw new Error(data.message || "Delete failed");
+      }
+
+      ids.forEach((id) => this.selectedMessageIds.delete(String(id)));
+      this.updateBatchDeleteControls();
+      this.syncSelectAllCheckbox();
+
+      if (this.selectedMessage && ids.includes(Number(this.selectedMessage.message?.message_id || 0))) {
+        this.selectedMessage = null;
+        this.showListView();
+      }
+
+      await this.loadMessages(this.currentType, 1);
+      await this.updateUnreadBadges();
+
+      if (options.successMessage !== false) {
+        this.showSuccessModal("Success", options.successMessage || data.message || "Message(s) deleted successfully");
+      }
+
+      return true;
+    } catch (err) {
+      loadingModal.close();
+      console.error("deleteMessagesByIds error", err);
+      this.showErrorModal("Delete Failed", "Failed to delete message(s): " + err.message);
+      return false;
+    }
+  }
+
+  confirmBatchDelete() {
+    const selectedIds = Array.from(this.selectedMessageIds);
+    if (!selectedIds.length) {
+      this.showWarningModal("No Messages Selected", "Select at least one message to delete.");
+      return;
+    }
+
+    this.showConfirmationModal({
+      title: 'Delete Selected Messages',
+      message: `Delete ${selectedIds.length} selected message${selectedIds.length === 1 ? '' : 's'}? This action cannot be undone.`,
+      confirmText: 'Delete Selected',
+      cancelText: 'Cancel',
+      danger: true,
+      details: {
+        Folder: this.currentType.charAt(0).toUpperCase() + this.currentType.slice(1),
+        Selected: String(selectedIds.length)
+      },
+      onConfirm: async () => {
+        await this.deleteMessagesByIds(selectedIds, {
+          loadingMessage: `Deleting ${selectedIds.length} selected message${selectedIds.length === 1 ? '' : 's'}...`,
+          successMessage: `${selectedIds.length} message${selectedIds.length === 1 ? '' : 's'} deleted successfully`
+        });
+      }
+    });
+  }
+
+  // 
+  // REAL-TIME TIME UPDATES - For relative time formatting in lists
+  // 
   /**
    * Initialize real-time time updates
    * Updates every minute to keep relative times current in list views
@@ -658,6 +928,7 @@ class MessagesApp {
   updateDetailViewTime() {
       const detailView = document.getElementById('messageDetailView');
       if (detailView && !detailView.classList.contains('hidden') && this.selectedMessage) {
+          const accessInfo = this.selectedMessage.access_info || {};
           // Update sent time in detail view
           const sentTimeElement = document.querySelector('.sent-time');
           if (sentTimeElement && this.selectedMessage.message) {
@@ -666,23 +937,25 @@ class MessagesApp {
           }
 
           // Update read status times in recipients list
-          const readStatusElements = document.querySelectorAll('.read-status');
-          readStatusElements.forEach(element => {
-              if (element.classList.contains('read') && element.textContent.includes('Read at')) {
-                  const recipientItem = element.closest('.recipient-item');
-                  if (recipientItem) {
-                      const recipientName = recipientItem.querySelector('strong')?.textContent;
-                      if (recipientName && this.selectedMessage.recipients) {
-                          const recipient = this.selectedMessage.recipients.find(r => 
-                              r.userName === recipientName && r.read_at
-                          );
-                          if (recipient) {
-                              element.textContent = `✓ Read at ${this.formatTime(recipient.read_at)}`;
+          if (accessInfo.is_sender) {
+              const readStatusElements = document.querySelectorAll('.read-status');
+              readStatusElements.forEach(element => {
+                  if (element.classList.contains('read') && element.textContent.includes('Read at')) {
+                      const recipientItem = element.closest('.recipient-item');
+                      if (recipientItem) {
+                          const recipientName = recipientItem.querySelector('strong')?.textContent;
+                          if (recipientName && this.selectedMessage.recipients) {
+                              const recipient = this.selectedMessage.recipients.find(r => 
+                                  r.userName === recipientName && r.read_at
+                              );
+                              if (recipient) {
+                                  element.textContent = `Read at ${this.formatTime(recipient.read_at)}`;
+                              }
                           }
                       }
                   }
-              }
-          });
+              });
+          }
       }
   }
 
@@ -715,9 +988,9 @@ class MessagesApp {
     }));
   }
 
-  // -----------------------
+  // 
   // MESSAGE DETAIL with Enhanced Time Display
-  // -----------------------
+  // 
   async showMessageDetail(messageId) {
     try {
       const res = await fetch(`${this.API.getMessageDetail}?message_id=${encodeURIComponent(messageId)}`, { credentials: "include" });
@@ -742,19 +1015,20 @@ class MessagesApp {
     const container = document.getElementById("messageDetail");
     if (!container || !this.selectedMessage) return;
     const m = this.selectedMessage.message;
+    const accessInfo = this.selectedMessage.access_info || {};
+    const canSeeRecipients = !!accessInfo.is_sender;
     const recipients = this.selectedMessage.recipients || [];
     const attachments = this.selectedMessage.attachments || [];
 
     // Enhanced recipients HTML with precise read timestamps
-    const recipientsHtml = recipients.length ? `
+    const recipientsHtml = canSeeRecipients && recipients.length ? `
       <div class="recipients-info">
         <strong>Recipients (${recipients.length})</strong>
         <div class="recipients-list">
             ${recipients.map(r => {
-                const readTime = r.read_at ? new Date(r.read_at) : null;
                 const readStatus = r.is_read ? 
-                    `<span class="read-status read">✓ Read at ${this.formatTime(r.read_at)}</span>` : 
-                    '<span class="read-status unread">✗ Unread</span>';
+                    `<span class="read-status read">Read at ${this.formatTime(r.read_at)}</span>` : 
+                    '<span class="read-status unread">Unread</span>';
                 
                 return `
                 <div class="recipient-item">
@@ -777,22 +1051,37 @@ class MessagesApp {
         <div class="attachments-list">
             ${attachments
             .map((a) => {
-                const storedFileName = a.file_path.split("/").pop();
-                const downloadUrl = `../backend/api/get_msg_image.php?file=${encodeURIComponent(storedFileName)}&type=attachment`;
+                const attachmentId = Number(a.attachment_id || 0);
+                const attachmentUrl = attachmentId > 0
+                    ? `../backend/api/view_message_attachment.php?attachment_id=${attachmentId}`
+                    : "#";
+                const viewerUrl = attachmentId > 0 && window.PensionsGoDocumentViewer?.buildViewerUrl
+                    ? (window.PensionsGoDocumentViewer.buildViewerUrl(attachmentUrl, {
+                        label: a.file_name || 'Attachment',
+                        backUrl: window.location.href,
+                        returnState: {
+                            page: 'messages',
+                            currentType: this.currentType,
+                            currentPage: this.currentPage,
+                            archivedMode: this.archivedMode,
+                            messageId: m.message_id
+                        }
+                    }) || attachmentUrl)
+                    : attachmentUrl;
                 const isImage = a.mime_type?.startsWith("image/");
                 const uploadTime = a.uploaded_at ? this.formatTime(a.uploaded_at) : 'Unknown';
 
                 return `
                 <div class="attachment-item">
-                    <a href="${downloadUrl}" target="_blank" class="attachment-link" rel="noopener">
+                    <a href="${viewerUrl}" class="attachment-link">
                     ${isImage 
-                        ? `<img src="${downloadUrl}" class="attachment-thumb" alt="${this.escapeHtml(a.file_name)}">`
+                        ? `<img src="${attachmentUrl}" class="attachment-thumb" alt="${this.escapeHtml(a.file_name)}">`
                         : `<i class="fas fa-file"></i>`}
                     <div class="attachment-info">
                         <span class="attachment-name">${this.escapeHtml(a.file_name)}</span>
                         <div class="attachment-meta">
                             <small>${this.formatFileSize(a.file_size)}</small>
-                            <small>• Uploaded: ${uploadTime}</small>
+                            <small>- Uploaded: ${uploadTime}</small>
                         </div>
                     </div>
                     </a>
@@ -842,9 +1131,8 @@ class MessagesApp {
     return this.escapeHtml(text).replace(/\n/g, "<br>");
   }
 
-  // -----------------------
-  // COMPREHENSIVE MODAL SYSTEM
-  // -----------------------
+  // 
+  // Comprehensive Modal System //
   showModal(options) {
     // Remove any existing modal
     const existingModal = document.querySelector('.modal-system-overlay');
@@ -1216,9 +1504,8 @@ class MessagesApp {
       }
   }
 
-  // -----------------------
-  // COMPOSE / SEND
-  // -----------------------
+  // 
+  // Compose / Send //
   showComposeModal(prefill = {}) {
     const modal = document.getElementById("composeModal");
     if (!modal) return;
@@ -1292,11 +1579,15 @@ class MessagesApp {
       } catch (error) {
           console.error('Error loading storage info:', error);
           // Set default values on error
+          const fallbackMax = window.AppSettingsManager?.get
+            ? Number(window.AppSettingsManager.get('message_storage_quota_mb', 300))
+            : 300;
+          const safeMax = Number.isFinite(fallbackMax) && fallbackMax > 0 ? fallbackMax : 300;
           this.updateStorageDisplay({
               used_mb: 0,
-              max_mb: 300,
+              max_mb: safeMax,
               percentage: 0,
-              remaining_mb: 300
+              remaining_mb: safeMax
           });
       }
   }
@@ -1455,9 +1746,8 @@ class MessagesApp {
     }
   }
 
-  // -----------------------
-  // ACTIONS
-  // -----------------------
+  // 
+  // Actions //
   setupActionButtons() {
     document.querySelector(".btn-action[title='Reply']")?.addEventListener("click", () => this.replyToMessage());
     document.querySelector(".btn-action[title='Forward']")?.addEventListener("click", () => this.forwardMessage());
@@ -1473,6 +1763,7 @@ class MessagesApp {
     if (deleteBtn && this.selectedMessage) {
       const message = this.selectedMessage.message;
       const isBroadcast = message.message_type === 'broadcast';
+      const accessInfo = this.selectedMessage.access_info || {};
       
       let canDelete = false;
       let deleteTitle = "Delete";
@@ -1481,8 +1772,7 @@ class MessagesApp {
         canDelete = this.userRole === 'admin';
         deleteTitle = canDelete ? "Delete broadcast for all users" : "Only administrators can delete broadcast messages";
       } else {
-        canDelete = message.sender_id === this.userId || 
-                   this.selectedMessage.recipients?.some(r => r.userId === this.userId);
+        canDelete = !!accessInfo.is_sender || !!accessInfo.is_recipient;
         deleteTitle = canDelete ? "Delete" : "You can only delete messages you sent or received";
       }
       
@@ -1524,9 +1814,10 @@ class MessagesApp {
       
       const message = this.selectedMessage.message;
       const isBroadcast = message.message_type === 'broadcast';
+      const accessInfo = this.selectedMessage.access_info || {};
       
-      const isSender = message.sender_id === this.userId;
-      const isRecipient = this.selectedMessage.recipients?.some(r => r.userId === this.userId);
+      const isSender = !!accessInfo.is_sender;
+      const isRecipient = !!accessInfo.is_recipient;
       
       let canDelete = false;
       
@@ -1560,35 +1851,17 @@ class MessagesApp {
               Date: this.formatTime(message.created_at)
           },
           onConfirm: async () => {
-              const messageId = this.selectedMessage.message.message_id;
-              const loadingModal = this.showLoadingModal('Deleting', 'Please wait while we delete the message...');
-              
               try {
-                  const res = await fetch(this.API.deleteMessage, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      credentials: "include",
-                      body: JSON.stringify({ ids: [messageId] })
-                  });
-                  const data = await res.json();
-                  
-                  loadingModal.close();
-                  
-                  if (!data.success) throw new Error(data.message || "Delete failed");
-
+                  const messageId = this.selectedMessage.message.message_id;
                   const successMessage = isBroadcast 
                       ? "Broadcast message deleted for all users" 
                       : "Message deleted successfully";
-                  
-                  this.showSuccessModal("Success", successMessage);
-                  
-                  this.showListView();
-                  await this.loadMessages(this.currentType, 1);
-                  await this.updateUnreadBadges();
-                  this.selectedMessage = null;
-                  
+                  await this.deleteMessagesByIds([messageId], {
+                      loadingTitle: 'Deleting',
+                      loadingMessage: 'Please wait while we delete the message...',
+                      successMessage
+                  });
               } catch (err) {
-                  loadingModal.close();
                   console.error("deleteSelectedMessage error", err);
                   this.showErrorModal("Delete Failed", "Failed to delete message: " + err.message);
               }
@@ -1646,9 +1919,8 @@ class MessagesApp {
     }
   }
 
-  // -----------------------
-  // UNREAD COUNTS / BADGES
-  // -----------------------
+  // 
+  // Unread Counts / Badges //
   async updateUnreadBadges() {
     try {
       const res = await fetch(this.API.getUnreadCount, { credentials: "include" });
@@ -1682,10 +1954,12 @@ class MessagesApp {
     }
   }
 
-  // -----------------------
-  // BROADCAST CHECKING & POPUP
-  // -----------------------
+  // 
+  // Broadcast Checking & Popup //
   startBroadcastChecker() {
+    if (window.AppSettingsManager && !window.AppSettingsManager.isBroadcastNotificationsEnabled()) {
+      return;
+    }
     this.checkNewBroadcasts();
     this.broadcastInterval = setInterval(() => this.checkNewBroadcasts(), 30000);
   }
@@ -1696,6 +1970,9 @@ class MessagesApp {
 
   async checkNewBroadcasts() {
     try {
+      if (window.AppSettingsManager && !window.AppSettingsManager.isBroadcastNotificationsEnabled()) {
+        return;
+      }
       const res = await fetch(this.API.checkBroadcasts, { credentials: "include" });
       if (!res.ok) return;
       const data = await res.json();
@@ -1815,9 +2092,8 @@ class MessagesApp {
     } catch (e) { /* ignore */ }
   }
 
-  // -----------------------
-  // UTILITIES
-  // -----------------------
+  // 
+  // Utilities //
   showListView() {
     document.getElementById("messagesListView").classList.remove("hidden");
     document.getElementById("messageDetailView").classList.add("hidden");
@@ -1841,15 +2117,44 @@ class MessagesApp {
   }
 
   getUserImage(photoPath) {
-    if (!photoPath) return "../frontend/images/default-user.png";
-    if (photoPath.startsWith("http") || photoPath.startsWith("data:")) return photoPath;
-    const filename = photoPath.split("/").pop();
-    return `../backend/api/get_msg_image.php?file=${encodeURIComponent(filename)}&type=profile`;
+    if (!photoPath || typeof photoPath !== "string") {
+      return "../backend/api/get_image.php?file=default-user.png&type=profile";
+    }
+
+    const normalized = photoPath.trim();
+    if (!normalized) {
+      return "../backend/api/get_image.php?file=default-user.png&type=profile";
+    }
+
+    if (normalized.startsWith("http://") || normalized.startsWith("https://") || normalized.startsWith("data:")) {
+      return normalized;
+    }
+
+    if (normalized.includes("backend/api/get_image.php")) {
+      return normalized;
+    }
+
+    if (normalized === "images/default-user.png" || normalized.endsWith("/default-user.png")) {
+      return "../backend/api/get_image.php?file=default-user.png&type=profile";
+    }
+
+    const filename = normalized.split(/[\\/]/).pop();
+    if (!filename) {
+      return "../backend/api/get_image.php?file=default-user.png&type=profile";
+    }
+
+    return `../backend/api/get_image.php?file=${encodeURIComponent(filename)}&type=profile`;
   }
 
-  // -----------------------
-  // SEARCH & FILTER
-  // -----------------------
+  // 
+  // Search & Filter //
+  updateListTitle() {
+    const titleEl = document.getElementById("listTitle");
+    if (!titleEl) return;
+    const baseTitle = this.currentType.charAt(0).toUpperCase() + this.currentType.slice(1);
+    titleEl.textContent = this.archivedMode ? `${baseTitle} (Archived)` : baseTitle;
+  }
+
   searchMessages(q) {
     const items = document.querySelectorAll(".message-item");
     if (!items) return;
@@ -1857,12 +2162,29 @@ class MessagesApp {
       const txt = it.textContent.toLowerCase();
       it.style.display = txt.includes((q||"").toLowerCase()) ? "flex" : "none";
     });
+    this.syncSelectAllCheckbox();
   }
 
   filterMessages(filter) {
+    if (filter === "archived") {
+      this.archivedMode = true;
+      this.updateListTitle();
+      this.loadMessages(this.currentType, 1);
+      return;
+    }
+
+    if (this.archivedMode) {
+      this.archivedMode = false;
+      this.updateListTitle();
+      this.loadMessages(this.currentType, 1);
+    }
+
     if (filter === "all") return this.renderMessagesOnly(this.messages);
     if (filter === "unread") return this.renderMessagesOnly(this.messages.filter(m => !m.is_read));
     if (filter === "urgent") return this.renderMessagesOnly(this.messages.filter(m => m.is_urgent));
+    if (filter === "with-attachments") {
+      return this.renderMessagesOnly(this.messages.filter(m => Number(m.attachment_count || 0) > 0));
+    }
     this.renderMessagesOnly(this.messages);
   }
 
@@ -1871,17 +2193,570 @@ class MessagesApp {
     if (!list) return;
     if (!msgs || msgs.length === 0) {
       list.innerHTML = `<div class="empty-state"><i class="fas fa-inbox"></i><h3>No messages</h3></div>`;
+      this.updateBatchDeleteControls();
+      this.syncSelectAllCheckbox();
       return;
     }
     list.innerHTML = msgs.map(m => this.messageRowHtml(m)).join("");
-    list.querySelectorAll(".message-item").forEach(el => {
-      el.addEventListener("click", () => this.showMessageDetail(el.dataset.messageId));
+    this.bindMessageListInteractions(list);
+    this.updateBatchDeleteControls();
+  }
+
+  // 
+  // LIVE STAFF CHAT, VOICE NOTES & WEBRTC CALLS
+  // 
+  async initializeLiveChat() {
+    try {
+      this.injectLiveChatDock();
+      await this.loadLiveChatUsers();
+      this.bindLiveChatEvents();
+      this.startLiveChatPolling();
+    } catch (error) {
+      console.warn("Live chat initialization failed:", error);
+    }
+  }
+
+  injectLiveChatDock() {
+    if (document.getElementById("liveChatDock")) return;
+    const dock = document.createElement("section");
+    dock.id = "liveChatDock";
+    dock.className = "live-chat-dock collapsed";
+    dock.innerHTML = `
+      <button class="live-chat-launcher" id="liveChatLauncher" type="button">
+        <i class="fas fa-comments"></i><span>Live Chat</span><strong id="liveChatOnlineCount">0</strong>
+      </button>
+      <div class="live-chat-panel" id="liveChatPanel" aria-label="Staff live chat">
+        <div class="live-chat-head">
+          <div><strong>Staff Live Chat</strong><small id="liveChatStatusText">Connecting...</small></div>
+          <button type="button" id="liveChatClose" title="Minimize"><i class="fas fa-minus"></i></button>
+        </div>
+        <div class="live-chat-body">
+          <aside class="live-chat-users" id="liveChatUsers"></aside>
+          <section class="live-chat-thread">
+            <div class="live-chat-peer" id="liveChatPeer">
+              <span>Select a staff member</span>
+            </div>
+            <div class="live-chat-messages" id="liveChatMessages">
+              <div class="live-chat-empty">Choose a staff member to start a live conversation.</div>
+            </div>
+            <div class="live-chat-composer">
+              <div class="emoji-picker hidden" id="liveEmojiPicker"></div>
+              <div class="live-chat-tools">
+                <button type="button" id="liveEmojiBtn" title="Emoji"><i class="far fa-smile"></i></button>
+                <button type="button" id="liveAttachBtn" title="Attachment"><i class="fas fa-paperclip"></i></button>
+                <button type="button" id="liveVoiceBtn" title="Record voice note"><i class="fas fa-microphone"></i></button>
+                <button type="button" id="liveAudioCallBtn" title="Audio call"><i class="fas fa-phone"></i></button>
+                <button type="button" id="liveVideoCallBtn" title="Video call"><i class="fas fa-video"></i></button>
+              </div>
+              <textarea id="liveChatInput" rows="2" placeholder="Type a message..." disabled></textarea>
+              <button type="button" id="liveSendBtn" disabled><i class="fas fa-paper-plane"></i></button>
+              <input type="file" id="liveChatAttachmentInput" class="hidden">
+            </div>
+          </section>
+        </div>
+      </div>
+      <div class="live-call-modal hidden" id="liveCallModal">
+        <div class="live-call-card">
+          <div class="live-call-head">
+            <strong id="liveCallTitle">Call</strong>
+            <span id="liveCallStatus">Preparing...</span>
+          </div>
+          <div class="live-video-grid">
+            <video id="liveRemoteVideo" autoplay playsinline></video>
+            <video id="liveLocalVideo" autoplay muted playsinline></video>
+          </div>
+          <div class="live-call-actions">
+            <button type="button" id="liveAcceptCallBtn" class="hidden"><i class="fas fa-phone"></i> Accept</button>
+            <button type="button" id="liveRejectCallBtn" class="hidden"><i class="fas fa-phone-slash"></i> Reject</button>
+            <button type="button" id="liveEndCallBtn"><i class="fas fa-phone-slash"></i> End</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(dock);
+
+    const emojis = ["😀","😂","😊","😍","👍","🙏","👏","✅","⚠️","📌","📎","📞","🎥","☕","🔥","💡","🎉","❤️"];
+    const picker = document.getElementById("liveEmojiPicker");
+    if (picker) {
+      picker.innerHTML = emojis.map((emoji) => `<button type="button" data-emoji="${emoji}">${emoji}</button>`).join("");
+    }
+  }
+
+  async loadLiveChatUsers() {
+    const response = await fetch(this.API.liveChatBootstrap, { credentials: "include", cache: "no-store" });
+    const data = await response.json();
+    if (!data.success) throw new Error(data.message || "Unable to load live chat users.");
+    this.liveChat.users = data.users || [];
+    this.renderLiveChatUsers();
+    this.updateLiveChatStatus();
+  }
+
+  bindLiveChatEvents() {
+    document.getElementById("liveChatLauncher")?.addEventListener("click", () => {
+      document.getElementById("liveChatDock")?.classList.remove("collapsed");
+    });
+    document.getElementById("liveChatClose")?.addEventListener("click", () => {
+      document.getElementById("liveChatDock")?.classList.add("collapsed");
+    });
+    document.getElementById("liveSendBtn")?.addEventListener("click", () => this.sendLiveChatText());
+    document.getElementById("liveChatInput")?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        this.sendLiveChatText();
+      }
+    });
+    document.getElementById("liveEmojiBtn")?.addEventListener("click", () => {
+      document.getElementById("liveEmojiPicker")?.classList.toggle("hidden");
+    });
+    document.getElementById("liveEmojiPicker")?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-emoji]");
+      if (!button) return;
+      const input = document.getElementById("liveChatInput");
+      if (input) {
+        input.value += button.dataset.emoji || "";
+        input.focus();
+      }
+    });
+    document.getElementById("liveAttachBtn")?.addEventListener("click", () => document.getElementById("liveChatAttachmentInput")?.click());
+    document.getElementById("liveChatAttachmentInput")?.addEventListener("change", (event) => this.sendLiveChatAttachment(event.target.files?.[0]));
+    document.getElementById("liveVoiceBtn")?.addEventListener("click", () => this.toggleVoiceRecording());
+    document.getElementById("liveAudioCallBtn")?.addEventListener("click", () => this.startLiveCall("audio"));
+    document.getElementById("liveVideoCallBtn")?.addEventListener("click", () => this.startLiveCall("video"));
+    document.getElementById("liveAcceptCallBtn")?.addEventListener("click", () => this.acceptIncomingCall());
+    document.getElementById("liveRejectCallBtn")?.addEventListener("click", () => this.rejectIncomingCall());
+    document.getElementById("liveEndCallBtn")?.addEventListener("click", () => this.endLiveCall());
+  }
+
+  renderLiveChatUsers() {
+    const container = document.getElementById("liveChatUsers");
+    if (!container) return;
+    container.innerHTML = this.liveChat.users.map((user) => `
+      <button type="button" class="live-chat-user ${this.liveChat.selectedUser?.userId === user.userId ? "active" : ""}" data-user-id="${user.userId}">
+        <span class="presence-dot ${user.isOnline ? "online" : ""}"></span>
+        <img src="${this.getUserImage(user.userPhoto)}" alt="${this.escapeHtml(user.userName)}">
+        <span><strong>${this.escapeHtml(user.userName)}</strong><small>${this.escapeHtml(user.userRole)}${user.isOnline ? " - online" : ""}</small></span>
+      </button>
+    `).join("") || `<div class="live-chat-empty">No staff users available.</div>`;
+    container.querySelectorAll(".live-chat-user").forEach((button) => {
+      button.addEventListener("click", () => this.selectLiveChatUser(button.dataset.userId));
     });
   }
 
-  // -----------------------
+  updateLiveChatStatus() {
+    const online = this.liveChat.users.filter((user) => user.isOnline).length;
+    const count = document.getElementById("liveChatOnlineCount");
+    const status = document.getElementById("liveChatStatusText");
+    if (count) count.textContent = String(online);
+    if (status) status.textContent = `${online} staff online`;
+  }
+
+  async selectLiveChatUser(userId) {
+    const user = this.liveChat.users.find((item) => item.userId === userId);
+    if (!user) return;
+    this.liveChat.selectedUser = user;
+    this.liveChat.lastMessageIdByUser[userId] = 0;
+    this.renderLiveChatUsers();
+    const peer = document.getElementById("liveChatPeer");
+    if (peer) {
+      peer.innerHTML = `<strong>${this.escapeHtml(user.userName)}</strong><small>${this.escapeHtml(user.userRole)}${user.isOnline ? " - online" : ""}</small>`;
+    }
+    ["liveChatInput","liveSendBtn","liveAudioCallBtn","liveVideoCallBtn","liveVoiceBtn","liveAttachBtn","liveEmojiBtn"].forEach((id) => {
+      const element = document.getElementById(id);
+      if (element) element.disabled = false;
+    });
+    const messages = document.getElementById("liveChatMessages");
+    if (messages) messages.innerHTML = `<div class="live-chat-empty">Loading conversation...</div>`;
+    await this.loadLiveChatMessages(true);
+  }
+
+  startLiveChatPolling() {
+    this.stopLiveChat();
+    this.liveChat.presenceTimer = setInterval(() => this.refreshLivePresence(), 10000);
+    this.liveChat.messagePollTimer = setInterval(() => this.loadLiveChatMessages(false), 3000);
+    this.liveChat.callPollTimer = setInterval(() => this.pollLiveCalls(), 2500);
+    this.refreshLivePresence();
+    this.pollLiveCalls();
+  }
+
+  stopLiveChat() {
+    ["presenceTimer","messagePollTimer","callPollTimer","signalPollTimer"].forEach((key) => {
+      if (this.liveChat[key]) clearInterval(this.liveChat[key]);
+      this.liveChat[key] = null;
+    });
+  }
+
+  async refreshLivePresence() {
+    try {
+      const response = await fetch(this.API.liveChatPresence, { credentials: "include", cache: "no-store" });
+      const data = await response.json();
+      if (!data.success) return;
+      const presence = data.presence || {};
+      this.liveChat.users = this.liveChat.users.map((user) => ({ ...user, ...(presence[user.userId] || {}) }));
+      if (this.liveChat.selectedUser) {
+        this.liveChat.selectedUser = this.liveChat.users.find((user) => user.userId === this.liveChat.selectedUser.userId) || this.liveChat.selectedUser;
+      }
+      this.renderLiveChatUsers();
+      this.updateLiveChatStatus();
+    } catch (_error) {}
+  }
+
+  async loadLiveChatMessages(force = false) {
+    const peer = this.liveChat.selectedUser;
+    if (!peer) return;
+    const since = force ? 0 : (this.liveChat.lastMessageIdByUser[peer.userId] || 0);
+    try {
+      const response = await fetch(`${this.API.liveChatMessages}?peer_id=${encodeURIComponent(peer.userId)}&since_id=${since}`, {
+        credentials: "include",
+        cache: "no-store"
+      });
+      const data = await response.json();
+      if (!data.success) return;
+      this.renderLiveChatMessages(data.messages || [], force);
+    } catch (error) {
+      console.warn("Live chat message poll failed:", error);
+    }
+  }
+
+  renderLiveChatMessages(messages, replace = false) {
+    const container = document.getElementById("liveChatMessages");
+    if (!container) return;
+    if (replace) container.innerHTML = "";
+    if (!messages.length && replace) {
+      container.innerHTML = `<div class="live-chat-empty">No messages yet. Say hello.</div>`;
+      return;
+    }
+    const empty = container.querySelector(".live-chat-empty");
+    if (empty && messages.length) empty.remove();
+    messages.forEach((message) => {
+      this.liveChat.lastMessageIdByUser[this.liveChat.selectedUser.userId] = Math.max(this.liveChat.lastMessageIdByUser[this.liveChat.selectedUser.userId] || 0, Number(message.id || 0));
+      const bubble = document.createElement("div");
+      bubble.className = `live-chat-bubble ${message.isOwn ? "own" : ""}`;
+      bubble.innerHTML = this.liveChatMessageHtml(message);
+      container.appendChild(bubble);
+    });
+    container.scrollTop = container.scrollHeight;
+  }
+
+  liveChatMessageHtml(message) {
+    const fileUrl = message.filePath ? `../backend/${message.filePath}` : "";
+    const filePart = message.kind === "voice" && fileUrl
+      ? `<audio controls src="${fileUrl}"></audio>`
+      : (fileUrl ? `<a href="${fileUrl}" target="_blank" rel="noopener"><i class="fas fa-paperclip"></i> ${this.escapeHtml(message.fileName || "Attachment")}</a>` : "");
+    return `
+      ${message.text ? `<p>${this.formatMessageText(message.text)}</p>` : ""}
+      ${filePart}
+      <small>${this.formatTimeShort(message.createdAt)}</small>
+    `;
+  }
+
+  async sendLiveChatText() {
+    const input = document.getElementById("liveChatInput");
+    const text = (input?.value || "").trim();
+    if (!text || !this.liveChat.selectedUser) return;
+    await this.sendLiveChatPayload({ message_text: text, message_kind: "text" });
+    input.value = "";
+  }
+
+  async sendLiveChatAttachment(file, kind = "attachment", text = "") {
+    if (!file || !this.liveChat.selectedUser) return;
+    await this.sendLiveChatPayload({ message_kind: kind, message_text: text, file });
+    const input = document.getElementById("liveChatAttachmentInput");
+    if (input) input.value = "";
+  }
+
+  async sendLiveChatPayload({ message_text = "", message_kind = "text", file = null } = {}) {
+    const peer = this.liveChat.selectedUser;
+    if (!peer) return;
+    const form = new FormData();
+    form.append("recipient_id", peer.userId);
+    form.append("message_text", message_text);
+    form.append("message_kind", message_kind);
+    if (file) form.append("file", file, file.name || `${message_kind}.webm`);
+    try {
+      const response = await fetch(this.API.liveChatSend, { method: "POST", credentials: "include", body: form });
+      const data = await response.json();
+      if (!data.success) throw new Error(data.message || "Unable to send chat message.");
+      await this.loadLiveChatMessages(false);
+    } catch (error) {
+      this.showErrorModal("Live Chat", error.message || "Unable to send chat message.");
+    }
+  }
+
+  async toggleVoiceRecording() {
+    const button = document.getElementById("liveVoiceBtn");
+    if (this.liveChat.recorder && this.liveChat.recorder.state === "recording") {
+      this.liveChat.recorder.stop();
+      button?.classList.remove("recording");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.liveChat.recordedChunks = [];
+      this.liveChat.recorder = new MediaRecorder(stream);
+      this.liveChat.recorder.ondataavailable = (event) => {
+        if (event.data?.size) this.liveChat.recordedChunks.push(event.data);
+      };
+      this.liveChat.recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        const blob = new Blob(this.liveChat.recordedChunks, { type: "audio/webm" });
+        const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: "audio/webm" });
+        await this.sendLiveChatAttachment(file, "voice", "Voice note");
+      };
+      this.liveChat.recorder.start();
+      button?.classList.add("recording");
+    } catch (error) {
+      this.showErrorModal("Voice Note", "Microphone access is required to record voice notes.");
+    }
+  }
+
+  async startLiveCall(callType = "audio") {
+    if (!this.liveChat.selectedUser) return;
+    try {
+      const response = await this.postLiveCall({ action: "start", callee_id: this.liveChat.selectedUser.userId, call_type: callType });
+      this.liveChat.activeCall = response.call;
+      this.liveChat.isCallInitiator = true;
+      this.liveChat.lastSignalId = 0;
+      await this.preparePeerConnection(callType, this.liveChat.selectedUser.userId);
+      const offer = await this.liveChat.peerConnection.createOffer();
+      await this.liveChat.peerConnection.setLocalDescription(offer);
+      await this.sendLiveSignal("offer", offer);
+      this.showCallModal(`Calling ${this.liveChat.selectedUser.userName}`, "Ringing...", callType, false);
+      this.startSignalPolling();
+    } catch (error) {
+      this.showErrorModal("Call Failed", error.message || "Unable to start call.");
+      this.cleanupLiveCall();
+    }
+  }
+
+  async pollLiveCalls() {
+    if (this.liveChat.activeCall) return;
+    try {
+      const data = await this.postLiveCall({ action: "poll" }, "GET");
+      const incoming = (data.calls || []).find((call) => call.calleeId === this.userId && call.status === "ringing");
+      if (incoming) {
+        this.liveChat.activeCall = incoming;
+        this.liveChat.isCallInitiator = false;
+        this.liveChat.lastSignalId = 0;
+        this.showCallModal(`${incoming.callerName} is calling`, `${incoming.callType} call`, incoming.callType, true);
+      }
+    } catch (_error) {}
+  }
+
+  showCallModal(title, status, callType = "audio", incoming = false) {
+    const modal = document.getElementById("liveCallModal");
+    modal?.classList.remove("hidden", "audio-only");
+    if (callType === "audio") modal?.classList.add("audio-only");
+    document.getElementById("liveCallTitle").textContent = title;
+    document.getElementById("liveCallStatus").textContent = status;
+    document.getElementById("liveAcceptCallBtn")?.classList.toggle("hidden", !incoming);
+    document.getElementById("liveRejectCallBtn")?.classList.toggle("hidden", !incoming);
+  }
+
+  async acceptIncomingCall() {
+    const call = this.liveChat.activeCall;
+    if (!call) return;
+    try {
+      await this.postLiveCall({ action: "update", call_id: call.callId, status: "accepted" });
+      await this.preparePeerConnection(call.callType, call.callerId);
+      this.startSignalPolling();
+      document.getElementById("liveCallStatus").textContent = "Connecting...";
+      document.getElementById("liveAcceptCallBtn")?.classList.add("hidden");
+      document.getElementById("liveRejectCallBtn")?.classList.add("hidden");
+    } catch (error) {
+      this.showErrorModal("Call Failed", error.message || "Unable to accept call.");
+      this.cleanupLiveCall();
+    }
+  }
+
+  async rejectIncomingCall() {
+    if (this.liveChat.activeCall) {
+      await this.sendLiveSignal("hangup", { reason: "rejected" }).catch(() => {});
+      await this.postLiveCall({ action: "update", call_id: this.liveChat.activeCall.callId, status: "rejected" }).catch(() => {});
+    }
+    this.cleanupLiveCall();
+  }
+
+  async endLiveCall() {
+    const call = this.liveChat.activeCall;
+    if (call) {
+      const peerId = call.callerId === this.userId ? call.calleeId : call.callerId;
+      await this.sendLiveSignal("hangup", { reason: "ended" }).catch(() => {});
+      await this.postLiveCall({ action: "update", call_id: call.callId, status: "ended" }).catch(() => {});
+      console.log("Ended call with", peerId);
+    }
+    this.cleanupLiveCall();
+  }
+
+  getLiveCallAudioConstraints() {
+    return {
+      echoCancellation: { ideal: true },
+      noiseSuppression: { ideal: true },
+      autoGainControl: { ideal: true },
+      channelCount: { ideal: 1 },
+      sampleRate: { ideal: 48000 },
+      sampleSize: { ideal: 16 }
+    };
+  }
+
+  isHandheldLiveCallDevice() {
+    return window.matchMedia?.("(pointer: coarse), (max-width: 768px)")?.matches || false;
+  }
+
+  async getLiveCallMediaStream(callType) {
+    const constraints = {
+      audio: this.getLiveCallAudioConstraints(),
+      video: callType === "video"
+    };
+    try {
+      return await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (error) {
+      return navigator.mediaDevices.getUserMedia({ audio: true, video: callType === "video" });
+    }
+  }
+
+  async tuneLiveCallAudioTrack(stream) {
+    const audioTrack = stream?.getAudioTracks?.()[0];
+    if (!audioTrack) return;
+    audioTrack.contentHint = "speech";
+    if (audioTrack.applyConstraints) {
+      await audioTrack.applyConstraints(this.getLiveCallAudioConstraints()).catch(() => {});
+    }
+  }
+
+  configureLiveCallMediaElements() {
+    const localVideo = document.getElementById("liveLocalVideo");
+    const remoteVideo = document.getElementById("liveRemoteVideo");
+    if (localVideo) {
+      localVideo.muted = true;
+      localVideo.volume = 0;
+      localVideo.autoplay = true;
+      localVideo.playsInline = true;
+      localVideo.setAttribute("playsinline", "");
+    }
+    if (remoteVideo) {
+      remoteVideo.muted = false;
+      remoteVideo.autoplay = true;
+      remoteVideo.playsInline = true;
+      remoteVideo.setAttribute("playsinline", "");
+      remoteVideo.volume = this.isHandheldLiveCallDevice() ? 0.78 : 1;
+    }
+  }
+
+  async preparePeerConnection(callType, peerId) {
+    this.configureLiveCallMediaElements();
+    this.liveChat.localStream = await this.getLiveCallMediaStream(callType);
+    await this.tuneLiveCallAudioTrack(this.liveChat.localStream);
+    this.liveChat.remoteStream = new MediaStream();
+    const localVideo = document.getElementById("liveLocalVideo");
+    const remoteVideo = document.getElementById("liveRemoteVideo");
+    if (localVideo) localVideo.srcObject = this.liveChat.localStream;
+    if (remoteVideo) remoteVideo.srcObject = this.liveChat.remoteStream;
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+    this.liveChat.peerConnection = pc;
+    this.liveChat.localStream.getTracks().forEach((track) => pc.addTrack(track, this.liveChat.localStream));
+    pc.ontrack = (event) => {
+      event.streams[0]?.getTracks().forEach((track) => {
+        if (!this.liveChat.remoteStream.getTracks().some((existing) => existing.id === track.id)) {
+          this.liveChat.remoteStream.addTrack(track);
+        }
+      });
+      if (remoteVideo) remoteVideo.srcObject = this.liveChat.remoteStream;
+      remoteVideo?.play?.().catch(() => {});
+    };
+    pc.onicecandidate = (event) => {
+      if (event.candidate) this.sendLiveSignal("ice", event.candidate.toJSON ? event.candidate.toJSON() : event.candidate).catch(() => {});
+    };
+    pc.onconnectionstatechange = () => {
+      const status = document.getElementById("liveCallStatus");
+      if (status) status.textContent = pc.connectionState;
+      if (["failed", "closed", "disconnected"].includes(pc.connectionState)) {
+        setTimeout(() => this.cleanupLiveCall(), 1200);
+      }
+    };
+  }
+
+  startSignalPolling() {
+    if (this.liveChat.signalPollTimer) clearInterval(this.liveChat.signalPollTimer);
+    this.liveChat.signalPollTimer = setInterval(() => this.pollLiveSignals(), 1200);
+    this.pollLiveSignals();
+  }
+
+  async pollLiveSignals() {
+    const call = this.liveChat.activeCall;
+    if (!call) return;
+    try {
+      const data = await this.postLiveCall({ action: "signals", call_id: call.callId, after_id: this.liveChat.lastSignalId }, "GET");
+      for (const signal of data.signals || []) {
+        this.liveChat.lastSignalId = Math.max(this.liveChat.lastSignalId, Number(signal.signalId || 0));
+        await this.handleLiveSignal(signal);
+      }
+    } catch (_error) {}
+  }
+
+  async handleLiveSignal(signal) {
+    const call = this.liveChat.activeCall;
+    const pc = this.liveChat.peerConnection;
+    if (!call) return;
+    if (signal.signalType === "hangup") {
+      this.cleanupLiveCall();
+      return;
+    }
+    if (signal.signalType === "offer") {
+      if (!pc) {
+        await this.preparePeerConnection(call.callType, signal.senderId);
+      }
+      await this.liveChat.peerConnection.setRemoteDescription(new RTCSessionDescription(signal.payload));
+      const answer = await this.liveChat.peerConnection.createAnswer();
+      await this.liveChat.peerConnection.setLocalDescription(answer);
+      await this.sendLiveSignal("answer", answer);
+      document.getElementById("liveCallStatus").textContent = "Connected";
+      return;
+    }
+    if (signal.signalType === "answer" && pc) {
+      await pc.setRemoteDescription(new RTCSessionDescription(signal.payload));
+      document.getElementById("liveCallStatus").textContent = "Connected";
+      return;
+    }
+    if (signal.signalType === "ice" && pc && signal.payload) {
+      await pc.addIceCandidate(new RTCIceCandidate(signal.payload)).catch(() => {});
+    }
+  }
+
+  async sendLiveSignal(signalType, payload) {
+    const call = this.liveChat.activeCall;
+    if (!call) return;
+    const recipientId = call.callerId === this.userId ? call.calleeId : call.callerId;
+    return this.postLiveCall({ action: "signal", call_id: call.callId, recipient_id: recipientId, signal_type: signalType, payload });
+  }
+
+  async postLiveCall(payload, method = "POST") {
+    const options = method === "GET"
+      ? { credentials: "include", cache: "no-store" }
+      : { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) };
+    const url = method === "GET" ? `${this.API.liveChatCall}?${new URLSearchParams(payload)}` : this.API.liveChatCall;
+    const response = await fetch(url, options);
+    const data = await response.json();
+    if (!data.success) throw new Error(data.message || "Live call request failed.");
+    return data;
+  }
+
+  cleanupLiveCall() {
+    if (this.liveChat.signalPollTimer) clearInterval(this.liveChat.signalPollTimer);
+    this.liveChat.signalPollTimer = null;
+    this.liveChat.peerConnection?.close();
+    this.liveChat.localStream?.getTracks().forEach((track) => track.stop());
+    this.liveChat.remoteStream?.getTracks().forEach((track) => track.stop());
+    this.liveChat.peerConnection = null;
+    this.liveChat.localStream = null;
+    this.liveChat.remoteStream = null;
+    this.liveChat.activeCall = null;
+    this.liveChat.lastSignalId = 0;
+    document.getElementById("liveCallModal")?.classList.add("hidden");
+  }
+
+  // 
   // Event listeners wiring
-  // -----------------------
+  // 
   setupEventListeners() {
     // nav items - All users can click broadcast nav item
     document.querySelectorAll(".nav-item").forEach(item => {
@@ -1890,7 +2765,6 @@ class MessagesApp {
         const t = item.dataset.type || "inbox";
         
         document.querySelectorAll(".nav-item").forEach(i => i.classList.toggle("active", i === item));
-        document.getElementById("listTitle") && (document.getElementById("listTitle").textContent = t.charAt(0).toUpperCase() + t.slice(1));
         this.switchView(t);
       });
     });
@@ -1908,6 +2782,11 @@ class MessagesApp {
     // search + filter
     document.getElementById("messageSearch")?.addEventListener("input", (e) => this.searchMessages(e.target.value));
     document.getElementById("filterSelect")?.addEventListener("change", (e) => this.filterMessages(e.target.value));
+    document.getElementById("batchDeleteBtn")?.addEventListener("click", () => this.confirmBatchDelete());
+    document.getElementById("selectAllMessages")?.addEventListener("change", (e) => {
+      const visibleIds = this.getVisibleMessageIds();
+      visibleIds.forEach((id) => this.toggleMessageSelection(id, e.target.checked));
+    });
 
     // back to list
     document.getElementById("backToList")?.addEventListener("click", () => this.showListView());
@@ -1931,9 +2810,17 @@ class MessagesApp {
     this.showListView();
     this.currentType = type;
     this.currentPage = 1;
+    this.archivedMode = false;
+    const filterSelect = document.getElementById("filterSelect");
+    if (filterSelect) {
+      filterSelect.value = "all";
+    }
+    this.updateListTitle();
     this.loadMessages(type, 1);
   }
 }
 
 // instantiate
 new MessagesApp();
+
+

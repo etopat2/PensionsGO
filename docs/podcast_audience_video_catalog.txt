@@ -1,0 +1,159 @@
+PENSIONAPP PODCAST / VIDEO CONTENT CATALOG
+Generated: 2026-03-25
+
+Audience analysis summary
+------------------------
+The application currently supports three podcast/video audience sections:
+1. public
+2. staff
+3. pensioner
+
+This is based on the role-filtered podcast model in the codebase:
+- tb_podcast_videos.audience supports public, staff, and pensioner
+- authenticated podcast access is filtered by role
+- public-facing video access is supported separately
+
+The ideas below are designed to fit the product's existing purpose:
+- guided public information
+- operational clarity for staff
+- self-service support for pensioners
+
+Each concept includes:
+- a title
+- the purpose of the video
+- a draft content outline that can be used for scripting, narration, or description writing
+
+
+======================================================================
+AUDIENCE SECTION: PUBLIC
+======================================================================
+
+1. Title: How Pension Applications Move From Submission to Approval
+Purpose:
+Help the public understand that pension processing is a governed workflow with multiple review stages, not a one-step event.
+Content draft:
+Open by explaining that pension administration is a structured process designed to protect accuracy, fairness, and accountability. Walk viewers through the major stages in plain language: initial record capture, verification, document review, file creation, assessment, approval, and payroll-related follow-up. Explain that progress can take time because each stage serves a control purpose. Clarify that missing or inconsistent details often create delays. Close by encouraging viewers to provide complete and accurate information early, keep contact details current, and use formal feedback or support channels when they need guidance rather than relying on rumor or informal updates.
+
+2. Title: Five Common Record Mistakes That Delay Pension Processing
+Purpose:
+Reduce preventable delays by educating the public on data quality and document readiness.
+Content draft:
+Introduce the video as a practical checklist for avoiding delay. Cover the most common issues: incorrect file number or identity details, mismatched names across records, outdated phone contacts, incomplete supporting documents, and failure to respond when clarification is needed. For each issue, explain what it looks like in practice and why it forces additional checking. Emphasize that accurate records help both the applicant and the pensions office. End with a simple message: if people take time to confirm their details before submission, the system can move their case more efficiently and with fewer interruptions.
+
+3. Title: Why Life Certificates Matter in Pension Administration
+Purpose:
+Explain the business reason for life-certificate compliance in language that builds trust instead of fear.
+Content draft:
+Start by explaining that life certificates are not a punishment or an inconvenience; they are an important control used to keep payment records current. Describe how life certificates support accuracy, reduce payment risk, and help the pensions office confirm that records still reflect the real situation. Make clear that a compliant record protects both the institution and the beneficiary. Briefly explain that some cases may be exempt, but that exemption is still a formal status rather than an assumption. Close by telling viewers to use the official channels for submission and to avoid waiting until reminders become urgent.
+
+4. Title: How to Use Feedback Channels the Right Way
+Purpose:
+Guide public users toward constructive, traceable feedback instead of informal complaints.
+Content draft:
+Introduce the feedback channel as the right place to raise concerns, report blocked processes, suggest improvements, or ask for clarification. Explain the difference between clear feedback and vague complaints. Show what makes a useful submission: the issue, the relevant file or reference if available, what has already happened, and the help being requested. Encourage users to be respectful, specific, and factual so the team can respond faster. End by reinforcing that a formal feedback record creates traceability, while informal messages or third-party complaints are harder to follow and resolve.
+
+5. Title: What the Pension File Registry Does and Why It Matters
+Purpose:
+Give public users a simple understanding of the registry as the controlled home of the pension record.
+Content draft:
+Explain that the pension file registry is the official record space where core pension-file data is maintained. Describe it as the reference point for identity, status, contact data, payroll linkage, documents, and lifecycle history. Emphasize that when registry details are correct, many downstream processes become easier and safer. Clarify that the registry is not just a storage list; it supports operational tracking, accountability, and controlled updates. Close by encouraging viewers to treat official records seriously and to update important contact information through the approved route rather than by informal note or verbal request alone.
+
+
+======================================================================
+AUDIENCE SECTION: STAFF
+======================================================================
+
+1. Title: From Staff Due to Registry: The Correct Intake Workflow
+Purpose:
+Reinforce disciplined intake practice for staff who capture and route retirement-bound records.
+Content draft:
+Open with the message that intake quality determines downstream workload. Walk through the correct path from staff-due capture to workflow progression and eventual registry establishment. Highlight the key fields that must be accurate early: file number, supplier number, names, retirement details, phone contact, and supporting metadata. Explain that weak intake creates repeated work later in claims, registry, payroll, and pensioner support. Remind staff to use the proper forms, queue actions, and status updates rather than storing important decisions in ad hoc comments. End by stressing that clean intake is not clerical polish; it is operational risk control.
+
+2. Title: Delete Requests, Recycle Bin, and Restore Governance
+Purpose:
+Help staff understand that deletion is a governed process and not a convenience feature.
+Content draft:
+Begin by explaining that pension data should not be removed casually because it has workflow, financial, and accountability consequences. Distinguish between staff-due delete requests and pension file registry recycle-bin flows. Explain that one route uses approval queues while the other captures recoverable snapshots for review and restoration. Walk through what staff should do before requesting deletion: verify the exact record, confirm the reason, and ensure there is no safer corrective action. Close by warning that restore and purge actions must be reserved for authorized users acting under policy and that deletion should never be used to hide poor data handling.
+
+3. Title: Payroll Reconciliation Without Guesswork
+Purpose:
+Improve staff understanding of payroll upload cycles, matching behavior, and review discipline.
+Content draft:
+Frame the video around one core idea: payroll reconciliation should be evidence-based, not assumed. Explain the relationship between payroll upload cycles, uploaded entries, matched registry records, and the latest payroll status view. Show why month, year, quarter, and financial year filters matter. Remind staff to review unmatched records immediately after upload, because unresolved mismatches weaken the value of downstream reporting. Clarify that uploaded files and payment-register documents are part of the audit surface and must be handled carefully. End with the principle that reconciliation is successful only when the payroll view and the registry view can be explained together.
+
+4. Title: How Workflow Tasks and Alerts Keep Cases Moving
+Purpose:
+Help staff and supervisors use the task system as intended.
+Content draft:
+Introduce tasks as the operational engine of responsibility, not just another notification area. Explain the difference between assigned work, task comments, alerts, completion queues, and supervisory actions such as realignment or schedule extension. Encourage staff to read task details fully, leave concise factual notes, and complete actions using the workflow controls rather than relying on memory or side conversations. Show how alerts point to risk: overdue work, stalled movement, or queue backlog. End by reminding supervisors that the task layer is where operational delays become visible early enough to manage.
+
+5. Title: Claims and Arrears Accountability Done Properly
+Purpose:
+Support finance and operations teams with a clean mental model for arrears handling.
+Content draft:
+Start by explaining that arrears work is more than recording a payment amount. Walk through the relationship between the claim type, the payment record, the ledger, allocations, accountability requirements, and export or reporting needs. Explain the importance of distinguishing recorded amount, applied amount, and unapplied amount. Show why accountability submissions matter for trust and governance. Encourage staff to use structured uploads for bulk operations when possible and to keep notes meaningful when recording exceptions. Close by reinforcing that arrears data supports both financial visibility and institutional accountability, so shortcuts create risk for everyone.
+
+
+======================================================================
+AUDIENCE SECTION: PENSIONER
+======================================================================
+
+1. Title: How to Read Your Pensioner Dashboard
+Purpose:
+Help pensioners understand what they are seeing when they log in.
+Content draft:
+Open with reassurance: the dashboard is designed to give a clear picture of the pension record, not to confuse the user. Walk through the main summary areas such as payroll status, monthly amount, account status, life-certificate status, and the detailed tabs for profile, application, benefits, compliance, claims, and lifecycle information. Explain that some sections are informational while others guide action. Encourage pensioners to refresh the dashboard when needed and to read status wording carefully before assuming something is wrong. End by reminding viewers that the dashboard is the safest place to review their official account picture.
+
+2. Title: Updating Contact Details the Right Way
+Purpose:
+Teach pensioners how to use the controlled self-service update flow.
+Content draft:
+Explain that the contact update form is intended for specific fields such as district of residence, phone number, and email address, with some additional fields available only where policy allows. Stress that accurate contact details help the pensions office communicate quickly and reduce service friction. Encourage pensioners to review what they enter before saving, especially phone numbers and email addresses. Also explain that some records have protected conditions where not every field remains editable through self-service. Close by telling users that if a field is hidden or unavailable, they should use the official support route rather than assuming the portal is broken.
+
+3. Title: Life Certificate Compliance: What You Need to Know
+Purpose:
+Give pensioners a clear, calm explanation of life-certificate status and follow-up.
+Content draft:
+Begin by explaining what the life-certificate status means on the dashboard. Clarify the difference between submitted, not submitted, and exempt. Explain that the status is tied to current-year compliance and is important for keeping the pension record up to date. Encourage pensioners to handle submissions early rather than waiting until a reminder becomes urgent. Remind them that a current and accurate record protects their service continuity. End with a simple call to action: check the status regularly, follow the official submission route, and contact the pensions office if they are unsure how their case should be treated.
+
+4. Title: Understanding Your Application Status, Benefits, and Claims
+Purpose:
+Help pensioners interpret dashboard information without anxiety or confusion.
+Content draft:
+Open by explaining that the portal brings several kinds of information together: application progress, benefit figures, payroll standing, and claims-related summaries where the feature is enabled. Walk through the idea that some values are descriptive while others show a process still in motion. Encourage users not to compare a single field in isolation without looking at the surrounding context. If a claim, application, or compliance item seems unfamiliar, advise the user to note the wording and ask for clarification through the right support channel. End by reminding viewers that the system is built to improve visibility, but formal decisions still follow the governed pension process.
+
+5. Title: Privacy, Pensioner Lookup, and Safe Use of the Portal
+Purpose:
+Explain privacy controls in a reassuring and practical way.
+Content draft:
+Introduce the topic by saying that the portal is designed to balance connection and privacy. Explain that pensioner lookup visibility depends on consent and that a user can control whether they appear in the directory. Clarify that only the intended audience should use pensioner-facing tools and that users should protect their own account details by logging out properly and not sharing credentials. Encourage pensioners to use only official pages when checking records or updating information. End with the message that privacy is not separate from service quality; good privacy practice protects the pensioner and strengthens trust in the portal.
+
+
+======================================================================
+OPTIONAL EDITORIAL NOTES
+======================================================================
+
+Recommended format mix
+----------------------
+- public videos: 2 to 4 minutes, trust-building tone, less jargon
+- staff videos: 4 to 7 minutes, workflow and control tone, concrete examples
+- pensioner videos: 2 to 5 minutes, reassuring and explanatory tone
+
+Recommended publishing pattern
+------------------------------
+- publish at least 1 evergreen guidance video per audience every month
+- add short update videos for policy changes, deadline reminders, or portal improvements
+- use tags consistently so users can search by topic
+
+Suggested tag families
+----------------------
+- workflow
+- registry
+- life-certificate
+- payroll
+- claims
+- arrears
+- support
+- privacy
+- guidance
+- updates

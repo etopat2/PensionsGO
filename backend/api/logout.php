@@ -1,215 +1,152 @@
 <?php
 /**
- * ============================================================
- * logout.php (Enhanced with Comprehensive User Logging)
- * ------------------------------------------------------------
- * PURPOSE:
- *   - Handles user logout with complete session cleanup
- *   - Logs logout activity with duration and type
- *   - Supports different logout types (user_initiated, session_expiry, device_conflict)
- *   - Updates login records with logout time and duration
- * ============================================================
+ * logout.php - terminate session and update logs
  */
 
-session_start();
-require_once __DIR__ . '/../config.php';
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+error_reporting(E_ALL);
 
-// Determine logout type from request or default to user initiated
-$logoutType = $_POST['logout_type'] ?? 'user_initiated';
-$logoutReason = $_POST['logout_reason'] ?? 'User clicked logout button';
+header('Content-Type: application/json; charset=UTF-8');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, X-Requested-With, X-Device-Token, X-CSRF-Token');
 
-// Prepare user info for logging
-$userId = $_SESSION['userId'] ?? 'unknown';
-$userName = $_SESSION['userName'] ?? 'Unknown User';
-$userRole = $_SESSION['userRole'] ?? 'guest';
-$sessionId = $_SESSION['session_id'] ?? session_id();
-$loginLogId = $_SESSION['login_log_id'] ?? null;
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
 
-// Get device and location info for logging
-$ipAddress = $_SERVER['REMOTE_ADDR'] ?? 'Unknown';
-$userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
-$deviceType = detectDeviceType($userAgent);
-$location = getLocationFromIP($ipAddress);
+ob_start();
 
-// Map logout type to activity type for logging
-$activityTypes = [
-    'user_initiated' => 'logout',
-    'session_expiry' => 'session_expiry',
-    'device_conflict' => 'device_conflict',
-    'auto_logout' => 'auto_logout'
-];
+$warnings = [];
+$sessionId = null;
+$userId = null;
+$userName = 'Unknown';
+$userRole = 'guest';
 
-$activityType = $activityTypes[$logoutType] ?? 'logout';
-
-// Calculate session duration if we have a login log
-$duration = 0;
-if ($loginLogId) {
-    try {
-        $stmt = $conn->prepare("SELECT login_time FROM tb_user_logs WHERE log_id = ?");
-        $stmt->bind_param("i", $loginLogId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $loginRecord = $result->fetch_assoc();
-        $stmt->close();
-        
-        if ($loginRecord) {
-            $loginTime = strtotime($loginRecord['login_time']);
-            $logoutTime = time();
-            $duration = $logoutTime - $loginTime;
-            
-            // Update the login record with logout time and duration
-            $updateStmt = $conn->prepare("
-                UPDATE tb_user_logs 
-                SET logout_time = NOW(), duration_seconds = ? 
-                WHERE log_id = ?
-            ");
-            $updateStmt->bind_param("ii", $duration, $loginLogId);
-            $updateStmt->execute();
-            $updateStmt->close();
-        }
-    } catch (Exception $e) {
-        error_log("Failed to update login record with logout time: " . $e->getMessage());
+try {
+    require_once __DIR__ . '/../config.php';
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
     }
+
+    if (!isset($conn) || !($conn instanceof mysqli)) {
+        throw new RuntimeException("Database connection unavailable");
+    }
+
+    $logoutAll = isset($_POST['logout_all_devices']) && ($_POST['logout_all_devices'] === 'true' || $_POST['logout_all_devices'] === '1');
+
+    if (isset($_SESSION['session_id'], $_SESSION['userId'])) {
+        $sessionId = (string)$_SESSION['session_id'];
+        $userId = (string)$_SESSION['userId'];
+        $userName = (string)($_SESSION['userName'] ?? 'Unknown');
+        $userRole = (string)($_SESSION['userRole'] ?? 'guest');
+
+        $requestDeviceId = null;
+        $deviceVerified = validateSessionDeviceBinding($conn, $sessionId, $userId, $requestDeviceId);
+        if (!$deviceVerified) {
+            $warnings[] = 'device_verification_failed';
+        }
+
+        require_once __DIR__ . '/SessionManager.php';
+        $sm = SessionManager::getInstance($conn);
+
+        try {
+            if ($logoutAll) {
+                $stmt = $conn->prepare("SELECT session_id FROM tb_user_sessions WHERE user_id = ? AND is_active = 1");
+                if ($stmt) {
+                    $stmt->bind_param('s', $userId);
+                    $stmt->execute();
+                    $res = $stmt->get_result();
+                    $rows = $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
+                    $stmt->close();
+                    foreach ($rows as $r) {
+                        try {
+                            $sm->terminateSession((string)$r['session_id'], $userId, 'user_initiated_all');
+                        } catch (Throwable $e) {
+                            $warnings[] = 'terminate_failed:' . ((string)$r['session_id']);
+                            error_log("logout.php terminate failure for {$r['session_id']}: " . $e->getMessage());
+                        }
+                    }
+                }
+            } else {
+                // Logout is a safe action: even if device verification is missing, terminate the current
+                // bound session row so stale active sessions do not survive a user-initiated logout.
+                $sm->terminateSession($sessionId, $userId, 'user_initiated');
+            }
+        } catch (Throwable $e) {
+            $warnings[] = 'session_terminate_exception';
+            error_log("logout.php terminate exception: " . $e->getMessage());
+        }
+
+        try {
+            if (function_exists('logUserActivity')) {
+                logUserActivity($conn, [
+                    'user_id' => $userId,
+                    'user_name' => $userName,
+                    'user_role' => $userRole,
+                    'activity_type' => 'logout',
+                    'ip_address' => getClientIP(),
+                    'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
+                    'device_type' => detectDeviceType($_SERVER['HTTP_USER_AGENT'] ?? ''),
+                    'location' => getLocationFromIP(getClientIP()),
+                    'session_id' => $sessionId,
+                    'details' => $deviceVerified ? 'User requested logout' : 'User requested logout (device token missing or changed)'
+                ]);
+            }
+        } catch (Throwable $e) {
+            $warnings[] = 'logout_activity_log_failed';
+            error_log("logout.php activity log failure: " . $e->getMessage());
+        }
+    }
+} catch (Throwable $e) {
+    $warnings[] = 'logout_exception';
+    error_log("logout.php fatal: " . $e->getMessage() . " in " . ($e->getFile() ?? '') . ":" . ($e->getLine() ?? ''));
 }
 
-// 🔥 LOG THE LOGOUT ACTIVITY
-logUserActivity($conn, [
-    'user_id' => $userId,
-    'user_name' => $userName,
-    'user_role' => $userRole,
-    'activity_type' => $activityType,
-    'ip_address' => $ipAddress,
-    'user_agent' => $userAgent,
-    'device_type' => $deviceType,
-    'location' => $location,
-    'session_id' => $sessionId,
-    'details' => "Logout reason: $logoutReason | Session duration: " . formatDuration($duration)
-]);
-
-// Mark session as inactive in database
-if (isset($_SESSION['session_id'])) {
-    $stmt = $conn->prepare("UPDATE tb_user_sessions SET is_active = 0 WHERE session_id = ?");
-    $stmt->bind_param("s", $_SESSION['session_id']);
-    $stmt->execute();
-    $stmt->close();
+// Always clear the PHP session locally so logout cannot leave a valid browser session behind.
+try {
+    $_SESSION = [];
+    if (ini_get('session.use_cookies')) {
+        $params = session_get_cookie_params();
+        if (PHP_VERSION_ID >= 70300) {
+            setcookie(session_name(), '', [
+                'expires' => time() - 42000,
+                'path' => $params['path'] ?? '/',
+                'domain' => $params['domain'] ?? '',
+                'secure' => !empty($params['secure']),
+                'httponly' => !empty($params['httponly']),
+                'samesite' => $params['samesite'] ?? 'Lax'
+            ]);
+        } else {
+            setcookie(
+                session_name(),
+                '',
+                time() - 42000,
+                ($params['path'] ?? '/') . '; samesite=' . ($params['samesite'] ?? 'Lax'),
+                $params['domain'] ?? '',
+                !empty($params['secure']),
+                !empty($params['httponly'])
+            );
+        }
+    }
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_destroy();
+    }
+} catch (Throwable $e) {
+    $warnings[] = 'session_clear_failed';
+    error_log("logout.php session clear failure: " . $e->getMessage());
 }
 
-// Clear session data
-$_SESSION = [];
-
-// Destroy session cookie if used
-if (ini_get("session.use_cookies")) {
-    $params = session_get_cookie_params();
-    setcookie(session_name(), '', time() - 42000,
-        $params["path"], $params["domain"],
-        $params["secure"], $params["httponly"]
-    );
+if (ob_get_length()) {
+    ob_clean();
 }
 
-// Destroy the session
-session_destroy();
-
-// Return JSON response (client handles redirection)
-header('Content-Type: application/json');
 echo json_encode([
     'success' => true,
-    'message' => 'You have been successfully logged out.',
-    'logout_type' => $logoutType,
-    'session_duration' => $duration,
-    'logged' => true
+    'message' => 'Logged out',
+    'warnings' => $warnings
 ]);
-
-// ============================================================
-// SUPPORT FUNCTIONS
-// ============================================================
-
-/**
- * Log user activity to tb_user_logs table
- */
-function logUserActivity($conn, $logData) {
-    try {
-        $stmt = $conn->prepare("
-            INSERT INTO tb_user_logs 
-            (user_id, user_name, user_role, activity_type, ip_address, user_agent, device_type, location, session_id, details)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        
-        $stmt->bind_param(
-            "ssssssssss",
-            $logData['user_id'],
-            $logData['user_name'],
-            $logData['user_role'],
-            $logData['activity_type'],
-            $logData['ip_address'],
-            $logData['user_agent'],
-            $logData['device_type'],
-            $logData['location'],
-            $logData['session_id'],
-            $logData['details']
-        );
-        
-        $stmt->execute();
-        $stmt->close();
-        
-        return true;
-    } catch (Exception $e) {
-        error_log("Failed to log user activity: " . $e->getMessage());
-        return false;
-    }
-}
-
-/**
- * Detect device type from user agent string
- */
-function detectDeviceType($userAgent) {
-    $userAgent = strtolower($userAgent);
-    
-    if (strpos($userAgent, 'mobile') !== false) {
-        return 'Mobile';
-    } elseif (strpos($userAgent, 'tablet') !== false) {
-        return 'Tablet';
-    } elseif (strpos($userAgent, 'android') !== false) {
-        return 'Android Mobile';
-    } elseif (strpos($userAgent, 'iphone') !== false) {
-        return 'iPhone';
-    } elseif (strpos($userAgent, 'ipad') !== false) {
-        return 'iPad';
-    } elseif (strpos($userAgent, 'windows') !== false) {
-        return 'Windows PC';
-    } elseif (strpos($userAgent, 'macintosh') !== false) {
-        return 'Macintosh';
-    } elseif (strpos($userAgent, 'linux') !== false) {
-        return 'Linux PC';
-    } else {
-        return 'Unknown Device';
-    }
-}
-
-/**
- * Get location from IP address (basic implementation)
- */
-function getLocationFromIP($ip) {
-    if ($ip === '127.0.0.1' || $ip === '::1') {
-        return 'Localhost';
-    }
-    return "IP: $ip";
-}
-
-/**
- * Format duration in seconds to human readable format
- */
-function formatDuration($seconds) {
-    if ($seconds < 60) {
-        return "$seconds seconds";
-    } elseif ($seconds < 3600) {
-        $minutes = floor($seconds / 60);
-        return "$minutes minutes";
-    } else {
-        $hours = floor($seconds / 3600);
-        $minutes = floor(($seconds % 3600) / 60);
-        return "$hours hours, $minutes minutes";
-    }
-}
-
 exit;
 ?>

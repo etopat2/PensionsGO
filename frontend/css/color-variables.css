@@ -1,162 +1,221 @@
-/* ================= COLOR VARIABLES ================= */
-/* Uganda Prisons Service Color Scheme - Pensions Management System */
+/* PensionsGo design tokens
+   Uganda Prisons-inspired interface system */
 
-/* ==== Primary Brand Colors ==== */
 :root {
-    /* Uganda Prisons Service Colors */
-    --primary-maroon: #8B0000;
-    --primary-maroon-dark: #5a0000;
-    --primary-maroon-light: #a52a2a;
-    
-    --primary-blue: #003366;
-    --primary-blue-dark: #001a33;
-    --primary-blue-light: #1e4a7a;
-    
-    --primary-gold: #D4AF37;
-    --primary-gold-dark: #a88529;
-    --primary-gold-light: #ffd700;
-    --primary-gold-darker: #b8941f;
-    
+    color-scheme: light;
+
+    /* Brand colors */
+    --primary-maroon: #7b1e26;
+    --primary-maroon-dark: #56151b;
+    --primary-maroon-light: #a2464d;
+    --primary-maroon-soft: #bf6f72;
+
+    --primary-blue: #244764;
+    --primary-blue-dark: #173249;
+    --primary-blue-light: #5b7a96;
+
+    --primary-gold: #d2a334;
+    --primary-gold-dark: #9f7821;
+    --primary-gold-light: #f1cc71;
+    --primary-gold-darker: #7a5b17;
+
     /* Legacy compatibility */
-    --primary-color: #8B0000;
-    --primary-dark: #5a0000;
-    --primary-light: #a52a2a;
+    --primary-color: var(--primary-blue);
+    --primary-dark: var(--primary-blue-dark);
+    --primary-light: var(--primary-blue-light);
+    --secondary-color: var(--primary-maroon);
+    --secondary-light: var(--primary-maroon-light);
+    --secondary-dark: var(--primary-maroon-dark);
+    --accent-color: var(--primary-gold);
+    --accent-light: var(--primary-gold-light);
+    --accent-dark: var(--primary-gold-dark);
 
-    --secondary-color: #003366;
-    --secondary-light: #1e4a7a;
-    --secondary-dark: #001a33;
+    /* Surfaces */
+    --bg-color: #f4f0e8;
+    --bg-color-rgb: 244, 240, 232;
+    --bg-elevated: #fbf8f4;
+    --main-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 247, 243, 0.98) 52%, rgba(243, 238, 230, 0.98) 100%);
+    --header-bg:
+        radial-gradient(circle at top right, rgba(210, 163, 52, 0.24), transparent 26%),
+        linear-gradient(125deg, #1c3246 0%, #264764 54%, #345d7f 100%);
+    --header-bg-solid: #1f374d;
+    --header-text: #fffaf4;
 
-    --accent-color: #D4AF37;
-    --accent-light: #ffd700;
-    --accent-dark: #a88529;
-}
+    --card-bg: #fffdf9;
+    --surface-soft: #f4efe8;
+    --surface-muted: #e6edf2;
+    --form-bg: #faf8f4;
+    --result-bg: #f3f7fa;
+    --menu-bg: #fffdf9;
+    --menu-bg-dark: #e7edf1;
 
-/* ==== Light Theme Colors ==== */
-:root {
-    /* Background Colors */
-    --bg-color: #f0f2f5;
-    --header-bg: linear-gradient(135deg, var(--primary-maroon) 0%, var(--primary-blue) 80%, var(--primary-gold) 200%);
-    --header-bg-solid: var(--primary-maroon);
-    --card-bg: #ffffff;
-    --form-bg: #faf9f9;
-    --result-bg: #f9f9f9;
-    --menu-bg: #ffffff; /* Solid white for menus */
-    --menu-bg-dark: #f8f9fa; /* Slightly darker for depth */
-    --menu-item-hover: linear-gradient(135deg, var(--primary-maroon) 0%, var(--primary-blue) 100%);
-    --menu-item-active: var(--primary-blue);
-    
-    /* Text Colors */
-    --text-color: #333;
-    --heading-color: #2c3e50;
-    --label-color: #444;
-    --muted-color: #666;
-    --muted-dark: #888;
-    --header-text: #ffffff; /* White header text */
-    
-    /* UI Elements */
-    --input-bg: #fff;
-    --input-text: #000;
-    --input-border: #bbb;
-    --result-border: #ccc;
-    --border-color: #dee2e6;
-    --header-border: rgba(245, 215, 66, 0.863);
-    --divider-color: rgba(212, 175, 55, 0.2);
-    
-    /* Interactive States */
-    --hover-bg: linear-gradient(135deg, var(--primary-maroon) 0%, var(--primary-blue) 100%);
-    --hover-bg-gold: linear-gradient(135deg, var(--primary-gold) 0%, var(--primary-gold-light) 100%);
-    --hover-text: #ffffff;
-    --focus-color: var(--primary-gold);
-    
+    /* Text */
+    --text-color: #27323a;
+    --heading-color: #23394b;
+    --label-color: #465963;
+    --muted-color: #6f7b83;
+    --muted-dark: #87949d;
+    --text-glow: none;
+
+    /* Borders and dividers */
+    --input-bg: #fffdf9;
+    --input-text: #1f2830;
+    --input-border: #c7d1d8;
+    --result-border: #d9e1e6;
+    --border-color: #d5dde2;
+    --table-border: #dce4e8;
+    --header-border: rgba(210, 163, 52, 0.72);
+    --divider-color: rgba(36, 71, 100, 0.12);
+
+    /* Interactive states */
+    --menu-item-hover:
+        linear-gradient(
+            135deg,
+            color-mix(in srgb, var(--primary-blue) 95%, #000 5%),
+            color-mix(in srgb, var(--primary-blue-light) 78%, var(--primary-blue) 22%)
+        );
+    --menu-item-active: color-mix(in srgb, var(--primary-blue) 82%, var(--primary-blue-dark) 18%);
+    --hover-bg:
+        linear-gradient(
+            135deg,
+            color-mix(in srgb, var(--primary-blue) 96%, #000 4%),
+            color-mix(in srgb, var(--primary-blue-light) 80%, var(--primary-blue) 20%)
+        );
+    --hover-bg-gold: linear-gradient(135deg, #f0cb69 0%, #d5a837 100%);
+    --hover-text: #fffaf2;
+    --focus-color: var(--primary-blue);
+    --focus-ring: 0 0 0 3px rgba(36, 71, 100, 0.14);
+
     /* Shadows */
-    --shadow-light: rgba(139, 0, 0, 0.1);
-    --shadow-medium: rgba(139, 0, 0, 0.15);
-    --shadow-dark: rgba(139, 0, 0, 0.2);
-    --menu-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-    
-    /* Semantic Colors */
-    --success-color: #28a745;
-    --warning-color: #ffc107;
-    --error-color: #dc3545;
-    --info-color: #003366;
+    --shadow-light: rgba(28, 51, 73, 0.08);
+    --shadow-medium: rgba(28, 51, 73, 0.14);
+    --shadow-dark: rgba(18, 34, 48, 0.24);
+    --menu-shadow: 0 18px 36px rgba(21, 42, 61, 0.16);
+    --card-shadow: 0 16px 34px rgba(28, 51, 73, 0.08);
+    --card-shadow-strong: 0 24px 50px rgba(28, 51, 73, 0.14);
+
+    /* Radii and spacing */
+    --surface-radius-sm: 10px;
+    --surface-radius-md: 14px;
+    --surface-radius-lg: 18px;
+    --surface-radius-xl: 24px;
+    --control-radius: 10px;
+    --control-height: 42px;
+
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.25rem;
+    --space-6: 1.5rem;
+    --space-7: 1.75rem;
+    --space-8: 2rem;
+
+    /* Controls */
+    --button-height-sm: 2.2rem;
+    --button-height-md: 2.65rem;
+    --button-height-lg: 3rem;
+    --table-head-bg: linear-gradient(180deg, #eef2f6 0%, #e3eaef 100%);
+    --table-row-hover: color-mix(in srgb, var(--card-bg) 82%, var(--primary-blue) 18%);
+
+    /* Semantic colors */
+    --success-color: #1f7a44;
+    --warning-color: #b7791f;
+    --error-color: #b42318;
+    --info-color: #2b587d;
 }
 
-/* ==== Dark Theme Overrides ==== */
 [data-theme="dark"] {
-    /* Uganda Prisons Service Colors - Dark Theme Variants */
-    --primary-maroon: #A52A2A;
-    --primary-maroon-dark: #8B0000;
-    --primary-maroon-light: #c45656;
-    
-    --primary-blue: #1e4a7a;
-    --primary-blue-dark: #003366;
-    --primary-blue-light: #2c5d95;
-    
-    --primary-gold: #FFD700;
-    --primary-gold-dark: #D4AF37;
-    --primary-gold-light: #ffdf4d;
-    --primary-gold-darker: #d4b400;
-    
-    /* Legacy compatibility */
-    --primary-color: #A52A2A;
-    --primary-dark: #8B0000;
-    --primary-light: #c45656;
+    color-scheme: dark;
 
-    --secondary-color: #1e4a7a;
-    --secondary-light: #2c5d95;
-    --secondary-dark: #003366;
+    --primary-maroon: #9f4147;
+    --primary-maroon-dark: #6c1d23;
+    --primary-maroon-light: #c06a6d;
+    --primary-maroon-soft: #d79394;
 
-    --accent-color: #FFD700;
-    --accent-light: #ffdf4d;
-    --accent-dark: #D4AF37;
+    --primary-blue: #7f9bb3;
+    --primary-blue-dark: #4d6983;
+    --primary-blue-light: #a4bacd;
 
-    /* Background Colors */
-    --bg-color: #2c3e50;
-    --header-bg: linear-gradient(135deg, var(--primary-maroon) 0%, var(--primary-blue) 80%, var(--primary-gold) 200%);
-    --header-bg-solid: var(--primary-maroon);
-    --card-bg: #34495e;
-    --form-bg: #3b4a5c;
-    --result-bg: #2a3a4d;
-    --menu-bg: #2c3e50; /* Solid dark for menus */
-    --menu-bg-dark: #253445; /* Slightly darker for depth */
-    --menu-item-hover: linear-gradient(135deg, var(--primary-maroon) 0%, var(--primary-blue) 100%);
-    --menu-item-active: var(--primary-blue-light);
-    
-    /* Text Colors */
-    --text-color: #ecf0f1;
-    --heading-color: #ffffff;
-    --label-color: #bdc3c7;
-    --muted-color: #95a5a6;
-    --muted-dark: #7f8c8d;
-    --header-text: #ffffff;
-    
-    /* UI Elements */
-    --input-bg: #4a6572;
-    --input-text: #ffffff;
-    --input-border: #556573;
-    --result-border: #4a6572;
-    --border-color: #4a6572;
-    --header-border: rgba(255, 215, 0, 0.4);
-    --divider-color: rgba(255, 215, 0, 0.3);
-    
-    /* Interactive States */
-    --hover-bg: linear-gradient(135deg, var(--primary-maroon) 0%, var(--primary-blue) 100%);
-    --hover-bg-gold: linear-gradient(135deg, var(--primary-gold) 0%, var(--primary-gold-light) 100%);
-    --hover-text: #ffffff;
-    --focus-color: var(--primary-gold);
-    
-    /* Glow Effects */
-    --text-glow: 0 0 10px rgba(255, 215, 0, 0.8), 0 0 20px rgba(255, 215, 0, 0.6), 0 0 40px var(--primary-maroon);
-    
-    /* Shadows */
+    --primary-gold: #dcb250;
+    --primary-gold-dark: #b2872d;
+    --primary-gold-light: #f4d887;
+    --primary-gold-darker: #8e671d;
+
+    --primary-color: var(--primary-blue);
+    --primary-dark: var(--primary-blue-dark);
+    --primary-light: var(--primary-blue-light);
+    --secondary-color: var(--primary-maroon);
+    --secondary-light: var(--primary-maroon-light);
+    --secondary-dark: var(--primary-maroon-dark);
+    --accent-color: var(--primary-gold);
+    --accent-light: var(--primary-gold-light);
+    --accent-dark: var(--primary-gold-dark);
+
+    --bg-color: #181615;
+    --bg-color-rgb: 24, 22, 21;
+    --bg-elevated: #211d1b;
+    --main-bg: linear-gradient(180deg, rgba(35, 31, 29, 0.98) 0%, rgba(29, 26, 25, 0.98) 52%, rgba(26, 23, 22, 0.98) 100%);
+    --header-bg:
+        radial-gradient(circle at top right, rgba(220, 178, 80, 0.18), transparent 24%),
+        linear-gradient(125deg, #20374d 0%, #35556e 52%, #466981 100%);
+    --header-bg-solid: #20374d;
+    --header-text: #fff8ef;
+
+    --card-bg: #221f1d;
+    --surface-soft: #2a2724;
+    --surface-muted: #303840;
+    --form-bg: #262320;
+    --result-bg: #282e33;
+    --menu-bg: #23201e;
+    --menu-bg-dark: #2b333a;
+
+    --text-color: #ece6de;
+    --heading-color: #f1d089;
+    --label-color: #d8cbc0;
+    --muted-color: #b0a397;
+    --muted-dark: #c0b4a9;
+    --text-glow: none;
+
+    --input-bg: #2a2724;
+    --input-text: #f7efe7;
+    --input-border: #54616b;
+    --result-border: #57636d;
+    --border-color: #525d65;
+    --table-border: #4a545c;
+    --header-border: rgba(220, 178, 80, 0.48);
+    --divider-color: rgba(129, 169, 202, 0.18);
+
+    --menu-item-hover:
+        linear-gradient(
+            135deg,
+            color-mix(in srgb, var(--primary-blue) 84%, #000 16%),
+            color-mix(in srgb, var(--primary-blue-light) 56%, var(--primary-blue-dark) 44%)
+        );
+    --menu-item-active: color-mix(in srgb, var(--primary-blue) 74%, var(--primary-blue-dark) 26%);
+    --hover-bg:
+        linear-gradient(
+            135deg,
+            color-mix(in srgb, var(--primary-blue) 86%, #000 14%),
+            color-mix(in srgb, var(--primary-blue-light) 50%, var(--primary-blue-dark) 50%)
+        );
+    --hover-bg-gold: linear-gradient(135deg, #dcb250 0%, #b2872d 100%);
+    --hover-text: #fff9ef;
+    --focus-color: var(--primary-blue-light);
+    --focus-ring: 0 0 0 3px rgba(127, 155, 179, 0.22);
+
     --shadow-light: rgba(0, 0, 0, 0.3);
     --shadow-medium: rgba(0, 0, 0, 0.4);
-    --shadow-dark: rgba(0, 0, 0, 0.5);
-    --menu-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    
-    /* Semantic Colors */
-    --success-color: #00bc8c;
-    --warning-color: #f39c12;
-    --error-color: #e74c3c;
-    --info-color: #3498db;
+    --shadow-dark: rgba(0, 0, 0, 0.56);
+    --menu-shadow: 0 22px 42px rgba(0, 0, 0, 0.42);
+    --card-shadow: 0 16px 34px rgba(0, 0, 0, 0.34);
+    --card-shadow-strong: 0 26px 54px rgba(0, 0, 0, 0.46);
+
+    --table-head-bg: linear-gradient(180deg, #30383f 0%, #272f35 100%);
+    --table-row-hover: color-mix(in srgb, var(--card-bg) 84%, var(--primary-blue) 16%);
+
+    --success-color: #52b071;
+    --warning-color: #d9a046;
+    --error-color: #e16d62;
+    --info-color: #81a9ca;
 }

@@ -1,16 +1,21 @@
 <?php
-// ============================================================================
+// 
 // get_message_detail.php
 // Purpose: Get detailed message information + mark as read with proper access control
 //          Allow access when only one party has deleted the message
-// ============================================================================
-
+// 
 require_once __DIR__ . '/../config.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['userId'])) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Session expired']);
+    exit;
+}
+
+if (!currentUserCanAccessMessagingModule()) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access denied']);
     exit;
 }
 
@@ -92,6 +97,31 @@ try {
 
     if (!$message) throw new Exception("Message not found");
 
+    $retentionRaw = function_exists('getAppSetting') ? getAppSetting($conn, 'message_retention_days') : null;
+    $retentionDays = is_numeric($retentionRaw) ? (int)$retentionRaw : 0;
+    if ($retentionDays > 0 && !empty($message['created_at'])) {
+        $cutoff = strtotime("-{$retentionDays} days");
+        $createdAt = strtotime($message['created_at']);
+        if ($createdAt && $createdAt < $cutoff) {
+            throw new Exception("Message is no longer available due to retention policy.");
+        }
+    }
+
+    $archiveRaw = function_exists('getAppSetting') ? getAppSetting($conn, 'message_archive_after_days') : null;
+    $archiveDays = is_numeric($archiveRaw) ? (int)$archiveRaw : 0;
+    if ($retentionDays > 0 && $archiveDays >= $retentionDays) {
+        $archiveDays = 0;
+    }
+    if ($archiveDays > 0 && !empty($message['created_at'])) {
+        $archiveCutoff = strtotime("-{$archiveDays} days");
+        $createdAt = strtotime($message['created_at']);
+        $message['is_archived'] = ($createdAt && $createdAt < $archiveCutoff);
+    } else {
+        $message['is_archived'] = false;
+    }
+
+    $message['message_text'] = decodeMessageText($message['message_text'] ?? '');
+
     // Mark as read for recipients (only if this user is a recipient and not the sender)
     if ($isRecipient && !$isSender) {
         $markRead = $conn->prepare("
@@ -120,9 +150,10 @@ try {
         }
     }
 
-    // FIXED: Get ALL recipients including deleted ones for sender view
+    $recipients = [];
+
+    // Only the sender may see the full recipient list and read receipts.
     if ($isSender) {
-        // Sender sees ALL recipients (including deleted ones)
         $recipientsStmt = $conn->prepare("
             SELECT 
                 u.userId, 
@@ -138,48 +169,43 @@ try {
             WHERE mr.message_id = ?
             ORDER BY u.userName
         ");
-    } else {
-        // Recipients and broadcast viewers only see non-deleted recipients
-        $recipientsStmt = $conn->prepare("
-            SELECT 
-                u.userId, 
-                u.userName, 
-                u.userRole, 
-                u.userPhoto,
-                mr.is_read, 
-                mr.read_at,
-                mr.is_deleted,
-                mr.deleted_at
-            FROM tb_message_recipients mr
-            INNER JOIN tb_users u ON mr.recipient_user_id = u.userId
-            WHERE mr.message_id = ?
-            AND mr.is_deleted = FALSE
-            ORDER BY u.userName
-        ");
-    }
-    
-    if ($recipientsStmt) {
-        $recipientsStmt->bind_param("i", $messageId);
-        $recipientsStmt->execute();
-        $recipients = $recipientsStmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $recipientsStmt->close();
-    } else {
-        $recipients = [];
+        if ($recipientsStmt) {
+            $recipientsStmt->bind_param("i", $messageId);
+            $recipientsStmt->execute();
+            $recipients = $recipientsStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $recipientsStmt->close();
+        }
     }
 
     // Get attachments
+    $attachmentRetentionRaw = function_exists('getAppSetting') ? getAppSetting($conn, 'attachment_retention_days') : null;
+    $attachmentRetentionDays = is_numeric($attachmentRetentionRaw) ? (int)$attachmentRetentionRaw : 0;
+    if ($attachmentRetentionDays < 0) {
+        $attachmentRetentionDays = 0;
+    }
+
+    $attachmentClause = $attachmentRetentionDays > 0
+        ? "AND uploaded_at >= DATE_SUB(NOW(), INTERVAL ? DAY)"
+        : "";
+
     $attachmentsStmt = $conn->prepare("
         SELECT 
             attachment_id, 
             file_name, 
             file_path, 
             file_size, 
-            mime_type
+            mime_type,
+            uploaded_at
         FROM tb_message_attachments
         WHERE message_id = ?
+        {$attachmentClause}
     ");
     if ($attachmentsStmt) {
-        $attachmentsStmt->bind_param("i", $messageId);
+        if ($attachmentRetentionDays > 0) {
+            $attachmentsStmt->bind_param("ii", $messageId, $attachmentRetentionDays);
+        } else {
+            $attachmentsStmt->bind_param("i", $messageId);
+        }
         $attachmentsStmt->execute();
         $attachments = $attachmentsStmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $attachmentsStmt->close();
@@ -195,7 +221,8 @@ try {
         'access_info' => [
             'is_sender' => $isSender,
             'is_recipient' => $isRecipient,
-            'is_broadcast' => $isBroadcast
+            'is_broadcast' => $isBroadcast,
+            'can_view_recipients' => $isSender
         ]
     ]);
 
@@ -206,3 +233,4 @@ try {
 
 $conn->close();
 ?>
+

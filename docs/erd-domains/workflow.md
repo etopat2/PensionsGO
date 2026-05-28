@@ -1,0 +1,183 @@
+# Workflow ERD
+
+Generated from `database/schema.sql` on 2026-05-28.
+
+Workflow routing, tasking, application progression, and execution logs.
+
+- Tables: 8
+- Relationships shown: 4
+
+## Tables Covered
+
+- `tb_application_queue`
+- `tb_appnstatus`
+- `tb_tasks`
+- `tb_task_alerts`
+- `tb_task_comments`
+- `tb_task_completion_queue`
+- `tb_task_delegation_logs`
+- `tb_workflow_logs`
+
+## Mermaid ERD
+
+```mermaid
+erDiagram
+  tb_application_queue {
+    int queue_id PK
+    int staffdue_id FK
+    string regNo
+    string current_stage
+    string status
+    string verified_by FK
+    datetime verified_at
+    string submitted_by FK
+    datetime submitted_at
+    text notes
+    timestamp updated_at
+  }
+  tb_appnstatus {
+    int id PK
+    string regNo FK
+    string computerNo
+    string verification
+    string writeUp
+    string fileCreation
+    string entrantAllocation
+    string dataCapture
+    string assessment
+    string audit
+    string approval
+    string payrollAccess
+    text other
+    timestamp timeStamp
+    datetime verification_at
+    string verification_by
+    text verification_comment
+    datetime writeUp_at
+    string writeUp_by
+    text writeUp_comment
+    datetime fileCreation_at
+    string fileCreation_by
+    text fileCreation_comment
+    datetime entrantAllocation_at
+    string entrantAllocation_by
+    text entrantAllocation_comment
+    datetime dataCapture_at
+    string dataCapture_by
+    text dataCapture_comment
+    datetime assessment_at
+    string assessment_by
+    text assessment_comment
+    datetime audit_at
+    string audit_by
+    text audit_comment
+    datetime approval_at
+    string approval_by
+    text approval_comment
+  }
+  tb_tasks {
+    int taskId PK
+    string createdBy FK
+    string sentTo FK
+    text details
+    text other
+    timestamp timeStamp
+    string created_by
+    string assigned_to
+    string assigned_role
+    string task_type
+    string task_title
+    text task_description
+    string status
+    string priority
+    int related_staff_id
+    string related_reg_no
+    datetime due_at
+    text declined_reason
+    text metadata
+    datetime updated_at
+    datetime completed_at
+    int parent_task_id
+  }
+  tb_task_alerts {
+    int alert_id PK
+    int task_id FK
+    string alert_type
+    string severity
+    string alert_status
+    string assigned_to
+    string assigned_role
+    string related_reg_no
+    datetime due_at
+    datetime triggered_at
+    datetime acknowledged_at
+    string acknowledged_by
+    datetime resolved_at
+    string resolved_by
+    datetime last_evaluated_at
+    text metadata
+    timestamp created_at
+    timestamp updated_at
+  }
+  tb_task_comments {
+    int comment_id PK
+    int task_id FK
+    string author_id
+    string author_name
+    string author_role
+    text comment
+    timestamp created_at
+  }
+  tb_task_completion_queue {
+    int queue_id PK
+    string owner_user_id FK
+    string owner_role
+    int task_id FK
+    string task_type
+    string task_title
+    string related_reg_no
+    string required_assignment_role
+    string next_assigned_to
+    string next_assigned_role
+    string next_priority
+    text action_note
+    string queue_status
+    int processed_task_id FK
+    text last_error
+    timestamp created_at
+    timestamp updated_at
+    datetime processed_at
+  }
+  tb_task_delegation_logs {
+    bigint log_id PK
+    int task_id
+    string from_user_id
+    string from_user_name
+    string from_user_role
+    string to_user_id
+    string to_user_name
+    string to_user_role
+    text note
+    string priority
+    datetime created_at
+  }
+  tb_workflow_logs {
+    bigint log_id PK
+    int task_id
+    int staffdue_id
+    string regNo
+    string action
+    string from_status
+    string to_status
+    string actor_id
+    string actor_name
+    string actor_role
+    text note
+    text metadata_json
+    datetime created_at
+  }
+  tb_tasks ||--o{ tb_task_alerts : task_id
+  tb_tasks ||--o{ tb_task_comments : task_id
+  tb_tasks ||--o{ tb_task_completion_queue : processed_task_id
+  tb_tasks ||--o{ tb_task_completion_queue : task_id
+```

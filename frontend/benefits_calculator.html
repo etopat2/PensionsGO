@@ -1,1 +1,209 @@
-<!-- benefits_calculator.html HTML scaffold -->
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>Benefits Calculator - PensionsGo</title>
+  <link rel="stylesheet" href="css/styles.css?v=20260507c" />
+  <link rel="stylesheet" href="css/profile.css?v=20260504a" />
+  <link rel="stylesheet" href="css/menu.css?v=20260504d" />
+  <link rel="stylesheet" href="css/overlay.css?v=20260504a" />
+  <link rel="stylesheet" href="css/forms.css?v=20260504a" />
+  <link rel="stylesheet" href="css/calculator.css?v=20260504a" />
+  <script type="module" src="js/main.js?v=20260528b"></script>
+  <script defer src="js/modules/retirement-types.js"></script>
+  <script defer src="js/calculator.js"></script>
+</head>
+<body>
+  <main class="benefits-page">
+    <div class="benefits-shell">
+      <section class="benefits-hero">
+        <div class="benefits-hero-copy">
+          <span class="benefits-eyebrow">Benefits Estimation</span>
+          <h2>Retirement Benefits Calculator</h2>
+          <p>
+            Estimate gratuity, reduced monthly pension, full pension readiness, and service milestones
+            before data is committed into workflow or registry records.
+          </p>
+        </div>
+
+        <div class="benefits-hero-side">
+          <article class="benefits-mini-card">
+            <span class="mini-label">What is estimated</span>
+            <strong>Gratuity, reduced pension, full pension, 15-year milestones</strong>
+          </article>
+          <article class="benefits-mini-card">
+            <span class="mini-label">Best use</span>
+            <strong>Pre-entry verification, workflow review, pension planning</strong>
+          </article>
+        </div>
+      </section>
+
+      <section class="benefits-grid">
+        <section class="calculator-section benefits-calculator-card" id="calculatorSection">
+          <div class="section-title-row">
+            <div>
+              <h2>Estimate Benefits</h2>
+              <p class="section-subtitle">
+                Enter the officer profile below. Results remain provisional until verified against personnel records.
+              </p>
+            </div>
+          </div>
+
+          <form id="benefitsForm" class="benefits-form-layout">
+            <div class="form-group">
+              <label for="retirementType">Type of Retirement</label>
+              <select id="retirementType" name="retirementType" required>
+                <option value="" disabled selected>-- Select Type --</option>
+                <option value="mandatory">Mandatory Retirement</option>
+                <option value="early">Early Retirement</option>
+                <option value="death">Death</option>
+                <option value="aor">Discharge (A.O.R)</option>
+                <option value="medical">Discharge (Medical)</option>
+                <option value="marriage">Discharge (Marriage)</option>
+                <option value="cbe">Discharge (C.B.E)</option>
+                <option value="ube">Discharge (U.B.E)</option>
+                <option value="public">Discharge (Public Interest)</option>
+                <option value="contract">End of Contract</option>
+                <option value="tx">Discharge (T.X)</option>
+                <option value="voluntary">Voluntary</option>
+                <option value="oldAge">Old Age</option>
+                <option value="abolition">Abolition of Office</option>
+              </select>
+            </div>
+
+            <div class="form-group hidden" id="dobGroup">
+              <label for="birthDate">Date of Birth</label>
+              <input type="date" id="birthDate" name="birthDate" />
+            </div>
+
+            <div class="form-group">
+              <label for="enlistmentDate">Date of Enlistment</label>
+              <input type="date" id="enlistmentDate" name="enlistmentDate" required />
+            </div>
+
+            <div class="form-group">
+              <label for="retirementDate">Date of Retirement</label>
+              <input type="date" id="retirementDate" name="retirementDate" required />
+            </div>
+
+            <div class="form-group">
+              <label for="monthlySalary">Monthly Salary</label>
+              <input type="text" id="monthlySalary" name="monthlySalary" required />
+            </div>
+
+            <div class="benefits-inline-summary">
+              <article class="benefits-inline-tile">
+                <span class="tile-label">Service Band</span>
+                <strong id="serviceBand">Awaiting data</strong>
+              </article>
+              <article class="benefits-inline-tile">
+                <span class="tile-label">Age at Retirement</span>
+                <strong id="ageAtRetirement">-</strong>
+              </article>
+              <article class="benefits-inline-tile">
+                <span class="tile-label">Retirement Window</span>
+                <strong id="retirementWindow">-</strong>
+              </article>
+            </div>
+
+            <div class="button-group benefits-button-row">
+              <button type="submit" class="btn btn-submit">Calculate Estimate</button>
+              <button type="reset" class="btn btn-reset">Clear Form</button>
+              <button type="button" class="btn btn-secondary" id="printEstimateBtn">Print Estimate</button>
+              <button type="button" class="btn btn-secondary" id="copyEstimateBtn">Copy Summary</button>
+            </div>
+          </form>
+
+          <section id="results" class="hidden benefits-results-panel">
+            <div class="results-heading">
+              <div>
+                <h3 id="estimateTitle">Estimate Results</h3>
+                <p id="formulaNote" class="results-subtitle">Computed from the currently supplied dates and salary.</p>
+              </div>
+            </div>
+
+            <div class="benefits-kpi-grid">
+              <article class="benefits-kpi">
+                <span class="kpi-label">Length of Service</span>
+                <strong id="lengthOfService">0 months</strong>
+                <small id="serviceRoundingNote" class="kpi-helper"></small>
+              </article>
+              <article class="benefits-kpi">
+                <span class="kpi-label">Annual Salary</span>
+                <strong id="annualSalary">UGX 0.00</strong>
+              </article>
+              <article class="benefits-kpi">
+                <span class="kpi-label">Expected Gratuity</span>
+                <strong id="expectedGratuity">UGX 0.00</strong>
+              </article>
+              <article class="benefits-kpi">
+                <span class="kpi-label">Reduced Monthly Pension</span>
+                <strong id="expectedMonthlyPension">UGX 0.00</strong>
+              </article>
+              <article class="benefits-kpi">
+                <span class="kpi-label">Expected Full Pension</span>
+                <strong id="expectedFullPension">UGX 0.00</strong>
+              </article>
+            </div>
+
+            <div class="benefits-milestone-grid">
+              <article class="milestone-card emphasis">
+                <span class="milestone-label">Date On 15 Years</span>
+                <strong id="dateOn15Years">-</strong>
+              </article>
+            </div>
+
+            <div id="eligibilityNote"></div>
+            <div class="benefits-advice" id="scenarioAdvice"></div>
+          </section>
+        </section>
+
+        <aside class="benefits-side-panel">
+          <article class="benefits-side-card">
+            <h3>Calculation Guide</h3>
+            <ul class="benefits-checklist">
+              <li>Use verified service dates where available.</li>
+              <li>Monthly salary should reflect the pensionable final salary.</li>
+              <li>Early Retirement and Discharge (A.O.R) follow the same rule set: they require either 20 years of service, or at least 10 years of service with age 45 years or above, and they do not attract benefits below 10 years of service.</li>
+              <li>Discharge (C.B.E), Discharge (U.B.E), and Discharge (Public Interest) attract short-service gratuity below 10 years, then full Mandatory Retirement benefits at 10 years or more.</li>
+              <li>Voluntary and Old Age follow the Mandatory Retirement formula family.</li>
+              <li>End of Contract and Discharge (T.X) use the contract gratuity rule only.</li>
+              <li>Discharge (Marriage) attracts marriage gratuity only, without monthly or full pension.</li>
+              <li>Abolition of Office uses its own special 25% formula set.</li>
+              <li>Results are estimates and should be validated before approval.</li>
+            </ul>
+          </article>
+
+          <article class="benefits-side-card">
+            <h3>Operational Notes</h3>
+            <div class="benefits-note-stack">
+              <div class="benefits-note-item">
+                <span class="note-label">Reduced Pension</span>
+                <p>Useful for ongoing pension estimates before the 15-year full-pension milestone.</p>
+              </div>
+              <div class="benefits-note-item">
+                <span class="note-label">Full Pension</span>
+                <p>Shown as the benchmark pension value after the 15-year milestone is reached.</p>
+              </div>
+              <div class="benefits-note-item">
+                <span class="note-label">Decision Support</span>
+                <p>Use the advisory panel to identify qualification gaps or items that require review.</p>
+              </div>
+            </div>
+          </article>
+        </aside>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
+
+
+

@@ -3,86 +3,294 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
   <title>Edit Staff Record</title>
-  <link rel="stylesheet" href="css/overlay.css">
-  <link rel="stylesheet" href="css/menu.css">
-  <link rel="stylesheet" href="css/styles.css">
-  <link rel="stylesheet" href="css/edit_staff.css">
+  <link rel="stylesheet" href="css/overlay.css?v=20260504a">
+  <link rel="stylesheet" href="css/menu.css?v=20260504d">
+  <link rel="stylesheet" href="css/styles.css?v=20260507c">
+  <link rel="stylesheet" href="css/edit_staff.css?v=20260504a">
+  <link rel="stylesheet" href="css/staff_workspaces.css?v=20260504b">
 
-  <script src="js/session_check.js" defer></script>
-  <script src="js/edit_staff.js" defer></script>
-  <script type="module" src="js/main.js"></script>
+  <script defer src="js/modules/filterable_select.js?v=20260429a"></script>
+  <script defer src="js/modules/district_selector.js?v=20260429a"></script>
+  <script src="js/modules/retirement-types.js" defer></script>
+  <script src="js/edit_staff.js?v=20260314a" defer></script>
+  <script type="module" src="js/main.js?v=20260528b"></script>
 </head>
 <body>
   <header id="dynamicHeader"></header>
 
-  <main class="edit-container">
-    <h2>Edit Staff Record</h2>
-    <form id="editStaffForm">
-      <div class="form-grid">
-        <label>Reg No:</label>
-        <input type="text" id="regNo" name="regNo" required readonly>
+  <main class="edit-page main-wrapper">
+    <section class="workspace-shell edit-container">
+      <div class="workspace-header-stack">
+        <div class="workspace-header page-heading">
+          <div class="page-heading-content">
+            <h2>Edit Staff Record</h2>
+            <p>Update officer profile, service details, benefits, and linked documentation.</p>
+          </div>
+          <div class="workspace-header-actions">
+            <button type="button" id="backToStaffBtn" class="workspace-btn ghost header-back-btn">Back</button>
+          </div>
+        </div>
 
-        <label>Title:</label>
-        <input type="text" id="title" name="title" required>
-
-        <label>Surname:</label>
-        <input type="text" id="sName" name="sName" required>
-
-        <label>First Name:</label>
-        <input type="text" id="fName" name="fName" required>
-
-        <label>Gender:</label>
-        <select id="gender" name="gender" required>
-          <option value="Male">Male</option>
-          <option value="Female">Female</option>
-        </select>
-
-        <label>Prison Unit:</label>
-        <input type="text" id="prisonUnit" name="prisonUnit" required>
-
-        <label>Telephone:</label>
-        <input type="tel" id="telNo" name="telNo" required pattern="^\\+256\\d{9}$" placeholder="+2567XXXXXXXX">
-
-        <label>Retirement Type:</label>
-        <select id="retirementType" name="retirementType" required>
-          <option value="Mandatory">Mandatory</option>
-          <option value="Early">Early</option>
-          <option value="AOR">AOR</option>
-          <option value="Death">Death</option>
-          <option value="Medical">Medical</option>
-          <option value="Marriage">Marriage</option>
-          <option value="CBE">CBE</option>
-          <option value="UBE">UBE</option>
-          <option value="Contract">Contract</option>
-          <option value="TX">TX</option>
-          <option value="Voluntary">Voluntary</option>
-          <option value="oldAge">Old Age</option>
-        </select>
-
-        <label>Submission Status:</label>
-        <select id="submissionStatus" name="submissionStatus" required>
-          <option value="pending">Pending</option>
-          <option value="submitted">Submitted</option>
-        </select>
-
-        <label>Application Status:</label>
-        <select id="appnStatus" name="appnStatus" required>
-          <option value="pending">Pending</option>
-          <option value="verified">Verified</option>
-          <option value="querried">Queried</option>
-          <option value="rejected">Rejected</option>
-        </select>
+        <div class="workspace-banner registry-edit-form-banner">
+          <div>
+            <strong>Editing Guidance</strong>
+            <p>Each tab reports whether its required information is complete. Finish the highlighted gaps before saving changes so workflow and benefit computations remain consistent.</p>
+          </div>
+        </div>
       </div>
 
-      <div class="form-actions">
-        <button type="submit" class="btn-save">💾 Save Changes</button>
-        <button type="button" class="btn-cancel" onclick="window.history.back()">↩ Cancel</button>
+      <div class="workspace-tabs registry-edit-tabs" id="editStaffTabs" role="tablist" aria-label="Edit staff sections">
+        <button type="button" class="workspace-tab registry-edit-tab is-active" data-tab-target="bio" data-valid-state="neutral">
+          <span>Bio Data</span><span class="workspace-tab-status" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="workspace-tab registry-edit-tab" data-tab-target="benefits" data-valid-state="neutral">
+          <span>Service &amp; Benefits</span><span class="workspace-tab-status" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="workspace-tab registry-edit-tab" data-tab-target="contact" data-valid-state="neutral">
+          <span>Contact &amp; Bank</span><span class="workspace-tab-status" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="workspace-tab registry-edit-tab" data-tab-target="documents" data-valid-state="neutral">
+          <span>Documents</span><span class="workspace-tab-status" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="workspace-tab registry-edit-tab" data-tab-target="workflow" data-valid-state="neutral">
+          <span>Workflow</span><span class="workspace-tab-status" aria-hidden="true"></span>
+        </button>
       </div>
-    </form>
-    <p id="formMessage"></p>
+
+      <form id="editStaffForm">
+        <div class="workspace-panels registry-edit-panels">
+          <section class="workspace-panel registry-edit-panel-group is-active form-section" data-panel="bio" role="tabpanel">
+            <div class="workspace-panel-scroll">
+              <div class="section-title">
+                <h3 class="workspace-section-title">Bio Data</h3>
+              </div>
+              <div class="form-grid cols-4 edit-grid">
+                <label class="field-group edit-field">
+                  <span class="field-label">File Number</span>
+                  <input type="text" id="regNo" name="regNo" data-text-case="upper" required readonly>
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">Computer Number</span>
+                  <input type="text" id="computerNo" name="computerNo">
+                </label>
+                <label class="field-group edit-field edit-field-span-2">
+                  <span class="field-label">Title</span>
+                  <select id="title" name="title" required data-filterable-select>
+                    <option value="">Select Title</option>
+                  </select>
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">Surname</span>
+                  <input type="text" id="sName" name="sName" required>
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">First Name</span>
+                  <input type="text" id="fName" name="fName" required>
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">Gender</span>
+                  <select id="gender" name="gender" required data-filterable-select>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">NIN</span>
+                  <input type="text" id="NIN" name="NIN">
+                </label>
+                <label class="field-group edit-field edit-field-span-2">
+                  <span class="field-label">Station / Prison Unit</span>
+                  <select id="prisonUnit" name="prisonUnit" data-filterable-select>
+                    <option value="">Select Prison Unit</option>
+                  </select>
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">Telephone</span>
+                  <input type="tel" id="telNo" name="telNo" required placeholder="+256700123456 or 0770123456">
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">Date of Birth</span>
+                  <input type="date" id="birthDate" name="birthDate">
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">Date of Enlistment</span>
+                  <input type="date" id="enlistmentDate" name="enlistmentDate">
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">Date of Retirement</span>
+                  <input type="date" id="retirementDate" name="retirementDate">
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">Financial Year</span>
+                  <input type="text" id="financialYear" name="financialYear" readonly>
+                </label>
+                <label class="field-group edit-field edit-field-span-2">
+                  <span class="field-label">Mode of Retirement</span>
+                  <select id="retirementType" name="retirementType" required data-filterable-select>
+                    <option value="mandatory">Mandatory Retirement</option>
+                    <option value="early">Early Retirement</option>
+                    <option value="death">Death</option>
+                    <option value="aor">Discharge (A.O.R)</option>
+                    <option value="medical">Discharge (Medical)</option>
+                    <option value="marriage">Discharge (Marriage)</option>
+                    <option value="cbe">Discharge (C.B.E)</option>
+                    <option value="ube">Discharge (U.B.E)</option>
+                    <option value="public">Discharge (Public Interest)</option>
+                    <option value="contract">End of Contract</option>
+                    <option value="tx">Discharge (T.X)</option>
+                    <option value="voluntary">Voluntary</option>
+                    <option value="oldAge">Old Age</option>
+                    <option value="abolition">Abolition of Office</option>
+                  </select>
+                </label>
+                <div class="workspace-inline-hint edit-field edit-field-span-2" id="editRetirementPolicyHint" data-state="neutral" hidden></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="workspace-panel registry-edit-panel-group form-section" data-panel="benefits" role="tabpanel">
+            <div class="workspace-panel-scroll">
+              <div class="section-title">
+                <h3 class="workspace-section-title">Service &amp; Benefits</h3>
+              </div>
+              <div class="form-grid cols-3 edit-grid">
+                <label class="field-group edit-field">
+                  <span class="field-label">Monthly Salary (UGX)</span>
+                  <input type="number" id="monthlySalary" name="monthlySalary" min="0" step="0.01" data-money-input data-money-fixed-decimals="2">
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">Length of Service (Months)</span>
+                  <input type="number" id="lengthOfService" name="lengthOfService" min="0" step="1" readonly>
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">Annual Salary (UGX)</span>
+                  <input type="number" id="annualSalary" name="annualSalary" min="0" step="0.01" readonly data-money-input data-money-fixed-decimals="2">
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">Expected Reduced Monthly Pension (UGX)</span>
+                  <input type="number" id="reducedPension" name="reducedPension" min="0" step="0.01" readonly data-money-input data-money-fixed-decimals="2">
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">Expected Full Pension (UGX)</span>
+                  <input type="number" id="fullPension" name="fullPension" min="0" step="0.01" readonly data-money-input data-money-fixed-decimals="2">
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">Expected Commuted Pension Gratuity (UGX)</span>
+                  <input type="number" id="gratuity" name="gratuity" min="0" step="0.01" readonly data-money-input data-money-fixed-decimals="2">
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section class="workspace-panel registry-edit-panel-group form-section" data-panel="contact" role="tabpanel">
+            <div class="workspace-panel-scroll">
+              <div class="section-title">
+                <h3 class="workspace-section-title">Contact &amp; Bank</h3>
+              </div>
+              <div class="form-grid cols-3 edit-grid">
+                <label class="field-group edit-field edit-field-span-2">
+                  <span class="field-label">District of Residence</span>
+                  <input type="text" id="address" name="address">
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">TIN</span>
+                  <input type="text" id="TIN" name="TIN">
+                </label>
+                <label class="field-group edit-field edit-field-span-2">
+                  <span class="field-label">Applicant Email</span>
+                  <input type="email" id="applicant_email" name="applicant_email" placeholder="name@example.com">
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">Next of Kin</span>
+                  <input type="text" id="next_of_kin" name="next_of_kin">
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">Next of Kin Contact</span>
+                  <input type="text" id="next_of_kin_contact" name="next_of_kin_contact">
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">Bank Name</span>
+                  <input type="text" id="bank_name" name="bank_name">
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">Bank Account Number</span>
+                  <input type="text" id="bank_account" name="bank_account">
+                </label>
+                <label class="field-group edit-field edit-field-span-2">
+                  <span class="field-label">Bank Branch</span>
+                  <input type="text" id="bank_branch" name="bank_branch">
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section class="workspace-panel registry-edit-panel-group form-section" data-panel="documents" role="tabpanel">
+            <div class="workspace-panel-scroll">
+              <div class="section-title">
+                <h3 class="workspace-section-title">Documents</h3>
+              </div>
+              <div class="doc-upload-row">
+                <select id="docType" data-filterable-select>
+                  <option value="">Select Document Type</option>
+                </select>
+                <input type="file" id="docFile" accept=".pdf,.jpg,.jpeg,.png">
+                <button type="button" id="uploadDocBtn" class="btn-secondary">Upload</button>
+              </div>
+              <div id="docList" class="doc-list app-state-message app-state-neutral">No documents uploaded.</div>
+            </div>
+          </section>
+
+          <section class="workspace-panel registry-edit-panel-group form-section" data-panel="workflow" role="tabpanel">
+            <div class="workspace-panel-scroll">
+              <div class="section-title">
+                <h3 class="workspace-section-title">Workflow Status</h3>
+              </div>
+              <div class="form-grid cols-2 edit-grid">
+                <label class="field-group edit-field">
+                  <span class="field-label">Submission Status</span>
+                  <select id="submissionStatus" name="submissionStatus" required data-filterable-select>
+                    <option value="pending">Pending</option>
+                    <option value="submitted">Submitted</option>
+                  </select>
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">Application Status</span>
+                  <select id="appnStatus" name="appnStatus" required data-filterable-select>
+                    <option value="pending">Pending</option>
+                    <option value="verified">Verified</option>
+                    <option value="querried">Queried</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div class="workspace-navigation">
+          <div class="workspace-navigation-group">
+            <button type="button" id="editStaffPrevBtn" class="workspace-nav-btn secondary">Previous</button>
+            <button type="button" id="editStaffNextBtn" class="workspace-nav-btn secondary">Next</button>
+          </div>
+          <div class="workspace-navigation-group form-actions">
+            <button type="button" class="workspace-btn ghost btn-cancel" onclick="window.history.back()">Cancel</button>
+            <button type="submit" class="workspace-btn primary btn-save">Save Changes</button>
+          </div>
+        </div>
+      </form>
+      <p id="formMessage" class="workspace-form-message form-message"></p>
+    </section>
   </main>
 
   <footer id="dynamicFooter"></footer>
 </body>
 </html>
+
+
+

@@ -1,8 +1,7 @@
-// ====================================================================
+// 
 // security-admin.js
-// Enhanced security module for admin dashboard with inactivity detection
-// ====================================================================
-
+// Security module for admin dashboard with inactivity detection
+// 
 class AdminSecurity {
     constructor() {
         this.inactivityTimeout = 10 * 60 * 1000; // 10 minutes
@@ -18,20 +17,9 @@ class AdminSecurity {
     async init() {
         // Initialize basic security features - handle missing security.js
         try {
-            // Try to import SecurityManager if available
-            if (typeof SecurityManager !== 'undefined') {
-                this.securityManager = new SecurityManager({
-                    preventContextMenu: true,
-                    preventTextSelection: true,
-                    preventDragDrop: true,
-                    preventDevTools: true,
-                    detectDevTools: true,
-                    securityLevel: 'high'
-                });
-            } else {
-                console.warn('SecurityManager not found, using fallback security');
-                this.setupFallbackSecurity();
-            }
+            // Always use the shared security controls in main.js.
+            // This avoids duplicate listeners and legacy dev-tools detectors.
+            this.setupFallbackSecurity();
         } catch (error) {
             console.warn('SecurityManager initialization failed, using fallback:', error);
             this.setupFallbackSecurity();
@@ -43,9 +31,11 @@ class AdminSecurity {
 
     // Fallback security setup
     setupFallbackSecurity() {
-        // Basic security measures that don't require SecurityManager
-        this.preventContextMenu();
-        this.preventDevTools();
+        // The shared client security controls in main.js already enforce
+        // settings-based restrictions for context menu, clipboard, drag,
+        // text selection, and developer-tools shortcuts.
+        // Do not attach the old fallback listeners here because they use a
+        // noisy console trap that causes false positives inside the admin UI.
     }
 
     // Basic context menu prevention
@@ -58,13 +48,8 @@ class AdminSecurity {
 
     // Basic dev tools prevention
     preventDevTools() {
-        // Simple dev tools detection
-        const devtools = /./;
-        devtools.toString = () => {
-            this.showSecurityWarning('Developer tools detected!');
-            return '';
-        };
-        console.log('%c', devtools);
+        // Deprecated. Developer-tools protection is handled centrally in
+        // main.js through settings-aware keyboard shortcut blocking.
     }
 
     // ... rest of your existing security-admin.js code remains the same ...
@@ -394,9 +379,13 @@ class AdminSecurity {
         this.logSecurityEvent('admin_session_terminated', 'Admin session terminated due to failed re-authentication');
         
         try {
+            const csrfToken = window.fetchCsrfToken ? await window.fetchCsrfToken() : '';
             await fetch('../backend/api/logout.php', {
                 method: 'POST',
-                credentials: 'include'
+                credentials: 'include',
+                headers: window.withDeviceTokenHeaders
+                    ? window.withDeviceTokenHeaders({ 'X-CSRF-Token': csrfToken })
+                    : { 'X-CSRF-Token': csrfToken }
             });
         } catch (error) {
             console.error('Logout error:', error);

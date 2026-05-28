@@ -1,0 +1,172 @@
+UPS PENSIONSGO PODCAST OUTRO
+LUMA LABS PROMPT PACK
+Generated: 2026-03-25
+
+PURPOSE
+-------
+Create a polished branded outro for UPS PensionsGo podcast and video uploads that feels like the natural closing companion to the existing intro pack. The outro should be generated as two separate 5-second clips that join as one continuous 10-second closing sequence.
+
+The result should:
+- feel visually related to the intro sequence
+- close videos with authority, calm, and trust
+- preserve Uganda Prisons Service brand discipline
+- end on a clean, premium title-safe frame or a graceful fade-ready branded end card
+
+BRAND GROUNDING
+---------------
+Use the same brand system as the intro sequence.
+
+Core palette:
+- Deep maroon: #8B0000 or #6D1116
+- Authority blue: #003366
+- Heritage gold: #D4AF37
+- Warm ivory / parchment: #F6F2EB or #FFF7E8
+- Metallic charcoal accents: #2B2B2B
+
+Brand mood:
+- official and reassuring
+- modern public-service excellence
+- secure and trustworthy
+- premium motion design, never loud or chaotic
+
+VISUAL DNA TO MATCH THE INTRO
+-----------------------------
+Carry over the same visual family used in the intro:
+- maroon-blue cinematic environment
+- premium gold signal lines and flowing routes
+- refined glass HUD overlays
+- shield arcs, circular insignia rings, and crest-like geometry
+- secure document symbols, check marks, folders, and clean workflow nodes
+- subtle waveform / broadcast pulse lines tied to podcast-video identity
+- elegant particles and volumetric light
+- premium civic-tech aesthetic, not generic social media motion graphics
+
+TYPOGRAPHY DIRECTION
+--------------------
+If text appears, keep it very short and centered.
+Suggested text only:
+- UPS PensionsGo
+- Official Pension Guidance
+- Uganda Prisons Service
+- PensionsGo Media Centre
+
+Avoid long captions inside Luma because text rendering can break.
+
+GENERAL OUTRO ARCHITECTURE
+--------------------------
+Total duration: 10 seconds
+Format: 16:9 landscape
+Break into two linked clips of 5 seconds each.
+
+Clip 1 function:
+- begin from a premium branded world that feels related to the intro
+- gather the motion language inward
+- suggest closure, trust, and completion
+- transition toward a controlled emblem or signal-ring convergence
+
+Clip 2 function:
+- continue seamlessly from clip 1
+- resolve into a final closing lockup or title-safe end card
+- hold still long enough for editor-friendly fade or cut-out
+- preserve elegant motion in the background but keep the frame readable and calm
+
+CONTINUITY RULES
+----------------
+To make the two clips feel like one uninterrupted outro:
+- keep the same color palette in both clips
+- keep lighting direction, lens feel, and material language identical
+- use the same brushed metal, smoked glass, gold trim, and volumetric fog style
+- keep the camera movement smooth and deliberate, slowing down across the sequence
+- clip 1 should end with a crest-ring or luminous signal field that clip 2 opens inside
+- clip 2 should begin at the same angle, same speed, same material world, then settle into the final end card
+- reuse the same seed, style reference, or reference frame in Luma if possible
+
+MASTER STYLE LOCK FOR LUMA
+--------------------------
+Use this style block in both prompts:
+
+"Premium branded outro for Uganda Prisons Service pension platform, deep maroon and navy blue environment with heritage gold highlights and warm ivory accents, broadcast-quality civic-tech motion graphics, refined volumetric lighting, polished metallic materials, subtle glass HUD overlays, clean infographic symbolism, secure official digital service aesthetic, sophisticated camera movement, calm premium energy, cinematic, 4K, 16:9, professional, visually clear, no clutter, no chaotic motion, no broken text, no cheap stock-video look, no violence."
+
+PROMPT FOR OUTRO CLIP 1 OF 2
+----------------------------
+Title: UPS PensionsGo outro - Part 1
+Duration target: 5 seconds
+
+Prompt:
+"Create a 5-second premium branded outro opening for a professional pension administration video platform. Begin in a sophisticated maroon-to-navy digital environment with floating gold particles, soft ivory haze, and subtle glass interface layers already present in the scene. Elegant gold workflow lines and secure document icons glide inward rather than outward, suggesting completion, verification, and service closure. Use shield arcs, concentric rings, and refined infographic symbols to bring the visual energy under control. Briefly show abstract service symbolism such as a dignified silhouette of a Uganda Prisons Service-inspired ceremonial officer and a pensioner-citizen figure in the far background, both secondary and respectful, dissolving into particles almost immediately. The camera should move in a smooth, measured arc and then begin slowing as luminous gold rings align into a crest-like convergence zone. End the clip with the camera entering or hovering inside that glowing convergence field so Part 2 can continue seamlessly. The look must feel modern, authoritative, premium, and emotionally resolved, 4K, 16:9."
+
+Desired shot behavior:
+- 0.0 to 1.8 seconds: re-enter the brand environment, show calm motion graphics and controlled particles
+- 1.8 to 3.6 seconds: pull infographic lines inward, resolve symbols of workflow, trust, and completion
+- 3.6 to 5.0 seconds: slow into a luminous crest-ring convergence field
+
+End frame requirement:
+- final frame must sit within or just at the edge of a glowing gold crest-ring field
+- camera movement should still be gently settling
+- same convergence field geometry must continue into clip 2
+
+PROMPT FOR OUTRO CLIP 2 OF 2
+----------------------------
+Title: UPS PensionsGo outro - Part 2
+Duration target: 5 seconds
+
+Prompt:
+"Create the second 5-second clip of the same branded outro sequence, matching exactly the style, color palette, camera angle, materials, motion, and lighting of Part 1. Start inside the same luminous gold crest-ring convergence field, continuing the same smooth settling motion as if there was no cut. Let the rings, workflow lines, and glass overlays resolve into a clean premium end-frame. Form a centered title-safe lockup area for UPS PensionsGo, or leave a clean central space for title insertion if text rendering is unstable. Keep subtle motion in the maroon-blue background through soft particles, gentle waveform pulses, and faint gold data routes, but make the center stable and elegant. In the final second, either hold the branded end card steady for an editor-friendly cut, or gently fade the background into a rich maroon-black premium finish while preserving gold highlights. The result should feel official, modern, calm, secure, and visually complete, 4K, 16:9."
+
+Desired shot behavior:
+- 0.0 to 1.4 seconds: continue the same convergence field from clip 1
+- 1.4 to 3.4 seconds: resolve the crest geometry, overlays, and signal lines into a clean closing composition
+- 3.4 to 5.0 seconds: hold the centered lockup area steady with subtle background motion
+
+End frame requirement:
+- centered and title-safe
+- premium maroon-blue field with gold accents
+- stable enough for clean fade to black or direct end-screen use
+- no rapid movement in the final 0.8 seconds
+
+NEGATIVE PROMPT / AVOID LIST
+----------------------------
+Avoid the following in both clips:
+- distorted faces or hands
+- loud glitch effects
+- hectic camera movement
+- militaristic aggression
+- prison bars as the dominant theme
+- dark oppressive mood
+- chaotic particle storms
+- comic or playful acting
+- purple-heavy color schemes
+- unreadable text
+- malformed logos or crests
+- oversaturated neon treatments
+- low-detail materials
+- influencer-style transitions or social-media gimmicks
+
+ASSEMBLY NOTES
+--------------
+Recommended generation flow:
+- generate outro clip 1 first
+- use the final frame of clip 1 as a direct visual reference for clip 2 if Luma allows continuation
+- keep the same seed or style controls across both clips
+- if text rendering is weak, render the end card without text and add exact branding in post
+- use the actual UPS PensionsGo or Uganda Prisons Service logo in post if exact brand fidelity is required
+
+OPTIONAL FINAL FRAME VARIANTS
+-----------------------------
+Use one of these as a short closing lockup if Luma text is usable:
+- UPS PensionsGo
+- Official Pension Guidance
+- Uganda Prisons Service
+- PensionsGo Media Centre
+
+OPTIONAL SOUND DIRECTION
+------------------------
+If Luma supports audio direction notes:
+- soft resolve from the intro music family
+- low cinematic pulse fading into calm brass or synth pad
+- subtle gold shimmer accents
+- confident but gentle finish
+
+MATCHING NOTE
+-------------
+This outro is designed to sit in the same brand universe as the intro prompt pack in `docs/luma_podcast_intro_prompt.txt`, so both can be used as a complete branded bookend set.

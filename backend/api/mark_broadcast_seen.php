@@ -1,15 +1,20 @@
 <?php
-// ============================================================================
+// 
 // mark_broadcast_seen.php
 // Purpose: Mark a broadcast as seen for the currently logged in user
-// ============================================================================
-
+// 
 require_once __DIR__ . '/../config.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['userId'])) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Session expired']);
+    exit;
+}
+
+if (!currentUserCanAccessMessagingModule()) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access denied']);
     exit;
 }
 

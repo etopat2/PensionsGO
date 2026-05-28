@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
+  <title>Claim Form - PensionsGo</title>
+  <link rel="stylesheet" href="css/color-variables.css?v=20260504a" />
+  <link rel="stylesheet" href="css/styles.css?v=20260507c" />
+  <link rel="stylesheet" href="css/profile.css?v=20260504a" />
+  <link rel="stylesheet" href="css/menu.css?v=20260504d" />
+  <link rel="stylesheet" href="css/overlay.css?v=20260504a" />
+  <link rel="stylesheet" href="css/claims.css?v=20260504a" />
+</head>
+<body>
+  <main class="claim-form-wrapper">
+    <div class="claim-form-header">
+      <div>
+        <h2>Claim Form</h2>
+        <p class="claim-form-subtitle">
+          Record arrears claims, post payments, and upload suspension lists for reconciliation.
+        </p>
+      </div>
+      <div class="claim-form-actions">
+        <button class="claims-btn claims-btn-accent" id="openClaimsUploadModalBtn" type="button">Upload Claims Data</button>
+        <a class="claims-link-btn" href="claims.html">Claims Dashboard</a>
+        <a class="claims-link-btn" href="budgeting.html">Budget Forecast</a>
+      </div>
+    </div>
+
+    <section id="claimFormFeedback" class="claims-toast" style="display:none;"></section>
+
+    <section class="claims-panel">
+      <header class="claims-panel-head">
+        <h3>Create / Update Arrears Entry</h3>
+        <span class="claims-panel-muted">Single-month and segmented-period arrears capture</span>
+      </header>
+      <div class="claims-panel-body">
+        <form id="arrearsEntryForm" class="claims-form-grid">
+          <div class="claims-col-span-2">
+            <label for="claimBeneficiaryInput">Beneficiary (search by file number or name)</label>
+            <input id="claimBeneficiaryInput" list="claimBeneficiaryList" type="text" placeholder="Type file number or name..." required />
+            <datalist id="claimBeneficiaryList"></datalist>
+          </div>
+          <input type="hidden" id="claimRegNoInput" />
+          <div>
+            <label for="claimTypeInput">Claim Type</label>
+            <select id="claimTypeInput" required>
+              <option value="Pension Arrears">Pension Arrears</option>
+              <option value="Gratuity Arrears">Gratuity Arrears</option>
+              <option value="Full Pension">Full Pension</option>
+              <option value="Full Pension Arrears">Full Pension Arrears</option>
+              <option value="Pension and Gratuity Arrears">Pension and Gratuity Arrears</option>
+              <option value="Underpayment Claim">Underpayment Claim</option>
+            </select>
+          </div>
+          <div>
+            <label for="claimExpectedAmountInput">Expected Amount (UGX)</label>
+            <input id="claimExpectedAmountInput" type="number" min="0" step="0.01" required data-money-input data-money-fixed-decimals="2" />
+          </div>
+          <div>
+            <label for="claimPeriodYearInput">Period Year</label>
+            <input id="claimPeriodYearInput" type="number" min="2000" max="2200" required />
+          </div>
+          <div>
+            <label for="claimPeriodMonthInput">Period Month</label>
+            <select id="claimPeriodMonthInput" required>
+              <option value="1">January</option>
+              <option value="2">February</option>
+              <option value="3">March</option>
+              <option value="4">April</option>
+              <option value="5">May</option>
+              <option value="6">June</option>
+              <option value="7">July</option>
+              <option value="8">August</option>
+              <option value="9">September</option>
+              <option value="10">October</option>
+              <option value="11">November</option>
+              <option value="12">December</option>
+            </select>
+          </div>
+          <div>
+            <label for="claimReasonInput">Reason</label>
+            <input id="claimReasonInput" type="text" maxlength="255" placeholder="Reason for claim..." />
+          </div>
+          <div>
+            <label for="claimSourceTypeInput">Source Type</label>
+            <select id="claimSourceTypeInput">
+              <option value="missed_payment">Missed Payment</option>
+              <option value="underpayment_adjustment">Underpayment Adjustment</option>
+              <option value="gratuity_gap">Gratuity Gap</option>
+            </select>
+          </div>
+          <div>
+            <label for="claimStatusInput">Claim Status</label>
+            <select id="claimStatusInput" required>
+              <option value="Complete">Complete</option>
+              <option value="Incomplete" selected>Incomplete</option>
+              <option value="Invalid">Invalid</option>
+              <option value="Valid">Valid</option>
+            </select>
+          </div>
+          <div class="claims-col-span-2">
+            <label for="claimNotesInput">Notes</label>
+            <textarea id="claimNotesInput" rows="3" placeholder="Add extra context for audit and review."></textarea>
+          </div>
+          <div class="claims-col-span-2">
+            <div class="claims-panel" style="min-height:auto;">
+              <header class="claims-panel-head">
+                <h3 style="font-size:0.84rem;">Segmented Periods (Optional)</h3>
+                <span class="claims-panel-muted">Example: Jan 2023-Nov 2023 @ 200000, Dec 2023-May 2025 @ 210000</span>
+              </header>
+              <div class="claims-panel-body">
+                <div class="claims-table-wrap">
+                  <table class="claims-table claims-segments-table">
+                    <thead>
+                      <tr>
+                        <th>Start Period</th>
+                        <th>End Period</th>
+                        <th>Monthly Amount (UGX)</th>
+                        <th>Reason</th>
+                        <th>Notes</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="claimSegmentsBody"></tbody>
+                  </table>
+                </div>
+                <div class="claims-form-footer" style="justify-content:flex-start;">
+                  <button class="claims-btn" id="addClaimSegmentBtn" type="button">Add Segment</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </form>
+        <div class="claims-form-footer">
+          <button class="claims-btn claims-btn-primary" id="saveClaimEntryBtn" type="button">Save Claim Entry</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="claimsUploadModal" class="claims-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="claimsUploadModalTitle">
+    <div class="claims-modal claims-upload-modal">
+      <header class="claims-modal-header">
+        <div>
+          <h3 id="claimsUploadModalTitle">Upload Claims Data File</h3>
+          <span class="claims-panel-muted">Bulk import arrears rows from CSV/XLSX</span>
+        </div>
+        <div class="claims-modal-actions">
+          <button class="claims-btn claims-btn-accent" id="downloadClaimsTemplateBtn" type="button">Download Template</button>
+          <button class="claims-btn claims-btn-primary" id="uploadClaimsBtnTop" type="button">Upload</button>
+          <button class="claims-btn" id="closeClaimsUploadModalBtn" type="button">Close</button>
+        </div>
+      </header>
+      <div class="claims-modal-body">
+        <div class="claims-inline-note">
+          Use the template to keep column names aligned with the required claims upload structure.
+        </div>
+        <form id="claimsUploadForm" class="claims-form-grid" enctype="multipart/form-data">
+          <div class="claims-col-span-2">
+            <label for="claimsUploadFileInput">Claims File (.csv / .xlsx)</label>
+            <input id="claimsUploadFileInput" type="file" accept=".csv,.xlsx,.xlxl" required />
+          </div>
+          <div>
+            <label for="claimsUploadTypeInput">Default Claim Type</label>
+            <select id="claimsUploadTypeInput">
+              <option value="Pension Arrears">Pension Arrears</option>
+              <option value="Gratuity Arrears">Gratuity Arrears</option>
+              <option value="Full Pension">Full Pension</option>
+              <option value="Full Pension Arrears">Full Pension Arrears</option>
+              <option value="Pension and Gratuity Arrears">Pension and Gratuity Arrears</option>
+              <option value="Underpayment Claim">Underpayment Claim</option>
+            </select>
+          </div>
+          <div>
+            <label for="claimsUploadStatusInput">Default Claim Status</label>
+            <select id="claimsUploadStatusInput" required>
+              <option value="Complete">Complete</option>
+              <option value="Incomplete" selected>Incomplete</option>
+              <option value="Invalid">Invalid</option>
+              <option value="Valid">Valid</option>
+            </select>
+          </div>
+          <div>
+            <label for="claimsUploadSourceTypeInput">Source Type</label>
+            <select id="claimsUploadSourceTypeInput">
+              <option value="uploaded_claims">Uploaded Claims</option>
+              <option value="missed_payment">Missed Payment</option>
+              <option value="underpayment_adjustment">Underpayment Adjustment</option>
+            </select>
+          </div>
+          <div class="claims-col-span-2">
+            <label for="claimsUploadReasonInput">Default Reason</label>
+            <input id="claimsUploadReasonInput" type="text" maxlength="255" placeholder="Reason used when a row reason is missing..." />
+          </div>
+          <div class="claims-col-span-2">
+            <label for="claimsUploadNotesInput">Default Notes</label>
+            <textarea id="claimsUploadNotesInput" rows="2" placeholder="Notes used when a row note is missing..."></textarea>
+          </div>
+        </form>
+      </div>
+      <footer class="claims-modal-footer">
+        <button class="claims-btn claims-btn-primary" id="uploadClaimsBtn" type="button">Upload Claims File</button>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js?v=20260528b"></script>
+  <script src="js/claim_form.js"></script>
+</body>
+</html>
+
+
+

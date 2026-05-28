@@ -1,0 +1,25 @@
+erDiagram
+  tb_appnsubmissions {
+    int id PK
+    string regNo FK
+    string title
+    string sName
+    string fName
+    string appnType
+    string contact
+    text address
+    date retirementDate
+    string retirementType
+    date submissionDate
+    text comment
+  }
+  tb_claimstatus {
+    int id PK
+    string regNo
+    string computerNo
+    string supplierNo
+    string appnType
+    date verificationDate
+    string appnStatus
+    text comment
+  }

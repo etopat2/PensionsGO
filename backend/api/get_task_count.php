@@ -3,36 +3,69 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../config.php';
 
-$userId = $_GET['userId'] ?? '';
-$userRole = $_GET['userRole'] ?? '';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-if (empty($userId)) {
-    echo json_encode(['success' => false, 'message' => 'User ID required']);
+if (!isset($_SESSION['userId'])) {
+    echo json_encode(['success' => false, 'message' => 'Authentication required']);
     exit;
 }
 
-// Assuming you have a tasks table with status fields
-// This query counts pending/assigned tasks for the user
-$query = "SELECT COUNT(*) as taskCount FROM tb_tasks 
-          WHERE (assigned_to = ? OR created_by = ?) 
-          AND status IN ('pending', 'assigned', 'in_progress')";
+ensureTasksTable($conn);
 
-$stmt = $conn->prepare($query);
-$stmt->bind_param("ii", $userId, $userId);
+$userId = $_SESSION['userId'];
+$userRole = $_SESSION['userRole'] ?? '';
+$inboxRoles = getWorkflowRoleKeysForInbox($userRole);
+
+if (empty($inboxRoles)) {
+    $query = "
+        SELECT COUNT(*) as taskCount
+        FROM tb_tasks
+        WHERE assigned_to = ?
+          AND status IN ('pending','assigned','in_progress')
+    ";
+    $stmt = $conn->prepare($query);
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'message' => 'Failed to prepare query']);
+        exit;
+    }
+    $stmt->bind_param("s", $userId);
+} else {
+    $placeholders = implode(',', array_fill(0, count($inboxRoles), '?'));
+    $query = "
+        SELECT COUNT(*) as taskCount
+        FROM tb_tasks
+        WHERE (
+            assigned_to = ?
+            OR (assigned_to IS NULL AND assigned_role IN ($placeholders))
+        )
+        AND status IN ('pending','assigned','in_progress')
+    ";
+
+    $stmt = $conn->prepare($query);
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'message' => 'Failed to prepare query']);
+        exit;
+    }
+
+    $types = "s" . str_repeat("s", count($inboxRoles));
+    $params = array_merge([$userId], $inboxRoles);
+    $stmt->bind_param($types, ...$params);
+}
+
 $stmt->execute();
 $result = $stmt->get_result();
+$count = 0;
 
 if ($row = $result->fetch_assoc()) {
-    echo json_encode([
-        'success' => true,
-        'taskCount' => $row['taskCount']
-    ]);
-} else {
-    echo json_encode([
-        'success' => true,
-        'taskCount' => 0
-    ]);
+    $count = (int)$row['taskCount'];
 }
+
+echo json_encode([
+    'success' => true,
+    'taskCount' => $count
+]);
 
 $stmt->close();
 $conn->close();

@@ -1,0 +1,175 @@
+erDiagram
+  tb_analytics_digest_runs {
+    bigint digest_id PK
+    date digest_date
+    string run_type
+    string digest_frequency
+    string recipient
+    string subject
+    string status
+    text summary_json
+    text notes
+    string created_by
+    string created_by_name
+    string created_by_role
+    datetime created_at
+  }
+  tb_analytics_snapshots {
+    bigint snapshot_id PK
+    string snapshot_type
+    text snapshot_payload
+    datetime created_at
+  }
+  tb_audit_logs {
+    int audit_id PK
+    string actor_id
+    string actor_name
+    string actor_role
+    string action
+    string entity_type
+    string entity_id
+    text details
+    timestamp created_at
+  }
+  tb_backup_logs {
+    int backup_id PK
+    string backup_label
+    string backup_type
+    string backup_scope
+    string file_name
+    string file_path
+    bigint file_size_bytes
+    string checksum_sha256
+    bool include_uploads
+    timestamp backup_time
+    string status
+    text notes
+    string created_by
+    string created_by_name
+    string created_by_role
+    timestamp restored_at
+    string restored_by
+  }
+  tb_data_export_runs {
+    int export_id PK
+    string dataset_key
+    string dataset_label
+    string export_format
+    string file_name
+    string file_path
+    bigint file_size_bytes
+    text filters_json
+    string status
+    text notes
+    timestamp created_at
+    string created_by FK
+    string created_by_name
+    string created_by_role
+  }
+  tb_data_import_runs {
+    int import_run_id PK
+    string dataset_key
+    string dataset_label
+    string source_file_name
+    string source_extension
+    string execution_mode
+    string run_status
+    int total_rows
+    int inserted_rows
+    int merged_rows
+    int skipped_exact_rows
+    int conflict_rows
+    int invalid_rows
+    int failed_rows
+    text report_json
+    string created_by FK
+    string created_by_name
+    string created_by_role
+    timestamp started_at
+    timestamp completed_at
+  }
+  tb_file_scan_logs {
+    bigint scan_id PK
+    string storage_context
+    string file_name
+    string file_path
+    string file_hash
+    string mime_type
+    string scan_engine
+    string scan_status
+    text findings
+    string scanned_by
+    string scanned_by_name
+    string scanned_by_role
+    datetime scanned_at
+  }
+  tb_ip_geolocation {
+    string ip_address PK
+    string city
+    string region
+    string country
+    string country_code
+    decimal latitude
+    decimal longitude
+    string timezone
+    string org
+    string asn
+    string location_label
+    text raw_json
+    timestamp last_lookup
+  }
+  tb_notification_digest_runs {
+    bigint digest_id PK
+    date digest_date
+    string run_type
+    string recipient
+    string subject
+    string status
+    text summary_json
+    text notes
+    string created_by
+    string created_by_name
+    string created_by_role
+    datetime created_at
+  }
+  tb_system_logs {
+    bigint log_id PK
+    string log_level
+    string log_category
+    string event_code
+    text message
+    text context_json
+    string actor_id
+    string actor_name
+    string actor_role
+    string ip_address
+    datetime created_at
+  }
+  tb_system_log_resolutions {
+    bigint resolution_id PK
+    bigint log_id FK
+    string resolution_status
+    text resolution_note
+    string resolved_by_id
+    string resolved_by_name
+    string resolved_by_role
+    datetime resolved_at
+  }
+  tb_user_logs {
+    int log_id PK
+    string user_id
+    string user_name
+    string user_role
+    string activity_type
+    string ip_address
+    text user_agent
+    string device_type
+    string location
+    string session_id
+    datetime login_time
+    datetime logout_time
+    int duration_seconds
+    text details
+    timestamp created_at
+  }
+  tb_system_logs ||--o{ tb_system_log_resolutions : log_id

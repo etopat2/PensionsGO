@@ -1,55 +1,751 @@
-/* ============================================================
-   DASHBOARD.JS
-   ============================================================
-   Purpose:
-   Controls all interactivity and data rendering for the
-   PensionsGo Dashboard.
-
-   Features:
-   ✅ Sidebar navigation switching between sections
-   ✅ Mobile-responsive navigation with select dropdown
-   ✅ Dynamic card population for all summary categories
-   ✅ Real user data fetching from backend API
-   ✅ Filter responsiveness (Life Certificates & Payroll)
-   ✅ Ready hooks for backend integration
-   ✅ Clean animations and error handling
-   ============================================================ */
-
-// Redirect if not logged in
-if (sessionStorage.getItem('isLoggedIn') !== 'true') {
-  window.location.replace('login.html');
-}
+/*
+ * DASHBOARD.JS
+ * ============================================================
+ * Purpose: Controls interactivity and data rendering for the
+ * PensionsGo dashboard.
+ *
+ * Key behaviors:
+ * - Sidebar navigation switching between sections
+ * - Mobile-responsive navigation with select dropdown
+ * - Dynamic card population for summary categories
+ * - Backend API data fetching
+ * - Filter responsiveness (life certificate and payroll)
+ * - Error handling and progressive UI updates
+ * ============================================================
+ */
 
 document.addEventListener("DOMContentLoaded", () => {
-  // -----------------------------
+  let currentSessionRole = "";
+  let dashboardRoleLabelMap = {};
+  let analyticsSettings = {
+    refreshIntervalMinutes: 15,
+    refreshIntervalMs: 15 * 60 * 1000,
+    exportEnabled: true,
+    showPredictiveCards: true,
+    includeFinancialForecasts: true,
+    includeOperationalKpis: true,
+    anomalyDetectionEnabled: true
+  };
+  // 
   // Element References
-  // -----------------------------
+  // 
   const desktopNavLinks = document.querySelectorAll(".desktop-nav a");
   const mobileNavSelect = document.getElementById("mobileNavSelect");
   const dashboardSections = document.querySelectorAll(".dashboard-section");
   const welcomeUser = document.getElementById("welcomeUser");
+  const dashboardLiveText = document.getElementById("dashboardLiveText");
 
   // Cards container references
-  const claimsCards = document.getElementById("claimsCards");
-  const pensionerTotalCard = document.getElementById("pensionerTotalCard");
-  const alivePensionerCards = document.getElementById("alivePensionerCards");
-  const deceasedPensionerCards = document.getElementById("deceasedPensionerCards");
-  const categoryCards = document.getElementById("categoryCards");
   const lifeCertCards = document.getElementById("lifeCertCards");
   const payrollCards = document.getElementById("payrollCards");
   const staffDueCards = document.getElementById("staffDueCards");
-  const fileCards = document.getElementById("fileCards");
+  const fileMovementSummaryCards = document.getElementById("fileMovementSummaryCards");
+  const fileMovementOfficeBody = document.getElementById("fileMovementOfficeBody");
+  const fileMovementCustodyBody = document.getElementById("fileMovementCustodyBody");
+  const fileMovementRecentBody = document.getElementById("fileMovementRecentBody");
   const userCards = document.getElementById("userCards");
+  const claimsTypeAnalytics = document.getElementById("claimsTypeAnalytics");
+  const claimsQuarterAnalytics = document.getElementById("claimsQuarterAnalytics");
+  const claimsInsightGrid = document.getElementById("claimsInsightGrid");
+  const pensionerPopulationAnalytics = document.getElementById("pensionerPopulationAnalytics");
+  const pensionerCompositionAnalytics = document.getElementById("pensionerCompositionAnalytics");
+  const pensionerInsightGrid = document.getElementById("pensionerInsightGrid");
+  const demographicsOverallGrid = document.getElementById("demographicsOverallGrid");
+  const demographicsGenderAnalytics = document.getElementById("demographicsGenderAnalytics");
+  const demographicsRegionAnalytics = document.getElementById("demographicsRegionAnalytics");
+  const demographicsRetirementAnalytics = document.getElementById("demographicsRetirementAnalytics");
+  const demographicsLifespanGrid = document.getElementById("demographicsLifespanGrid");
+  const demographicsEstateGrid = document.getElementById("demographicsEstateGrid");
+  const demographicsFilterBtn = document.getElementById("demographicsFilterBtn");
+  const demographicsRefreshBtn = document.getElementById("demographicsRefreshBtn");
+  const retirementModeAnalytics = document.getElementById("retirementModeAnalytics");
+  const retirementModeInsightGrid = document.getElementById("retirementModeInsightGrid");
+  const lifeCertAnalyticsBars = document.getElementById("lifeCertAnalyticsBars");
+  const lifeCertInsightGrid = document.getElementById("lifeCertInsightGrid");
+  const payrollCoverageAnalytics = document.getElementById("payrollCoverageAnalytics");
+  const payrollInsightGrid = document.getElementById("payrollInsightGrid");
+  const staffDueTypeAnalytics = document.getElementById("staffDueTypeAnalytics");
+  const staffDuePipelineAnalytics = document.getElementById("staffDuePipelineAnalytics");
+  const staffDueInsightGrid = document.getElementById("staffDueInsightGrid");
+  const staffDuePipelineCaption = document.getElementById("staffDuePipelineCaption");
+  const fileRegistryCompositionAnalytics = document.getElementById("fileRegistryCompositionAnalytics");
+  const fileRegistryPayrollAnalytics = document.getElementById("fileRegistryPayrollAnalytics");
+  const fileRegistryInsightGrid = document.getElementById("fileRegistryInsightGrid");
+  const fileMovementOfficeAnalytics = document.getElementById("fileMovementOfficeAnalytics");
+  const fileMovementInsightGrid = document.getElementById("fileMovementInsightGrid");
+  const userRoleAnalytics = document.getElementById("userRoleAnalytics");
+  const userInsightGrid = document.getElementById("userInsightGrid");
+  const workflowResponseAnalytics = document.getElementById("workflowResponseAnalytics");
+
+  function formatRetirementType(value) {
+    return window.PensionsGoRetirementTypes?.getLabel?.(value) || String(value || "").trim() || "N/A";
+  }
+  const workflowInsightGrid = document.getElementById("workflowInsightGrid");
+  const feedbackAccessNotice = document.getElementById("feedbackAccessNotice");
+  const feedbackWorkspace = document.getElementById("feedbackWorkspace");
+  const feedbackSummaryCards = document.getElementById("feedbackSummaryCards");
+  const feedbackTypeAnalytics = document.getElementById("feedbackTypeAnalytics");
+  const feedbackAudienceAnalytics = document.getElementById("feedbackAudienceAnalytics");
+  const feedbackTrendAnalytics = document.getElementById("feedbackTrendAnalytics");
+  const feedbackInsightGrid = document.getElementById("feedbackInsightGrid");
+  const feedbackNoteList = document.getElementById("feedbackNoteList");
+  const feedbackSearchInput = document.getElementById("feedbackSearchInput");
+  const feedbackTypeFilter = document.getElementById("feedbackTypeFilter");
+  const feedbackAudienceFilter = document.getElementById("feedbackAudienceFilter");
+  const feedbackStatusFilter = document.getElementById("feedbackStatusFilter");
+  const feedbackPriorityFilter = document.getElementById("feedbackPriorityFilter");
+  const feedbackAssigneeFilter = document.getElementById("feedbackAssigneeFilter");
+  const feedbackDateFrom = document.getElementById("feedbackDateFrom");
+  const feedbackDateTo = document.getElementById("feedbackDateTo");
+  const feedbackOverdueOnly = document.getElementById("feedbackOverdueOnly");
+  const feedbackRefreshBtn = document.getElementById("feedbackRefreshBtn");
+  const feedbackClearBtn = document.getElementById("feedbackClearBtn");
+  const feedbackTableBody = document.getElementById("feedbackTableBody");
+  const feedbackPrevBtn = document.getElementById("feedbackPrevBtn");
+  const feedbackNextBtn = document.getElementById("feedbackNextBtn");
+  const feedbackPageLabel = document.getElementById("feedbackPageLabel");
+  const feedbackExportXlsxBtn = document.getElementById("feedbackExportXlsxBtn");
+  const feedbackExportPdfBtn = document.getElementById("feedbackExportPdfBtn");
+  const feedbackExportCsvBtn = document.getElementById("feedbackExportCsvBtn");
+  const feedbackDetailModal = document.getElementById("feedbackDetailModal");
+  const feedbackDetailModalTitle = document.getElementById("feedbackDetailModalTitle");
+  const feedbackDetailOverview = document.getElementById("feedbackDetailOverview");
+  const feedbackMessageMeta = document.getElementById("feedbackMessageMeta");
+  const feedbackMessageBody = document.getElementById("feedbackMessageBody");
+  const feedbackActivityList = document.getElementById("feedbackActivityList");
+  const feedbackDetailSubmissionId = document.getElementById("feedbackDetailSubmissionId");
+  const feedbackDetailStatus = document.getElementById("feedbackDetailStatus");
+  const feedbackDetailPriority = document.getElementById("feedbackDetailPriority");
+  const feedbackDetailAssignee = document.getElementById("feedbackDetailAssignee");
+  const feedbackDetailResolutionSummary = document.getElementById("feedbackDetailResolutionSummary");
+  const feedbackDetailInternalNote = document.getElementById("feedbackDetailInternalNote");
+  const feedbackWorkflowHelper = document.getElementById("feedbackWorkflowHelper");
+  const feedbackDetailAssignBtn = document.getElementById("feedbackDetailAssignBtn");
+  const feedbackDetailReviewBtn = document.getElementById("feedbackDetailReviewBtn");
+  const feedbackDetailResolveBtn = document.getElementById("feedbackDetailResolveBtn");
+  const feedbackDetailCloseBtn = document.getElementById("feedbackDetailCloseBtn");
+  const feedbackDetailSaveBtn = document.getElementById("feedbackDetailSaveBtn");
+  const feedbackDetailDismissBtn = document.getElementById("feedbackDetailDismissBtn");
+  const feedbackDetailModalCloseBtn = document.getElementById("feedbackDetailModalCloseBtn");
+  const feedbackDetailTabs = document.querySelectorAll(".feedback-detail-tab");
+  const feedbackDesktopLink = document.querySelector('.desktop-nav a[data-target="feedbackSection"]');
+  const feedbackMobileOption = document.querySelector('#mobileNavSelect option[value="feedbackSection"]');
+  const dataManagementDesktopLink = document.querySelector('.desktop-nav a[data-target="dataSection"]');
+  const dataManagementMobileOption = document.querySelector('#mobileNavSelect option[value="dataSection"]');
+  const dataManagementSection = document.getElementById("dataSection");
+  const generalSummaryCards = document.getElementById("generalSummaryCards");
+  const generalVolumeAnalytics = document.getElementById("generalVolumeAnalytics");
+  const generalRiskAnalytics = document.getElementById("generalRiskAnalytics");
+  const generalInsightGrid = document.getElementById("generalInsightGrid");
+  const generalNoteList = document.getElementById("generalNoteList");
+  const openSummaryReportBtn = document.getElementById("openSummaryReportBtn");
+  const summaryReportModal = document.getElementById("summaryReportModal");
+  const summaryReportModalCloseBtn = document.getElementById("summaryReportModalCloseBtn");
+  const summaryReportContent = document.getElementById("summaryReportContent");
+  const summaryReportRefreshBtn = document.getElementById("summaryReportRefreshBtn");
+  const summaryReportPrintBtn = document.getElementById("summaryReportPrintBtn");
+  const summaryReportWordBtn = document.getElementById("summaryReportWordBtn");
+  const summaryReportPdfBtn = document.getElementById("summaryReportPdfBtn");
+  const recycleBinAccessNotice = document.getElementById("recycleBinAccessNotice");
+  const recycleBinWorkspace = document.getElementById("recycleBinWorkspace");
+  const recycleBinSummaryCards = document.getElementById("recycleBinSummaryCards");
+  const recycleBinSearchInput = document.getElementById("recycleBinSearchInput");
+  const recycleBinStateFilter = document.getElementById("recycleBinStateFilter");
+  const recycleBinRoleFilter = document.getElementById("recycleBinRoleFilter");
+  const recycleBinDateFrom = document.getElementById("recycleBinDateFrom");
+  const recycleBinDateTo = document.getElementById("recycleBinDateTo");
+  const recycleBinRefreshBtn = document.getElementById("recycleBinRefreshBtn");
+  const recycleBinClearFiltersBtn = document.getElementById("recycleBinClearFiltersBtn");
+  const recycleBinTableBody = document.getElementById("recycleBinTableBody");
+  const recycleBinPrevBtn = document.getElementById("recycleBinPrevBtn");
+  const recycleBinNextBtn = document.getElementById("recycleBinNextBtn");
+  const recycleBinPageLabel = document.getElementById("recycleBinPageLabel");
+  const recycleBinExportXlsxBtn = document.getElementById("recycleBinExportXlsxBtn");
+  const recycleBinExportPdfBtn = document.getElementById("recycleBinExportPdfBtn");
+  const recycleBinExportCsvBtn = document.getElementById("recycleBinExportCsvBtn");
+  const recycleBinPurgeToggleBtn = document.getElementById("recycleBinPurgeToggleBtn");
+  const recycleBinPurgePanel = document.getElementById("recycleBinPurgePanel");
+  const recycleBinPurgeCloseBtn = document.getElementById("recycleBinPurgeCloseBtn");
+  const recycleBinPurgeDays = document.getElementById("recycleBinPurgeDays");
+  const recycleBinPurgeState = document.getElementById("recycleBinPurgeState");
+  const recycleBinPurgeRole = document.getElementById("recycleBinPurgeRole");
+  const recycleBinPurgePreviewBtn = document.getElementById("recycleBinPurgePreviewBtn");
+  const recycleBinPurgeConfirmBtn = document.getElementById("recycleBinPurgeConfirmBtn");
+  const recycleBinPurgePreview = document.getElementById("recycleBinPurgePreview");
+  const dataManagementTabs = document.querySelectorAll(".data-management-tab");
+  const dataManagementPanels = document.querySelectorAll(".data-management-panel");
+  const dmExportButtons = document.querySelectorAll("[data-dm-export]");
+  const dmRegistrySummaryCards = document.getElementById("dmRegistrySummaryCards");
+  const dmRegistrySearch = document.getElementById("dmRegistrySearch");
+  const dmRegistryBoxNumber = document.getElementById("dmRegistryBoxNumber");
+  const dmRegistryGender = document.getElementById("dmRegistryGender");
+  const dmRegistryLivingStatus = document.getElementById("dmRegistryLivingStatus");
+  const dmRegistryPayType = document.getElementById("dmRegistryPayType");
+  const dmRegistryPayrollStatus = document.getElementById("dmRegistryPayrollStatus");
+  const dmRegistryAvailability = document.getElementById("dmRegistryAvailability");
+  const dmRegistryLifeCert = document.getElementById("dmRegistryLifeCert");
+  const dmRegistryRefreshBtn = document.getElementById("dmRegistryRefreshBtn");
+  const dmRegistryClearBtn = document.getElementById("dmRegistryClearBtn");
+  const dmRegistryTableBody = document.getElementById("dmRegistryTableBody");
+  const dmRegistryPrevBtn = document.getElementById("dmRegistryPrevBtn");
+  const dmRegistryNextBtn = document.getElementById("dmRegistryNextBtn");
+  const dmRegistryPageLabel = document.getElementById("dmRegistryPageLabel");
+  const dmStaffDueSummaryCards = document.getElementById("dmStaffDueSummaryCards");
+  const dmStaffDueSearch = document.getElementById("dmStaffDueSearch");
+  const dmStaffDueRetirementType = document.getElementById("dmStaffDueRetirementType");
+  const dmStaffDueSubmissionStatus = document.getElementById("dmStaffDueSubmissionStatus");
+  const dmStaffDueAppStatus = document.getElementById("dmStaffDueAppStatus");
+  const dmStaffDueRefreshBtn = document.getElementById("dmStaffDueRefreshBtn");
+  const dmStaffDueClearBtn = document.getElementById("dmStaffDueClearBtn");
+  const dmStaffDueDeleteFilteredBtn = document.getElementById("dmStaffDueDeleteFilteredBtn");
+  const dmStaffDueWorkspaceLink = document.getElementById("dmStaffDueWorkspaceLink");
+  const dmStaffDueTableBody = document.getElementById("dmStaffDueTableBody");
+  const dmStaffDuePrevBtn = document.getElementById("dmStaffDuePrevBtn");
+  const dmStaffDueNextBtn = document.getElementById("dmStaffDueNextBtn");
+  const dmStaffDuePageLabel = document.getElementById("dmStaffDuePageLabel");
+  const dmMovementsSummaryCards = document.getElementById("dmMovementsSummaryCards");
+  const dmMovementsSearch = document.getElementById("dmMovementsSearch");
+  const dmMovementsType = document.getElementById("dmMovementsType");
+  const dmMovementsFromOffice = document.getElementById("dmMovementsFromOffice");
+  const dmMovementsToOffice = document.getElementById("dmMovementsToOffice");
+  const dmMovementsDateFrom = document.getElementById("dmMovementsDateFrom");
+  const dmMovementsDateTo = document.getElementById("dmMovementsDateTo");
+  const dmMovementsRefreshBtn = document.getElementById("dmMovementsRefreshBtn");
+  const dmMovementsClearBtn = document.getElementById("dmMovementsClearBtn");
+  const dmMovementsTableBody = document.getElementById("dmMovementsTableBody");
+  const dmMovementsPrevBtn = document.getElementById("dmMovementsPrevBtn");
+  const dmMovementsNextBtn = document.getElementById("dmMovementsNextBtn");
+  const dmMovementsPageLabel = document.getElementById("dmMovementsPageLabel");
+  const dmClaimsSummaryCards = document.getElementById("dmClaimsSummaryCards");
+  const dmClaimsSearch = document.getElementById("dmClaimsSearch");
+  const dmClaimsType = document.getElementById("dmClaimsType");
+  const dmClaimsStatus = document.getElementById("dmClaimsStatus");
+  const dmClaimsYear = document.getElementById("dmClaimsYear");
+  const dmClaimsQuarter = document.getElementById("dmClaimsQuarter");
+  const dmClaimsRefreshBtn = document.getElementById("dmClaimsRefreshBtn");
+  const dmClaimsClearBtn = document.getElementById("dmClaimsClearBtn");
+  const dmClaimsDeleteFilteredBtn = document.getElementById("dmClaimsDeleteFilteredBtn");
+  const dmClaimsTableBody = document.getElementById("dmClaimsTableBody");
+  const dmClaimsPrevBtn = document.getElementById("dmClaimsPrevBtn");
+  const dmClaimsNextBtn = document.getElementById("dmClaimsNextBtn");
+  const dmClaimsPageLabel = document.getElementById("dmClaimsPageLabel");
+  const dmTasksSummaryCards = document.getElementById("dmTasksSummaryCards");
+  const dmTasksSearch = document.getElementById("dmTasksSearch");
+  const dmTasksStatus = document.getElementById("dmTasksStatus");
+  const dmTasksPriority = document.getElementById("dmTasksPriority");
+  const dmTasksRole = document.getElementById("dmTasksRole");
+  const dmTasksRefreshBtn = document.getElementById("dmTasksRefreshBtn");
+  const dmTasksClearBtn = document.getElementById("dmTasksClearBtn");
+  const dmTasksTableBody = document.getElementById("dmTasksTableBody");
+  const dmTasksPrevBtn = document.getElementById("dmTasksPrevBtn");
+  const dmTasksNextBtn = document.getElementById("dmTasksNextBtn");
+  const dmTasksPageLabel = document.getElementById("dmTasksPageLabel");
+  const dmPdfExportModal = document.getElementById("dmPdfExportModal");
+  const dmPdfExportModalTitle = document.getElementById("dmPdfExportModalTitle");
+  const dmPdfExportModalCloseBtn = document.getElementById("dmPdfExportModalCloseBtn");
+  const dmPdfExportDatasetLabel = document.getElementById("dmPdfExportDatasetLabel");
+  const dmPdfExportSelectedCount = document.getElementById("dmPdfExportSelectedCount");
+  const dmPdfExportFilterCount = document.getElementById("dmPdfExportFilterCount");
+  const dmPdfExportModalDescription = document.getElementById("dmPdfExportModalDescription");
+  const dmPdfExportFilterSummary = document.getElementById("dmPdfExportFilterSummary");
+  const dmPdfExportFieldGroups = document.getElementById("dmPdfExportFieldGroups");
+  const dmPdfSelectDefaultBtn = document.getElementById("dmPdfSelectDefaultBtn");
+  const dmPdfSelectAllBtn = document.getElementById("dmPdfSelectAllBtn");
+  const dmPdfClearSelectionBtn = document.getElementById("dmPdfClearSelectionBtn");
+  const dmPdfExportModalCancelBtn = document.getElementById("dmPdfExportModalCancelBtn");
+  const dmPdfExportModalConfirmBtn = document.getElementById("dmPdfExportModalConfirmBtn");
+  const dataRowActionModal = document.getElementById("dataRowActionModal");
+  const dataRowActionModalEyebrow = document.getElementById("dataRowActionModalEyebrow");
+  const dataRowActionModalTitle = document.getElementById("dataRowActionModalTitle");
+  const dataRowActionModalSummary = document.getElementById("dataRowActionModalSummary");
+  const dataRowActionModalActions = document.getElementById("dataRowActionModalActions");
+  const dataRowActionModalCloseBtn = document.getElementById("dataRowActionModalCloseBtn");
+  const dataRowActionModalDismissBtn = document.getElementById("dataRowActionModalDismissBtn");
+  const demographicsDetailModal = document.getElementById("demographicsDetailModal");
+  const demographicsDetailModalCloseBtn = document.getElementById("demographicsDetailModalCloseBtn");
+  const demographicsDetailModalDismissBtn = document.getElementById("demographicsDetailModalDismissBtn");
+  const demographicsResultSummary = document.getElementById("demographicsResultSummary");
+  const demographicsFocusFilter = document.getElementById("demographicsFocusFilter");
+  const demographicsLivingStatusFilter = document.getElementById("demographicsLivingStatusFilter");
+  const demographicsGenderFilter = document.getElementById("demographicsGenderFilter");
+  const demographicsRegionFilter = document.getElementById("demographicsRegionFilter");
+  const demographicsDistrictFilter = document.getElementById("demographicsDistrictFilter");
+  const demographicsRetirementTypeFilter = document.getElementById("demographicsRetirementTypeFilter");
+  const demographicsSearchInput = document.getElementById("demographicsSearchInput");
+  const demographicsLiveResults = document.getElementById("demographicsLiveResults");
+  const demographicsApplyBtn = document.getElementById("demographicsApplyBtn");
+  const demographicsResetBtn = document.getElementById("demographicsResetBtn");
+  const demographicsTableBody = document.getElementById("demographicsTableBody");
+  const deathReportModal = document.getElementById("deathReportModal");
+  const deathReportModalCloseBtn = document.getElementById("deathReportModalCloseBtn");
+  const deathReportCancelBtn = document.getElementById("deathReportCancelBtn");
+  const deathReportSaveBtn = document.getElementById("deathReportSaveBtn");
+  const deathReportRegistryId = document.getElementById("deathReportRegistryId");
+  const deathReportRegNo = document.getElementById("deathReportRegNo");
+  const deathReportSubject = document.getElementById("deathReportSubject");
+  const deathReportRegistryMeta = document.getElementById("deathReportRegistryMeta");
+  const deathReportRegNoMeta = document.getElementById("deathReportRegNoMeta");
+  const deathReportRetirementMeta = document.getElementById("deathReportRetirementMeta");
+  const deathReportRetirementDateMeta = document.getElementById("deathReportRetirementDateMeta");
+  const deathReportDateOfDeath = document.getElementById("deathReportDateOfDeath");
+  const deathReportNotificationDate = document.getElementById("deathReportNotificationDate");
+  const deathReportNotifierName = document.getElementById("deathReportNotifierName");
+  const deathReportNotifierContact = document.getElementById("deathReportNotifierContact");
+  const deathReportNotes = document.getElementById("deathReportNotes");
+  const workflowSummaryCards = document.getElementById("workflowSummaryCards");
+  const workflowPerformanceBody = document.getElementById("workflowPerformanceBody");
+  const workflowSearchInput = document.getElementById("workflowSearchInput");
+  const workflowRoleFilter = document.getElementById("workflowRoleFilter");
+  const workflowStateFilter = document.getElementById("workflowStateFilter");
+  const workflowAlertSummaryCards = document.getElementById("workflowAlertSummaryCards");
+  const workflowAlertRoleBody = document.getElementById("workflowAlertRoleBody");
+  const workflowAlertUserBody = document.getElementById("workflowAlertUserBody");
+  const workflowAlertRecentFeed = document.getElementById("workflowAlertRecentFeed");
+  const workflowAlertTrendChart = document.getElementById("workflowAlertTrendChart");
+  const workflowAlertsAnalytics = document.getElementById("workflowAlertsAnalytics");
+  const exportWorkflowPerformanceXlsxBtn = document.getElementById("exportWorkflowPerformanceXlsxBtn");
+  const exportWorkflowPerformancePdfBtn = document.getElementById("exportWorkflowPerformancePdfBtn");
+  const exportWorkflowAlertsXlsBtn = document.getElementById("exportWorkflowAlertsXlsBtn");
+  const exportWorkflowAlertsPdfBtn = document.getElementById("exportWorkflowAlertsPdfBtn");
+  const workflowDesktopLink = document.querySelector('.desktop-nav a[data-target="workflowSection"]');
+  const workflowMobileOption = document.querySelector('#mobileNavSelect option[value="workflowSection"]');
 
   // Filter elements
   const lifeCertYear = document.getElementById("lifeCertYear");
+  const lifeCertStatusFilter = document.getElementById("lifeCertStatusFilter");
+  const lifeCertSearch = document.getElementById("lifeCertSearch");
+  const lifeCertRefreshBtn = document.getElementById("lifeCertRefreshBtn");
+  const lifeCertExportXlsxBtn = document.getElementById("lifeCertExportXlsxBtn");
+  const lifeCertExportPdfBtn = document.getElementById("lifeCertExportPdfBtn");
+  const lifeCertExportCsvBtn = document.getElementById("lifeCertExportCsvBtn");
+  const lifeCertTableBody = document.getElementById("lifeCertTableBody");
+  const lifeCertPrevBtn = document.getElementById("lifeCertPrevBtn");
+  const lifeCertNextBtn = document.getElementById("lifeCertNextBtn");
+  const lifeCertPageLabel = document.getElementById("lifeCertPageLabel");
+  const lifeCertActionTools = document.getElementById("lifeCertActionTools");
+  const lifeCertMarkRegNo = document.getElementById("lifeCertMarkRegNo");
+  const lifeCertMarkNotes = document.getElementById("lifeCertMarkNotes");
+  const lifeCertMarkBtn = document.getElementById("lifeCertMarkBtn");
   const payrollMonth = document.getElementById("payrollMonth");
   const payrollYear = document.getElementById("payrollYear");
+  const payrollFinancialYear = document.getElementById("payrollFinancialYear");
+  const payrollQuarter = document.getElementById("payrollQuarter");
+  const payrollStatusFilter = document.getElementById("payrollStatusFilter");
+  const payrollSearch = document.getElementById("payrollSearch");
+  const payrollRefreshBtn = document.getElementById("payrollRefreshBtn");
+  const payrollTableBody = document.getElementById("payrollTableBody");
+  const payrollPrevBtn = document.getElementById("payrollPrevBtn");
+  const payrollNextBtn = document.getElementById("payrollNextBtn");
+  const payrollPageLabel = document.getElementById("payrollPageLabel");
+  const payrollUploadTools = document.getElementById("payrollUploadTools");
+  const openPayrollUploadModalBtn = document.getElementById("openPayrollUploadModalBtn");
+  const openPayrollRegisterModalBtn = document.getElementById("openPayrollRegisterModalBtn");
+  const payrollUploadModal = document.getElementById("payrollUploadModal");
+  const payrollUploadModalCloseBtn = document.getElementById("payrollUploadModalCloseBtn");
+  const payrollUploadModalCancelBtn = document.getElementById("payrollUploadModalCancelBtn");
+  const payrollUploadModalForm = document.getElementById("payrollUploadModalForm");
+  const payrollUploadModalMonth = document.getElementById("payrollUploadModalMonth");
+  const payrollUploadModalYear = document.getElementById("payrollUploadModalYear");
+  const payrollUploadFile = document.getElementById("payrollUploadFile");
+  const payrollUploadNotes = document.getElementById("payrollUploadNotes");
+  const payrollUploadBtn = document.getElementById("payrollUploadBtn");
+  const payrollDownloadTemplateBtn = document.getElementById("payrollDownloadTemplateBtn");
+  const payrollRegisterUploadModal = document.getElementById("payrollRegisterUploadModal");
+  const payrollRegisterUploadModalCloseBtn = document.getElementById("payrollRegisterUploadModalCloseBtn");
+  const payrollRegisterUploadCancelBtn = document.getElementById("payrollRegisterUploadCancelBtn");
+  const payrollRegisterUploadForm = document.getElementById("payrollRegisterUploadForm");
+  const payrollRegisterModalMonth = document.getElementById("payrollRegisterModalMonth");
+  const payrollRegisterModalYear = document.getElementById("payrollRegisterModalYear");
+  const payrollRegisterFile = document.getElementById("payrollRegisterFile");
+  const payrollRegisterUploadNotes = document.getElementById("payrollRegisterUploadNotes");
+  const payrollRegisterUploadBtn = document.getElementById("payrollRegisterUploadBtn");
+  const payrollRecentCycles = document.getElementById("payrollRecentCycles");
+  const payrollHistoryLinkWrap = document.getElementById("payrollHistoryLinkWrap");
 
-  /* ============================================================
-     SECTION NAVIGATION LOGIC
-     ============================================================ */
+  const lifeCertState = { page: 1, limit: 20, totalPages: 1, canMark: false, searchTimer: null };
+  const payrollState = { page: 1, limit: 20, totalPages: 1, canUpload: false, searchTimer: null, latestMonth: "", latestYear: "" };
+  const pensionersState = { cache: null, fetchedAt: 0, pending: null };
+  const generalStatisticsState = { cache: null, fetchedAt: 0, pending: null };
+  const demographicsState = {
+    cache: null,
+    fetchedAt: 0,
+    pending: null,
+    rows: [],
+    selectedRowKey: "",
+    listAbortController: null,
+    listRefreshTimer: null,
+    listRequestSequence: 0,
+    filters: {
+      focus: "oldest",
+      livingStatus: "Alive",
+      gender: "",
+      region: "",
+      district: "",
+      retirementType: "",
+      search: ""
+    },
+    lastListSummary: null,
+    currentSubject: null
+  };
+  const summaryReportState = {
+    model: null,
+    loading: false
+  };
+  const workflowState = { items: [], searchTimer: null };
+  const recycleBinState = { page: 1, limit: 15, totalPages: 1, totalRows: 0, searchTimer: null, canManage: false, canPurge: false };
+  const feedbackState = {
+    page: 1,
+    limit: 12,
+    totalPages: 1,
+    totalRows: 0,
+    searchTimer: null,
+    rows: [],
+    canView: false,
+    canManage: false,
+    allowAssignment: true,
+    allowExport: true,
+    currentDetail: null
+  };
+  const dataManagementState = {
+    activeTab: "recycle",
+    registry: { page: 1, limit: 12, totalPages: 1, rows: [], searchTimer: null },
+    staffDue: { page: 1, limit: 10, totalPages: 1, rows: [], visibleRows: [], searchTimer: null },
+    movements: { page: 1, limit: 12, totalPages: 1, rows: [], searchTimer: null },
+    claims: { page: 1, limit: 12, totalPages: 1, searchTimer: null, claimTypesLoaded: false, visibleRows: [] },
+    tasks: { page: 1, limit: 10, totalPages: 1, rows: [], filteredRows: [], searchTimer: null }
+  };
+  const dmPdfExportState = {
+    datasetKey: "",
+    triggerButton: null,
+    metadata: null,
+    metadataCache: new Map(),
+    selectedFields: new Set(),
+    loading: false
+  };
+  let dashboardPermissions = {};
+  let dashboardLastSyncTs = 0;
+  let dashboardLastSyncSection = "";
+  let headerResizeObserver = null;
+  const liveSectionLabels = {
+    claimsSection: "Claims Summary",
+    pensionersSection: "Pensioners Summary",
+    demographicsSection: "Demographics & Longevity",
+    categoriesSection: "Retirement Label",
+    lifeCertSection: "Life Certificate",
+    payrollSection: "Payroll Movements",
+    staffDueSection: "Staff Due",
+    filesSection: "File Registry",
+    fileMovementSection: "File Movement",
+    usersSection: "System Users",
+    workflowSection: "Workflow Performance",
+    feedbackSection: "Feedback Management",
+    generalSection: "General Statistics",
+    dataSection: "Data Management"
+  };
+
+  function getDashboardPermission(key, fallback = false) {
+    if (Object.prototype.hasOwnProperty.call(dashboardPermissions, key)) {
+      return Boolean(dashboardPermissions[key]);
+    }
+    return Boolean(fallback);
+  }
+
+  async function loadDashboardPermissions() {
+    try {
+      const keys = ["registry.edit", "registry.delete_queue.process", "staff_due.edit", "staff_due.bulk_upload", "staff_due.delete_request", "staff_due.delete_queue.process", "claims.arrears.view", "claims.arrears.manage", "feedback.view", "feedback.manage", "payroll.upload"];
+      const res = await fetch(`../backend/api/get_current_permissions.php?keys=${encodeURIComponent(keys.join(","))}`, {
+        credentials: "include",
+        cache: "no-store"
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.permissions && typeof data.permissions === "object") {
+        dashboardPermissions = data.permissions;
+      } else {
+        dashboardPermissions = {};
+      }
+    } catch (error) {
+      console.error("Unable to load dashboard permissions:", error);
+      dashboardPermissions = {};
+    }
+  }
+
+  function parseSettingBool(value, fallback = true) {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value !== 0;
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (["1", "true", "yes", "on", "enabled"].includes(normalized)) return true;
+      if (["0", "false", "no", "off", "disabled"].includes(normalized)) return false;
+    }
+    return fallback;
+  }
+
+  function resolveSettingInt(value, fallback) {
+    const parsed = Number.parseInt(String(value ?? "").trim(), 10);
+    if (Number.isFinite(parsed)) return parsed;
+    return fallback;
+  }
+
+  function toggleElement(element, shouldShow) {
+    if (!element) return;
+    element.classList.toggle("hidden", !shouldShow);
+  }
+
+  function setAnalyticsHidden(element, hidden) {
+    if (!element) return;
+    if (hidden) {
+      element.classList.add("hidden");
+      element.dataset.analyticsHidden = "1";
+      return;
+    }
+    if (element.dataset.analyticsHidden === "1") {
+      element.classList.remove("hidden");
+      delete element.dataset.analyticsHidden;
+    }
+  }
+
+  function setAnalyticsPlaceholder(container, shouldShow, message) {
+    if (!container) return;
+    const parent = container.parentElement;
+    if (!parent) return;
+    const key = container.id || container.dataset?.analyticsKey || "analytics";
+    const selector = `.analytics-empty-state[data-placeholder-for="${key}"]`;
+    const existing = parent.querySelector(selector);
+    if (shouldShow) {
+      if (existing) {
+        existing.textContent = message;
+        existing.classList.remove("hidden");
+        return;
+      }
+      const placeholder = document.createElement("div");
+      placeholder.className = "analytics-empty-state analytics-disabled-placeholder";
+      placeholder.dataset.placeholderFor = key;
+      placeholder.textContent = message;
+      parent.insertBefore(placeholder, container);
+    } else if (existing) {
+      existing.remove();
+    }
+  }
+
+  async function loadAnalyticsSettings() {
+    let settings = null;
+    try {
+      if (window.AppSettingsManager?.load) {
+        await window.AppSettingsManager.load();
+        settings = {
+          analytics_refresh_interval_minutes: window.AppSettingsManager.get("analytics_refresh_interval_minutes", analyticsSettings.refreshIntervalMinutes),
+          analytics_export_enabled: window.AppSettingsManager.get("analytics_export_enabled", analyticsSettings.exportEnabled),
+          analytics_show_predictive_cards: window.AppSettingsManager.get("analytics_show_predictive_cards", analyticsSettings.showPredictiveCards),
+          analytics_include_financial_forecasts: window.AppSettingsManager.get("analytics_include_financial_forecasts", analyticsSettings.includeFinancialForecasts),
+          analytics_include_operational_kpis: window.AppSettingsManager.get("analytics_include_operational_kpis", analyticsSettings.includeOperationalKpis),
+          analytics_anomaly_detection_enabled: window.AppSettingsManager.get("analytics_anomaly_detection_enabled", analyticsSettings.anomalyDetectionEnabled)
+        };
+      } else {
+        const res = await fetch("../backend/api/get_public_settings.php", { credentials: "include", cache: "no-store" });
+        const data = await res.json();
+        if (res.ok && data.success && data.settings) {
+          settings = data.settings;
+        }
+      }
+    } catch (error) {
+      console.warn("Unable to load analytics settings:", error);
+    }
+
+    if (settings) {
+      const refreshMinutes = Math.max(5, resolveSettingInt(settings.analytics_refresh_interval_minutes, analyticsSettings.refreshIntervalMinutes));
+      analyticsSettings.refreshIntervalMinutes = refreshMinutes;
+      analyticsSettings.refreshIntervalMs = refreshMinutes * 60 * 1000;
+      analyticsSettings.exportEnabled = parseSettingBool(settings.analytics_export_enabled, analyticsSettings.exportEnabled);
+      analyticsSettings.showPredictiveCards = parseSettingBool(settings.analytics_show_predictive_cards, analyticsSettings.showPredictiveCards);
+      analyticsSettings.includeFinancialForecasts = parseSettingBool(settings.analytics_include_financial_forecasts, analyticsSettings.includeFinancialForecasts);
+      analyticsSettings.includeOperationalKpis = parseSettingBool(settings.analytics_include_operational_kpis, analyticsSettings.includeOperationalKpis);
+      analyticsSettings.anomalyDetectionEnabled = parseSettingBool(settings.analytics_anomaly_detection_enabled, analyticsSettings.anomalyDetectionEnabled);
+    }
+
+    applyAnalyticsVisibility();
+    return analyticsSettings;
+  }
+
+  function applyAnalyticsVisibility() {
+    const showOperational = Boolean(analyticsSettings.includeOperationalKpis);
+    const showPredictive = showOperational && Boolean(analyticsSettings.showPredictiveCards);
+    const showRisk = showOperational && Boolean(analyticsSettings.anomalyDetectionEnabled);
+
+    const operationalElements = [
+      lifeCertCards,
+      payrollCards,
+      staffDueCards,
+      fileMovementSummaryCards,
+      userCards,
+      claimsTypeAnalytics,
+      claimsQuarterAnalytics,
+      pensionerPopulationAnalytics,
+      pensionerCompositionAnalytics,
+      retirementModeAnalytics,
+      lifeCertAnalyticsBars,
+      payrollCoverageAnalytics,
+      staffDueTypeAnalytics,
+      staffDuePipelineAnalytics,
+      staffDuePipelineCaption,
+      fileRegistryCompositionAnalytics,
+      fileRegistryPayrollAnalytics,
+      fileMovementOfficeAnalytics,
+      userRoleAnalytics,
+      workflowResponseAnalytics,
+      generalSummaryCards,
+      generalVolumeAnalytics,
+      feedbackSummaryCards,
+      feedbackTypeAnalytics,
+      feedbackAudienceAnalytics,
+      feedbackTrendAnalytics
+    ];
+    const operationalMessage = "Operational analytics are disabled by system settings.";
+    if (!showOperational) {
+      operationalElements.forEach((el) => {
+        setAnalyticsHidden(el, true);
+        setAnalyticsPlaceholder(el, true, operationalMessage);
+      });
+    } else {
+      operationalElements.forEach((el) => {
+        setAnalyticsHidden(el, false);
+        setAnalyticsPlaceholder(el, false, operationalMessage);
+      });
+    }
+
+    const predictiveElements = [
+      claimsInsightGrid,
+      pensionerInsightGrid,
+      retirementModeInsightGrid,
+      lifeCertInsightGrid,
+      payrollInsightGrid,
+      staffDueInsightGrid,
+      fileRegistryInsightGrid,
+      userInsightGrid,
+      workflowInsightGrid,
+      feedbackInsightGrid,
+      generalInsightGrid,
+      generalNoteList,
+      feedbackNoteList
+    ];
+    const predictiveMessage = showOperational
+      ? "Predictive insights are disabled by system settings."
+      : operationalMessage;
+    if (!showPredictive) {
+      predictiveElements.forEach((el) => {
+        setAnalyticsHidden(el, true);
+        setAnalyticsPlaceholder(el, true, predictiveMessage);
+      });
+    } else {
+      predictiveElements.forEach((el) => {
+        setAnalyticsHidden(el, false);
+        setAnalyticsPlaceholder(el, false, predictiveMessage);
+      });
+    }
+
+    const riskMessage = showOperational
+      ? "Risk and anomaly analytics are disabled by system settings."
+      : operationalMessage;
+    [
+      generalRiskAnalytics,
+      fileMovementInsightGrid,
+      workflowAlertsAnalytics
+    ].forEach((el) => {
+      if (!showRisk) {
+        setAnalyticsHidden(el, true);
+        setAnalyticsPlaceholder(el, true, riskMessage);
+      } else {
+        setAnalyticsHidden(el, false);
+        setAnalyticsPlaceholder(el, false, riskMessage);
+      }
+    });
+
+    const exportButtons = [
+      exportWorkflowPerformanceXlsxBtn,
+      exportWorkflowPerformancePdfBtn,
+      exportWorkflowAlertsXlsBtn,
+      exportWorkflowAlertsPdfBtn
+    ];
+    exportButtons.forEach((btn) => toggleElement(btn, analyticsSettings.exportEnabled));
+  }
+
+  function syncMainHeaderOffset() {
+    const header = document.getElementById("mainHeader");
+    const headerHeight = header ? Math.max(0, Math.round(header.getBoundingClientRect().height)) : 0;
+    document.documentElement.style.setProperty("--main-header-height", `${headerHeight}px`);
+  }
+
+  function initializeMainHeaderOffsetSync() {
+    const attachHeaderObserver = () => {
+      const header = document.getElementById("mainHeader");
+      if (!header) return false;
+
+      if ("ResizeObserver" in window && !headerResizeObserver) {
+        headerResizeObserver = new ResizeObserver(() => {
+          syncMainHeaderOffset();
+        });
+        headerResizeObserver.observe(header);
+      }
+
+      syncMainHeaderOffset();
+      return true;
+    };
+
+    if (!attachHeaderObserver()) {
+      let attempts = 0;
+      const maxAttempts = 40;
+      const poll = setInterval(() => {
+        attempts += 1;
+        if (attachHeaderObserver() || attempts >= maxAttempts) {
+          clearInterval(poll);
+        }
+      }, 100);
+    }
+
+    [0, 100, 300, 700, 1200].forEach((delay) => {
+      setTimeout(syncMainHeaderOffset, delay);
+    });
+
+    window.addEventListener("resize", syncMainHeaderOffset, { passive: true });
+    window.addEventListener("orientationchange", syncMainHeaderOffset);
+    window.addEventListener("load", syncMainHeaderOffset);
+  }
+
+  function formatRelativeSyncTime(syncTs) {
+    if (!syncTs) return "Awaiting first sync";
+    const seconds = Math.max(0, Math.floor((Date.now() - syncTs) / 1000));
+    if (seconds < 5) return "Just now";
+    if (seconds < 60) return `${seconds}s ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ago`;
+  }
+
+  function refreshDashboardLiveStampLabel() {
+    if (!dashboardLiveText) return;
+    const sectionLabel = dashboardLastSyncSection || "dashboard";
+    const relativeText = formatRelativeSyncTime(dashboardLastSyncTs);
+    dashboardLiveText.textContent = `Live data synced ${relativeText} | ${sectionLabel}`;
+  }
+
+  function updateDashboardLiveStamp(sectionId) {
+    dashboardLastSyncTs = Date.now();
+    dashboardLastSyncSection = liveSectionLabels[sectionId] || "Dashboard";
+    refreshDashboardLiveStampLabel();
+  }
+
+  /* Section Navigation Logic*/
   function switchSection(targetSectionId) {
+    if (targetSectionId === "workflowSection" && !canViewWorkflow(currentSessionRole || getCurrentRole())) {
+      targetSectionId = "claimsSection";
+    }
+    if (targetSectionId === "feedbackSection" && !canViewFeedbackSection()) {
+      targetSectionId = "claimsSection";
+    }
+    if (targetSectionId === "dataSection" && !canViewDataManagement(currentSessionRole || getCurrentRole())) {
+      targetSectionId = "claimsSection";
+    }
+
     // Remove active class from all desktop links
     desktopNavLinks.forEach((link) => link.classList.remove("active"));
     
@@ -73,6 +769,48 @@ document.addEventListener("DOMContentLoaded", () => {
       targetSection.classList.add("active");
       // Scroll to top of the content area when switching sections
       document.querySelector('.dashboard-content').scrollTop = 0;
+      if (targetSectionId === "workflowSection") {
+        renderWorkflowPerformance();
+      }
+      if (targetSectionId === "fileMovementSection") {
+        renderFileMovementAnalytics();
+      }
+      if (targetSectionId === "lifeCertSection") {
+        renderLifeCertificates();
+      }
+      if (targetSectionId === "payrollSection") {
+        renderPayrollMovements();
+      }
+      if (targetSectionId === "claimsSection") {
+        renderClaimsSummary();
+      }
+      if (targetSectionId === "pensionersSection") {
+        renderPensionersSummary();
+      }
+      if (targetSectionId === "demographicsSection") {
+        renderDemographicsSection();
+      }
+      if (targetSectionId === "categoriesSection") {
+        renderModeOfRetirement();
+      }
+      if (targetSectionId === "staffDueSection") {
+        renderStaffDue();
+      }
+      if (targetSectionId === "filesSection") {
+        renderFilesSummary();
+      }
+      if (targetSectionId === "usersSection") {
+        renderUsersSummary();
+      }
+      if (targetSectionId === "generalSection") {
+        renderGeneralStatistics();
+      }
+      if (targetSectionId === "feedbackSection") {
+        renderFeedbackManagement();
+      }
+      if (targetSectionId === "dataSection") {
+        renderActiveDataManagementTab();
+      }
     }
   }
 
@@ -93,27 +831,37 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  /* ============================================================
-     LOAD USER INFO
-     ============================================================ */
+  /* Load User Info*/
+  function getTimeGreeting(date = new Date()) {
+    const hour = Number(date.getHours());
+    if (hour >= 5 && hour < 12) return "Good morning";
+    if (hour >= 12 && hour < 17) return "Good afternoon";
+    return "Good evening";
+  }
+
   function loadUserInfo() {
     try {
       const userData = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
       const userName = userData.name || sessionStorage.getItem('userName') || 'User';
-      const userRole = userData.role || sessionStorage.getItem('userRole') || 'User';
-      
-      welcomeUser.textContent = `Welcome, ${userName} (${userRole})`;
+      const rawUserRole = userData.role || sessionStorage.getItem('userRole') || 'User';
+      const rawRoleLabel = userData.role_label || userData.roleLabel || sessionStorage.getItem('userRoleLabel') || '';
+      const roleLabel = formatRoleName(rawUserRole, rawRoleLabel);
+      const greeting = getTimeGreeting();
+
+      welcomeUser.textContent = `${greeting}, ${userName} (${roleLabel})`;
     } catch (error) {
       console.error('Error loading user info:', error);
-      welcomeUser.textContent = 'Welcome to PensionsGo Dashboard';
+      welcomeUser.textContent = `${getTimeGreeting()}, welcome to PensionsGo Dashboard`;
     }
   }
 
   loadUserInfo();
+  setInterval(loadUserInfo, 60 * 1000);
+  initializeMainHeaderOffsetSync();
+  refreshDashboardLiveStampLabel();
+  setInterval(refreshDashboardLiveStampLabel, 30000);
 
-  /* ============================================================
-     HELPER FUNCTION: Create Card
-     ============================================================ */
+  /* HELPER FUNCTION: Create Card */
   function createCard(title, total, subtitle1 = "", val1 = "", subtitle2 = "", val2 = "", color = "blue") {
     const card = document.createElement("div");
     card.className = `card ${color}`;
@@ -126,12 +874,93 @@ document.addEventListener("DOMContentLoaded", () => {
     return card;
   }
 
-  /* ============================================================
-     API CALL: Fetch Users Data
-     ============================================================ */
+  function setAnalyticsEmpty(container, message = "No analytics available.") {
+    if (!container) return;
+    container.innerHTML = `<div class="analytics-empty-state">${escapeHtml(message)}</div>`;
+  }
+
+  function renderAnalyticsBarList(container, items = [], options = {}) {
+    if (!container) return;
+    const rows = Array.isArray(items) ? items.filter((item) => item && Number(item.value || 0) >= 0) : [];
+    if (!rows.length) {
+      setAnalyticsEmpty(container, options.emptyMessage || "No analytics available.");
+      return;
+    }
+
+    const maxValue = Math.max(1, ...rows.map((item) => Number(item.value || 0)));
+    const valueFormatter = typeof options.valueFormatter === "function"
+      ? options.valueFormatter
+      : (value) => Number(value || 0).toLocaleString();
+
+    container.innerHTML = rows.map((item) => {
+      const value = Number(item.value || 0);
+      const fillPercent = Math.max(4, Math.min(100, (value / maxValue) * 100));
+      return `
+        <div class="analytics-bar-row tone-${escapeHtml(item.tone || "info")}">
+          <div class="analytics-bar-topline">
+            <span class="analytics-bar-label">${escapeHtml(item.label || "Item")}</span>
+            <span class="analytics-bar-value">${escapeHtml(valueFormatter(value, item))}</span>
+          </div>
+          <div class="analytics-bar-track">
+            <div class="analytics-bar-fill" style="--fill:${fillPercent.toFixed(2)}%;"></div>
+          </div>
+          ${item.meta ? `<div class="analytics-bar-meta">${escapeHtml(item.meta)}</div>` : ""}
+        </div>
+      `;
+    }).join("");
+  }
+
+  function renderAnalyticsStatGrid(container, items = [], options = {}) {
+    if (!container) return;
+    const rows = Array.isArray(items) ? items.filter((item) => item && item.label) : [];
+    if (!rows.length) {
+      setAnalyticsEmpty(container, options.emptyMessage || "No metrics available.");
+      return;
+    }
+
+    container.innerHTML = rows.map((item) => `
+      <article class="analytics-stat-card tone-${escapeHtml(item.tone || "info")}">
+        <span class="analytics-stat-label">${escapeHtml(item.label)}</span>
+        <strong class="analytics-stat-value">${escapeHtml(item.value ?? "0")}</strong>
+        <span class="analytics-stat-helper">${escapeHtml(item.helper || "")}</span>
+      </article>
+    `).join("");
+  }
+
+  function renderAnalyticsNotes(container, items = [], options = {}) {
+    if (!container) return;
+    const rows = Array.isArray(items) ? items.filter((item) => item && item.title) : [];
+    if (!rows.length) {
+      setAnalyticsEmpty(container, options.emptyMessage || "No narrative insights available.");
+      return;
+    }
+
+    container.innerHTML = rows.map((item) => `
+      <article class="analytics-note-item tone-${escapeHtml(item.tone || "info")}">
+        <strong>${escapeHtml(item.title)}</strong>
+        <p>${escapeHtml(item.body || "")}</p>
+      </article>
+    `).join("");
+  }
+
+  function toPercent(numerator, denominator, digits = 1) {
+    const top = Number(numerator || 0);
+    const bottom = Number(denominator || 0);
+    if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom <= 0) {
+      return "0.0%";
+    }
+    return `${((top / bottom) * 100).toFixed(digits)}%`;
+  }
+
+  function pluralize(value, singular, plural = `${singular}s`) {
+    const count = Number(value || 0);
+    return `${count.toLocaleString()} ${count === 1 ? singular : plural}`;
+  }
+
+  /* API CALL: Fetch Users Data */
   async function fetchUsersData() {
     try {
-      console.log('🔄 Fetching users data from API...');
+      console.log('Fetching users data from API...');
       
       const response = await fetch('../backend/api/get_users_summary.php', {
         method: 'GET',
@@ -148,44 +977,111 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await response.json();
       
       if (data.success) {
-        console.log('✅ Users data fetched successfully:', data.users);
-        return data.users;
+        dashboardRoleLabelMap = {
+          ...dashboardRoleLabelMap,
+          ...(data.role_labels || {})
+        };
+        const users = Array.isArray(data.users) ? data.users : [];
+        console.log('Users data fetched successfully:', users);
+        return users;
       } else {
         throw new Error(data.message || 'Failed to fetch users data');
       }
     } catch (error) {
-      console.error('❌ Error fetching users data:', error);
-      // Return mock data as fallback
-      return getMockUsersData();
+      console.error('Error fetching users data:', error);
+      return await fetchUsersDataFallback();
     }
   }
 
-  /* ============================================================
-     MOCK DATA FALLBACK
-     ============================================================ */
-  function getMockUsersData() {
-    console.warn('⚠️ Using mock users data as fallback');
-    return [
-      { role: 'admin', count: 3 },
-      { role: 'clerk', count: 8 },
-      { role: 'oc_pen', count: 2 },
-      { role: 'writeup_officer', count: 4 },
-      { role: 'file_creator', count: 3 },
-      { role: 'data_entry', count: 6 },
-      { role: 'assessor', count: 3 },
-      { role: 'auditor', count: 2 },
-      { role: 'approver', count: 2 }
-    ];
+  async function fetchUsersDataFallback() {
+    try {
+      const response = await fetch('../backend/api/get_users.php', {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store'
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        return [];
+      }
+
+      dashboardRoleLabelMap = {
+        ...dashboardRoleLabelMap,
+        ...(data.role_labels || {})
+      };
+
+      const users = Array.isArray(data.users) ? data.users : [];
+      const counts = new Map();
+      users.forEach((user) => {
+        const key = String(user.userRole || '').toLowerCase().trim();
+        if (!key) return;
+        counts.set(key, (counts.get(key) || 0) + 1);
+      });
+
+      const roleRows = [];
+      const seen = new Set();
+      const roles = Array.isArray(data.roles) ? data.roles : [];
+
+      roles.forEach((role) => {
+        const key = String(role.role_key || '').toLowerCase().trim();
+        if (!key) return;
+        roleRows.push({
+          role: key,
+          role_label: role.role_label || dashboardRoleLabelMap[key] || '',
+          count: Number(counts.get(key) || 0),
+          is_active: Boolean(role.is_active),
+          is_system: Boolean(role.is_system)
+        });
+        seen.add(key);
+      });
+
+      counts.forEach((count, key) => {
+        if (seen.has(key)) return;
+        roleRows.push({
+          role: key,
+          role_label: dashboardRoleLabelMap[key] || '',
+          count: Number(count || 0),
+          is_active: true,
+          is_system: false
+        });
+      });
+
+      return roleRows;
+    } catch (fallbackError) {
+      console.error('Fallback users fetch failed:', fallbackError);
+      return [];
+    }
   }
 
-  /* ============================================================
-     FORMAT ROLE NAME FOR DISPLAY
-     ============================================================ */
-  function formatRoleName(role) {
+  /* Format Role Name For Display*/
+  function formatRoleName(role, providedLabel = "") {
+    const roleKey = String(role || '').toLowerCase().trim();
+    if (roleKey === 'dep_oc') {
+      return 'Deputy OC-PEN';
+    }
+    if (providedLabel && String(providedLabel).trim() !== '') {
+      const cleanedLabel = String(providedLabel).trim();
+      if (cleanedLabel.toLowerCase() === 'dep oc' || cleanedLabel.toLowerCase() === 'dep_oc') {
+        return 'Deputy OC-PEN';
+      }
+      return cleanedLabel;
+    }
+    if (dashboardRoleLabelMap[roleKey]) {
+      const mapped = String(dashboardRoleLabelMap[roleKey] || '').trim();
+      if (roleKey === 'dep_oc') {
+        return 'Deputy OC-PEN';
+      }
+      return mapped;
+    }
+
     const roleMap = {
       'admin': 'Admin',
       'clerk': 'Clerk',
       'oc_pen': 'OC-PEN',
+      'dep_oc': 'Deputy OC-PEN',
+      'deputy_oc': 'Deputy OC-PEN',
+      'deputy_oc_pen': 'Deputy OC-PEN',
+      'deputy_oc_pension': 'Deputy OC-PEN',
       'writeup_officer': 'Write-up Officer',
       'file_creator': 'File Creator',
       'data_entry': 'Data Entrant',
@@ -196,17 +1092,20 @@ document.addEventListener("DOMContentLoaded", () => {
       'user': 'User'
     };
     
-    return roleMap[role] || role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    return roleMap[roleKey] || roleKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   }
 
-  /* ============================================================
-     ASSIGN COLOR BASED ON ROLE
-     ============================================================ */
+  /* Assign Color Based On Role*/
   function getRoleColor(role) {
+    const roleKey = String(role || '').toLowerCase().trim();
     const colorMap = {
       'admin': 'purple',
       'clerk': 'blue',
       'oc_pen': 'teal',
+      'dep_oc': 'teal',
+      'deputy_oc': 'teal',
+      'deputy_oc_pen': 'teal',
+      'deputy_oc_pension': 'teal',
       'writeup_officer': 'green',
       'file_creator': 'orange',
       'data_entry': 'blue',
@@ -217,192 +1116,7329 @@ document.addEventListener("DOMContentLoaded", () => {
       'user': 'purple'
     };
     
-    return colorMap[role] || 'blue';
+    if (colorMap[roleKey]) {
+      return colorMap[roleKey];
+    }
+
+    const palette = ['blue', 'teal', 'green', 'orange', 'purple', 'red'];
+    const hash = roleKey.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+    return palette[Math.abs(hash) % palette.length];
   }
 
-  /* ============================================================
-     RENDER FUNCTIONS
-     ============================================================ */
+  function getCurrentRole() {
+    if (currentSessionRole) {
+      return String(currentSessionRole).toLowerCase().trim();
+    }
+    try {
+      const userData = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
+      const storedEffective = sessionStorage.getItem('userRoleEffective') || localStorage.getItem('userRoleEffective') || '';
+      if (storedEffective) {
+        return String(storedEffective).toLowerCase().trim();
+      }
+      const role = userData.role || sessionStorage.getItem('userRole') || '';
+      const normalized = String(role).toLowerCase().trim();
+      if (normalized === 'administrator') return 'admin';
+      if (normalized === 'oc/pension' || normalized === 'oc pension') return 'oc_pen';
+      if (normalized === 'dep oc' || normalized === 'deputy oc' || normalized === 'deputy oc/pen' || normalized === 'deputy oc-pen' || normalized === 'deputy oc pension' || normalized === 'deputy oc/pension') return 'oc_pen';
+      if (normalized === 'dep_oc' || normalized === 'deputy_oc' || normalized === 'deputy_oc_pen' || normalized === 'deputy_oc_pension') return 'oc_pen';
+      if (normalized === 'data entrant') return 'data_entry';
+      if (normalized === 'writeup officer') return 'writeup_officer';
+      if (normalized === 'file creator') return 'file_creator';
+      return normalized;
+    } catch (error) {
+      const storedEffective = sessionStorage.getItem('userRoleEffective') || localStorage.getItem('userRoleEffective') || '';
+      if (storedEffective) {
+        return String(storedEffective).toLowerCase().trim();
+      }
+      const fallback = String(sessionStorage.getItem('userRole') || '').toLowerCase().trim();
+      if (fallback === 'administrator') return 'admin';
+      if (fallback === 'oc/pension' || fallback === 'oc pension') return 'oc_pen';
+      if (fallback === 'dep oc' || fallback === 'deputy oc' || fallback === 'deputy oc/pen' || fallback === 'deputy oc-pen' || fallback === 'deputy oc pension' || fallback === 'deputy oc/pension' || fallback === 'dep_oc' || fallback === 'deputy_oc' || fallback === 'deputy_oc_pen' || fallback === 'deputy_oc_pension') return 'oc_pen';
+      return fallback;
+    }
+  }
 
-  // ---- Claims Summary ----
-  function renderClaimsSummary() {
-    const data = [
-      { type: "Pension", count: 35, color: "blue" },
-      { type: "Gratuity", count: 22, color: "green" },
-      { type: "Arrears", count: 8, color: "orange" },
-      { type: "Full Pension", count: 5, color: "teal" },
-      { type: "Underpayment", count: 3, color: "red" },
-    ];
-    claimsCards.innerHTML = "";
-    data.forEach((item) => {
-      const card = createCard(item.type, item.count, "", "", "", "", item.color);
-      claimsCards.appendChild(card);
+  async function ensureActiveSession() {
+    try {
+      const res = await fetch('../backend/api/check_session.php', {
+        credentials: 'include',
+        cache: 'no-store'
+      });
+      const data = await res.json();
+      if (!data.active) {
+        window.location.replace('login.html');
+        return false;
+      }
+      currentSessionRole = String(data.userRoleEffective || data.userRole || '').toLowerCase().trim();
+      return true;
+    } catch (error) {
+      console.error('Session validation failed:', error);
+      window.location.replace('login.html');
+      return false;
+    }
+  }
+
+  function canViewWorkflow(role) {
+    const normalizedRole = String(role || "").toLowerCase().trim();
+    return normalizedRole === "admin"
+      || normalizedRole === "oc_pen"
+      || normalizedRole === "dep_oc"
+      || normalizedRole === "deputy_oc"
+      || normalizedRole === "deputy_oc_pen"
+      || normalizedRole === "deputy_oc_pension";
+  }
+
+  function canViewFeedbackSection() {
+    return getDashboardPermission("feedback.view", false);
+  }
+
+  function canManageFeedbackSection() {
+    if (!canEditDashboardData()) return false;
+    return getDashboardPermission("feedback.manage", false);
+  }
+
+  function normalizeDataManagementRole(role) {
+    const normalized = String(role || "").toLowerCase().trim();
+    if (normalized === "administrator") return "admin";
+    if (normalized === "oc/pension" || normalized === "oc pension") return "oc_pen";
+    if (
+      normalized === "dep oc"
+      || normalized === "deputy oc"
+      || normalized === "deputy oc/pen"
+      || normalized === "deputy oc-pen"
+      || normalized === "deputy oc pension"
+      || normalized === "deputy oc/pension"
+    ) {
+      return "dep_oc";
+    }
+    if (["deputy_oc", "deputy_oc_pen", "deputy_oc_pension"].includes(normalized)) return "dep_oc";
+    return normalized;
+  }
+
+  function canViewDataManagement(role) {
+    const normalizedRole = normalizeDataManagementRole(role);
+    return normalizedRole === "admin"
+      || normalizedRole === "oc_pen"
+      || normalizedRole === "dep_oc";
+  }
+
+  function applyDataManagementVisibility(role) {
+    const allowed = canViewDataManagement(role);
+    if (dataManagementDesktopLink) {
+      const listItem = dataManagementDesktopLink.closest("li");
+      if (listItem) {
+        listItem.style.display = allowed ? "" : "none";
+      }
+    }
+
+    if (dataManagementMobileOption) {
+      dataManagementMobileOption.hidden = !allowed;
+      dataManagementMobileOption.disabled = !allowed;
+      if (!allowed && mobileNavSelect && mobileNavSelect.value === "dataSection") {
+        mobileNavSelect.value = "claimsSection";
+      }
+    }
+
+    if (dataManagementSection) {
+      dataManagementSection.style.display = allowed ? "" : "none";
+      if (!allowed && dataManagementSection.classList.contains("active")) {
+        switchSection("claimsSection");
+      }
+    }
+  }
+
+  function applyWorkflowMenuVisibility(role) {
+    const allowed = canViewWorkflow(role);
+
+    if (workflowDesktopLink) {
+      const listItem = workflowDesktopLink.closest("li");
+      if (listItem) {
+        listItem.style.display = allowed ? "" : "none";
+      }
+    }
+
+    if (workflowMobileOption) {
+      workflowMobileOption.hidden = !allowed;
+      workflowMobileOption.disabled = !allowed;
+      if (!allowed && mobileNavSelect && mobileNavSelect.value === "workflowSection") {
+        mobileNavSelect.value = "claimsSection";
+      }
+    }
+
+    const workflowSection = document.getElementById("workflowSection");
+    if (workflowSection && !allowed && workflowSection.classList.contains("active")) {
+      switchSection("claimsSection");
+    }
+  }
+
+  function applyFeedbackMenuVisibility() {
+    const allowed = canViewFeedbackSection();
+    if (feedbackDesktopLink) {
+      const listItem = feedbackDesktopLink.closest("li");
+      if (listItem) {
+        listItem.style.display = allowed ? "" : "none";
+      }
+    }
+
+    if (feedbackMobileOption) {
+      feedbackMobileOption.hidden = !allowed;
+      feedbackMobileOption.disabled = !allowed;
+      if (!allowed && mobileNavSelect && mobileNavSelect.value === "feedbackSection") {
+        mobileNavSelect.value = "claimsSection";
+      }
+    }
+
+    const feedbackSection = document.getElementById("feedbackSection");
+    if (feedbackSection && !allowed && feedbackSection.classList.contains("active")) {
+      switchSection("claimsSection");
+    }
+  }
+
+  function formatDurationHours(value) {
+    const hours = Number(value || 0);
+    if (!Number.isFinite(hours) || hours <= 0) return "0h";
+    if (hours >= 24) {
+      const days = Math.floor(hours / 24);
+      const remHours = Math.round(hours % 24);
+      return `${days}d ${remHours}h`;
+    }
+    return `${hours.toFixed(1)}h`;
+  }
+
+  function getFilteredWorkflowItems() {
+    const items = Array.isArray(workflowState.items) ? workflowState.items : [];
+    if (!items.length) return [];
+
+    const searchPhrase = String(workflowSearchInput?.value || "").toLowerCase().trim();
+    const selectedRole = String(workflowRoleFilter?.value || "").toLowerCase().trim();
+    const selectedState = String(workflowStateFilter?.value || "").toLowerCase().trim();
+
+    return items.filter((item) => {
+      const role = String(item.user_role || "").toLowerCase().trim();
+      const name = String(item.user_name || "").toLowerCase().trim();
+      const roleLabel = String(item.user_role_label || "").toLowerCase().trim();
+      const hasSearchMatch = !searchPhrase
+        || name.includes(searchPhrase)
+        || roleLabel.includes(searchPhrase)
+        || role.includes(searchPhrase);
+      if (!hasSearchMatch) return false;
+
+      if (selectedRole && selectedRole !== role) {
+        return false;
+      }
+
+      const overdue = Number(item.overdue_open || 0);
+      const openTasks = Number(item.active_open || 0);
+      const responseRate = Number(item.response_rate || 0);
+
+      if (selectedState === "overdue") return overdue > 0;
+      if (selectedState === "open") return openTasks > 0;
+      if (selectedState === "high_response") return responseRate >= 80;
+      if (selectedState === "low_response") return responseRate < 50;
+      return true;
     });
   }
 
-  // ---- Pensioners Summary ----
-  function renderPensionersSummary() {
-    // Totals for simulation
-    const total = { total: 620, male: 380, female: 240 };
-    const alive = { total: 520, male: 320, female: 200 };
-    const deceased = { total: 100, male: 60, female: 40 };
+  function renderWorkflowPerformanceRows() {
+    if (!workflowPerformanceBody) return;
+    const items = getFilteredWorkflowItems();
+    if (!items.length) {
+      workflowPerformanceBody.innerHTML = '<tr><td colspan="8">No performance records match the selected filters.</td></tr>';
+      return;
+    }
 
-    pensionerTotalCard.innerHTML = "";
-    alivePensionerCards.innerHTML = "";
-    deceasedPensionerCards.innerHTML = "";
-
-    pensionerTotalCard.appendChild(
-      createCard("Total Pensioners", total.total, "Male", total.male, "Female", total.female, "purple")
-    );
-
-    alivePensionerCards.appendChild(
-      createCard("Alive Pensioners", alive.total, "Male", alive.male, "Female", alive.female, "green")
-    );
-
-    deceasedPensionerCards.appendChild(
-      createCard("Deceased Pensioners", deceased.total, "Male", deceased.male, "Female", deceased.female, "red")
-    );
+    workflowPerformanceBody.innerHTML = items.map((item) => `
+      <tr>
+        <td>${item.user_name || 'Unknown'}</td>
+        <td>${formatRoleName(item.user_role || '', item.user_role_label || '')}</td>
+        <td>${Number(item.assigned_total || 0).toLocaleString()}</td>
+        <td>${Number(item.completed_total || 0).toLocaleString()}</td>
+        <td>${Number(item.active_open || 0).toLocaleString()}</td>
+        <td>${Number(item.overdue_open || 0).toLocaleString()}</td>
+        <td>${Number(item.response_rate || 0).toFixed(1)}%</td>
+        <td>${formatDurationHours(item.avg_completion_hours || 0)}</td>
+      </tr>
+    `).join("");
   }
 
-  // ---- Mode of Retirement ----
-  function renderModeOfRetirement() {
-    const modes = [
-      { name: "Mandatory", total: 180, alive: 150, deceased: 30 },
-      { name: "AOR / Early", total: 110, alive: 95, deceased: 15 },
-      { name: "Marriage Grounds", total: 30, alive: 28, deceased: 2 },
-      { name: "Discharge (CBE)", total: 70, alive: 65, deceased: 5 },
-      { name: "Discharge (UBE)", total: 45, alive: 40, deceased: 5 },
-      { name: "Medical Grounds", total: 60, alive: 55, deceased: 5 },
-      { name: "Contract", total: 40, alive: 35, deceased: 5 },
-      { name: "Voluntary", total: 20, alive: 18, deceased: 2 },
-      { name: "Abolition of Office", total: 15, alive: 13, deceased: 2 },
-    ];
+  function formatDurationCompact(seconds) {
+    const totalSeconds = Number(seconds || 0);
+    if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return "0m";
+    const mins = Math.floor(totalSeconds / 60);
+    const hours = Math.floor(mins / 60);
+    const days = Math.floor(hours / 24);
+    if (days > 0) return `${days}d ${hours % 24}h`;
+    if (hours > 0) return `${hours}h ${mins % 60}m`;
+    return `${Math.max(1, mins)}m`;
+  }
 
-    categoryCards.innerHTML = "";
-    modes.forEach((m) => {
-      categoryCards.appendChild(
-        createCard(m.name, m.total, "Alive", m.alive, "Deceased", m.deceased, "orange")
+  function formatCurrencyUGX(value) {
+    const amount = Number(value || 0);
+    if (!Number.isFinite(amount)) return "UGX 0.00";
+    return `UGX ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  function escapeHtml(value) {
+    if (value === null || value === undefined) return "";
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function getDashboardPreparedByName() {
+    try {
+      const userData = JSON.parse(localStorage.getItem("loggedInUser") || "{}");
+      const candidate = String(
+        userData.userName
+        || userData.name
+        || sessionStorage.getItem("userName")
+        || ""
+      ).trim();
+      return candidate || "Dashboard user";
+    } catch (_error) {
+      return String(sessionStorage.getItem("userName") || "").trim() || "Dashboard user";
+    }
+  }
+
+  function triggerCurrentTabDownload(url, filename = "") {
+    const safeUrl = String(url || "").trim();
+    if (!safeUrl) return false;
+    const anchor = document.createElement("a");
+    anchor.href = safeUrl;
+    if (filename) {
+      anchor.download = filename;
+    }
+    anchor.rel = "noopener";
+    anchor.style.display = "none";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    return true;
+  }
+
+  function openPdfInSecureViewer(url, label = "Exported PDF") {
+    const safeUrl = String(url || "").trim();
+    if (!safeUrl) return false;
+    const viewerUrl = window.PensionsGoDocumentViewer?.buildViewerUrl
+      ? window.PensionsGoDocumentViewer.buildViewerUrl(safeUrl, {
+        label,
+        backUrl: window.location.href
+      })
+      : "";
+    if (viewerUrl) {
+      window.location.assign(viewerUrl);
+      return true;
+    }
+    window.location.assign(safeUrl);
+    return true;
+  }
+
+  function deliverDashboardExport(url, options = {}) {
+    const safeUrl = String(url || "").trim();
+    if (!safeUrl) return false;
+    const normalizedFormat = String(options.format || "").trim().toLowerCase();
+    const label = String(options.label || "Exported file").trim() || "Exported file";
+    const fileName = String(options.fileName || "").trim();
+    if (normalizedFormat === "pdf") {
+      return openPdfInSecureViewer(safeUrl, label);
+    }
+    return triggerCurrentTabDownload(safeUrl, fileName);
+  }
+
+  function exportWorkflowAlerts(format) {
+    const normalized = String(format || "").toLowerCase();
+    if (!["xlsx", "pdf"].includes(normalized)) {
+      return;
+    }
+    if (!analyticsSettings.exportEnabled) {
+      notifyDashboard("warning", "Analytics exports are disabled by system settings.", "Export");
+      return;
+    }
+    const url = `../backend/api/exports/export_workflow_alerts.php?format=${encodeURIComponent(normalized)}`;
+    deliverDashboardExport(url, {
+      format: normalized,
+      label: "Workflow Alerts Report"
+    });
+  }
+
+  function exportWorkflowPerformance(format) {
+    const normalized = String(format || "").toLowerCase();
+    if (!["xlsx", "pdf"].includes(normalized)) {
+      return;
+    }
+    if (!analyticsSettings.exportEnabled) {
+      notifyDashboard("warning", "Analytics exports are disabled by system settings.", "Export");
+      return;
+    }
+    const url = `../backend/api/exports/export_workflow_performance.php?format=${encodeURIComponent(normalized)}`;
+    deliverDashboardExport(url, {
+      format: normalized,
+      label: "Workflow Performance Report"
+    });
+  }
+
+  function formatAlertTypeLabel(value) {
+    const normalized = String(value || "").toLowerCase();
+    if (normalized === "due_soon") return "Due Soon";
+    if (normalized === "overdue") return "Overdue";
+    if (normalized === "stalled") return "Stalled";
+    return normalized ? normalized.replace(/_/g, " ").replace(/\b\w/g, (ch) => ch.toUpperCase()) : "Alert";
+  }
+
+  function formatMinutesCompact(minutesValue) {
+    const minutes = Number(minutesValue || 0);
+    if (!Number.isFinite(minutes) || minutes <= 0) return "0m";
+    if (minutes >= 60) {
+      const hours = Math.floor(minutes / 60);
+      const remMins = Math.round(minutes % 60);
+      return `${hours}h ${remMins}m`;
+    }
+    return `${Math.round(minutes)}m`;
+  }
+
+  function drawWorkflowAlertTrend(trend) {
+    if (!workflowAlertTrendChart) return;
+
+    const ctx = workflowAlertTrendChart.getContext("2d");
+    if (!ctx) return;
+
+    const labels = Array.isArray(trend?.labels) ? trend.labels : [];
+    const opened = Array.isArray(trend?.opened) ? trend.opened : [];
+    const resolved = Array.isArray(trend?.resolved) ? trend.resolved : [];
+    const critical = Array.isArray(trend?.critical) ? trend.critical : [];
+
+    const width = workflowAlertTrendChart.clientWidth || 900;
+    const height = 240;
+    workflowAlertTrendChart.width = width;
+    workflowAlertTrendChart.height = height;
+
+    ctx.clearRect(0, 0, width, height);
+    if (!labels.length) {
+      ctx.fillStyle = "#64748b";
+      ctx.font = "13px Segoe UI, sans-serif";
+      ctx.fillText("No alert trend data available.", 12, 28);
+      return;
+    }
+
+    const values = [...opened, ...resolved, ...critical].map((v) => Number(v || 0));
+    const maxValue = Math.max(1, ...values);
+    const leftPadding = 42;
+    const topPadding = 16;
+    const bottomPadding = 30;
+    const graphHeight = height - topPadding - bottomPadding;
+    const graphWidth = width - leftPadding - 12;
+    const stepX = labels.length > 1 ? graphWidth / (labels.length - 1) : graphWidth;
+
+    // Grid lines.
+    ctx.strokeStyle = "rgba(100, 116, 139, 0.22)";
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i += 1) {
+      const y = topPadding + (graphHeight * i / 4);
+      ctx.beginPath();
+      ctx.moveTo(leftPadding, y);
+      ctx.lineTo(width - 8, y);
+      ctx.stroke();
+    }
+
+    const renderSeries = (series, color, fill = false) => {
+      ctx.beginPath();
+      series.forEach((rawValue, index) => {
+        const value = Number(rawValue || 0);
+        const x = leftPadding + (stepX * index);
+        const y = topPadding + graphHeight - ((value / maxValue) * graphHeight);
+        if (index === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      if (fill) {
+        ctx.lineTo(leftPadding + (stepX * (series.length - 1)), topPadding + graphHeight);
+        ctx.lineTo(leftPadding, topPadding + graphHeight);
+        ctx.closePath();
+        ctx.fillStyle = color.replace("1)", "0.12)");
+        ctx.fill();
+      }
+    };
+
+    renderSeries(opened, "rgba(15, 98, 174, 1)", true);
+    renderSeries(resolved, "rgba(22, 163, 74, 1)");
+    renderSeries(critical, "rgba(185, 28, 28, 1)");
+
+    ctx.fillStyle = "#64748b";
+    ctx.font = "11px Segoe UI, sans-serif";
+    labels.forEach((label, index) => {
+      if (labels.length > 8 && index % 2 !== 0) return;
+      const x = leftPadding + (stepX * index);
+      const pretty = String(label).slice(5);
+      ctx.fillText(pretty, x - 14, height - 10);
+    });
+
+    // Legend.
+    const legend = [
+      { label: "Opened", color: "rgba(15, 98, 174, 1)" },
+      { label: "Resolved", color: "rgba(22, 163, 74, 1)" },
+      { label: "Critical", color: "rgba(185, 28, 28, 1)" }
+    ];
+    let legendX = leftPadding;
+    legend.forEach((item) => {
+      ctx.fillStyle = item.color;
+      ctx.fillRect(legendX, 4, 10, 10);
+      ctx.fillStyle = "#475569";
+      ctx.fillText(item.label, legendX + 14, 13);
+      legendX += 84;
+    });
+  }
+
+  function statusBadge(status) {
+    const normalized = String(status || "").toLowerCase();
+    let cls = "status-chip neutral";
+    if (normalized === "submitted" || normalized === "on payroll") cls = "status-chip success";
+    if (normalized === "not submitted" || normalized === "not on payroll") cls = "status-chip warning";
+    if (normalized === "exempt") cls = "status-chip muted";
+    return `<span class="${cls}">${escapeHtml(status || "N/A")}</span>`;
+  }
+
+  const DASHBOARD_EDIT_ROLES = new Set([
+    "admin",
+    "data_entry",
+    "oc_pen",
+    "dep_oc",
+    "deputy_oc",
+    "deputy_oc_pen",
+    "deputy_oc_pension"
+  ]);
+
+  function canEditDashboardData() {
+    return DASHBOARD_EDIT_ROLES.has(getCurrentRole());
+  }
+
+  function roleCanManageLifeCert() {
+    return canEditDashboardData();
+  }
+
+  function roleCanUploadPayroll() {
+    const fallbackRoles = new Set(["admin", "oc_pen", "clerk"]);
+    return getDashboardPermission("payroll.upload", fallbackRoles.has(getCurrentRole()));
+  }
+
+  function roleCanViewPayrollHistory() {
+    const role = getCurrentRole();
+    return role !== "" && role !== "pensioner";
+  }
+
+  const PAYROLL_MONTH_OPTIONS = [
+    { value: "01", label: "January" },
+    { value: "02", label: "February" },
+    { value: "03", label: "March" },
+    { value: "04", label: "April" },
+    { value: "05", label: "May" },
+    { value: "06", label: "June" },
+    { value: "07", label: "July" },
+    { value: "08", label: "August" },
+    { value: "09", label: "September" },
+    { value: "10", label: "October" },
+    { value: "11", label: "November" },
+    { value: "12", label: "December" }
+  ];
+
+  function buildPayrollYearOptions() {
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for (let year = currentYear + 1; year >= currentYear - 10; year -= 1) {
+      years.push(String(year));
+    }
+    return years;
+  }
+
+  function populatePayrollPeriodSelects() {
+    const yearOptions = buildPayrollYearOptions();
+    const monthMarkup = PAYROLL_MONTH_OPTIONS.map((item) => `<option value="${item.value}">${item.label}</option>`).join("");
+    const yearMarkup = yearOptions.map((year) => `<option value="${escapeHtml(year)}">${escapeHtml(year)}</option>`).join("");
+
+    [payrollUploadModalMonth, payrollRegisterModalMonth].forEach((select) => {
+      if (!select || select.options.length > 1) return;
+      select.innerHTML = `<option value="">Select Month</option>${monthMarkup}`;
+    });
+    [payrollUploadModalYear, payrollRegisterModalYear].forEach((select) => {
+      if (!select || select.options.length > 1) return;
+      select.innerHTML = `<option value="">Select Year</option>${yearMarkup}`;
+    });
+  }
+
+  function getPreferredPayrollPeriod() {
+    const now = new Date();
+    return {
+      month: String(payrollMonth?.value || "").trim() || String(payrollState.latestMonth || "").trim() || String(now.getMonth() + 1).padStart(2, "0"),
+      year: String(payrollYear?.value || "").trim() || String(payrollState.latestYear || "").trim() || String(now.getFullYear())
+    };
+  }
+
+  function applyPayrollPeriodDefaults() {
+    populatePayrollPeriodSelects();
+    const preferred = getPreferredPayrollPeriod();
+    if (payrollUploadModalMonth) payrollUploadModalMonth.value = preferred.month;
+    if (payrollUploadModalYear) payrollUploadModalYear.value = preferred.year;
+    if (payrollRegisterModalMonth) payrollRegisterModalMonth.value = preferred.month;
+    if (payrollRegisterModalYear) payrollRegisterModalYear.value = preferred.year;
+  }
+
+  function openPayrollUploadModal() {
+    if (!payrollUploadModal || !roleCanUploadPayroll()) return;
+    applyPayrollPeriodDefaults();
+    payrollUploadModal.classList.add("open");
+    payrollUploadModal.setAttribute("aria-hidden", "false");
+    syncDashboardModalBodyLock();
+  }
+
+  function closePayrollUploadModal() {
+    if (!payrollUploadModal) return;
+    payrollUploadModal.classList.remove("open");
+    payrollUploadModal.setAttribute("aria-hidden", "true");
+    payrollUploadModalForm?.reset();
+    applyPayrollPeriodDefaults();
+    syncDashboardModalBodyLock();
+  }
+
+  function openPayrollRegisterUploadModal() {
+    if (!payrollRegisterUploadModal || !roleCanUploadPayroll()) return;
+    applyPayrollPeriodDefaults();
+    payrollRegisterUploadModal.classList.add("open");
+    payrollRegisterUploadModal.setAttribute("aria-hidden", "false");
+    syncDashboardModalBodyLock();
+  }
+
+  function closePayrollRegisterUploadModal() {
+    if (!payrollRegisterUploadModal) return;
+    payrollRegisterUploadModal.classList.remove("open");
+    payrollRegisterUploadModal.setAttribute("aria-hidden", "true");
+    payrollRegisterUploadForm?.reset();
+    applyPayrollPeriodDefaults();
+    syncDashboardModalBodyLock();
+  }
+
+  async function fetchPensionersSummaryData(forceRefresh = false) {
+    const now = Date.now();
+    const cacheIsFresh = pensionersState.cache && (now - pensionersState.fetchedAt) < 60000;
+
+    if (!forceRefresh && cacheIsFresh) {
+      return pensionersState.cache;
+    }
+
+    if (pensionersState.pending) {
+      return pensionersState.pending;
+    }
+
+    pensionersState.pending = (async () => {
+      try {
+        const response = await fetch("../backend/api/get_pensioners_summary.php", {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store"
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || `HTTP ${response.status}`);
+        }
+        pensionersState.cache = data;
+        pensionersState.fetchedAt = Date.now();
+        return data;
+      } catch (error) {
+        console.error("Error loading pensioners summary:", error);
+        return null;
+      } finally {
+        pensionersState.pending = null;
+      }
+    })();
+
+    return pensionersState.pending;
+  }
+
+  function invalidatePensionerAnalyticsCaches() {
+    pensionersState.cache = null;
+    pensionersState.fetchedAt = 0;
+    pensionersState.pending = null;
+    demographicsState.cache = null;
+    demographicsState.fetchedAt = 0;
+    demographicsState.pending = null;
+  }
+
+  async function fetchDemographicsSummaryData(forceRefresh = false) {
+    const now = Date.now();
+    const cacheIsFresh = demographicsState.cache && (now - demographicsState.fetchedAt) < 60000;
+
+    if (!forceRefresh && cacheIsFresh) {
+      return demographicsState.cache;
+    }
+
+    if (demographicsState.pending) {
+      return demographicsState.pending;
+    }
+
+    demographicsState.pending = (async () => {
+      try {
+        const response = await fetch("../backend/api/get_pensioner_demographics.php", {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store"
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || `HTTP ${response.status}`);
+        }
+        demographicsState.cache = data;
+        demographicsState.fetchedAt = Date.now();
+        return data;
+      } catch (error) {
+        console.error("Error loading demographics summary:", error);
+        return null;
+      } finally {
+        demographicsState.pending = null;
+      }
+    })();
+
+    return demographicsState.pending;
+  }
+
+  async function fetchDemographicsListData(filters = {}, options = {}) {
+    const query = new URLSearchParams({
+      mode: "list",
+      focus: filters.focus || "oldest",
+      living_status: filters.livingStatus ?? "Alive",
+      gender: filters.gender || "",
+      region: filters.region || "",
+      district: filters.district || "",
+      retirement_type: filters.retirementType || "",
+      search: filters.search || "",
+      limit: String(filters.limit || 120)
+    });
+    const response = await fetch(`../backend/api/get_pensioner_demographics.php?${query.toString()}`, {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+      signal: options.signal
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || `HTTP ${response.status}`);
+    }
+    return data;
+  }
+
+  function populateDropdownOptions(selectEl, options = [], { placeholder = "", valueKey = "value", labelKey = "label" } = {}) {
+    if (!selectEl) return;
+    const current = selectEl.value || "";
+    const rows = Array.isArray(options) ? options : [];
+    const markup = [];
+    if (placeholder) {
+      markup.push(`<option value="">${escapeHtml(placeholder)}</option>`);
+    }
+    rows.forEach((option) => {
+      if (option == null) return;
+      if (typeof option === "string") {
+        markup.push(`<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`);
+        return;
+      }
+      const value = String(option[valueKey] ?? "");
+      const label = String(option[labelKey] ?? value);
+      if (!value && placeholder) return;
+      markup.push(`<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`);
+    });
+    selectEl.innerHTML = markup.join("");
+    if (current) {
+      const exists = Array.from(selectEl.options).some((option) => option.value === current);
+      selectEl.value = exists ? current : "";
+    }
+  }
+
+  function normalizeDemographicsFilterValue(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+
+  function setSelectValue(selectEl, value, fallback = "") {
+    if (!selectEl) return;
+    const target = String(value ?? "");
+    const exists = Array.from(selectEl.options).some((option) => option.value === target);
+    selectEl.value = exists ? target : fallback;
+  }
+
+  function getDemographicsLocationPairs(data = demographicsState.cache) {
+    return Array.isArray(data?.filters?.locations)
+      ? data.filters.locations.filter((item) => item && typeof item === "object")
+      : [];
+  }
+
+  function syncDemographicsLocationOptions(source = "") {
+    if (!demographicsRegionFilter || !demographicsDistrictFilter) return;
+
+    const locationPairs = getDemographicsLocationPairs();
+    let region = String(demographicsRegionFilter.value || "").trim();
+    let district = String(demographicsDistrictFilter.value || "").trim();
+    const districtMatch = district
+      ? locationPairs.find((item) => normalizeDemographicsFilterValue(item?.district) === normalizeDemographicsFilterValue(district))
+      : null;
+
+    if (source === "district" && districtMatch) {
+      region = String(districtMatch.region || "").trim();
+      setSelectValue(demographicsRegionFilter, region, "");
+    } else if (districtMatch && region && normalizeDemographicsFilterValue(districtMatch.region) !== normalizeDemographicsFilterValue(region)) {
+      district = "";
+    }
+
+    const activeRegion = String(demographicsRegionFilter.value || region || "").trim();
+    const districtOptions = Array.from(new Set(
+      locationPairs
+        .filter((item) => !activeRegion || normalizeDemographicsFilterValue(item?.region) === normalizeDemographicsFilterValue(activeRegion))
+        .map((item) => String(item?.district || "").trim())
+        .filter(Boolean)
+    )).sort((left, right) => left.localeCompare(right));
+
+    populateDropdownOptions(demographicsDistrictFilter, districtOptions, { placeholder: "All Districts" });
+    setSelectValue(demographicsDistrictFilter, district, "");
+
+    demographicsState.filters.region = String(demographicsRegionFilter.value || "").trim();
+    demographicsState.filters.district = String(demographicsDistrictFilter.value || "").trim();
+  }
+
+  function populateDemographicsFilters(data) {
+    const filters = data?.filters || {};
+    populateDropdownOptions(demographicsGenderFilter, filters.genders || [], { placeholder: "All Genders" });
+    populateDropdownOptions(demographicsRegionFilter, filters.regions || [], { placeholder: "All Regions" });
+    populateDropdownOptions(demographicsRetirementTypeFilter, filters.retirementTypes || [], {
+      placeholder: "All Retirement Labels",
+      valueKey: "value",
+      labelKey: "label"
+    });
+
+    if (demographicsFocusFilter) demographicsFocusFilter.value = demographicsState.filters.focus || "oldest";
+    if (demographicsLivingStatusFilter) setSelectValue(demographicsLivingStatusFilter, demographicsState.filters.livingStatus, "Alive");
+    if (demographicsGenderFilter) demographicsGenderFilter.value = demographicsState.filters.gender || "";
+    if (demographicsRegionFilter) demographicsRegionFilter.value = demographicsState.filters.region || "";
+    if (demographicsDistrictFilter) demographicsDistrictFilter.value = demographicsState.filters.district || "";
+    if (demographicsRetirementTypeFilter) demographicsRetirementTypeFilter.value = demographicsState.filters.retirementType || "";
+    if (demographicsSearchInput) demographicsSearchInput.value = demographicsState.filters.search || "";
+    syncDemographicsLocationOptions(demographicsState.filters.district ? "district" : "");
+  }
+
+  /* Render Functions*/
+  // Claims Summary
+  async function renderClaimsSummary() {
+    try {
+      const [summaryResponse, dashboardResponse] = await Promise.all([
+        fetch("../backend/api/get_claims_summary.php", {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store"
+        }),
+        fetch("../backend/api/get_claims_dashboard.php?page=1&limit=20", {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store"
+        }).catch(() => null)
+      ]);
+      const data = await summaryResponse.json();
+      if (!summaryResponse.ok || !data.success) {
+        throw new Error(data.message || `HTTP ${summaryResponse.status}`);
+      }
+
+      let dashboardData = null;
+      if (dashboardResponse) {
+        try {
+          const maybeDashboardData = await dashboardResponse.json();
+          if (dashboardResponse.ok && maybeDashboardData.success) {
+            dashboardData = maybeDashboardData;
+          }
+        } catch (dashboardError) {
+          console.warn("Claims analytics payload unavailable:", dashboardError);
+        }
+      }
+
+        const rows = Array.isArray(data.claims) ? data.claims : [];
+
+      const byType = Array.isArray(dashboardData?.byType) ? dashboardData.byType : rows.map((row) => ({
+        claimType: row.type,
+        entries: Number(row.count || 0),
+        expected: 0,
+        paid: 0,
+        balance: 0,
+        countOnly: true
+      }));
+      const claimsUseCurrency = Array.isArray(dashboardData?.byType) && dashboardData.byType.length > 0;
+      renderAnalyticsBarList(
+        claimsTypeAnalytics,
+        [...byType]
+          .sort((a, b) => Number((b.countOnly ? b.entries : (b.balance || b.expected || 0))) - Number((a.countOnly ? a.entries : (a.balance || a.expected || 0))))
+          .slice(0, 6)
+          .map((item) => ({
+            label: item.claimType || "Unspecified",
+            value: Number(item.countOnly ? item.entries : (item.balance || item.expected || 0)),
+            meta: item.countOnly
+              ? `${pluralize(item.entries || 0, "claim")} currently tracked in this type.`
+              : `Expected ${formatCurrencyUGX(item.expected || 0)} | Paid ${formatCurrencyUGX(item.paid || 0)}`,
+            tone: item.countOnly ? "info" : (Number(item.balance || 0) > 0 ? "warning" : "success")
+          })),
+        { valueFormatter: (value) => claimsUseCurrency ? formatCurrencyUGX(value) : Number(value || 0).toLocaleString() }
       );
+
+      const quarterlyRows = Array.isArray(dashboardData?.quarterly) ? dashboardData.quarterly : [];
+      renderAnalyticsBarList(
+        claimsQuarterAnalytics,
+        quarterlyRows
+          .slice(0, 6)
+          .map((item) => ({
+            label: `${item.financialYear || "FY"} ${item.quarter || ""}`.trim(),
+            value: Number(item.balance || item.expected || 0),
+            meta: `${pluralize(item.entries || 0, "entry")} | Paid ${formatCurrencyUGX(item.paid || 0)}`,
+            tone: Number(item.balance || 0) > 0 ? "danger" : "success"
+          })),
+        {
+          valueFormatter: (value) => formatCurrencyUGX(value),
+          emptyMessage: "Quarterly claims distribution becomes available after arrears entries are recorded."
+        }
+      );
+
+      const claimsSummary = dashboardData?.summary || {};
+      const expectedTotal = Number(claimsSummary.expected_total ?? claimsSummary.expectedTotal ?? 0);
+      const paidTotal = Number(claimsSummary.paid_total ?? claimsSummary.paidTotal ?? 0);
+      const balanceTotal = Number(claimsSummary.balance_total ?? claimsSummary.balanceTotal ?? 0);
+      const entryCount = Number(
+        claimsSummary.entry_count
+          ?? claimsSummary.entryCount
+          ?? rows.reduce((sum, row) => sum + Number(row.count || 0), 0)
+      );
+      const openCount = Number(claimsSummary.open_count ?? claimsSummary.openCount ?? 0);
+      const pendingAccountability = Number(
+        claimsSummary.pending_accountability_count
+          ?? claimsSummary.pendingAccountabilityCount
+          ?? 0
+      );
+      const accountabilitySubmitted = Number(
+        claimsSummary.accountability_submitted_count
+          ?? claimsSummary.accountabilitySubmittedCount
+          ?? 0
+      );
+      renderAnalyticsStatGrid(claimsInsightGrid, [
+        {
+          label: "Outstanding Balance",
+          value: formatCurrencyUGX(balanceTotal),
+          helper: `${toPercent(balanceTotal, expectedTotal || balanceTotal || 1)} of current claims exposure remains unsettled.`,
+          tone: balanceTotal > 0 ? "danger" : "success"
+        },
+        {
+          label: "Settlement Rate",
+          value: toPercent(paidTotal, expectedTotal || paidTotal || 1),
+          helper: `${formatCurrencyUGX(paidTotal)} paid against ${formatCurrencyUGX(expectedTotal)} expected.`,
+          tone: paidTotal >= balanceTotal ? "success" : "warning"
+        },
+        {
+          label: "Open Arrears Entries",
+          value: pluralize(openCount, "entry"),
+          helper: `${pluralize(entryCount, "ledger record")} currently tracked in the arrears ledger.`,
+          tone: openCount > 0 ? "warning" : "success"
+        },
+        {
+          label: "Accountability Pipeline",
+          value: pluralize(pendingAccountability, "pending form"),
+          helper: `${pluralize(accountabilitySubmitted, "submission")} already captured for cross-FY payments.`,
+          tone: pendingAccountability > 0 ? "warning" : "info"
+        }
+      ], {
+        emptyMessage: "Claims decision support will appear once arrears records are available."
+      });
+
+      updateDashboardLiveStamp("claimsSection");
+    } catch (error) {
+      console.error("Error loading claims summary:", error);
+      setAnalyticsEmpty(claimsTypeAnalytics, "Unable to load claims exposure analytics.");
+      setAnalyticsEmpty(claimsQuarterAnalytics, "Unable to load quarterly claims pressure.");
+      setAnalyticsEmpty(claimsInsightGrid, "Unable to load claims decision support metrics.");
+    }
+  }
+
+  function canManageRecycleBin() {
+    if (!canEditDashboardData()) return false;
+    const role = getCurrentRole();
+    const defaultRoles = new Set(["admin", "oc_pen", "dep_oc", "deputy_oc", "deputy_oc_pen", "deputy_oc_pension"]);
+    return getDashboardPermission("registry.delete_queue.process", defaultRoles.has(role));
+  }
+
+  function canRequestStaffDueDelete() {
+    if (!canEditDashboardData()) return false;
+    const role = getCurrentRole();
+    const defaultRoles = new Set(["admin", "clerk", "data_entry", "oc_pen", "dep_oc", "deputy_oc", "deputy_oc_pen", "deputy_oc_pension"]);
+    return getDashboardPermission("staff_due.delete_request", defaultRoles.has(role));
+  }
+
+  function canProcessStaffDueDeleteQueue() {
+    if (!canEditDashboardData()) return false;
+    const role = getCurrentRole();
+    const defaultRoles = new Set(["admin", "oc_pen", "dep_oc", "deputy_oc", "deputy_oc_pen", "deputy_oc_pension"]);
+    return getDashboardPermission("staff_due.delete_queue.process", defaultRoles.has(role));
+  }
+
+  function canDeleteStaffDueDirectly() {
+    if (!canEditDashboardData()) return false;
+    return ["admin", "oc_pen", "dep_oc", "deputy_oc", "deputy_oc_pen", "deputy_oc_pension"].includes(getCurrentRole());
+  }
+
+  function canDeleteStaffDueRecords() {
+    return canDeleteStaffDueDirectly() || canRequestStaffDueDelete();
+  }
+
+  function canEditStaffDueRecords() {
+    if (!canEditDashboardData()) return false;
+    const role = getCurrentRole();
+    const defaultRoles = new Set(["admin", "clerk", "data_entry", "writeup_officer"]);
+    return getDashboardPermission("staff_due.edit", defaultRoles.has(role));
+  }
+
+  function canBulkUploadStaffDueRecords() {
+    if (!canEditDashboardData()) return false;
+    const role = getCurrentRole();
+    const defaultRoles = new Set(["admin", "oc_pen", "dep_oc", "deputy_oc", "deputy_oc_pen", "deputy_oc_pension", "data_entry"]);
+    return getDashboardPermission("staff_due.bulk_upload", defaultRoles.has(role));
+  }
+
+  function canAccessStaffDueWorkspace() {
+    return canEditStaffDueRecords() || canBulkUploadStaffDueRecords();
+  }
+
+  function canManageClaimsRecords() {
+    if (!canEditDashboardData()) return false;
+    const role = getCurrentRole();
+    const defaultRoles = new Set(["admin", "data_entry", "oc_pen", "dep_oc", "deputy_oc", "deputy_oc_pen", "deputy_oc_pension"]);
+    return getDashboardPermission("claims.arrears.manage", defaultRoles.has(role));
+  }
+
+  function isCompactDashboardViewport() {
+    return window.matchMedia("(max-width: 860px)").matches;
+  }
+
+  function closeDataRowActionModal() {
+    if (!dataRowActionModal) return;
+    dataRowActionModal.classList.remove("open");
+    dataRowActionModal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("modal-open");
+  }
+
+  function openDataRowActionModal({ eyebrow = "Record Actions", title = "Manage record", summaryTitle = "", summaryItems = [], actions = [] } = {}) {
+    if (!dataRowActionModal || !dataRowActionModalSummary || !dataRowActionModalActions) return;
+    dataRowActionModalEyebrow.textContent = eyebrow;
+    dataRowActionModalTitle.textContent = title;
+    const safeItems = Array.isArray(summaryItems) ? summaryItems.filter((item) => item && item.label) : [];
+    dataRowActionModalSummary.innerHTML = `
+      ${summaryTitle ? `<h4>${escapeHtml(summaryTitle)}</h4>` : ""}
+      <div class="dashboard-data-modal-summary-grid">
+        ${safeItems.map((item) => `
+          <div class="dashboard-data-modal-summary-item">
+            <span>${escapeHtml(item.label)}</span>
+            <strong>${escapeHtml(item.value ?? "N/A")}</strong>
+          </div>
+        `).join("")}
+      </div>
+    `;
+    dataRowActionModalActions.innerHTML = "";
+    actions.forEach((action) => {
+      if (!action || action.hidden) return;
+      const button = document.createElement(action.href ? "a" : "button");
+      if (action.href) {
+        button.href = action.href;
+      } else {
+        button.type = "button";
+      }
+      button.className = `btn-action ${action.className || ""}`.trim();
+      button.textContent = action.label || "Action";
+      if (action.disabled) {
+        button.classList.add("disabled");
+        if (!action.href) {
+          button.disabled = true;
+        } else {
+          button.setAttribute("aria-disabled", "true");
+        }
+      }
+      if (typeof action.onClick === "function" && !action.disabled) {
+        button.addEventListener("click", async (event) => {
+          event.preventDefault();
+          const shouldClose = await action.onClick();
+          if (shouldClose !== false) {
+            closeDataRowActionModal();
+          }
+        });
+      }
+      dataRowActionModalActions.appendChild(button);
+    });
+
+    dataRowActionModal.classList.add("open");
+    dataRowActionModal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+  }
+
+  function notifyDashboard(type, message, title = "") {
+    if (typeof window.appToast === "function") {
+      window.appToast(String(message || ""), {
+        type: type || "info",
+        title: title || undefined
+      });
+      return;
+    }
+    if (typeof window.appAlert === "function") {
+      window.appAlert(String(message || ""), { title: title || "Notification" });
+      return;
+    }
+    window.alert(String(message || ""));
+  }
+
+  async function showDashboardImportFeedback(title, message, type = "info") {
+    const cleanTitle = String(title || "Import Summary").trim() || "Import Summary";
+    const cleanMessage = String(message || "").trim();
+    if (!cleanMessage) {
+      return;
+    }
+    if (typeof window.appAlert === "function") {
+      await window.appAlert(cleanMessage, { title: cleanTitle, type });
+      return;
+    }
+    notifyDashboard(type, cleanMessage, cleanTitle);
+  }
+
+  function escapeHtml(value) {
+    if (value === null || value === undefined) return "";
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function humanizeRole(value) {
+    return formatRoleName(value || "");
+  }
+
+  function formatDashboardDateTime(value) {
+    const text = String(value || "").trim();
+    if (!text) {
+      return "N/A";
+    }
+    const parsed = new Date(text.replace(" ", "T"));
+    if (Number.isNaN(parsed.getTime())) {
+      return text;
+    }
+    try {
+      return parsed.toLocaleString([], {
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    } catch {
+      return text;
+    }
+  }
+
+  function formatDashboardDate(value) {
+    const text = String(value || "").trim();
+    if (!text) {
+      return "N/A";
+    }
+    const parsed = new Date(`${text}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) {
+      return text;
+    }
+    try {
+      return parsed.toLocaleDateString([], {
+        year: "numeric",
+        month: "short",
+        day: "2-digit"
+      });
+    } catch {
+      return text;
+    }
+  }
+
+  function formatAgeValue(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 0) {
+      return "N/A";
+    }
+    return `${numeric.toFixed(1)} yrs`;
+  }
+
+  function formatDashboardLabel(value) {
+    const normalized = String(value || "").trim();
+    if (!normalized) {
+      return "N/A";
+    }
+    return normalized
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  function setDataTableMessage(tbody, colspan, message) {
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="${Number(colspan) || 1}">${escapeHtml(message || "No records found.")}</td></tr>`;
+  }
+
+  function renderDataMetricCards(container, cards = []) {
+    if (!container) return;
+    if (!Array.isArray(cards) || !cards.length) {
+      container.innerHTML = '<div class="workflow-empty-card">No metrics available for the current filters.</div>';
+      return;
+    }
+    container.innerHTML = "";
+    cards.forEach((card) => {
+      container.appendChild(createCard(
+        card.title || "Metric",
+        card.value ?? 0,
+        card.subtitle1 || "",
+        card.subvalue1 || "",
+        card.subtitle2 || "",
+        card.subvalue2 || "",
+        card.color || "blue"
+      ));
     });
   }
 
-  // ---- Life Certificate ----
-  function renderLifeCertificates(year = new Date().getFullYear()) {
-    const data = { submitted: 410, notSubmitted: 110 };
+  function updateManagedPagination(state, labelEl, prevBtn, nextBtn, totalRows = 0) {
+    const safeLimit = Math.max(1, Number(state.limit || 10));
+    const safeRows = Math.max(0, Number(totalRows || 0));
+    state.totalPages = Math.max(1, Math.ceil(safeRows / safeLimit));
+    if (state.page > state.totalPages) state.page = state.totalPages;
+    if (labelEl) {
+      labelEl.textContent = `Page ${state.page} of ${state.totalPages}`;
+    }
+    if (prevBtn) prevBtn.disabled = state.page <= 1;
+    if (nextBtn) nextBtn.disabled = state.page >= state.totalPages;
+  }
+
+  function currentDataManagementFilters(datasetKey) {
+    switch (datasetKey) {
+      case "registry_recycle_bin":
+        return {
+          search: (recycleBinSearchInput?.value || "").trim(),
+          recycle_status: (recycleBinStateFilter?.value || "all") === "all" ? "" : ((recycleBinStateFilter?.value || "all") === "deleted" ? "Deleted" : "Restored"),
+          deleted_by_role: recycleBinRoleFilter?.value || "",
+          date_from: recycleBinDateFrom?.value || "",
+          date_to: recycleBinDateTo?.value || ""
+        };
+      case "file_registry":
+        return {
+          search: (dmRegistrySearch?.value || "").trim(),
+          box_number: (dmRegistryBoxNumber?.value || "").trim(),
+          gender: dmRegistryGender?.value || "",
+          living_status: dmRegistryLivingStatus?.value || "",
+          pay_type: dmRegistryPayType?.value || "",
+          payroll_status: dmRegistryPayrollStatus?.value || "",
+          availability_status: dmRegistryAvailability?.value || "",
+          life_certificate_status: dmRegistryLifeCert?.value || ""
+        };
+      case "staff_due":
+        return {
+          search: (dmStaffDueSearch?.value || "").trim(),
+          retirement_type: dmStaffDueRetirementType?.value || "",
+          submission_status: dmStaffDueSubmissionStatus?.value || "",
+          application_status: dmStaffDueAppStatus?.value || ""
+        };
+      case "file_movements":
+        return {
+          search: (dmMovementsSearch?.value || "").trim(),
+          movement_type: dmMovementsType?.value || "",
+          from_office: dmMovementsFromOffice?.value || "",
+          to_office: dmMovementsToOffice?.value || "",
+          date_from: dmMovementsDateFrom?.value || "",
+          date_to: dmMovementsDateTo?.value || ""
+        };
+      case "claims_ledger":
+        return {
+          search: (dmClaimsSearch?.value || "").trim(),
+          claim_type: dmClaimsType?.value || "",
+          status: dmClaimsStatus?.value || "",
+          period_year: (dmClaimsYear?.value || "").trim(),
+          quarter_label: dmClaimsQuarter?.value || ""
+        };
+      case "tasks":
+        return {
+          search: (dmTasksSearch?.value || "").trim(),
+          status: dmTasksStatus?.value || "",
+          priority: dmTasksPriority?.value || "",
+          assigned_role: dmTasksRole?.value || ""
+        };
+      default:
+        return {};
+    }
+  }
+
+  async function parseDashboardJsonResponse(response, fallbackMessage = "The server returned an unexpected response.") {
+    const rawText = await response.text();
+    if (!rawText) {
+      return {};
+    }
+
+    try {
+      return JSON.parse(rawText);
+    } catch (_error) {
+      const cleaned = rawText
+        .replace(/<br\s*\/?>/gi, " ")
+        .replace(/<[^>]*>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      throw new Error(cleaned || fallbackMessage);
+    }
+  }
+
+  function countSelectedDmExportFields() {
+    return Array.from(dmPdfExportState.selectedFields || []).filter(Boolean).length;
+  }
+
+  function readDashboardExportFilterEntries(filters = {}, metadata = dmPdfExportState.metadata) {
+    const filterLabels = metadata?.filter_labels || {};
+    return Object.entries(filters || {})
+      .map(([key, rawValue]) => {
+        const value = String(rawValue ?? "").trim();
+        if (!value) return null;
+        return {
+          key,
+          label: filterLabels[key] || formatDashboardLabel(key),
+          value
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function setDmPdfFieldSelection(fields = []) {
+    dmPdfExportState.selectedFields = new Set(
+      Array.from(fields || [])
+        .map((field) => String(field || "").trim())
+        .filter(Boolean)
+    );
+
+    Array.from(dmPdfExportFieldGroups?.querySelectorAll("input[data-dm-export-field]") || []).forEach((input) => {
+      input.checked = dmPdfExportState.selectedFields.has(String(input.value || ""));
+    });
+    updateDmPdfExportSelectionSummary();
+  }
+
+  function updateDmPdfExportSelectionSummary() {
+    const selectedCount = countSelectedDmExportFields();
+    if (dmPdfExportSelectedCount) {
+      dmPdfExportSelectedCount.textContent = `${selectedCount} ${selectedCount === 1 ? "field" : "fields"}`;
+    }
+
+    const filterEntries = readDashboardExportFilterEntries(
+      currentDataManagementFilters(dmPdfExportState.datasetKey),
+      dmPdfExportState.metadata
+    );
+    if (dmPdfExportFilterCount) {
+      dmPdfExportFilterCount.textContent = `${filterEntries.length} active`;
+    }
+
+    Array.from(dmPdfExportFieldGroups?.querySelectorAll("[data-dm-export-group]") || []).forEach((groupEl) => {
+      const selected = Array.from(groupEl.querySelectorAll("input[data-dm-export-field]:checked")).length;
+      const total = Array.from(groupEl.querySelectorAll("input[data-dm-export-field]")).length;
+      const countEl = groupEl.querySelector("[data-dm-export-group-count]");
+      if (countEl) {
+        countEl.textContent = `${selected}/${total} selected`;
+      }
+    });
+
+    if (dmPdfExportModalConfirmBtn) {
+      dmPdfExportModalConfirmBtn.disabled = dmPdfExportState.loading || selectedCount === 0;
+    }
+  }
+
+  function renderDmPdfExportFilterSummary() {
+    if (!dmPdfExportFilterSummary) return;
+    const filterEntries = readDashboardExportFilterEntries(
+      currentDataManagementFilters(dmPdfExportState.datasetKey),
+      dmPdfExportState.metadata
+    );
+    if (!filterEntries.length) {
+      dmPdfExportFilterSummary.innerHTML = `
+        <div class="dashboard-export-filter-empty">
+          No filters are active. The PDF will include all rows currently available for this dataset.
+        </div>
+      `;
+      return;
+    }
+
+    dmPdfExportFilterSummary.innerHTML = filterEntries.map((entry) => `
+      <div class="dashboard-export-filter-chip">
+        <strong>${escapeHtml(entry.label)}</strong>
+        <span>${escapeHtml(entry.value)}</span>
+      </div>
+    `).join("");
+  }
+
+  function renderDmPdfExportFieldGroups() {
+    if (!dmPdfExportFieldGroups || !dmPdfExportState.metadata) return;
+    const columns = dmPdfExportState.metadata.columns || {};
+    const groupEntries = Object.entries(dmPdfExportState.metadata.field_groups || {});
+    dmPdfExportFieldGroups.innerHTML = groupEntries.map(([groupTitle, fields], groupIndex) => `
+      <section class="dashboard-export-field-group" data-dm-export-group="${groupIndex}">
+        <div class="dashboard-export-group-header">
+          <div>
+            <h5>${escapeHtml(groupTitle)}</h5>
+          </div>
+          <span data-dm-export-group-count>${escapeHtml(`${Array.isArray(fields) ? fields.length : 0} fields`)}</span>
+        </div>
+        <div class="dashboard-export-group-list">
+          ${Array.from(fields || []).map((field) => `
+            <label class="dashboard-export-field-option">
+              <input type="checkbox" value="${escapeHtml(String(field || ""))}" data-dm-export-field="${escapeHtml(String(field || ""))}">
+              <span class="dashboard-export-field-copy">
+                <strong>${escapeHtml(columns[field] || formatDashboardLabel(field))}</strong>
+                <span>${escapeHtml(formatDashboardLabel(field))}</span>
+              </span>
+            </label>
+          `).join("")}
+        </div>
+      </section>
+    `).join("");
+
+    Array.from(dmPdfExportFieldGroups.querySelectorAll("input[data-dm-export-field]")).forEach((input) => {
+      input.checked = dmPdfExportState.selectedFields.has(String(input.value || ""));
+      input.addEventListener("change", () => {
+        const fieldKey = String(input.value || "");
+        if (!fieldKey) return;
+        if (input.checked) {
+          dmPdfExportState.selectedFields.add(fieldKey);
+        } else {
+          dmPdfExportState.selectedFields.delete(fieldKey);
+        }
+        updateDmPdfExportSelectionSummary();
+      });
+    });
+
+    updateDmPdfExportSelectionSummary();
+  }
+
+  function openDmPdfExportModal() {
+    if (!dmPdfExportModal) return;
+    dmPdfExportModal.classList.add("open");
+    dmPdfExportModal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+    window.requestAnimationFrame(() => {
+      dmPdfExportModalCloseBtn?.focus();
+    });
+  }
+
+  function closeDmPdfExportModal() {
+    if (!dmPdfExportModal) return;
+    dmPdfExportModal.classList.remove("open");
+    dmPdfExportModal.setAttribute("aria-hidden", "true");
+    dmPdfExportState.loading = false;
+    updateDmPdfExportSelectionSummary();
+    syncDashboardModalBodyLock();
+    dmPdfExportState.triggerButton?.focus?.();
+  }
+
+  async function fetchDmExportMetadata(datasetKey) {
+    const normalizedKey = String(datasetKey || "").trim();
+    if (!normalizedKey) {
+      throw new Error("No dataset was selected for PDF export.");
+    }
+    if (dmPdfExportState.metadataCache.has(normalizedKey)) {
+      return dmPdfExportState.metadataCache.get(normalizedKey);
+    }
+
+    const response = await fetch(`../backend/api/get_dashboard_export_fields.php?dataset_key=${encodeURIComponent(normalizedKey)}`, {
+      credentials: "include",
+      cache: "no-store",
+      headers: { Accept: "application/json" }
+    });
+    const data = await parseDashboardJsonResponse(response, "Unable to load PDF export fields.");
+    if (!response.ok || !data.success || !data.metadata) {
+      throw new Error(data.message || "Unable to load PDF export fields.");
+    }
+
+    dmPdfExportState.metadataCache.set(normalizedKey, data.metadata);
+    return data.metadata;
+  }
+
+  async function openDmPdfExportBuilder(datasetKey, triggerButton = null) {
+    const button = triggerButton || null;
+    const originalLabel = button?.textContent || "";
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Preparing...";
+    }
+
+    try {
+      const metadata = await fetchDmExportMetadata(datasetKey);
+      dmPdfExportState.datasetKey = String(datasetKey || "");
+      dmPdfExportState.triggerButton = button;
+      dmPdfExportState.metadata = metadata;
+      dmPdfExportState.selectedFields = new Set(Array.from(metadata.default_fields || []).map((field) => String(field || "").trim()).filter(Boolean));
+
+      if (dmPdfExportModalTitle) {
+        dmPdfExportModalTitle.textContent = `Choose PDF Fields${metadata.label ? ` - ${metadata.label}` : ""}`;
+      }
+      if (dmPdfExportDatasetLabel) {
+        dmPdfExportDatasetLabel.textContent = metadata.label || "Dashboard Export";
+      }
+      if (dmPdfExportModalDescription) {
+        dmPdfExportModalDescription.textContent = metadata.description
+          || "Choose the columns you want in the PDF. Focused field selections generate faster, cleaner, and more readable exports.";
+      }
+
+      renderDmPdfExportFilterSummary();
+      renderDmPdfExportFieldGroups();
+      openDmPdfExportModal();
+      syncDashboardModalBodyLock();
+    } catch (error) {
+      console.error("Failed to prepare PDF export builder:", error);
+      notifyDashboard("error", error.message || "Unable to prepare the PDF export builder.", "Data Management");
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalLabel;
+      }
+    }
+  }
+
+  async function exportDashboardDataset(datasetKey, format, options = {}) {
+    const sourceButton = options?.sourceButton || null;
+    const originalLabel = sourceButton?.textContent || "";
+    if (sourceButton) {
+      sourceButton.disabled = true;
+      if (format === "pdf") {
+        sourceButton.textContent = "Generating...";
+      }
+    }
+
+    try {
+      const payload = {
+        dataset_key: datasetKey,
+        format,
+        filters: currentDataManagementFilters(datasetKey)
+      };
+      const selectedFields = Array.isArray(options?.selectedFields)
+        ? options.selectedFields.map((field) => String(field || "").trim()).filter(Boolean)
+        : [];
+      if (selectedFields.length) {
+        payload.selected_fields = selectedFields;
+      }
+
+      const response = await fetch("../backend/api/run_dashboard_data_export.php", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await parseDashboardJsonResponse(response, "Unable to generate dashboard export.");
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Unable to generate dashboard export.");
+      }
+      if (data.export?.download_url) {
+        deliverDashboardExport(data.export.download_url, {
+          format,
+          label: `${data.export.dataset_label || "Dashboard"} Export`,
+          fileName: data.export.file_name || ""
+        });
+      }
+      if (format === "pdf" && options?.closeOnSuccess) {
+        closeDmPdfExportModal();
+      }
+      notifyDashboard("success", data.message || "Export generated successfully.", "Data Management");
+    } catch (error) {
+      console.error("Dashboard export failed:", error);
+      notifyDashboard("error", error.message || "Unable to generate dashboard export.", "Data Management");
+    } finally {
+      if (sourceButton) {
+        sourceButton.disabled = false;
+        sourceButton.textContent = originalLabel;
+      }
+    }
+  }
+
+  function applyDataManagementTabSelection() {
+    dataManagementTabs.forEach((button) => {
+      const isActive = button.dataset.dataTab === dataManagementState.activeTab;
+      button.classList.toggle("active", isActive);
+      button.setAttribute("aria-selected", isActive ? "true" : "false");
+    });
+    dataManagementPanels.forEach((panel) => {
+      panel.classList.toggle("active", panel.dataset.dataPanel === dataManagementState.activeTab);
+    });
+  }
+
+  async function renderActiveDataManagementTab() {
+    switch (dataManagementState.activeTab) {
+      case "registry":
+        await renderManagedFileRegistry();
+        break;
+      case "staffDue":
+        await renderManagedStaffDue();
+        break;
+      case "movements":
+        await renderManagedFileMovements();
+        break;
+      case "claims":
+        await renderManagedClaims();
+        break;
+      case "tasks":
+        await renderManagedTasks();
+        break;
+      case "recycle":
+      default:
+        await renderRecycleBinSection();
+        break;
+    }
+  }
+
+  async function switchDataManagementTab(tabKey) {
+    const normalized = String(tabKey || "recycle").trim();
+    if (!normalized || normalized === dataManagementState.activeTab) {
+      applyDataManagementTabSelection();
+      await renderActiveDataManagementTab();
+      return;
+    }
+    dataManagementState.activeTab = normalized;
+    applyDataManagementTabSelection();
+    await renderActiveDataManagementTab();
+  }
+
+  function dashboardStatusTone(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (["submitted", "approved", "verified", "completed", "paid", "restored", "returned", "on payroll", "in shelf", "in_shelf"].includes(normalized)) return "success";
+    if (["pending", "in_process", "in process", "partially paid", "moved out", "out of shelf", "out_of_shelf", "not submitted", "not on payroll"].includes(normalized)) return "warning";
+    if (["rejected", "queried", "waived", "deleted", "overdue", "urgent"].includes(normalized)) return "muted";
+    return "neutral";
+  }
+
+  function dashboardStatusChip(value, fallback = "N/A") {
+    const text = String(value || "").trim() || fallback;
+    return `<span class="status-chip ${dashboardStatusTone(text)}">${escapeHtml(text)}</span>`;
+  }
+
+  function syncDashboardFilterableSelect(selectEl) {
+    if (!selectEl || !selectEl.matches('select[data-filterable-select]') || !window.PensionsGoFilterableSelect?.syncElement) {
+      return;
+    }
+    window.PensionsGoFilterableSelect.syncElement(selectEl);
+  }
+
+  function populateSelectOptions(selectEl, values = [], placeholder = "All") {
+    if (!selectEl) return;
+    const currentValue = selectEl.value || "";
+    const normalizedValues = Array.from(new Set(values.map((value) => String(value || "").trim()).filter(Boolean)));
+    selectEl.innerHTML = [`<option value="">${escapeHtml(placeholder)}</option>`]
+      .concat(normalizedValues.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`))
+      .join("");
+    if (currentValue && normalizedValues.includes(currentValue)) {
+      selectEl.value = currentValue;
+    }
+    syncDashboardFilterableSelect(selectEl);
+  }
+
+  function buildStaffDueName(row) {
+    return formatTitleName(row.title || "", row.sName || "", row.fName || "") || "Unknown Officer";
+  }
+
+  function buildRegistryName(row) {
+    return formatTitleName(row.title || "", row.sName || "", row.fName || "") || "Unknown Pensioner";
+  }
+
+  function formatTitleName(title, sName, fName) {
+    const cleanTitle = String(title || "").trim();
+    const cleanName = `${String(sName || "").trim()} ${String(fName || "").trim()}`.trim();
+    if (cleanTitle && cleanName) {
+      return `${cleanTitle} - ${cleanName}`;
+    }
+    return cleanTitle || cleanName;
+  }
+
+  function staffDueCanDeleteRow(row) {
+    return canDeleteStaffDueRecords() && !["completed"].includes(String(row.workflow_action_state || "").toLowerCase());
+  }
+
+  function buildClaimsWorkspaceUrl(row) {
+    const params = new URLSearchParams();
+    if (row?.regNo) params.set("regNo", String(row.regNo));
+    if (row?.claimType) params.set("claimType", String(row.claimType));
+    return `claims.html${params.toString() ? `?${params.toString()}` : ""}`;
+  }
+
+  function claimsRowCanDelete(row) {
+    return canManageClaimsRecords() && Number(row?.paidAmount || 0) <= 0;
+  }
+
+  async function askDashboardConfirm(message, options = {}) {
+    if (typeof window.appConfirm === "function") {
+      return window.appConfirm(String(message || ""), options);
+    }
+    return Promise.resolve(window.confirm(String(message || "")));
+  }
+
+  async function submitStaffDueDelete(row, reason = "", silent = false) {
+    const direct = canDeleteStaffDueDirectly();
+    const endpoint = direct ? "../backend/api/delete_staffdue.php" : "../backend/api/request_staff_due_delete.php";
+    const payload = direct
+      ? { id: Number(row?.id || 0), reason: reason || "Direct deletion by privileged user." }
+      : { staffdue_id: Number(row?.id || 0), reason };
+    const response = await fetch(endpoint, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || `HTTP ${response.status}`);
+    }
+    if (!silent) {
+      notifyDashboard("success", data.message || (direct ? "Record deleted successfully." : "Delete request queued successfully."), "Staff Due");
+    }
+    return data;
+  }
+
+  async function deleteClaimsLedgerEntries(ledgerIds = [], silent = false) {
+    const ids = Array.from(new Set((Array.isArray(ledgerIds) ? ledgerIds : []).map((value) => Number(value || 0)).filter((value) => value > 0)));
+    if (!ids.length) {
+      throw new Error("No claims entries selected for deletion.");
+    }
+    const response = await fetch("../backend/api/post_arrears_tracking.php", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: ids.length > 1 ? "delete_entries" : "delete_entry",
+        ledgerId: ids[0] || 0,
+        ledgerIds: ids
+      })
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || `HTTP ${response.status}`);
+    }
+    if (!silent) {
+      notifyDashboard("success", data.message || "Claims record deleted successfully.", "Claims");
+    }
+    return data;
+  }
+
+  async function deleteFilteredStaffDueRecords() {
+    if (!canDeleteStaffDueDirectly()) {
+      notifyDashboard("error", "You do not have permission to delete staff due records.", "Access Denied");
+      return;
+    }
+    const targets = (dataManagementState.staffDue.rows || []).filter(staffDueCanDeleteRow);
+    if (!targets.length) {
+      notifyDashboard("info", "There are no deletable staff due records in the current filter.", "Staff Due");
+      return;
+    }
+    const confirmed = await askDashboardConfirm(
+      `Delete ${targets.length} filtered staff due record(s)? This removes them from active staff due lists immediately.`,
+      { title: "Delete Filtered Staff Due", confirmText: "Delete Filtered", type: "danger" }
+    );
+    if (!confirmed) return;
+
+    let deletedCount = 0;
+    for (const row of targets) {
+      try {
+        await submitStaffDueDelete(row, "Bulk direct deletion from Data Management.", true);
+        deletedCount += 1;
+      } catch (error) {
+        console.error("Failed to delete staff due record:", error);
+      }
+    }
+
+    notifyDashboard(
+      deletedCount > 0 ? "success" : "warning",
+      deletedCount > 0
+        ? `Deleted ${deletedCount} staff due record(s).`
+        : "No staff due records were deleted.",
+      "Staff Due"
+    );
+    await renderManagedStaffDue();
+  }
+
+  async function fetchAllFilteredClaimsRows() {
+    const combined = [];
+    let page = 1;
+    let totalPages = 1;
+    do {
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: "200",
+        search: (dmClaimsSearch?.value || "").trim(),
+        claim_type: dmClaimsType?.value || "",
+        status: dmClaimsStatus?.value || "",
+        year: (dmClaimsYear?.value || "").trim(),
+        quarter: dmClaimsQuarter?.value || ""
+      });
+      const response = await fetch(`../backend/api/get_claims_dashboard.php?${params.toString()}`, {
+        credentials: "include",
+        cache: "no-store"
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || `HTTP ${response.status}`);
+      }
+      combined.push(...(Array.isArray(data.rows) ? data.rows : []));
+      totalPages = Number(data.pagination?.totalPages || 1);
+      page += 1;
+    } while (page <= totalPages);
+    return combined;
+  }
+
+  async function deleteFilteredClaimsRecords() {
+    if (!canManageClaimsRecords()) {
+      notifyDashboard("error", "You do not have permission to delete claims records.", "Access Denied");
+      return;
+    }
+    const allRows = await fetchAllFilteredClaimsRows();
+    const targets = allRows.filter(claimsRowCanDelete);
+    if (!targets.length) {
+      notifyDashboard("info", "There are no deletable claims in the current filter.", "Claims");
+      return;
+    }
+    const confirmed = await askDashboardConfirm(
+      `Delete ${targets.length} filtered claim record(s)? Paid entries are excluded automatically.`,
+      { title: "Delete Filtered Claims", confirmText: "Delete Filtered", type: "danger" }
+    );
+    if (!confirmed) return;
+    const result = await deleteClaimsLedgerEntries(targets.map((row) => row.ledgerId), true);
+    notifyDashboard("success", result.message || `Deleted ${targets.length} claim record(s).`, "Claims");
+    await renderManagedClaims();
+  }
+
+  function buildStaffDueRowActions(row) {
+    const actions = [
+      `<button type="button" class="btn-action btn-small btn-secondary js-dm-staff-view">View</button>`
+    ];
+    if (canEditStaffDueRecords()) {
+      actions.push(`<a class="btn-action btn-small" href="edit_staff.html?id=${encodeURIComponent(row.id)}&from=dashboard">Edit</a>`);
+    }
+    if (staffDueCanDeleteRow(row)) {
+      actions.push(`<button type="button" class="btn-action btn-small btn-danger js-dm-staff-delete">Delete</button>`);
+    }
+    return `<div class="data-row-actions">${actions.join("")}</div>`;
+  }
+
+  function buildClaimsRowActions(row) {
+    const actions = [
+      `<a class="btn-action btn-small btn-secondary" href="${buildClaimsWorkspaceUrl(row)}">Open</a>`
+    ];
+    if (claimsRowCanDelete(row)) {
+      actions.push(`<button type="button" class="btn-action btn-small btn-danger js-dm-claim-delete">Delete</button>`);
+    }
+    return `<div class="data-row-actions">${actions.join("")}</div>`;
+  }
+
+  async function promptDeleteStaffDueRow(row) {
+    if (canDeleteStaffDueDirectly()) {
+      const confirmed = await askDashboardConfirm(
+        `Delete ${buildStaffDueName(row)} from Staff Due for Retirement?`,
+        { title: "Delete Staff Due Record", confirmText: "Delete Record", type: "danger" }
+      );
+      if (!confirmed) return false;
+      await submitStaffDueDelete(row);
+    } else {
+      const reasonValue = typeof window.appPrompt === "function"
+        ? await window.appPrompt(
+            `Provide a reason for deleting ${buildStaffDueName(row)}:`,
+            "",
+            { title: "Request Delete", confirmText: "Submit Request" }
+          )
+        : window.prompt(`Provide a reason for deleting ${buildStaffDueName(row)}:`, "");
+      if (reasonValue === null) return false;
+      const reason = String(reasonValue || "").trim();
+      if (!reason) {
+        throw new Error("Delete reason is required.");
+      }
+      await submitStaffDueDelete(row, reason);
+    }
+    await renderManagedStaffDue();
+    return true;
+  }
+
+  async function promptDeleteClaimsRow(row) {
+    const confirmed = await askDashboardConfirm(
+      `Delete the ${row.claimType || "claim"} entry for ${row.regNo || "this record"}? Paid entries cannot be deleted.`,
+      { title: "Delete Claim Entry", confirmText: "Delete Entry", type: "danger" }
+    );
+    if (!confirmed) return false;
+    await deleteClaimsLedgerEntries([row.ledgerId]);
+    await renderManagedClaims();
+    return true;
+  }
+
+  function openStaffDueRowActionModal(row) {
+    openDataRowActionModal({
+      eyebrow: "Staff Due Record",
+      title: buildStaffDueName(row),
+      summaryTitle: row.regNo || "Staff Due Record",
+      summaryItems: [
+        { label: "File Number", value: row.regNo || "N/A" },
+        { label: "Retirement Date", value: row.retirementDate || "N/A" },
+        { label: "Unit", value: row.prisonUnit || "N/A" },
+        { label: "Retirement Label", value: formatRetirementType(row.retirementType) },
+        { label: "NIN", value: row.NIN || "N/A" },
+        { label: "Submission", value: row.submissionStatus || "Pending" },
+        { label: "Application", value: row.appnStatus || "Pending" },
+        { label: "Workflow", value: String(row.workflow_action_state || "").toLowerCase() === "completed" ? "Completed" : (String(row.workflow_action_state || "").toLowerCase() === "in_process" ? "In Process" : "Pending") }
+      ],
+      actions: [
+        { label: "Edit Record", href: `edit_staff.html?id=${encodeURIComponent(row.id)}&from=dashboard`, hidden: !canEditStaffDueRecords() },
+        { label: "Delete Record", className: "btn-danger", hidden: !staffDueCanDeleteRow(row), onClick: () => promptDeleteStaffDueRow(row) }
+      ]
+    });
+  }
+
+  function openClaimsRowActionModal(row) {
+    openDataRowActionModal({
+      eyebrow: "Claims Actions",
+      title: formatTitleName(row.title || "", row.displayName || "", "") || (row.regNo || "Claims Entry"),
+      summaryTitle: row.claimType || "Claim Entry",
+      summaryItems: [
+        { label: "File Number", value: row.regNo || "N/A" },
+        { label: "Financial Year", value: row.financialYear || "N/A" },
+        { label: "Quarter", value: row.quarter || "N/A" },
+        { label: "Expected", value: formatCurrencyUGX(row.expectedAmount || 0) },
+        { label: "Balance", value: formatCurrencyUGX(row.balanceAmount || 0) },
+        { label: "Status", value: row.status || "Pending" }
+      ],
+      actions: [
+        { label: "Open Claims Workspace", href: buildClaimsWorkspaceUrl(row), className: "btn-secondary" },
+        { label: "Delete Entry", className: "btn-danger", hidden: !claimsRowCanDelete(row), onClick: () => promptDeleteClaimsRow(row) }
+      ]
+    });
+  }
+
+  function openRegistryRowActionModal(row) {
+    const availabilityLabel = formatDashboardLabel(row.availabilityStatus || "in_shelf");
+    openDataRowActionModal({
+      eyebrow: "Registry Record",
+      title: buildRegistryName(row),
+      summaryTitle: row.regNo || "Registry Record",
+      summaryItems: [
+        { label: "File Number", value: row.regNo || "N/A" },
+        { label: "Computer No", value: row.computerNo || "N/A" },
+        { label: "Supplier No", value: row.supplierNo || "N/A" },
+        { label: "Gender", value: row.gender || "N/A" },
+        { label: "Living Status", value: row.livingStatus || "N/A" },
+        { label: "Pay Type", value: row.payType || "N/A" },
+        { label: "Payroll Status", value: row.payrollStatus || "N/A" },
+        { label: "Availability", value: availabilityLabel || "N/A" },
+        { label: "Life Certificate", value: row.lifeCertificateStatus || "N/A" },
+        { label: "Retirement Label", value: formatRetirementType(row.retirementType) },
+        { label: "Retirement Date", value: row.retirementDate || "N/A" },
+        { label: "Station", value: row.station || "N/A" },
+        { label: "Phone", value: row.phone || "N/A" }
+      ],
+      actions: [
+        { label: "Open Registry Workspace", href: "pension_file_registry.html", className: "btn-secondary" }
+      ]
+    });
+  }
+
+  async function renderManagedFileRegistry() {
+    if (!dmRegistryTableBody) return;
+    setDataTableMessage(dmRegistryTableBody, 12, "Loading registry records...");
+
+    try {
+      const params = new URLSearchParams({
+        page: String(dataManagementState.registry.page),
+        limit: String(dataManagementState.registry.limit),
+        search: (dmRegistrySearch?.value || "").trim(),
+        box_number: (dmRegistryBoxNumber?.value || "").trim(),
+        gender: dmRegistryGender?.value || "",
+        living_status: dmRegistryLivingStatus?.value || "",
+        pay_type: dmRegistryPayType?.value || "",
+        payroll_status: dmRegistryPayrollStatus?.value || "",
+        availability_status: dmRegistryAvailability?.value || "",
+        life_certificate_status: dmRegistryLifeCert?.value || ""
+      });
+      const response = await fetch(`../backend/api/get_file_registry_dashboard.php?${params.toString()}`, {
+        credentials: "include",
+        cache: "no-store"
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || `HTTP ${response.status}`);
+      }
+
+      populateSelectOptions(dmRegistryBoxNumber, data.boxNumberOptions || [], "All Box Numbers");
+
+      const summary = data.summary || {};
+      renderDataMetricCards(dmRegistrySummaryCards, [
+        { title: "Visible Records", value: Number(summary.total || 0), color: "blue" },
+        { title: "Alive", value: Number(summary.alive || 0), color: "green" },
+        { title: "Deceased", value: Number(summary.deceased || 0), color: "red" },
+        { title: "On Payroll", value: Number(summary.onPayroll || 0), color: "teal" },
+        { title: "Out of Shelf", value: Number(summary.outOfShelf || 0), color: "orange" },
+        { title: "Life Cert Pending", value: Number(summary.lifeNotSubmitted || 0), color: "purple" }
+      ]);
+
+      dataManagementState.registry.page = Number(data.pagination?.page || dataManagementState.registry.page);
+      updateManagedPagination(
+        dataManagementState.registry,
+        dmRegistryPageLabel,
+        dmRegistryPrevBtn,
+        dmRegistryNextBtn,
+        Number(data.pagination?.totalRows || 0)
+      );
+
+      const rows = Array.isArray(data.rows) ? data.rows : [];
+      dataManagementState.registry.rows = rows;
+
+      if (!rows.length) {
+        setDataTableMessage(dmRegistryTableBody, 12, "No registry records matched the selected filters.");
+      } else {
+        dmRegistryTableBody.innerHTML = rows.map((row) => {
+          const name = buildRegistryName(row);
+          const availabilityLabel = formatDashboardLabel(row.availabilityStatus || "in_shelf");
+          return `
+            <tr class="data-management-row ${isCompactDashboardViewport() ? "is-actionable" : ""}" data-dm-row-type="registry" data-dm-row-id="${Number(row.id || 0)}">
+              <td>${escapeHtml(row.regNo || "N/A")}</td>
+              <td>${escapeHtml(name || "N/A")}</td>
+              <td>${escapeHtml(row.gender || "N/A")}</td>
+              <td>${dashboardStatusChip(row.livingStatus || "N/A")}</td>
+              <td>${escapeHtml(row.payType || "N/A")}</td>
+              <td>${dashboardStatusChip(row.payrollStatus || "N/A")}</td>
+              <td>${dashboardStatusChip(availabilityLabel || "N/A")}</td>
+              <td>${dashboardStatusChip(row.lifeCertificateStatus || "Not Submitted")}</td>
+              <td>${escapeHtml(formatRetirementType(row.retirementType))}</td>
+              <td>${escapeHtml(row.retirementDate || "N/A")}</td>
+              <td>${escapeHtml(row.station || "N/A")}</td>
+              <td>${escapeHtml(row.phone || "N/A")}</td>
+            </tr>
+          `;
+        }).join("");
+
+        if (isCompactDashboardViewport()) {
+          Array.from(dmRegistryTableBody.querySelectorAll("tr[data-dm-row-id]")).forEach((rowEl) => {
+            const rowId = Number(rowEl.dataset.dmRowId || 0);
+            const rowData = rows.find((item) => Number(item.id || 0) === rowId);
+            if (!rowData) return;
+            rowEl.addEventListener("click", (event) => {
+              if (event.target.closest("a, button")) return;
+              openRegistryRowActionModal(rowData);
+            });
+          });
+        }
+      }
+
+      updateDashboardLiveStamp("dataSection");
+    } catch (error) {
+      console.error("Failed to load registry management data:", error);
+      renderDataMetricCards(dmRegistrySummaryCards, []);
+      setDataTableMessage(dmRegistryTableBody, 12, error.message || "Unable to load registry records.");
+    }
+  }
+
+  async function renderManagedStaffDue() {
+    if (!dmStaffDueTableBody) return;
+    setDataTableMessage(dmStaffDueTableBody, 10, "Loading staff due records...");
+
+    try {
+      const params = new URLSearchParams({
+        search: (dmStaffDueSearch?.value || "").trim(),
+        retirementType: dmStaffDueRetirementType?.value || "",
+        submissionStatus: dmStaffDueSubmissionStatus?.value || "",
+        appnStatus: dmStaffDueAppStatus?.value || ""
+      });
+      const response = await fetch(`../backend/api/fetch_staffdue.php?${params.toString()}`, {
+        credentials: "include",
+        cache: "no-store"
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || `HTTP ${response.status}`);
+      }
+
+      const rows = Array.isArray(data.records) ? data.records : [];
+      dataManagementState.staffDue.rows = rows;
+      populateSelectOptions(dmStaffDueRetirementType, rows.map((row) => formatRetirementType(row.retirementType)), "All Retirement Labels");
+
+      renderDataMetricCards(dmStaffDueSummaryCards, [
+        { title: "Visible Records", value: rows.length, color: "blue" },
+        { title: "Submitted", value: rows.filter((row) => String(row.submissionStatus || "").toLowerCase() === "submitted").length, color: "green" },
+        { title: "Pending Submission", value: rows.filter((row) => String(row.submissionStatus || "").toLowerCase() !== "submitted").length, color: "orange" },
+        { title: "In Process", value: rows.filter((row) => String(row.workflow_action_state || "").toLowerCase() === "in_process").length, color: "teal" },
+        { title: "Completed", value: rows.filter((row) => String(row.workflow_action_state || "").toLowerCase() === "completed").length, color: "purple" }
+      ]);
+
+      updateManagedPagination(dataManagementState.staffDue, dmStaffDuePageLabel, dmStaffDuePrevBtn, dmStaffDueNextBtn, rows.length);
+      const start = (dataManagementState.staffDue.page - 1) * dataManagementState.staffDue.limit;
+      const visibleRows = rows.slice(start, start + dataManagementState.staffDue.limit);
+      dataManagementState.staffDue.visibleRows = visibleRows;
+      if (dmStaffDueWorkspaceLink) {
+        dmStaffDueWorkspaceLink.style.display = canAccessStaffDueWorkspace() ? "" : "none";
+      }
+      if (dmStaffDueDeleteFilteredBtn) {
+        dmStaffDueDeleteFilteredBtn.style.display = canDeleteStaffDueDirectly() ? "" : "none";
+        dmStaffDueDeleteFilteredBtn.disabled = !canDeleteStaffDueDirectly() || rows.filter(staffDueCanDeleteRow).length === 0;
+      }
+
+      if (!visibleRows.length) {
+        setDataTableMessage(dmStaffDueTableBody, 10, "No staff due records matched the selected filters.");
+      } else {
+        dmStaffDueTableBody.innerHTML = visibleRows.map((row) => {
+          const name = formatTitleName(row.title || "", row.sName || "", row.fName || "") || "N/A";
+          const workflowState = String(row.workflow_action_state || "").trim();
+          const workflowLabel = workflowState === "completed" ? "Completed" : (workflowState === "in_process" ? "In Process" : "Pending");
+          return `
+            <tr class="data-management-row ${isCompactDashboardViewport() ? "is-actionable" : ""}" data-dm-row-type="staffDue" data-dm-row-id="${Number(row.id || 0)}">
+              <td>${escapeHtml(row.regNo || "N/A")}</td>
+              <td>${escapeHtml(row.title || "N/A")}</td>
+              <td>${escapeHtml(name)}</td>
+              <td>${escapeHtml(row.retirementDate || "N/A")}</td>
+              <td>${escapeHtml(formatRetirementType(row.retirementType))}</td>
+              <td>${escapeHtml(row.financialYear || "N/A")}</td>
+              <td>${dashboardStatusChip(row.submissionStatus || "Pending")}</td>
+              <td>${dashboardStatusChip(row.appnStatus || "Pending")}</td>
+              <td>${dashboardStatusChip(workflowLabel)}</td>
+              <td class="action-col">${buildStaffDueRowActions(row)}</td>
+            </tr>
+          `;
+        }).join("");
+
+        Array.from(dmStaffDueTableBody.querySelectorAll("tr[data-dm-row-id]")).forEach((rowEl) => {
+          const rowId = Number(rowEl.dataset.dmRowId || 0);
+          const rowData = visibleRows.find((item) => Number(item.id || 0) === rowId);
+          if (!rowData) return;
+          rowEl.querySelector(".js-dm-staff-view")?.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            openStaffDueRowActionModal(rowData);
+          });
+          rowEl.querySelector(".js-dm-staff-delete")?.addEventListener("click", async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            try {
+              await promptDeleteStaffDueRow(rowData);
+            } catch (error) {
+              notifyDashboard("error", error.message || "Unable to delete staff due record.", "Staff Due");
+            }
+          });
+          if (isCompactDashboardViewport()) {
+            rowEl.addEventListener("click", (event) => {
+              if (event.target.closest("a, button")) return;
+              openStaffDueRowActionModal(rowData);
+            });
+          }
+        });
+      }
+
+      updateDashboardLiveStamp("dataSection");
+    } catch (error) {
+      console.error("Failed to load staff due management data:", error);
+      renderDataMetricCards(dmStaffDueSummaryCards, []);
+      setDataTableMessage(dmStaffDueTableBody, 10, error.message || "Unable to load staff due records.");
+    }
+  }
+
+  async function renderManagedFileMovements() {
+    if (!dmMovementsTableBody) return;
+    setDataTableMessage(dmMovementsTableBody, 10, "Loading file movement records...");
+
+    try {
+      const params = new URLSearchParams({
+        page: String(dataManagementState.movements.page),
+        limit: String(dataManagementState.movements.limit),
+        search: (dmMovementsSearch?.value || "").trim(),
+        movement_type: dmMovementsType?.value || "",
+        from_office: dmMovementsFromOffice?.value || "",
+        to_office: dmMovementsToOffice?.value || "",
+        date_from: dmMovementsDateFrom?.value || "",
+        date_to: dmMovementsDateTo?.value || ""
+      });
+      const response = await fetch(`../backend/api/get_file_movement_log.php?${params.toString()}`, {
+        credentials: "include",
+        cache: "no-store"
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || `HTTP ${response.status}`);
+      }
+
+      populateSelectOptions(dmMovementsFromOffice, data.options?.offices || [], "All Offices");
+      populateSelectOptions(dmMovementsToOffice, data.options?.offices || [], "All Offices");
+
+      renderDataMetricCards(dmMovementsSummaryCards, [
+        { title: "Visible Movements", value: Number(data.summary?.total || 0), color: "blue" },
+        { title: "Open Custody", value: Number(data.summary?.open || 0), color: "orange" },
+        { title: "Returned", value: Number(data.summary?.returned || 0), color: "green" },
+        { title: "Overdue", value: Number(data.summary?.overdue || 0), color: "red" },
+        { title: "Moved Today", value: Number(data.summary?.moved_today || 0), color: "teal" }
+      ]);
+
+      dataManagementState.movements.page = Number(data.pagination?.page || dataManagementState.movements.page);
+      updateManagedPagination(dataManagementState.movements, dmMovementsPageLabel, dmMovementsPrevBtn, dmMovementsNextBtn, Number(data.pagination?.totalRows || 0));
+      const rows = Array.isArray(data.rows) ? data.rows : [];
+      if (!rows.length) {
+        setDataTableMessage(dmMovementsTableBody, 10, "No movement records matched the selected filters.");
+      } else {
+        dmMovementsTableBody.innerHTML = rows.map((row) => `
+          <tr>
+            <td>${escapeHtml(row.regNo || "N/A")}</td>
+            <td>${dashboardStatusChip(row.movement_type || "Moved Out")}</td>
+            <td>${escapeHtml(row.from_office || "N/A")}</td>
+            <td>${escapeHtml(row.to_office || "N/A")}</td>
+            <td>${escapeHtml(row.delivered_by_name || "N/A")}</td>
+            <td>${escapeHtml(formatDashboardDateTime(row.moved_at))}</td>
+            <td>${escapeHtml(formatDashboardDateTime(row.expected_return_at))}</td>
+            <td>${escapeHtml(formatDashboardDateTime(row.returned_at))}</td>
+            <td>${escapeHtml(formatDurationCompact(row.duration_seconds || 0))}</td>
+            <td>${escapeHtml(row.reason || "N/A")}</td>
+          </tr>
+        `).join("");
+      }
+
+      updateDashboardLiveStamp("dataSection");
+    } catch (error) {
+      console.error("Failed to load file movement management data:", error);
+      renderDataMetricCards(dmMovementsSummaryCards, []);
+      setDataTableMessage(dmMovementsTableBody, 10, error.message || "Unable to load file movements.");
+    }
+  }
+
+  async function renderManagedClaims() {
+    if (!dmClaimsTableBody) return;
+    setDataTableMessage(dmClaimsTableBody, 12, "Loading claims data...");
+
+    try {
+      const params = new URLSearchParams({
+        page: String(dataManagementState.claims.page),
+        limit: String(dataManagementState.claims.limit),
+        search: (dmClaimsSearch?.value || "").trim(),
+        claim_type: dmClaimsType?.value || "",
+        status: dmClaimsStatus?.value || "",
+        year: (dmClaimsYear?.value || "").trim(),
+        quarter: dmClaimsQuarter?.value || ""
+      });
+      const response = await fetch(`../backend/api/get_claims_dashboard.php?${params.toString()}`, {
+        credentials: "include",
+        cache: "no-store"
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || `HTTP ${response.status}`);
+      }
+
+      if (!dataManagementState.claims.claimTypesLoaded) {
+        populateSelectOptions(dmClaimsType, data.claimTypeOptions || [], "All Types");
+        dataManagementState.claims.claimTypesLoaded = true;
+      }
+
+      renderDataMetricCards(dmClaimsSummaryCards, [
+        { title: "Expected Total", value: formatCurrencyUGX(data.summary?.expectedTotal || 0), color: "blue" },
+        { title: "Paid Total", value: formatCurrencyUGX(data.summary?.paidTotal || 0), color: "green" },
+        { title: "Outstanding Balance", value: formatCurrencyUGX(data.summary?.balanceTotal || 0), color: "red" },
+        { title: "Open Entries", value: Number(data.summary?.openCount || 0), color: "orange" },
+        { title: "Pending Accountability", value: Number(data.summary?.pendingAccountabilityCount || 0), color: "purple" }
+      ]);
+
+      dataManagementState.claims.page = Number(data.pagination?.page || dataManagementState.claims.page);
+      updateManagedPagination(dataManagementState.claims, dmClaimsPageLabel, dmClaimsPrevBtn, dmClaimsNextBtn, Number(data.pagination?.totalRows || 0));
+      const rows = Array.isArray(data.rows) ? data.rows : [];
+      dataManagementState.claims.visibleRows = rows;
+      if (dmClaimsDeleteFilteredBtn) {
+        dmClaimsDeleteFilteredBtn.disabled = !canManageClaimsRecords();
+      }
+      if (!rows.length) {
+        setDataTableMessage(dmClaimsTableBody, 12, "No claims matched the selected filters.");
+      } else {
+        dmClaimsTableBody.innerHTML = rows.map((row) => `
+          <tr class="data-management-row ${isCompactDashboardViewport() ? "is-actionable" : ""}" data-dm-row-type="claims" data-dm-ledger-id="${Number(row.ledgerId || 0)}">
+            <td>${escapeHtml(row.regNo || "N/A")}</td>
+            <td>${escapeHtml(row.title || "N/A")}</td>
+            <td>${escapeHtml(row.displayName || "N/A")}</td>
+            <td>${escapeHtml(row.claimType || "N/A")}</td>
+            <td>${escapeHtml(row.financialYear || "N/A")}</td>
+            <td>${escapeHtml(row.quarter || "N/A")}</td>
+            <td>${escapeHtml(formatCurrencyUGX(row.expectedAmount || 0))}</td>
+            <td>${escapeHtml(formatCurrencyUGX(row.paidAmount || 0))}</td>
+            <td>${escapeHtml(formatCurrencyUGX(row.balanceAmount || 0))}</td>
+            <td>${dashboardStatusChip(row.status || "Pending")}</td>
+            <td>${dashboardStatusChip(row.accountabilityRequired ? (row.accountabilityStatus || "Pending Accountability") : "Not Required")}</td>
+            <td class="action-col">${buildClaimsRowActions(row)}</td>
+          </tr>
+        `).join("");
+
+        Array.from(dmClaimsTableBody.querySelectorAll("tr[data-dm-ledger-id]")).forEach((rowEl) => {
+          const ledgerId = Number(rowEl.dataset.dmLedgerId || 0);
+          const rowData = rows.find((item) => Number(item.ledgerId || 0) === ledgerId);
+          if (!rowData) return;
+          rowEl.querySelector(".js-dm-claim-delete")?.addEventListener("click", async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            try {
+              await promptDeleteClaimsRow(rowData);
+            } catch (error) {
+              notifyDashboard("error", error.message || "Unable to delete claims record.", "Claims");
+            }
+          });
+          if (isCompactDashboardViewport()) {
+            rowEl.addEventListener("click", (event) => {
+              if (event.target.closest("a, button")) return;
+              openClaimsRowActionModal(rowData);
+            });
+          }
+        });
+      }
+
+      updateDashboardLiveStamp("dataSection");
+    } catch (error) {
+      console.error("Failed to load claims management data:", error);
+      renderDataMetricCards(dmClaimsSummaryCards, []);
+      setDataTableMessage(dmClaimsTableBody, 12, error.message || "Unable to load claims data.");
+    }
+  }
+
+  function renderManagedTasksRows(items = []) {
+    if (!dmTasksTableBody) return;
+    if (!items.length) {
+      setDataTableMessage(dmTasksTableBody, 10, "No workflow tasks matched the selected filters.");
+      return;
+    }
+
+    dmTasksTableBody.innerHTML = items.map((task) => `
+      <tr>
+        <td>${escapeHtml(task.related_reg_no || "N/A")}</td>
+        <td>${escapeHtml(task.applicant_name || "Unlinked Applicant")}</td>
+        <td>${escapeHtml(task.task_title || "Untitled Task")}</td>
+        <td>${escapeHtml(formatDashboardLabel(task.task_type || ""))}</td>
+        <td>${escapeHtml(task.created_by_name || "System")}</td>
+        <td>${escapeHtml(formatRoleName(task.assigned_role || ""))}</td>
+        <td>${dashboardStatusChip(formatDashboardLabel(task.priority || "medium"))}</td>
+        <td>${dashboardStatusChip(formatDashboardLabel(task.status || "pending"))}</td>
+        <td>${escapeHtml(formatDashboardDateTime(task.due_at))}</td>
+        <td>${escapeHtml(formatDashboardDateTime(task.created_at))}</td>
+      </tr>
+    `).join("");
+  }
+
+  async function renderManagedTasks() {
+    if (!dmTasksTableBody) return;
+    setDataTableMessage(dmTasksTableBody, 10, "Loading workflow tasks...");
+
+    try {
+      const elevatedMonitoringRoles = new Set(["admin"]);
+      const includeDelegated = elevatedMonitoringRoles.has(getCurrentRole()) ? "1" : "0";
+      const params = new URLSearchParams({
+        include_delegated: includeDelegated,
+        status: dmTasksStatus?.value || ""
+      });
+      const response = await fetch(`../backend/api/get_tasks.php?${params.toString()}`, {
+        credentials: "include",
+        cache: "no-store"
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || `HTTP ${response.status}`);
+      }
+
+      const allRows = Array.isArray(data.tasks) ? data.tasks : [];
+      dataManagementState.tasks.rows = allRows;
+
+      if (dmTasksStatus) {
+        const currentStatus = dmTasksStatus.value || "";
+        const rawStatuses = Array.from(new Set(allRows.map((task) => String(task.status || "").trim()).filter(Boolean)));
+        dmTasksStatus.innerHTML = ['<option value="">All</option>']
+          .concat(rawStatuses.map((status) => `<option value="${escapeHtml(status)}">${escapeHtml(formatDashboardLabel(status))}</option>`))
+          .join("");
+        if (currentStatus && rawStatuses.includes(currentStatus)) {
+          dmTasksStatus.value = currentStatus;
+        }
+      }
+      if (dmTasksRole) {
+        const currentRoleValue = dmTasksRole.value || "";
+        const rawRoles = Array.from(new Set(allRows.map((task) => String(task.assigned_role || "").trim()).filter(Boolean)));
+        dmTasksRole.innerHTML = ['<option value="">All Roles</option>']
+          .concat(rawRoles.map((roleKey) => `<option value="${escapeHtml(roleKey)}">${escapeHtml(formatRoleName(roleKey))}</option>`))
+          .join("");
+        if (currentRoleValue && rawRoles.includes(currentRoleValue)) {
+          dmTasksRole.value = currentRoleValue;
+        }
+      }
+
+      const search = (dmTasksSearch?.value || "").trim().toLowerCase();
+      const priority = (dmTasksPriority?.value || "").trim().toLowerCase();
+      const roleFilter = (dmTasksRole?.value || "").trim();
+      const filtered = allRows.filter((task) => {
+        const roleText = formatRoleName(task.assigned_role || "");
+        if (priority && String(task.priority || "").trim().toLowerCase() !== priority) return false;
+        if (roleFilter && String(task.assigned_role || "").trim() !== roleFilter) return false;
+        if (!search) return true;
+        const haystack = [
+          task.related_reg_no,
+          task.applicant_name,
+          task.task_title,
+          task.task_type,
+          task.created_by_name,
+          roleText
+        ].join(" ").toLowerCase();
+        return haystack.includes(search);
+      });
+
+      renderDataMetricCards(dmTasksSummaryCards, [
+        { title: "Visible Tasks", value: filtered.length, color: "blue" },
+        { title: "Pending", value: filtered.filter((task) => String(task.status || "").toLowerCase() === "pending").length, color: "orange" },
+        { title: "Completed", value: filtered.filter((task) => String(task.status || "").toLowerCase() === "completed").length, color: "green" },
+        { title: "Overdue", value: filtered.filter((task) => Boolean(task.is_overdue)).length, color: "red" },
+        { title: "Urgent", value: filtered.filter((task) => String(task.priority || "").toLowerCase() === "urgent").length, color: "purple" }
+      ]);
+
+      updateManagedPagination(dataManagementState.tasks, dmTasksPageLabel, dmTasksPrevBtn, dmTasksNextBtn, filtered.length);
+      const start = (dataManagementState.tasks.page - 1) * dataManagementState.tasks.limit;
+      renderManagedTasksRows(filtered.slice(start, start + dataManagementState.tasks.limit));
+
+      updateDashboardLiveStamp("dataSection");
+    } catch (error) {
+      console.error("Failed to load workflow tasks management data:", error);
+      renderDataMetricCards(dmTasksSummaryCards, []);
+      setDataTableMessage(dmTasksTableBody, 10, error.message || "Unable to load workflow tasks.");
+    }
+  }
+
+  // Pensioners Summary
+  async function renderPensionersSummary() {
+    const [data, registryData] = await Promise.all([
+      fetchPensionersSummaryData(),
+      fetch('../backend/api/get_file_registry_summary.php', {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { 'Accept': 'application/json' }
+      }).then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok || !payload.success) {
+          return null;
+        }
+        return payload.summary || null;
+      }).catch(() => null)
+    ]);
+    if (!data) {
+      setAnalyticsEmpty(pensionerPopulationAnalytics, "Unable to load pensioner composition.");
+      setAnalyticsEmpty(pensionerCompositionAnalytics, "Unable to load registry composition.");
+      setAnalyticsEmpty(pensionerInsightGrid, "Unable to load pensioner insights.");
+      return;
+    }
+
+    const total = data.summary?.total || {};
+    const alive = data.summary?.alive || {};
+    const deceased = data.summary?.deceased || {};
+
+    renderAnalyticsBarList(pensionerPopulationAnalytics, [
+      { label: "Alive Pensioners", value: Number(alive.total || 0), meta: `Male ${Number(alive.male || 0)} | Female ${Number(alive.female || 0)}`, tone: "success" },
+      { label: "Deceased Pensioners", value: Number(deceased.total || 0), meta: `Male ${Number(deceased.male || 0)} | Female ${Number(deceased.female || 0)}`, tone: "danger" },
+      { label: "Male Records", value: Number(total.male || 0), meta: `Across ${Number(total.total || 0)} pensioner records`, tone: "info" },
+      { label: "Female Records", value: Number(total.female || 0), meta: `Across ${Number(total.total || 0)} pensioner records`, tone: "warning" }
+    ]);
+
+    const categories = registryData?.categories || {};
+    const pensionerStats = categories.pensioner || {};
+    const oneOffStats = categories.oneOff || {};
+    renderAnalyticsBarList(
+      pensionerCompositionAnalytics,
+      [
+        { label: "Pensioner - Alive", value: Number(pensionerStats.alive?.total || 0), meta: `Male ${Number(pensionerStats.alive?.male || 0)} | Female ${Number(pensionerStats.alive?.female || 0)}`, tone: "success" },
+        { label: "Pensioner - Deceased", value: Number(pensionerStats.deceased?.total || 0), meta: `Male ${Number(pensionerStats.deceased?.male || 0)} | Female ${Number(pensionerStats.deceased?.female || 0)}`, tone: "danger" },
+        { label: "One-off - Alive", value: Number(oneOffStats.alive?.total || 0), meta: `Male ${Number(oneOffStats.alive?.male || 0)} | Female ${Number(oneOffStats.alive?.female || 0)}`, tone: "info" },
+        { label: "One-off - Deceased", value: Number(oneOffStats.deceased?.total || 0), meta: `Male ${Number(oneOffStats.deceased?.male || 0)} | Female ${Number(oneOffStats.deceased?.female || 0)}`, tone: "warning" }
+      ],
+      { emptyMessage: "Registry composition becomes available once file registry records exist." }
+    );
+
+    const totalRecords = Number(total.total || 0);
+    const aliveCount = Number(alive.total || 0);
+    const deceasedCount = Number(deceased.total || 0);
+    const pensionerTotal = Number(pensionerStats.alive?.total || 0) + Number(pensionerStats.deceased?.total || 0);
+    const oneOffTotal = Number(oneOffStats.alive?.total || 0) + Number(oneOffStats.deceased?.total || 0);
+    renderAnalyticsStatGrid(pensionerInsightGrid, [
+      {
+        label: "Alive Share",
+        value: toPercent(aliveCount, totalRecords || 1),
+        helper: `${pluralize(aliveCount, "record")} are currently marked alive.`,
+        tone: "success"
+      },
+      {
+        label: "Deceased Share",
+        value: toPercent(deceasedCount, totalRecords || 1),
+        helper: `${pluralize(deceasedCount, "record")} require estate-style handling.`,
+        tone: deceasedCount > 0 ? "warning" : "info"
+      },
+      {
+        label: "Pensioner Files",
+        value: pluralize(pensionerTotal, "file"),
+        helper: `${toPercent(pensionerTotal, pensionerTotal + oneOffTotal || 1)} of registry files are recurring pensioner files.`,
+        tone: "info"
+      },
+      {
+        label: "Gender Balance",
+        value: `${Number(total.male || 0).toLocaleString()} : ${Number(total.female || 0).toLocaleString()}`,
+        helper: `Male-to-female pensioner ratio for beneficiary engagement planning.`,
+        tone: "warning"
+      }
+    ]);
+
+    updateDashboardLiveStamp("pensionersSection");
+  }
+
+  function formatDemographicsSnapshot(snapshot) {
+    if (!snapshot || !snapshot.name) {
+      return "No matching pensioner";
+    }
+    const parts = [snapshot.name];
+    if (snapshot.regNo) parts.push(snapshot.regNo);
+    if (snapshot.region) parts.push(snapshot.region);
+    return parts.join(" • ");
+  }
+
+  function readDemographicsFilters() {
+    demographicsState.filters = {
+      focus: demographicsFocusFilter?.value || "oldest",
+      livingStatus: demographicsLivingStatusFilter?.value || "Alive",
+      gender: demographicsGenderFilter?.value || "",
+      region: demographicsRegionFilter?.value || "",
+      district: demographicsDistrictFilter?.value || "",
+      retirementType: demographicsRetirementTypeFilter?.value || "",
+      search: (demographicsSearchInput?.value || "").trim()
+    };
+    return { ...demographicsState.filters };
+  }
+
+  async function renderDemographicsSection(forceRefresh = false) {
+    const data = await fetchDemographicsSummaryData(forceRefresh);
+    if (!data) {
+      setAnalyticsEmpty(demographicsOverallGrid, "Unable to load demographics insights.");
+      setAnalyticsEmpty(demographicsGenderAnalytics, "Unable to load gender age signals.");
+      setAnalyticsEmpty(demographicsRegionAnalytics, "Unable to load regional age signals.");
+      setAnalyticsEmpty(demographicsRetirementAnalytics, "Unable to load retirement age signals.");
+      setAnalyticsEmpty(demographicsLifespanGrid, "Unable to load observed lifespan metrics.");
+      setAnalyticsEmpty(demographicsEstateGrid, "Unable to load estate lifecycle signals.");
+      return;
+    }
+
+    populateDemographicsFilters(data);
+
+    const totals = data.summary?.totals || {};
+    const overall = data.summary?.overall || {};
+    const lifespan = data.summary?.lifespan || {};
+    const byGender = Array.isArray(data.summary?.byGender) ? data.summary.byGender : [];
+    const byRegion = Array.isArray(data.summary?.byRegion) ? data.summary.byRegion : [];
+    const byRetirementType = Array.isArray(data.summary?.byRetirementType) ? data.summary.byRetirementType : [];
+
+    renderAnalyticsStatGrid(demographicsOverallGrid, [
+      {
+        label: "Oldest Alive",
+        value: formatAgeValue(overall.oldestAlive?.ageYears),
+        helper: formatDemographicsSnapshot(overall.oldestAlive),
+        tone: "warning"
+      },
+      {
+        label: "Youngest Alive",
+        value: formatAgeValue(overall.youngestAlive?.ageYears),
+        helper: formatDemographicsSnapshot(overall.youngestAlive),
+        tone: "success"
+      },
+      {
+        label: "Active Estates",
+        value: pluralize(totals.activeEstates || 0, "estate"),
+        helper: `${pluralize(totals.deceasedPensioners || 0, "deceased pensioner")} currently recorded in the registry.`,
+        tone: "info"
+      },
+      {
+        label: "15 Years Elapsed",
+        value: pluralize(totals.expiredEstates || 0, "estate"),
+        helper: "Deceased pensioner files whose earning window has fully elapsed.",
+        tone: (totals.expiredEstates || 0) > 0 ? "danger" : "neutral"
+      }
+    ]);
+
+    renderAnalyticsBarList(demographicsGenderAnalytics, byGender.slice(0, 6).map((item) => ({
+      label: item.group || "Unspecified",
+      value: Number(item.oldest?.ageYears || 0),
+      meta: `Oldest ${formatDemographicsSnapshot(item.oldest)} | Youngest ${formatAgeValue(item.youngest?.ageYears)} | ${pluralize(item.aliveCount || 0, "alive pensioner")}`,
+      tone: String(item.group || "").toLowerCase() === "female" ? "warning" : "info"
+    })), {
+      valueFormatter: (value) => formatAgeValue(value),
+      emptyMessage: "No alive pensioner age records available by gender."
+    });
+
+    renderAnalyticsBarList(demographicsRegionAnalytics, byRegion.slice(0, 8).map((item) => ({
+      label: item.group || "Unspecified",
+      value: Number(item.oldest?.ageYears || 0),
+      meta: `Oldest ${formatDemographicsSnapshot(item.oldest)} | ${pluralize(item.aliveCount || 0, "alive pensioner")}`,
+      tone: "info"
+    })), {
+      valueFormatter: (value) => formatAgeValue(value),
+      emptyMessage: "No regional age signals available yet."
+    });
+
+    renderAnalyticsBarList(demographicsRetirementAnalytics, byRetirementType.slice(0, 8).map((item) => ({
+      label: item.group || "Unspecified",
+      value: Number(item.oldest?.ageYears || 0),
+      meta: `Youngest ${formatAgeValue(item.youngest?.ageYears)} | ${pluralize(item.aliveCount || 0, "alive pensioner")}`,
+      tone: "success"
+    })), {
+      valueFormatter: (value) => formatAgeValue(value),
+      emptyMessage: "No retirement-label age signals available yet."
+    });
+
+    renderAnalyticsStatGrid(demographicsLifespanGrid, [
+      {
+        label: "Observed Death Records",
+        value: pluralize(lifespan.observedDeaths || 0, "record"),
+        helper: "Non-Death retirement pensioners with both retirement date and date of death recorded.",
+        tone: "info"
+      },
+      {
+        label: "Average Years After Retirement",
+        value: formatAgeValue(lifespan.averageYearsAfterRetirement),
+        helper: "Observed years lived after retirement before death was reported.",
+        tone: "success"
+      },
+      {
+        label: "Median Years After Retirement",
+        value: formatAgeValue(lifespan.medianYearsAfterRetirement),
+        helper: "Middle observed span for the same population.",
+        tone: "warning"
+      },
+      {
+        label: "Longest Observed Span",
+        value: formatAgeValue(lifespan.longestYearsAfterRetirement),
+        helper: `Longest observed survival span after retirement. Average age at death: ${formatAgeValue(lifespan.averageAgeAtDeath)}.`,
+        tone: "info"
+      },
+      {
+        label: "Projected Remaining Span",
+        value: formatAgeValue(lifespan.projectedAverageRemainingYears),
+        helper: `${pluralize(lifespan.forecastPopulation || 0, "alive pensioner")} used for the current forecast proxy based on observed non-Death records.`,
+        tone: "warning"
+      },
+      {
+        label: "Projected Age at Death",
+        value: formatAgeValue(lifespan.projectedAgeAtDeath),
+        helper: "Observed average age at death reused as a simple expectancy reference for planning conversations.",
+        tone: "info"
+      }
+    ]);
+
+    renderAnalyticsStatGrid(demographicsEstateGrid, [
+      {
+        label: "Within 15-Year Cap",
+        value: pluralize(lifespan.within15YearsCount || 0, "record"),
+        helper: "Reported deaths that happened before the estate earning window elapsed.",
+        tone: "success"
+      },
+      {
+        label: "Beyond 15-Year Cap",
+        value: pluralize(lifespan.beyond15YearsCount || 0, "record"),
+        helper: "Reported deaths that landed on or after the estate expiry threshold.",
+        tone: (lifespan.beyond15YearsCount || 0) > 0 ? "danger" : "neutral"
+      },
+      {
+        label: "Alive Pensioners",
+        value: pluralize(totals.alivePensioners || 0, "pensioner"),
+        helper: `${pluralize(totals.pensionerPopulation || 0, "pensioner file")} currently included in longevity monitoring.`,
+        tone: "info"
+      },
+      {
+        label: "Explorer",
+        value: "Open Modal",
+        helper: "Use Explore Pensioners to filter oldest/youngest cohorts and trigger death reporting where permitted.",
+        tone: "warning"
+      }
+    ]);
+
+    updateDashboardLiveStamp("demographicsSection");
+  }
+
+  function renderDemographicsRows(rows = []) {
+    if (!demographicsTableBody) return;
+    if (!Array.isArray(rows) || !rows.length) {
+      demographicsTableBody.innerHTML = '<tr><td colspan="11">No pensioners matched the current filters.</td></tr>';
+      return;
+    }
+
+    demographicsTableBody.innerHTML = rows.map((row, index) => `
+      <tr data-demographics-index="${index}">
+        <td>${escapeHtml(row.regNo || "")}</td>
+        <td>
+          <strong>${escapeHtml(row.name || "Unknown pensioner")}</strong>
+          <div class="dashboard-table-subtext">${escapeHtml(row.retirementTypeLabel || "Unspecified")}</div>
+        </td>
+        <td>${escapeHtml(row.gender || "N/A")}</td>
+        <td>${escapeHtml(formatAgeValue(row.ageYears))}</td>
+        <td>${escapeHtml(row.district || "Unspecified")}</td>
+        <td>${escapeHtml(row.region || "Unspecified")}</td>
+        <td>${escapeHtml(row.retirementTypeLabel || "Unspecified")}</td>
+        <td>${escapeHtml(row.livingStatus || "N/A")}</td>
+        <td>${escapeHtml(row.yearsAfterRetirementLabel || formatAgeValue(row.yearsAfterRetirement))}</td>
+        <td><span class="demographics-status-pill status-${String(row.estateStatus || "").toLowerCase().replace(/[^a-z0-9]+/g, "-")}">${escapeHtml(row.estateStatus || "Not Applicable")}</span></td>
+        <td>
+          ${row.canReportDeath
+            ? `<button type="button" class="btn-action btn-secondary demographics-row-action" data-demographics-action="report" data-demographics-index="${index}">Report Death</button>`
+            : `<span class="dashboard-table-subtext">${escapeHtml(row.dateOfDeath ? "Death captured" : "View only")}</span>`}
+        </td>
+      </tr>
+    `).join("");
+  }
+
+  function syncDashboardModalBodyLock() {
+    const hasOpenModal = [
+      dmPdfExportModal,
+      dataRowActionModal,
+      feedbackDetailModal,
+      demographicsDetailModal,
+      deathReportModal,
+      summaryReportModal,
+      payrollUploadModal,
+      payrollRegisterUploadModal
+    ].some((modal) => modal?.classList.contains("open"));
+    document.body.classList.toggle("modal-open", hasOpenModal);
+  }
+
+  async function renderDemographicsModalResults() {
+    if (!demographicsResultSummary) return;
+    const filters = readDemographicsFilters();
+    demographicsResultSummary.innerHTML = `
+      <h4>Matching Pensioners</h4>
+      <div class="dashboard-data-modal-summary-grid">
+        <div class="dashboard-data-modal-summary-item">
+          <span>Focus</span>
+          <strong>${escapeHtml(formatDashboardLabel(filters.focus))}</strong>
+        </div>
+        <div class="dashboard-data-modal-summary-item">
+          <span>Living Status</span>
+          <strong>${escapeHtml(filters.livingStatus || "Alive")}</strong>
+        </div>
+        <div class="dashboard-data-modal-summary-item">
+          <span>Scope</span>
+          <strong>Loading...</strong>
+        </div>
+      </div>
+    `;
+    if (demographicsTableBody) {
+      demographicsTableBody.innerHTML = '<tr><td colspan="11">Loading pensioner details...</td></tr>';
+    }
+
+    try {
+      const data = await fetchDemographicsListData(filters);
+      demographicsState.rows = Array.isArray(data.rows) ? data.rows : [];
+      const summary = data.summary || {};
+      const descriptors = [];
+      if (filters.gender) descriptors.push(filters.gender);
+      if (filters.region) descriptors.push(filters.region);
+      if (filters.district) descriptors.push(filters.district);
+      if (filters.retirementType) descriptors.push(formatRetirementType(filters.retirementType));
+      if (filters.search) descriptors.push(`Search: ${filters.search}`);
+      demographicsResultSummary.innerHTML = `
+        <h4>Matching Pensioners</h4>
+        <div class="dashboard-data-modal-summary-grid">
+          <div class="dashboard-data-modal-summary-item">
+            <span>Matched Rows</span>
+            <strong>${escapeHtml(pluralize(summary.matchedCount || 0, "record"))}</strong>
+          </div>
+          <div class="dashboard-data-modal-summary-item">
+            <span>Oldest in View</span>
+            <strong>${escapeHtml(formatAgeValue(summary.oldest?.ageYears))}</strong>
+          </div>
+          <div class="dashboard-data-modal-summary-item">
+            <span>Youngest in View</span>
+            <strong>${escapeHtml(formatAgeValue(summary.youngest?.ageYears))}</strong>
+          </div>
+          <div class="dashboard-data-modal-summary-item">
+            <span>Scope</span>
+            <strong>${escapeHtml(descriptors.join(" • ") || "All matching pensioners")}</strong>
+          </div>
+        </div>
+      `;
+      renderDemographicsRows(demographicsState.rows);
+    } catch (error) {
+      console.error("Unable to load demographics detail rows:", error);
+      if (demographicsTableBody) {
+        demographicsTableBody.innerHTML = `<tr><td colspan="11">${escapeHtml(error.message || "Unable to load pensioner details.")}</td></tr>`;
+      }
+      demographicsResultSummary.innerHTML = `
+        <h4>Matching Pensioners</h4>
+        <div class="dashboard-data-modal-summary-grid">
+          <div class="dashboard-data-modal-summary-item">
+            <span>Status</span>
+            <strong>${escapeHtml(error.message || "Unable to load pensioner details.")}</strong>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  function formatDemographicsSnapshot(snapshot) {
+    if (!snapshot || !snapshot.name) {
+      return "No matching pensioner";
+    }
+    const parts = [snapshot.name];
+    if (snapshot.regNo) parts.push(snapshot.regNo);
+    if (snapshot.region) parts.push(snapshot.region);
+    return parts.join(" | ");
+  }
+
+  function readDemographicsFilters() {
+    syncDemographicsLocationOptions();
+    demographicsState.filters = {
+      focus: demographicsFocusFilter?.value || "oldest",
+      livingStatus: demographicsLivingStatusFilter?.value ?? "Alive",
+      gender: demographicsGenderFilter?.value || "",
+      region: demographicsRegionFilter?.value || "",
+      district: demographicsDistrictFilter?.value || "",
+      retirementType: demographicsRetirementTypeFilter?.value || "",
+      search: (demographicsSearchInput?.value || "").trim()
+    };
+    return { ...demographicsState.filters };
+  }
+
+  function buildDemographicsScopeDescriptors(filters = demographicsState.filters) {
+    const descriptors = [];
+    if (filters.livingStatus) descriptors.push(filters.livingStatus);
+    if (filters.gender) descriptors.push(filters.gender);
+    if (filters.region) descriptors.push(filters.region);
+    if (filters.district) descriptors.push(filters.district);
+    if (filters.retirementType) descriptors.push(formatRetirementType(filters.retirementType));
+    if (filters.search) descriptors.push(`Search: ${filters.search}`);
+    return descriptors;
+  }
+
+  function getDemographicsRowKey(row) {
+    return String(row?.regNo || row?.registryId || "").trim();
+  }
+
+  function ensureDemographicsSelection(rows = demographicsState.rows) {
+    const availableKeys = Array.isArray(rows)
+      ? rows.map((row) => getDemographicsRowKey(row)).filter(Boolean)
+      : [];
+    if (!availableKeys.length) {
+      demographicsState.selectedRowKey = "";
+      return;
+    }
+    if (!availableKeys.includes(demographicsState.selectedRowKey)) {
+      demographicsState.selectedRowKey = availableKeys[0];
+    }
+  }
+
+  function renderDemographicsLiveResults(rows = [], summary = {}, filters = demographicsState.filters) {
+    if (!demographicsLiveResults) return;
+    if (!Array.isArray(rows) || !rows.length) {
+      demographicsLiveResults.innerHTML = '<div class="demographics-live-results-empty">No pensioners matched the current filters. Adjust the search or clear one of the filters to widen the explorer.</div>';
+      return;
+    }
+
+    ensureDemographicsSelection(rows);
+    const matchedCount = Number(summary.matchedCount || rows.length);
+    const returnedCount = Number(summary.returnedCount || rows.length);
+    const scopeDescriptors = buildDemographicsScopeDescriptors(filters);
+    const countLabel = matchedCount > returnedCount
+      ? `Showing ${returnedCount.toLocaleString()} of ${matchedCount.toLocaleString()} matched records`
+      : pluralize(matchedCount || returnedCount, "record");
+
+    demographicsLiveResults.innerHTML = `
+      <div class="demographics-live-results-head">
+        <div>
+          <strong>Filtered Pensioner List</strong>
+          <span>${escapeHtml(countLabel)}</span>
+        </div>
+        <div class="dashboard-table-subtext">${escapeHtml(scopeDescriptors.join(" | ") || `${formatDashboardLabel(filters.focus)} order`)}</div>
+      </div>
+      <div class="demographics-live-results-list">
+        ${rows.map((row, index) => {
+          const rowKey = getDemographicsRowKey(row);
+          const active = rowKey && rowKey === demographicsState.selectedRowKey;
+          const detailBits = [
+            row.regNo || "No file number",
+            formatAgeValue(row.ageYears),
+            row.gender || "Unspecified"
+          ];
+          const locationBits = [
+            row.district || "Unspecified district",
+            row.region || "Unspecified region",
+            row.retirementTypeLabel || "Unspecified retirement label"
+          ];
+          const lifecycleBits = [
+            `Years after retirement: ${row.yearsAfterRetirementLabel || formatAgeValue(row.yearsAfterRetirement)}`,
+            `Estate: ${row.estateStatus || "Not Applicable"}`
+          ];
+          return `
+            <button
+              type="button"
+              class="demographics-live-result-card${active ? " active" : ""}"
+              data-demographics-preview-index="${index}"
+            >
+              <div class="demographics-live-result-head">
+                <div>
+                  <strong>${escapeHtml(row.name || "Unknown pensioner")}</strong>
+                  <div class="dashboard-table-subtext">${escapeHtml(detailBits.join(" | "))}</div>
+                </div>
+                <span class="demographics-status-pill status-${String(row.livingStatus || "unknown").toLowerCase().replace(/[^a-z0-9]+/g, "-")}">${escapeHtml(row.livingStatus || "N/A")}</span>
+              </div>
+              <div class="demographics-live-result-meta">${escapeHtml(locationBits.join(" | "))}</div>
+              <div class="demographics-live-result-meta">${escapeHtml(lifecycleBits.join(" | "))}</div>
+            </button>
+          `;
+        }).join("")}
+      </div>
+    `;
+  }
+
+  function renderDemographicsRows(rows = []) {
+    if (!demographicsTableBody) return;
+    if (!Array.isArray(rows) || !rows.length) {
+      demographicsTableBody.innerHTML = '<tr><td colspan="11">No pensioners matched the current filters.</td></tr>';
+      return;
+    }
+
+    ensureDemographicsSelection(rows);
+    demographicsTableBody.innerHTML = rows.map((row, index) => {
+      const active = getDemographicsRowKey(row) === demographicsState.selectedRowKey;
+      return `
+        <tr data-demographics-index="${index}" class="${active ? "is-active" : ""}">
+          <td>${escapeHtml(row.regNo || "")}</td>
+          <td>
+            <strong>${escapeHtml(row.name || "Unknown pensioner")}</strong>
+            <div class="dashboard-table-subtext">${escapeHtml(row.retirementTypeLabel || "Unspecified")}</div>
+          </td>
+          <td>${escapeHtml(row.gender || "N/A")}</td>
+          <td>${escapeHtml(formatAgeValue(row.ageYears))}</td>
+          <td>${escapeHtml(row.district || "Unspecified")}</td>
+          <td>${escapeHtml(row.region || "Unspecified")}</td>
+          <td>${escapeHtml(row.retirementTypeLabel || "Unspecified")}</td>
+          <td>${escapeHtml(row.livingStatus || "N/A")}</td>
+          <td>${escapeHtml(row.yearsAfterRetirementLabel || formatAgeValue(row.yearsAfterRetirement))}</td>
+          <td><span class="demographics-status-pill status-${String(row.estateStatus || "").toLowerCase().replace(/[^a-z0-9]+/g, "-")}">${escapeHtml(row.estateStatus || "Not Applicable")}</span></td>
+          <td>
+            ${row.canReportDeath
+              ? `<button type="button" class="btn-action btn-secondary demographics-row-action" data-demographics-action="report" data-demographics-index="${index}">Report Death</button>`
+              : `<span class="dashboard-table-subtext">${escapeHtml(row.dateOfDeath ? "Death captured" : "View only")}</span>`}
+          </td>
+        </tr>
+      `;
+    }).join("");
+  }
+
+  function selectDemographicsRowByIndex(index, options = {}) {
+    const row = Array.isArray(demographicsState.rows) ? demographicsState.rows[index] : null;
+    if (!row) return;
+
+    demographicsState.selectedRowKey = getDemographicsRowKey(row);
+    renderDemographicsLiveResults(demographicsState.rows, demographicsState.lastListSummary || {}, demographicsState.filters);
+    renderDemographicsRows(demographicsState.rows);
+
+    if (options.scrollIntoView) {
+      const targetRow = demographicsTableBody?.querySelector(`tr[data-demographics-index="${index}"]`);
+      targetRow?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+    }
+  }
+
+  function scheduleDemographicsModalResults(delay = 0) {
+    window.clearTimeout(demographicsState.listRefreshTimer);
+    if (!demographicsDetailModal?.classList.contains("open")) {
+      return;
+    }
+    if (delay > 0) {
+      demographicsState.listRefreshTimer = window.setTimeout(() => {
+        renderDemographicsModalResults();
+      }, delay);
+      return;
+    }
+    renderDemographicsModalResults();
+  }
+
+  async function renderDemographicsModalResults() {
+    if (!demographicsResultSummary) return;
+
+    const filters = readDemographicsFilters();
+    const requestSequence = ++demographicsState.listRequestSequence;
+    if (demographicsState.listAbortController) {
+      demographicsState.listAbortController.abort();
+    }
+
+    const controller = new AbortController();
+    demographicsState.listAbortController = controller;
+    demographicsState.lastListSummary = null;
+
+    demographicsResultSummary.innerHTML = `
+      <h4>Matching Pensioners</h4>
+      <div class="dashboard-data-modal-summary-grid">
+        <div class="dashboard-data-modal-summary-item">
+          <span>Focus</span>
+          <strong>${escapeHtml(formatDashboardLabel(filters.focus))}</strong>
+        </div>
+        <div class="dashboard-data-modal-summary-item">
+          <span>Living Status</span>
+          <strong>${escapeHtml(filters.livingStatus || "All Statuses")}</strong>
+        </div>
+        <div class="dashboard-data-modal-summary-item">
+          <span>Scope</span>
+          <strong>Loading...</strong>
+        </div>
+      </div>
+    `;
+
+    if (demographicsLiveResults) {
+      demographicsLiveResults.innerHTML = '<div class="demographics-live-results-empty">Loading filtered pensioner records...</div>';
+    }
+    if (demographicsTableBody) {
+      demographicsTableBody.innerHTML = '<tr><td colspan="11">Loading pensioner details...</td></tr>';
+    }
+
+    try {
+      const data = await fetchDemographicsListData(filters, { signal: controller.signal });
+      if (requestSequence !== demographicsState.listRequestSequence) {
+        return;
+      }
+
+      demographicsState.rows = Array.isArray(data.rows) ? data.rows : [];
+      demographicsState.lastListSummary = data.summary || {};
+      ensureDemographicsSelection(demographicsState.rows);
+
+      const summary = demographicsState.lastListSummary;
+      const descriptors = buildDemographicsScopeDescriptors(filters);
+      demographicsResultSummary.innerHTML = `
+        <h4>Matching Pensioners</h4>
+        <div class="dashboard-data-modal-summary-grid">
+          <div class="dashboard-data-modal-summary-item">
+            <span>Matched Rows</span>
+            <strong>${escapeHtml(pluralize(summary.matchedCount || 0, "record"))}</strong>
+          </div>
+          <div class="dashboard-data-modal-summary-item">
+            <span>Oldest in View</span>
+            <strong>${escapeHtml(formatAgeValue(summary.oldest?.ageYears))}</strong>
+          </div>
+          <div class="dashboard-data-modal-summary-item">
+            <span>Youngest in View</span>
+            <strong>${escapeHtml(formatAgeValue(summary.youngest?.ageYears))}</strong>
+          </div>
+          <div class="dashboard-data-modal-summary-item">
+            <span>Scope</span>
+            <strong>${escapeHtml(descriptors.join(" | ") || "All matching pensioners")}</strong>
+          </div>
+        </div>
+      `;
+
+      renderDemographicsLiveResults(demographicsState.rows, summary, filters);
+      renderDemographicsRows(demographicsState.rows);
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        return;
+      }
+      console.error("Unable to load demographics detail rows:", error);
+      demographicsState.rows = [];
+      demographicsState.selectedRowKey = "";
+      demographicsState.lastListSummary = null;
+      if (demographicsLiveResults) {
+        demographicsLiveResults.innerHTML = `<div class="demographics-live-results-empty">${escapeHtml(error.message || "Unable to load pensioner details.")}</div>`;
+      }
+      if (demographicsTableBody) {
+        demographicsTableBody.innerHTML = `<tr><td colspan="11">${escapeHtml(error.message || "Unable to load pensioner details.")}</td></tr>`;
+      }
+      demographicsResultSummary.innerHTML = `
+        <h4>Matching Pensioners</h4>
+        <div class="dashboard-data-modal-summary-grid">
+          <div class="dashboard-data-modal-summary-item">
+            <span>Status</span>
+            <strong>${escapeHtml(error.message || "Unable to load pensioner details.")}</strong>
+          </div>
+        </div>
+      `;
+    } finally {
+      if (demographicsState.listAbortController === controller) {
+        demographicsState.listAbortController = null;
+      }
+    }
+  }
+
+  async function openDemographicsDetailModal() {
+    if (!demographicsDetailModal) return;
+    demographicsDetailModal.classList.add("open");
+    demographicsDetailModal.setAttribute("aria-hidden", "false");
+    syncDashboardModalBodyLock();
+    const summaryData = demographicsState.cache || await fetchDemographicsSummaryData();
+    if (summaryData) {
+      populateDemographicsFilters(summaryData);
+    }
+    renderDemographicsModalResults();
+  }
+
+  function closeDemographicsDetailModal() {
+    if (!demographicsDetailModal) return;
+    window.clearTimeout(demographicsState.listRefreshTimer);
+    if (demographicsState.listAbortController) {
+      demographicsState.listAbortController.abort();
+      demographicsState.listAbortController = null;
+    }
+    demographicsDetailModal.classList.remove("open");
+    demographicsDetailModal.setAttribute("aria-hidden", "true");
+    syncDashboardModalBodyLock();
+  }
+
+  function closeDeathReportModal() {
+    if (!deathReportModal) return;
+    deathReportModal.classList.remove("open");
+    deathReportModal.setAttribute("aria-hidden", "true");
+    demographicsState.currentSubject = null;
+    syncDashboardModalBodyLock();
+  }
+
+  function openDeathReportModal(row) {
+    if (!deathReportModal || !row) return;
+    demographicsState.currentSubject = row;
+    if (deathReportRegistryId) deathReportRegistryId.value = String(row.registryId || "");
+    if (deathReportRegNo) deathReportRegNo.value = String(row.regNo || "");
+    if (deathReportSubject) deathReportSubject.textContent = row.name || "Selected pensioner";
+    if (deathReportRegistryMeta) deathReportRegistryMeta.textContent = String(row.registryId || "--");
+    if (deathReportRegNoMeta) deathReportRegNoMeta.textContent = row.regNo || "--";
+    if (deathReportRetirementMeta) deathReportRetirementMeta.textContent = row.retirementTypeLabel || "Unspecified";
+    if (deathReportRetirementDateMeta) deathReportRetirementDateMeta.textContent = formatDashboardDate(row.retirementDate || "");
+    const todayIso = new Date().toISOString().slice(0, 10);
+    if (deathReportDateOfDeath) {
+      deathReportDateOfDeath.value = "";
+      deathReportDateOfDeath.min = row.retirementDate || "";
+      deathReportDateOfDeath.max = todayIso;
+    }
+    if (deathReportNotificationDate) {
+      deathReportNotificationDate.value = todayIso;
+      deathReportNotificationDate.min = row.retirementDate || "";
+      deathReportNotificationDate.max = todayIso;
+    }
+    if (deathReportNotifierName) deathReportNotifierName.value = "";
+    if (deathReportNotifierContact) deathReportNotifierContact.value = "";
+    if (deathReportNotes) deathReportNotes.value = "";
+
+    deathReportModal.classList.add("open");
+    deathReportModal.setAttribute("aria-hidden", "false");
+    syncDashboardModalBodyLock();
+  }
+
+  async function submitDeathReport() {
+    const row = demographicsState.currentSubject;
+    if (!row) {
+      notifyDashboard("error", "Select a pensioner record before saving the death report.", "Estate Update");
+      return;
+    }
+
+    const payload = {
+      registry_id: Number(deathReportRegistryId?.value || row.registryId || 0),
+      regNo: deathReportRegNo?.value || row.regNo || "",
+      date_of_death: deathReportDateOfDeath?.value || "",
+      notification_date: deathReportNotificationDate?.value || "",
+      notifier_name: (deathReportNotifierName?.value || "").trim(),
+      notifier_contact: (deathReportNotifierContact?.value || "").trim(),
+      notes: (deathReportNotes?.value || "").trim()
+    };
+
+    if (!payload.date_of_death) {
+      notifyDashboard("error", "Enter the date of death before saving this report.", "Estate Update");
+      deathReportDateOfDeath?.focus();
+      return;
+    }
+    if (!payload.notification_date) {
+      notifyDashboard("error", "Enter the notification date before saving this report.", "Estate Update");
+      deathReportNotificationDate?.focus();
+      return;
+    }
+    if (!payload.notifier_name) {
+      notifyDashboard("error", "Enter the notifying person's name before saving this report.", "Estate Update");
+      deathReportNotifierName?.focus();
+      return;
+    }
+    if (!payload.notifier_contact) {
+      notifyDashboard("error", "Enter the notifying person's contact before saving this report.", "Estate Update");
+      deathReportNotifierContact?.focus();
+      return;
+    }
+    if (row.retirementDate && payload.date_of_death < row.retirementDate) {
+      notifyDashboard("error", "The date of death cannot be earlier than the retirement date.", "Estate Update");
+      deathReportDateOfDeath?.focus();
+      return;
+    }
+    if (payload.notification_date < payload.date_of_death) {
+      notifyDashboard("error", "The notification date cannot be earlier than the date of death.", "Estate Update");
+      deathReportNotificationDate?.focus();
+      return;
+    }
+
+    try {
+      const response = await fetch("../backend/api/report_pensioner_death.php", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || `HTTP ${response.status}`);
+      }
+      notifyDashboard("success", data.message || "Death report saved successfully.", "Estate Update");
+      closeDeathReportModal();
+      invalidatePensionerAnalyticsCaches();
+      await Promise.allSettled([
+        renderDemographicsSection(true),
+        renderPensionersSummary(),
+        renderModeOfRetirement(),
+        renderClaimsSummary()
+      ]);
+      if (demographicsDetailModal?.classList.contains("open")) {
+        await renderDemographicsModalResults();
+      }
+    } catch (error) {
+      notifyDashboard("error", error.message || "Unable to save the death report.", "Estate Update");
+    }
+  }
+
+  // Retirement Label
+  async function renderModeOfRetirement() {
+    const data = await fetchPensionersSummaryData();
+    const modes = Array.isArray(data?.modes) ? data.modes : [];
+
+    if (!modes.length) {
+      setAnalyticsEmpty(retirementModeAnalytics, "No retirement pathway analytics available.");
+      setAnalyticsEmpty(retirementModeInsightGrid, "No retirement pathway insights available.");
+      return;
+    }
+
+    renderAnalyticsBarList(
+      retirementModeAnalytics,
+      modes.slice(0, 8).map((item) => ({
+        label: formatRetirementType(item.name || "Unspecified"),
+        value: Number(item.total || 0),
+        meta: `Alive ${Number(item.alive || 0)} | Deceased ${Number(item.deceased || 0)}`,
+        tone: Number(item.deceased || 0) > Number(item.alive || 0) ? "warning" : "info"
+      })),
+      { emptyMessage: "No retirement pathway analytics available." }
+    );
+
+    const dominantMode = modes[0] || {};
+    const dominantTotal = Number(dominantMode.total || 0);
+    const dominantAlive = Number(dominantMode.alive || 0);
+    const dominantDeceased = Number(dominantMode.deceased || 0);
+    const totalModes = modes.length;
+    renderAnalyticsStatGrid(retirementModeInsightGrid, [
+      {
+        label: "Dominant Retirement Label",
+        value: formatRetirementType(dominantMode.name || "Unspecified"),
+        helper: `${pluralize(dominantTotal, "record")} are currently classified under the largest retirement label on record.`,
+        tone: "info"
+      },
+      {
+        label: "Dominant Label Survival Mix",
+        value: `${toPercent(dominantAlive, dominantTotal || 1)} alive`,
+        helper: `${pluralize(dominantDeceased, "deceased record")} remain under the same retirement label.`,
+        tone: dominantDeceased > 0 ? "warning" : "success"
+      },
+      {
+        label: "Retirement Label Variety",
+        value: pluralize(totalModes, "retirement label"),
+        helper: `Distinct retirement labels currently represented in the registry.`,
+        tone: "success"
+      },
+      {
+        label: "Concentration Share",
+        value: toPercent(dominantTotal, modes.reduce((sum, item) => sum + Number(item.total || 0), 0) || 1),
+        helper: `Shows how much operational weight is concentrated in a single retirement label.`,
+        tone: dominantTotal > 0 ? "warning" : "info"
+      }
+    ]);
+
+    updateDashboardLiveStamp("categoriesSection");
+  }
+
+  // Life Certificate
+  async function renderLifeCertificates() {
+    if (!lifeCertCards || !lifeCertTableBody) return;
+
+    const selectedYear = Number(lifeCertYear?.value || new Date().getFullYear());
+    const query = new URLSearchParams({
+      year: String(selectedYear),
+      status: lifeCertStatusFilter?.value || "",
+      search: lifeCertSearch?.value?.trim() || "",
+      page: String(lifeCertState.page),
+      limit: String(lifeCertState.limit)
+    });
+
     lifeCertCards.innerHTML = "";
-    lifeCertCards.appendChild(createCard(`Submitted (${year})`, data.submitted, "", "", "", "", "green"));
-    lifeCertCards.appendChild(createCard(`Not Submitted (${year})`, data.notSubmitted, "", "", "", "", "red"));
+    lifeCertCards.appendChild(createCard(`Submitted (${selectedYear})`, "...", "", "", "", "", "green"));
+    lifeCertCards.appendChild(createCard(`Not Submitted (${selectedYear})`, "...", "", "", "", "", "red"));
+    lifeCertCards.appendChild(createCard(`Exempt (${selectedYear})`, "...", "", "", "", "", "teal"));
+    lifeCertCards.appendChild(createCard(`Expected (${selectedYear})`, "...", "", "", "", "", "blue"));
+    lifeCertTableBody.innerHTML = '<tr><td colspan="9">Loading life certificate records...</td></tr>';
+
+    try {
+      const response = await fetch(`../backend/api/get_life_certificate_dashboard.php?${query.toString()}`, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store"
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        const message = data.message || `HTTP ${response.status}`;
+        lifeCertTableBody.innerHTML = `<tr><td colspan="9">${escapeHtml(message)}</td></tr>`;
+        setAnalyticsEmpty(lifeCertAnalyticsBars, message);
+        setAnalyticsEmpty(lifeCertInsightGrid, message);
+        return;
+      }
+
+      const summary = data.summary || {};
+      const eligibleLifeCertCount = Number(summary.eligible || 0);
+      const lifeCertPortfolioCount = Number(summary.total || 0);
+      lifeCertCards.innerHTML = "";
+      lifeCertCards.appendChild(createCard(`Submitted (${selectedYear})`, Number(summary.submitted || 0), "", "", "", "", "green"));
+      lifeCertCards.appendChild(createCard(`Not Submitted (${selectedYear})`, Number(summary.notSubmitted || 0), "", "", "", "", "red"));
+      lifeCertCards.appendChild(createCard(`Exempt (${selectedYear})`, Number(summary.exempt || 0), "", "", "", "", "teal"));
+      lifeCertCards.appendChild(createCard(`Expected (${selectedYear})`, eligibleLifeCertCount, "", "", "", "", "blue"));
+
+      renderAnalyticsBarList(lifeCertAnalyticsBars, [
+        {
+          label: "Submitted",
+          value: Number(summary.submitted || 0),
+          meta: `${toPercent(summary.submitted || 0, eligibleLifeCertCount || 1)} compliance for ${selectedYear}, based on eligible alive pensioner files.`,
+          tone: "success"
+        },
+        {
+          label: "Not Submitted",
+          value: Number(summary.notSubmitted || 0),
+          meta: `${pluralize(summary.notSubmitted || 0, "record")} still need annual confirmation.`,
+          tone: "danger"
+        },
+        {
+          label: "Exempt",
+          value: Number(summary.exempt || 0),
+          meta: `${pluralize(summary.exempt || 0, "record")} are excluded because of living-status or pay-type rules out of ${pluralize(lifeCertPortfolioCount, "tracked file")}.`,
+          tone: "info"
+        }
+      ]);
+
+      const rows = Array.isArray(data.rows) ? data.rows : [];
+      renderAnalyticsStatGrid(lifeCertInsightGrid, [
+        {
+          label: "Compliance Rate",
+          value: toPercent(summary.submitted || 0, eligibleLifeCertCount || 1),
+          helper: `Calculated only from eligible alive pensioner files expected to submit for ${selectedYear}.`,
+          tone: Number(summary.notSubmitted || 0) > 0 ? "warning" : "success"
+        },
+        {
+          label: "Follow-up Load",
+          value: pluralize(summary.notSubmitted || 0, "record"),
+          helper: `${pluralize(rows.length, "record")} currently displayed after active filters.`,
+          tone: Number(summary.notSubmitted || 0) > 0 ? "danger" : "success"
+        },
+        {
+          label: "Exemption Share",
+          value: toPercent(summary.exempt || 0, lifeCertPortfolioCount || 1),
+          helper: `Shows how much of the tracked portfolio is excluded before compliance is calculated.`,
+          tone: "info"
+        },
+        {
+          label: "Submission Window",
+          value: selectedYear.toLocaleString(),
+          helper: `Dashboard is currently analyzing current-year compliance only.`,
+          tone: "info"
+        }
+      ]);
+
+      lifeCertState.totalPages = Number(data.totalPages || 1);
+      lifeCertState.canMark = !!data.canMarkSubmission && roleCanManageLifeCert();
+      if (lifeCertPageLabel) lifeCertPageLabel.textContent = `Page ${Number(data.page || 1)} of ${lifeCertState.totalPages}`;
+      if (lifeCertPrevBtn) lifeCertPrevBtn.disabled = Number(data.page || 1) <= 1;
+      if (lifeCertNextBtn) lifeCertNextBtn.disabled = Number(data.page || 1) >= lifeCertState.totalPages;
+      if (lifeCertActionTools) {
+        lifeCertActionTools.style.display = lifeCertState.canMark ? "" : "none";
+      }
+
+      if (!rows.length) {
+        lifeCertTableBody.innerHTML = '<tr><td colspan="9">No records found for selected filters.</td></tr>';
+      } else {
+        lifeCertTableBody.innerHTML = rows.map((row) => {
+          const canMarkRow = lifeCertState.canMark && String(row.lifeCertificateStatus || "") === "Not Submitted";
+          return `
+            <tr>
+              <td>${escapeHtml(row.regNo || "")}</td>
+              <td>${escapeHtml(row.name || "")}</td>
+              <td>${escapeHtml(row.title || "")}</td>
+              <td>${escapeHtml(row.station || "")}</td>
+              <td>${escapeHtml(row.payType || "")}</td>
+              <td>${escapeHtml(row.livingStatus || "")}</td>
+              <td>${statusBadge(row.lifeCertificateStatus || "Not Submitted")}</td>
+              <td>${escapeHtml(row.submittedAt || "N/A")}</td>
+              <td>${canMarkRow ? `<button type="button" class="btn-action btn-import life-cert-mark-row" data-regno="${escapeHtml(row.regNo || "")}">Mark Submitted</button>` : "-"}</td>
+            </tr>
+          `;
+        }).join("");
+      }
+
+      lifeCertTableBody.querySelectorAll(".life-cert-mark-row").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const regNo = btn.getAttribute("data-regno") || "";
+          if (!regNo) return;
+          await submitLifeCertificate(regNo);
+        });
+      });
+
+      updateDashboardLiveStamp("lifeCertSection");
+    } catch (error) {
+      console.error("Error loading life certificate dashboard:", error);
+      lifeCertTableBody.innerHTML = '<tr><td colspan="9">Failed to load life certificate records.</td></tr>';
+      setAnalyticsEmpty(lifeCertAnalyticsBars, "Unable to load compliance distribution.");
+      setAnalyticsEmpty(lifeCertInsightGrid, "Unable to load compliance insights.");
+    }
   }
 
-  // ---- Payroll Movements ----
-  function renderPayrollMovements(month = "10", year = new Date().getFullYear()) {
-    const data = { new: 12, removed: 7 };
+  async function exportLifeCertificates(format = "xlsx") {
+    const selectedYear = Number(lifeCertYear?.value || new Date().getFullYear());
+    const params = new URLSearchParams({
+      year: String(selectedYear),
+      status: lifeCertStatusFilter?.value || "",
+      search: lifeCertSearch?.value?.trim() || "",
+      format: String(format || "xlsx").toLowerCase()
+    });
+
+    try {
+      const response = await fetch(`../backend/api/export_life_certificate_dashboard.php?${params.toString()}`, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store"
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success || !data.export?.download_url) {
+        throw new Error(data.message || "Unable to generate life certificate export.");
+      }
+      notifyDashboard("success", data.message || "Life certificate export generated.", "Life Certificate");
+      deliverDashboardExport(data.export.download_url, {
+        format,
+        label: "Life Certificate Export",
+        fileName: data.export.file_name || ""
+      });
+    } catch (error) {
+      console.error("Life certificate export failed:", error);
+      notifyDashboard("error", error.message || "Unable to export life certificate records.", "Life Certificate");
+    }
+  }
+
+  async function submitLifeCertificate(regNoOverride = "") {
+    if (!roleCanManageLifeCert()) {
+      appAlert("You do not have permission to update life certificate submissions from the dashboard.");
+      return;
+    }
+    const regNo = (regNoOverride || lifeCertMarkRegNo?.value || "").trim();
+    const selectedYear = Number(lifeCertYear?.value || new Date().getFullYear());
+    if (!regNo) {
+      appAlert("Enter a valid file number.");
+      return;
+    }
+    try {
+      const response = await fetch("../backend/api/mark_life_certificate_submission.php", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          regNo,
+          year: selectedYear,
+          notes: lifeCertMarkNotes?.value?.trim() || ""
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        appAlert(data.message || "Unable to mark life certificate.");
+        return;
+      }
+      if (lifeCertMarkRegNo) lifeCertMarkRegNo.value = "";
+      if (lifeCertMarkNotes) lifeCertMarkNotes.value = "";
+      await renderLifeCertificates();
+    } catch (error) {
+      console.error("Error marking life certificate:", error);
+      appAlert("Unable to mark life certificate.");
+    }
+  }
+
+  // Payroll Movements
+  async function renderPayrollMovements() {
+    if (!payrollCards || !payrollTableBody) return;
+
+    const monthValue = String(payrollMonth?.value || "").trim();
+    const yearValue = String(payrollYear?.value || "").trim();
+    const query = new URLSearchParams({
+      financial_year: payrollFinancialYear?.value || "",
+      quarter: payrollQuarter?.value || "",
+      status: payrollStatusFilter?.value || "",
+      search: payrollSearch?.value?.trim() || "",
+      page: String(payrollState.page),
+      limit: String(payrollState.limit)
+    });
+    if (monthValue) query.set("month", monthValue);
+    if (yearValue) query.set("year", yearValue);
+
     payrollCards.innerHTML = "";
-    payrollCards.appendChild(createCard(`New on Payroll (${month}-${year})`, data.new, "", "", "", "", "blue"));
-    payrollCards.appendChild(createCard(`Off Payroll (${month}-${year})`, data.removed, "", "", "", "", "orange"));
+    payrollCards.appendChild(createCard("On Payroll", "...", "", "", "", "", "green"));
+    payrollCards.appendChild(createCard("Not on Payroll", "...", "", "", "", "", "orange"));
+    payrollCards.appendChild(createCard("Total Beneficiaries", "...", "", "", "", "", "blue"));
+    payrollCards.appendChild(createCard("Monthly Amount (Registry Match)", "...", "", "", "", "", "purple"));
+    payrollCards.appendChild(createCard("Monthly Amount (Payroll)", "...", "", "", "", "", "teal"));
+    payrollTableBody.innerHTML = '<tr><td colspan="8">Loading payroll records...</td></tr>';
+
+    try {
+      const response = await fetch(`../backend/api/get_payroll_dashboard.php?${query.toString()}`, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store"
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        const message = data.message || `HTTP ${response.status}`;
+        payrollTableBody.innerHTML = `<tr><td colspan="8">${escapeHtml(message)}</td></tr>`;
+        setAnalyticsEmpty(payrollCoverageAnalytics, message);
+        setAnalyticsEmpty(payrollInsightGrid, message);
+        return;
+      }
+
+      const selectedPeriod = data.selectedPeriod || {};
+      const latestAvailablePeriod = data.latestAvailablePeriod || {};
+      const resolvedMonth = Number(selectedPeriod.month || latestAvailablePeriod.month || monthValue || new Date().getMonth() + 1);
+      const resolvedYear = Number(selectedPeriod.year || latestAvailablePeriod.year || yearValue || new Date().getFullYear());
+      payrollState.latestMonth = latestAvailablePeriod.month ? String(latestAvailablePeriod.month).padStart(2, "0") : String(resolvedMonth).padStart(2, "0");
+      payrollState.latestYear = latestAvailablePeriod.year ? String(latestAvailablePeriod.year) : String(resolvedYear);
+      if (payrollMonth && (!payrollMonth.value || data.usedLatestFallback)) {
+        payrollMonth.value = String(resolvedMonth).padStart(2, "0");
+      }
+      if (payrollYear && (!payrollYear.value || data.usedLatestFallback)) {
+        payrollYear.value = String(resolvedYear);
+      }
+
+      const summary = data.summary || {};
+      payrollCards.innerHTML = "";
+      payrollCards.appendChild(createCard("On Payroll", Number(summary.onPayroll || 0), "", "", "", "", "green"));
+      payrollCards.appendChild(createCard("Not on Payroll", Number(summary.offPayroll || 0), "", "", "", "", "orange"));
+      payrollCards.appendChild(createCard("Total Beneficiaries", Number(summary.total || 0), "", "", "", "", "blue"));
+      payrollCards.appendChild(createCard("Monthly Amount (Registry Match)", formatCurrencyUGX(summary.onPayrollAmount || 0), "", "", "", "", "purple"));
+      payrollCards.appendChild(createCard("Monthly Amount (Payroll)", formatCurrencyUGX(summary.payrollUploadedAmount || 0), "", "", "", "", "teal"));
+
+      renderAnalyticsBarList(payrollCoverageAnalytics, [
+        {
+          label: "On Payroll",
+          value: Number(summary.onPayroll || 0),
+          meta: `${toPercent(summary.onPayroll || 0, summary.total || 1)} of reconciled beneficiaries are on payroll.`,
+          tone: "success"
+        },
+        {
+          label: "Not on Payroll",
+          value: Number(summary.offPayroll || 0),
+          meta: `${pluralize(summary.offPayroll || 0, "beneficiary")} remain unmatched or inactive in the selected cycle.`,
+          tone: "danger"
+        }
+      ], { emptyMessage: "No payroll coverage analytics available for the selected cycle." });
+
+      const onPayrollAmount = Number(summary.onPayrollAmount || 0);
+      const uploadedAmount = Number(summary.payrollUploadedAmount || 0);
+      const variance = uploadedAmount - onPayrollAmount;
+      renderAnalyticsStatGrid(payrollInsightGrid, [
+        {
+          label: "Coverage Rate",
+          value: toPercent(summary.onPayroll || 0, summary.total || 1),
+          helper: `${pluralize(summary.total || 0, "beneficiary")} in the selected payroll view.`,
+          tone: Number(summary.offPayroll || 0) > 0 ? "warning" : "success"
+        },
+        {
+          label: "Registry Match Amount",
+          value: formatCurrencyUGX(onPayrollAmount),
+          helper: `Total expected amount from registry records that matched payroll.`,
+          tone: "info"
+        },
+        {
+          label: "Payroll Variance",
+          value: formatCurrencyUGX(variance),
+          helper: `Difference between uploaded payroll amount and registry-matched amount.`,
+          tone: Math.abs(variance) > 0 ? "warning" : "success"
+        },
+        {
+          label: "Cycle Focus",
+          value: `${String(resolvedMonth).padStart(2, "0")}/${resolvedYear}`,
+          helper: `${payrollFinancialYear?.value || "All financial years"} ${payrollQuarter?.value || "all quarters"} currently in view.`,
+          tone: "info"
+        }
+      ]);
+
+      payrollState.totalPages = Number(data.totalPages || 1);
+      payrollState.canUpload = !!data.canUpload && roleCanUploadPayroll();
+      if (payrollPageLabel) payrollPageLabel.textContent = `Page ${Number(data.page || 1)} of ${payrollState.totalPages}`;
+      if (payrollPrevBtn) payrollPrevBtn.disabled = Number(data.page || 1) <= 1;
+      if (payrollNextBtn) payrollNextBtn.disabled = Number(data.page || 1) >= payrollState.totalPages;
+      if (payrollUploadTools) {
+        payrollUploadTools.style.display = payrollState.canUpload ? "" : "none";
+      }
+      if (payrollHistoryLinkWrap) {
+        payrollHistoryLinkWrap.style.display = roleCanViewPayrollHistory() ? "" : "none";
+      }
+
+      const rows = Array.isArray(data.rows) ? data.rows : [];
+      if (!rows.length) {
+        payrollTableBody.innerHTML = '<tr><td colspan="8">No payroll records found for selected filters.</td></tr>';
+      } else {
+        payrollTableBody.innerHTML = rows.map((row) => `
+          <tr>
+            <td>${escapeHtml(row.regNo || "")}</td>
+            <td>${escapeHtml(row.name || "")}</td>
+            <td>${escapeHtml(row.supplierNo || "")}</td>
+            <td>${statusBadge(row.payrollStatus || "Not on Payroll")}</td>
+            <td>${escapeHtml(formatCurrencyUGX(row.amount || 0))}</td>
+            <td>${escapeHtml(row.financialYear || "")}</td>
+            <td>${escapeHtml(row.quarter || "")}</td>
+            <td>${escapeHtml(String(row.month || "").padStart(2, "0"))}/${escapeHtml(String(row.year || ""))}</td>
+          </tr>
+        `).join("");
+      }
+
+      if (payrollFinancialYear) {
+        const currentValue = payrollFinancialYear.value;
+        const values = Array.isArray(data.filters?.financialYears) ? data.filters.financialYears : [];
+        payrollFinancialYear.innerHTML = `<option value="">All</option>${values.map((fy) => `<option value="${escapeHtml(fy)}">${escapeHtml(fy)}</option>`).join("")}`;
+        if (values.includes(currentValue)) {
+          payrollFinancialYear.value = currentValue;
+        }
+      }
+
+      if (payrollRecentCycles) {
+        const cycles = Array.isArray(data.recentCycles) ? data.recentCycles : [];
+        if (!cycles.length) {
+          payrollRecentCycles.innerHTML = "<p>No payroll uploads yet.</p>";
+        } else {
+          payrollRecentCycles.innerHTML = `
+            <h4>Recent Payroll Uploads</h4>
+            <div class="cycle-chip-list">
+              ${cycles.map((cycle) => `
+                <span class="cycle-chip">
+                  ${escapeHtml(cycle.financialYear || "")} ${escapeHtml(cycle.quarter || "")} -
+                  ${escapeHtml(String(cycle.month || "").padStart(2, "0"))}/${escapeHtml(String(cycle.year || ""))}
+                  ${cycle.sourceFile ? `<a class="cycle-doc-link" href="${escapeHtml(window.PensionsGoDocumentViewer?.buildViewerUrl ? (window.PensionsGoDocumentViewer.buildViewerUrl(`../backend/api/view_payroll_document.php?cycle_id=${Number(cycle.cycleId || 0)}&type=source`, { label: 'Payroll Source File', backUrl: window.location.href }) || `../backend/api/view_payroll_document.php?cycle_id=${Number(cycle.cycleId || 0)}&type=source`) : `../backend/api/view_payroll_document.php?cycle_id=${Number(cycle.cycleId || 0)}&type=source`)}">Payroll</a>` : ""}
+                  ${cycle.paymentRegisterFile ? `<a class="cycle-doc-link" href="${escapeHtml(window.PensionsGoDocumentViewer?.buildViewerUrl ? (window.PensionsGoDocumentViewer.buildViewerUrl(`../backend/api/view_payroll_document.php?cycle_id=${Number(cycle.cycleId || 0)}&type=register`, { label: 'Payment Register', backUrl: window.location.href }) || `../backend/api/view_payroll_document.php?cycle_id=${Number(cycle.cycleId || 0)}&type=register`) : `../backend/api/view_payroll_document.php?cycle_id=${Number(cycle.cycleId || 0)}&type=register`)}">Register PDF</a>` : ""}
+                </span>
+              `).join("")}
+            </div>
+          `;
+        }
+      }
+
+      updateDashboardLiveStamp("payrollSection");
+    } catch (error) {
+      console.error("Error loading payroll dashboard:", error);
+      payrollTableBody.innerHTML = '<tr><td colspan="8">Failed to load payroll records.</td></tr>';
+      setAnalyticsEmpty(payrollCoverageAnalytics, "Unable to load payroll coverage analytics.");
+      setAnalyticsEmpty(payrollInsightGrid, "Unable to load payroll reconciliation insights.");
+    }
   }
 
-  // ---- Staff Due for Retirement ----
-  function renderStaffDue() {
-    const data = { total: 140, male: 90, female: 50, submitted: 95, notSubmitted: 45 };
+  async function uploadPayrollCycle() {
+    if (!roleCanUploadPayroll()) {
+      appAlert("You do not have permission to upload payroll data from the dashboard.");
+      return;
+    }
+    if (!payrollUploadFile || !payrollUploadFile.files || payrollUploadFile.files.length === 0) {
+      appAlert("Select a payroll source file (.csv or .xlsx) before upload.");
+      payrollUploadFile?.focus();
+      return;
+    }
+    const month = String(payrollUploadModalMonth?.value || "").trim();
+    const year = String(payrollUploadModalYear?.value || "").trim();
+    if (!month || !year) {
+      appAlert("Select the payroll month and year before uploading the payroll source file.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("payroll_file", payrollUploadFile.files[0]);
+    formData.append("payroll_month", month);
+    formData.append("payroll_year", year);
+    formData.append("notes", payrollUploadNotes?.value?.trim() || "");
+
+    try {
+      if (payrollUploadBtn) payrollUploadBtn.disabled = true;
+      const response = await fetch("../backend/api/upload_payroll_cycle.php", {
+        method: "POST",
+        credentials: "include",
+        body: formData
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        appAlert(data.message || "Payroll upload failed.");
+        return;
+      }
+      const matched = Number(data.stats?.matched || 0);
+      const unmatched = Number(data.stats?.unmatched || 0);
+      const onPayroll = Number(data.stats?.on_payroll || 0);
+      const offPayroll = Number(data.stats?.off_payroll || 0);
+      const reviewDownloadStarted = downloadImportReviewExport(data.review_export, "payroll_upload_review.csv");
+      const payrollSummary = [
+        data.message || "Payroll upload completed.",
+        `Matched rows: ${matched}.`,
+        `Unmatched rows: ${unmatched}.`,
+        `Registry marked On Payroll: ${onPayroll}.`,
+        `Registry marked Not on Payroll: ${offPayroll}.`,
+        reviewDownloadStarted ? "A review file download has started for rows that need reconciliation." : ""
+      ].join("\n");
+      const payrollType = unmatched > 0 ? "warning" : "success";
+
+      closePayrollUploadModal();
+      if (payrollMonth) payrollMonth.value = month;
+      if (payrollYear) payrollYear.value = year;
+      notifyDashboard(
+        payrollType,
+        unmatched > 0
+          ? `Payroll upload completed with review items. Matched ${matched}, unmatched ${unmatched}.`
+          : `Payroll upload completed. Matched ${matched} payroll row(s).`,
+        "Payroll Upload"
+      );
+      await showDashboardImportFeedback("Payroll Upload Summary", payrollSummary, payrollType);
+      await renderPayrollMovements();
+    } catch (error) {
+      console.error("Payroll upload failed:", error);
+      appAlert("Payroll upload failed.");
+    } finally {
+      if (payrollUploadBtn) payrollUploadBtn.disabled = false;
+    }
+  }
+
+  async function uploadPayrollRegister() {
+    if (!roleCanUploadPayroll()) {
+      appAlert("You do not have permission to upload payment register files from the dashboard.");
+      return;
+    }
+    if (!payrollRegisterFile || !payrollRegisterFile.files || payrollRegisterFile.files.length === 0) {
+      appAlert("Select the signed payment register PDF before upload.");
+      payrollRegisterFile?.focus();
+      return;
+    }
+    const month = String(payrollRegisterModalMonth?.value || "").trim();
+    const year = String(payrollRegisterModalYear?.value || "").trim();
+    if (!month || !year) {
+      appAlert("Select the payroll month and year before uploading the payment register.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("payment_register_file", payrollRegisterFile.files[0]);
+    formData.append("payroll_month", month);
+    formData.append("payroll_year", year);
+    formData.append("notes", payrollRegisterUploadNotes?.value?.trim() || "");
+
+    try {
+      if (payrollRegisterUploadBtn) payrollRegisterUploadBtn.disabled = true;
+      const response = await fetch("../backend/api/upload_payroll_register.php", {
+        method: "POST",
+        credentials: "include",
+        body: formData
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        appAlert(data.message || "Payment register upload failed.");
+        return;
+      }
+
+      closePayrollRegisterUploadModal();
+      if (payrollMonth) payrollMonth.value = month;
+      if (payrollYear) payrollYear.value = year;
+      notifyDashboard("success", data.message || "Payment register uploaded successfully.", "Payroll Register");
+      await showDashboardImportFeedback(
+        "Payment Register Upload Summary",
+        [
+          data.message || "Payment register uploaded successfully.",
+          `Target payroll period: ${month}/${year}.`,
+          "The latest active payroll cycle for the selected period has been updated with the new payment register."
+        ].join("\n"),
+        "success"
+      );
+      await renderPayrollMovements();
+    } catch (error) {
+      console.error("Payment register upload failed:", error);
+      appAlert("Payment register upload failed.");
+    } finally {
+      if (payrollRegisterUploadBtn) payrollRegisterUploadBtn.disabled = false;
+    }
+  }
+
+  function downloadPayrollTemplate() {
+    if (!roleCanUploadPayroll()) {
+      appAlert("You do not have permission to download the payroll template.");
+      return;
+    }
+    triggerCurrentTabDownload("../backend/api/download_payroll_template.php", "payroll_upload_template.csv");
+  }
+
+  function downloadImportReviewExport(reviewExport, fallbackName = "import_review.csv") {
+    if (!reviewExport || !reviewExport.content_base64) {
+      return false;
+    }
+
+    try {
+      const binary = window.atob(String(reviewExport.content_base64 || ""));
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) {
+        bytes[index] = binary.charCodeAt(index);
+      }
+      const blob = new Blob([bytes], { type: reviewExport.mime || "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = reviewExport.file_name || fallbackName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return true;
+    } catch (error) {
+      console.error("Unable to download import review export:", error);
+      return false;
+    }
+  }
+
+  // Staff Due for Retirement
+  async function renderStaffDue() {
+    if (!staffDueCards) return;
+
     staffDueCards.innerHTML = "";
     staffDueCards.appendChild(
-      createCard("Staff Due for Retirement", data.total, "Male", data.male, "Female", data.female, "teal")
+      createCard("Staff Due for Retirement", "...", "Male", "...", "Female", "...", "teal")
     );
     staffDueCards.appendChild(
-      createCard("Applications Submitted", data.submitted, "Male", data.male, "Female", data.female, "green")
+      createCard("Applications Submitted", "...", "Male", "...", "Female", "...", "green")
     );
     staffDueCards.appendChild(
-      createCard("Applications Not Submitted", data.notSubmitted, "Male", data.male, "Female", data.female, "red")
+      createCard("Applications Not Submitted", "...", "Male", "...", "Female", "...", "red")
     );
+
+    try {
+      const [summaryResponse, recordsResponse] = await Promise.all([
+        fetch('../backend/api/get_staff_due_summary.php', {
+          method: 'GET',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: { 'Accept': 'application/json' }
+        }),
+        fetch('../backend/api/fetch_staffdue.php', {
+          method: 'GET',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: { 'Accept': 'application/json' }
+        }).catch(() => null)
+      ]);
+      const data = await summaryResponse.json();
+
+      if (!summaryResponse.ok || !data.success) {
+        throw new Error(data.message || `HTTP ${summaryResponse.status}`);
+      }
+
+      let recordPayload = [];
+      if (recordsResponse) {
+        try {
+          const recordsData = await recordsResponse.json();
+          if (recordsResponse.ok && recordsData.success) {
+            recordPayload = Array.isArray(recordsData.records) ? recordsData.records : [];
+          }
+        } catch (recordsError) {
+          console.warn("Staff due records analytics payload unavailable:", recordsError);
+        }
+      }
+
+      const summary = data.summary || {};
+      const total = Number(summary.total || 0);
+      const male = Number(summary.male || 0);
+      const female = Number(summary.female || 0);
+      const submitted = Number(summary.submitted || 0);
+      const notSubmitted = Number(summary.notSubmitted || 0);
+      const submittedMale = Number(summary.submittedMale || 0);
+      const submittedFemale = Number(summary.submittedFemale || 0);
+      const notSubmittedMale = Number(summary.notSubmittedMale || 0);
+      const notSubmittedFemale = Number(summary.notSubmittedFemale || 0);
+      const verifiedCount = Number(summary.verified || 0);
+      const queriedCount = Number(summary.queried || 0);
+      const rejectedCount = Number(summary.rejected || 0);
+      const inProcessCount = Number(summary.inProcess || 0);
+      const completedCount = Number(summary.completed || 0);
+      const verificationStartedCount = Number(summary.verificationStarted || 0);
+      const awaitingVerificationCount = Number(summary.awaitingVerification || 0);
+      const verificationDueSoonCount = Number(summary.verificationDueSoon || 0);
+      const verificationEscalatedCount = Number(summary.verificationEscalated || 0);
+      const verificationEscalationWindowDays = Number(summary.verificationEscalationWindowDays || 60);
+      if (staffDuePipelineCaption) {
+        staffDuePipelineCaption.textContent = `Processing escalation window: ${verificationEscalationWindowDays} days from application submission before verification-start escalation is raised.`;
+      }
+
+      staffDueCards.innerHTML = "";
+      staffDueCards.appendChild(
+        createCard("Staff Due for Retirement", total, "Male", male, "Female", female, "teal")
+      );
+      staffDueCards.appendChild(
+        createCard("Applications Submitted", submitted, "Male", submittedMale, "Female", submittedFemale, "green")
+      );
+      staffDueCards.appendChild(
+        createCard("Applications Not Submitted", notSubmitted, "Male", notSubmittedMale, "Female", notSubmittedFemale, "red")
+      );
+
+      const typeCounts = new Map();
+      recordPayload.forEach((item) => {
+        const key = formatRetirementType(item.retirementType || "Unspecified");
+        typeCounts.set(key, (typeCounts.get(key) || 0) + 1);
+      });
+
+      renderAnalyticsBarList(
+        staffDueTypeAnalytics,
+        [...typeCounts.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 6)
+          .map(([label, value]) => ({
+            label,
+            value,
+            meta: `${toPercent(value, total || 1)} of the current retirement intake.`,
+            tone: value > (total / 3) ? "warning" : "info"
+          })),
+        { emptyMessage: "Retirement type analytics appear when staff-due records are loaded." }
+      );
+
+      renderAnalyticsBarList(staffDuePipelineAnalytics, [
+        {
+          label: "Pending Submission",
+          value: notSubmitted,
+          meta: `${pluralize(notSubmitted, "record")} still awaiting submission into workflow.`,
+          tone: "danger"
+        },
+        {
+          label: "Submitted",
+          value: submitted,
+          meta: `${toPercent(submitted, total || 1)} of due records are already submitted.`,
+          tone: "success"
+        },
+        {
+          label: "Verification Started",
+          value: verificationStartedCount,
+          meta: `${pluralize(verificationStartedCount, "submitted file")} have already moved beyond pending verification.`,
+          tone: "info"
+        },
+        {
+          label: "Awaiting Verification",
+          value: awaitingVerificationCount,
+          meta: `${pluralize(awaitingVerificationCount, "submitted file")} are still waiting for verification to begin.`,
+          tone: awaitingVerificationCount > 0 ? "warning" : "success"
+        },
+        {
+          label: "Due Soon",
+          value: verificationDueSoonCount,
+          meta: `${pluralize(verificationDueSoonCount, "submitted file")} are nearing the ${verificationEscalationWindowDays}-day verification-start threshold.`,
+          tone: verificationDueSoonCount > 0 ? "warning" : "success"
+        },
+        {
+          label: "Escalated",
+          value: verificationEscalatedCount,
+          meta: `${pluralize(verificationEscalatedCount, "submitted file")} have already exceeded the ${verificationEscalationWindowDays}-day verification-start rule.`,
+          tone: verificationEscalatedCount > 0 ? "danger" : "success"
+        },
+        {
+          label: "In Process",
+          value: inProcessCount,
+          meta: `${pluralize(inProcessCount, "record")} are already in live workflow execution.`,
+          tone: "warning"
+        },
+        {
+          label: "Completed",
+          value: completedCount,
+          meta: `${pluralize(completedCount, "record")} have reached completion or approval.`,
+          tone: "info"
+        }
+      ]);
+
+      renderAnalyticsStatGrid(staffDueInsightGrid, [
+        {
+          label: "Submission Rate",
+          value: toPercent(submitted, total || 1),
+          helper: `Share of due staff already moved from intake into workflow.`,
+          tone: submitted < total ? "warning" : "success"
+        },
+        {
+          label: "Verification Start Rate",
+          value: toPercent(verificationStartedCount, submitted || 1),
+          helper: `${pluralize(verificationEscalatedCount, "file")} escalated and ${pluralize(verificationDueSoonCount, "file")} nearing the ${verificationEscalationWindowDays}-day escalation window.`,
+          tone: verificationEscalatedCount > 0 ? "danger" : (verificationDueSoonCount > 0 ? "warning" : "success")
+        },
+        {
+          label: "Completion Rate",
+          value: toPercent(completedCount, total || 1),
+          helper: `${pluralize(completedCount, "record")} have already cleared the due-cycle workflow.`,
+          tone: "info"
+        },
+        {
+          label: "Decision Outcomes",
+          value: `${verifiedCount.toLocaleString()} / ${queriedCount.toLocaleString()} / ${rejectedCount.toLocaleString()}`,
+          helper: `Verified, queried, and rejected application decisions currently on record.`,
+          tone: queriedCount > 0 || rejectedCount > 0 ? "warning" : "info"
+        },
+        {
+          label: "Gender Split",
+          value: `${male.toLocaleString()} : ${female.toLocaleString()}`,
+          helper: `Male-to-female due population for staffing and outreach planning.`,
+          tone: "info"
+        }
+      ]);
+
+      updateDashboardLiveStamp("staffDueSection");
+    } catch (error) {
+      console.error('Error loading staff due summary:', error);
+      if (staffDuePipelineCaption) {
+        staffDuePipelineCaption.textContent = "Processing escalation window: 60 days from application submission before verification-start escalation is raised.";
+      }
+      staffDueCards.innerHTML = "";
+      staffDueCards.appendChild(
+        createCard("Staff Due for Retirement", 0, "Male", 0, "Female", 0, "teal")
+      );
+      staffDueCards.appendChild(
+        createCard("Applications Submitted", 0, "Male", 0, "Female", 0, "green")
+      );
+      staffDueCards.appendChild(
+        createCard("Applications Not Submitted", 0, "Male", 0, "Female", 0, "red")
+      );
+      setAnalyticsEmpty(staffDueTypeAnalytics, "Unable to load the retirement type breakdown.");
+      setAnalyticsEmpty(staffDuePipelineAnalytics, "Unable to load workflow funnel.");
+      setAnalyticsEmpty(staffDueInsightGrid, "Unable to load staff due insights.");
+    }
   }
 
-  // ---- File Registry ----
-  function renderFilesSummary() {
-    const data = { inRegistry: 520, outRegistry: 80 };
-    fileCards.innerHTML = "";
-    fileCards.appendChild(createCard("Files in Registry", data.inRegistry, "", "", "", "", "blue"));
-    fileCards.appendChild(createCard("Files Out of Registry", data.outRegistry, "", "", "", "", "orange"));
+  // File Registry
+  async function renderFilesSummary() {
+    const formatPayrollPeriod = (monthValue, yearValue) => {
+      const month = Number(monthValue || 0);
+      const year = Number(yearValue || 0);
+      if (!Number.isFinite(month) || month < 1 || month > 12 || !Number.isFinite(year) || year <= 0) {
+        return "Latest";
+      }
+      const monthShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return `${monthShort[month - 1]}/${year}`;
+    };
+
+    try {
+      const response = await fetch('../backend/api/get_file_registry_summary.php', {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { 'Accept': 'application/json' }
+      });
+      const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || `HTTP ${response.status}`);
+        }
+        const summary = data.summary || {};
+        const categories = summary.categories || {};
+        const pensioner = categories.pensioner || {};
+        const oneOff = categories.oneOff || {};
+        const latestPayroll = summary.latestPayroll || {};
+      const onPayroll = latestPayroll.onPayroll || {};
+      const offPayroll = latestPayroll.offPayroll || {};
+      const totalFiles = Number(summary.totalFiles || 0);
+      const outRegistry = Number(summary.outRegistry || 0);
+      const inRegistry = Number(summary.inRegistry || 0);
+      const pensionerTotal = Number(pensioner.alive?.total || 0) + Number(pensioner.deceased?.total || 0);
+        const oneOffTotal = Number(oneOff.alive?.total || 0) + Number(oneOff.deceased?.total || 0);
+        const latestOnPayroll = Number(onPayroll.alive?.total || 0) + Number(onPayroll.deceased?.total || 0);
+        const latestOffPayroll = Number(offPayroll.alive?.total || 0) + Number(offPayroll.deceased?.total || 0);
+        const payrollPeriod = formatPayrollPeriod(latestPayroll.month, latestPayroll.year);
+
+        renderAnalyticsBarList(fileRegistryCompositionAnalytics, [
+        { label: "Pensioner - Alive", value: Number(pensioner.alive?.total || 0), meta: `Male ${Number(pensioner.alive?.male || 0)} | Female ${Number(pensioner.alive?.female || 0)}`, tone: "success" },
+        { label: "Pensioner - Deceased", value: Number(pensioner.deceased?.total || 0), meta: `Male ${Number(pensioner.deceased?.male || 0)} | Female ${Number(pensioner.deceased?.female || 0)}`, tone: "danger" },
+        { label: "One-off - Alive", value: Number(oneOff.alive?.total || 0), meta: `Male ${Number(oneOff.alive?.male || 0)} | Female ${Number(oneOff.alive?.female || 0)}`, tone: "info" },
+        { label: "One-off - Deceased", value: Number(oneOff.deceased?.total || 0), meta: `Male ${Number(oneOff.deceased?.male || 0)} | Female ${Number(oneOff.deceased?.female || 0)}`, tone: "warning" }
+      ], { emptyMessage: "Registry composition is not yet available." });
+
+      renderAnalyticsBarList(fileRegistryPayrollAnalytics, [
+        { label: "Latest On Payroll - Alive", value: Number(onPayroll.alive?.total || 0), meta: `Male ${Number(onPayroll.alive?.male || 0)} | Female ${Number(onPayroll.alive?.female || 0)}`, tone: "success" },
+        { label: "Latest Off Payroll - Alive", value: Number(offPayroll.alive?.total || 0), meta: `Male ${Number(offPayroll.alive?.male || 0)} | Female ${Number(offPayroll.alive?.female || 0)}`, tone: "danger" },
+        { label: "Latest On Payroll - Deceased", value: Number(onPayroll.deceased?.total || 0), meta: `Male ${Number(onPayroll.deceased?.male || 0)} | Female ${Number(onPayroll.deceased?.female || 0)}`, tone: "info" },
+        { label: "Latest Off Payroll - Deceased", value: Number(offPayroll.deceased?.total || 0), meta: `Male ${Number(offPayroll.deceased?.male || 0)} | Female ${Number(offPayroll.deceased?.female || 0)}`, tone: "warning" }
+      ], { emptyMessage: "Latest payroll status becomes visible after payroll reconciliation runs." });
+
+      renderAnalyticsStatGrid(fileRegistryInsightGrid, [
+        {
+          label: "Circulation Ratio",
+          value: toPercent(outRegistry, totalFiles || 1),
+          helper: `${pluralize(outRegistry, "file")} are out of shelf while ${pluralize(inRegistry, "file")} remain in registry.`,
+          tone: outRegistry > 0 ? "warning" : "success"
+        },
+        {
+          label: "Pensioner Portfolio",
+          value: toPercent(pensionerTotal, pensionerTotal + oneOffTotal || 1),
+          helper: `${pluralize(pensionerTotal, "file")} are recurring pensioner files versus ${pluralize(oneOffTotal, "one-off file")}.`,
+          tone: "info"
+        },
+        {
+          label: "Latest Payroll Coverage",
+          value: toPercent(latestOnPayroll, latestOnPayroll + latestOffPayroll || 1),
+          helper: `${pluralize(latestOffPayroll, "pensioner file")} remain off payroll in the latest cycle.`,
+          tone: latestOffPayroll > 0 ? "warning" : "success"
+        },
+        {
+          label: "Registry Density",
+          value: pluralize(totalFiles, "file"),
+          helper: `Current registry population driving storage, movement, and lifecycle workload.`,
+          tone: "info"
+        }
+      ]);
+      updateDashboardLiveStamp("filesSection");
+    } catch (error) {
+      console.error('Error loading file registry summary:', error);
+      renderFileCards({
+        totalFiles: 0,
+        inRegistry: 0,
+        outRegistry: 0,
+        categories: {
+          pensioner: {
+            alive: { total: 0, male: 0, female: 0 },
+            deceased: { total: 0, male: 0, female: 0 }
+          },
+          oneOff: {
+            alive: { total: 0, male: 0, female: 0 },
+            deceased: { total: 0, male: 0, female: 0 }
+          }
+        },
+        latestPayroll: {
+          available: false,
+          onPayroll: {
+            alive: { total: 0, male: 0, female: 0 },
+            deceased: { total: 0, male: 0, female: 0 }
+          },
+          offPayroll: {
+            alive: { total: 0, male: 0, female: 0 },
+            deceased: { total: 0, male: 0, female: 0 }
+          }
+        }
+      });
+      setAnalyticsEmpty(fileRegistryCompositionAnalytics, "Unable to load registry composition.");
+      setAnalyticsEmpty(fileRegistryPayrollAnalytics, "Unable to load payroll status analytics.");
+      setAnalyticsEmpty(fileRegistryInsightGrid, "Unable to load registry insights.");
+    }
   }
 
-  // ---- System Users ----
+  // System Users
   async function renderUsersSummary() {
     try {
-      console.log('🔄 Rendering users summary...');
-      userCards.innerHTML = '<div class="loading-message">Loading users data...</div>';
+      console.log('Rendering users summary...');
+      if (userCards) {
+        userCards.innerHTML = '<div class="loading-message">Loading users data...</div>';
+      }
       
       const usersData = await fetchUsersData();
       
       if (!usersData || usersData.length === 0) {
-        userCards.innerHTML = '<div class="error-message">No users data available</div>';
+        if (userCards) {
+          userCards.innerHTML = '<div class="error-message">No users data available</div>';
+        }
+        setAnalyticsEmpty(userRoleAnalytics, "No role distribution analytics available.");
+        setAnalyticsEmpty(userInsightGrid, "No user governance insights available.");
         return;
       }
 
-      userCards.innerHTML = "";
+      if (userCards) {
+        userCards.innerHTML = "";
+        usersData.forEach((userRole) => {
+          const displayName = formatRoleName(userRole.role, userRole.role_label);
+          const color = getRoleColor(userRole.role);
+          const card = createCard(displayName, userRole.count, "", "", "", "", color);
+          userCards.appendChild(card);
+        });
+      }
+
+      renderAnalyticsBarList(
+        userRoleAnalytics,
+        [...usersData]
+          .filter((item) => Number(item.count || 0) > 0)
+          .sort((a, b) => Number(b.count || 0) - Number(a.count || 0))
+          .slice(0, 8)
+          .map((item) => ({
+            label: formatRoleName(item.role, item.role_label),
+            value: Number(item.count || 0),
+            meta: `${item.is_system ? "System role" : "Custom role"} | ${item.is_active ? "Active" : "Inactive"}`,
+            tone: item.role === "pensioner" ? "warning" : "info"
+          })),
+        { emptyMessage: "No role distribution analytics available." }
+      );
+
+      const totalUsers = usersData.reduce((sum, item) => sum + Number(item.count || 0), 0);
+      const pensionerUsers = usersData.reduce((sum, item) => sum + (String(item.role || "").toLowerCase() === "pensioner" ? Number(item.count || 0) : 0), 0);
+      const publicUsers = usersData.reduce((sum, item) => {
+        const key = String(item.role || "").toLowerCase();
+        if (key === "pensioner" || key === "user") {
+          return sum + Number(item.count || 0);
+        }
+        return sum;
+      }, 0);
+      const staffUsers = Math.max(0, totalUsers - publicUsers);
+      const rolesWithUsers = usersData.filter((item) => Number(item.count || 0) > 0);
+      const systemRoles = rolesWithUsers.filter((item) => Boolean(item.is_system)).length;
+      const customRoles = rolesWithUsers.filter((item) => !item.is_system).length;
+      renderAnalyticsStatGrid(userInsightGrid, [
+        {
+          label: "Total User Base",
+          value: pluralize(totalUsers, "account"),
+          helper: `${pluralize(publicUsers, "account")} are public-facing (pensioner or user) accounts.`,
+          tone: "info"
+        },
+        {
+          label: "Staff Accounts",
+          value: pluralize(staffUsers, "account"),
+          helper: `Operational and governance accounts for internal workflow execution.`,
+          tone: "success"
+        },
+        {
+          label: "System Roles",
+          value: pluralize(systemRoles, "role"),
+          helper: `${pluralize(customRoles, "custom role")} currently have active user assignments.`,
+          tone: "warning"
+        },
+        {
+          label: "Pensioner Share",
+          value: toPercent(pensionerUsers, totalUsers || 1),
+          helper: `Useful for separating internal capacity planning from beneficiary account growth.`,
+          tone: "info"
+        }
+      ]);
+
+      updateDashboardLiveStamp("usersSection");
       
-      usersData.forEach((userRole) => {
-        const displayName = formatRoleName(userRole.role);
-        const color = getRoleColor(userRole.role);
-        const card = createCard(displayName, userRole.count, "", "", "", "", color);
-        userCards.appendChild(card);
-      });
-      
-      console.log('✅ Users summary rendered successfully');
+      console.log('Users summary rendered successfully');
       
     } catch (error) {
-      console.error('❌ Error rendering users summary:', error);
-      userCards.innerHTML = '<div class="error-message">Failed to load users data</div>';
+      console.error('Error rendering users summary:', error);
+      if (userCards) {
+        userCards.innerHTML = '<div class="error-message">Failed to load users data</div>';
+      }
+      setAnalyticsEmpty(userRoleAnalytics, "Unable to load role distribution analytics.");
+      setAnalyticsEmpty(userInsightGrid, "Unable to load user governance insights.");
     }
   }
 
-  /* ============================================================
-     FILTER EVENT LISTENERS
-     ============================================================ */
+  // Workflow Performance
+  async function renderWorkflowPerformance() {
+    if (!workflowSummaryCards || !workflowPerformanceBody) return;
 
-  // Life Certificate year filter
-  if (lifeCertYear) {
-    lifeCertYear.addEventListener("change", (e) => {
-      const selectedYear = e.target.value || new Date().getFullYear();
-      renderLifeCertificates(selectedYear);
+    workflowSummaryCards.innerHTML = "";
+    workflowSummaryCards.appendChild(createCard("Open Tasks", "...", "", "", "", "", "blue"));
+    workflowSummaryCards.appendChild(createCard("Overdue Tasks", "...", "", "", "", "", "red"));
+    workflowSummaryCards.appendChild(createCard("Completed (7d)", "...", "", "", "", "", "green"));
+    workflowSummaryCards.appendChild(createCard("Avg Completion", "...", "", "", "", "", "teal"));
+    workflowPerformanceBody.innerHTML = '<tr><td colspan="8">Loading metrics...</td></tr>';
+    if (workflowAlertSummaryCards) {
+      workflowAlertSummaryCards.innerHTML = "";
+      workflowAlertSummaryCards.appendChild(createCard("Open Alerts", "...", "", "", "", "", "orange"));
+      workflowAlertSummaryCards.appendChild(createCard("Critical Alerts", "...", "", "", "", "", "red"));
+      workflowAlertSummaryCards.appendChild(createCard("Resolved (7d)", "...", "", "", "", "", "green"));
+      workflowAlertSummaryCards.appendChild(createCard("Avg Alert Resolution", "...", "", "", "", "", "teal"));
+    }
+    if (workflowAlertRoleBody) {
+      workflowAlertRoleBody.innerHTML = '<tr><td colspan="6">Loading role analytics...</td></tr>';
+    }
+    if (workflowAlertUserBody) {
+      workflowAlertUserBody.innerHTML = '<tr><td colspan="6">Loading staff analytics...</td></tr>';
+    }
+    if (workflowAlertRecentFeed) {
+      workflowAlertRecentFeed.innerHTML = '<div class="workflow-feed-empty">Loading recent alerts...</div>';
+    }
+
+    try {
+      const [response, staffDueSummaryResponse] = await Promise.all([
+        fetch('../backend/api/get_task_performance.php', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          cache: 'no-store'
+        }),
+        fetch('../backend/api/get_staff_due_summary.php', {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+          credentials: 'include',
+          cache: 'no-store'
+        }).catch(() => null)
+      ]);
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        const msg = data.message || `HTTP ${response.status}`;
+        workflowSummaryCards.innerHTML = `<div class="workflow-empty-card">${msg}</div>`;
+        workflowPerformanceBody.innerHTML = `<tr><td colspan="8">${msg}</td></tr>`;
+        setAnalyticsEmpty(workflowResponseAnalytics, msg);
+        setAnalyticsEmpty(workflowInsightGrid, msg);
+        return;
+      }
+
+      let staffDueSummary = {};
+      if (staffDueSummaryResponse) {
+        try {
+          const staffDueData = await staffDueSummaryResponse.json();
+          if (staffDueSummaryResponse.ok && staffDueData.success) {
+            staffDueSummary = staffDueData.summary || {};
+          }
+        } catch (staffDueError) {
+          console.warn("Workflow performance could not load staff due escalation metrics:", staffDueError);
+        }
+      }
+
+      const summary = data.summary || {};
+      const verificationEscalatedCount = Number(staffDueSummary.verificationEscalated || 0);
+      const verificationDueSoonCount = Number(staffDueSummary.verificationDueSoon || 0);
+      const verificationEscalationWindowDays = Number(staffDueSummary.verificationEscalationWindowDays || 60);
+      workflowSummaryCards.innerHTML = "";
+      workflowSummaryCards.appendChild(createCard("Open Tasks", Number(summary.total_open || 0), "", "", "", "", "blue"));
+      workflowSummaryCards.appendChild(createCard("Overdue Tasks", Number(summary.overdue_open || 0), "", "", "", "", "red"));
+      workflowSummaryCards.appendChild(createCard("Verification Escalations", verificationEscalatedCount, "", "", "", "", "orange"));
+      workflowSummaryCards.appendChild(createCard("Completed (7d)", Number(summary.completed_7d || 0), "", "", "", "", "green"));
+      workflowSummaryCards.appendChild(createCard("Avg Completion", formatDurationHours(summary.avg_completion_hours || 0), "", "", "", "", "teal"));
+
+      const items = Array.isArray(data.staff_performance) ? data.staff_performance : [];
+      workflowState.items = items;
+      if (workflowRoleFilter) {
+        const currentRoleFilter = String(workflowRoleFilter.value || '').toLowerCase().trim();
+        const roleMap = new Map();
+        items.forEach((item) => {
+          const role = String(item.user_role || '').toLowerCase().trim();
+          if (!role) return;
+          if (!roleMap.has(role)) {
+            roleMap.set(role, formatRoleName(role, item.user_role_label || ''));
+          }
+        });
+        const options = ['<option value="">All Roles</option>'];
+        [...roleMap.entries()]
+          .sort((a, b) => a[1].localeCompare(b[1]))
+          .forEach(([roleKey, roleLabel]) => {
+            const selected = currentRoleFilter === roleKey ? ' selected' : '';
+            options.push(`<option value="${escapeHtml(roleKey)}"${selected}>${escapeHtml(roleLabel)}</option>`);
+          });
+        workflowRoleFilter.innerHTML = options.join('');
+      }
+
+      if (!items.length) {
+        workflowPerformanceBody.innerHTML = '<tr><td colspan="8">No performance records found.</td></tr>';
+        setAnalyticsEmpty(workflowResponseAnalytics, "No workflow response analytics available.");
+        setAnalyticsEmpty(workflowInsightGrid, "No workflow insight metrics available.");
+        await renderWorkflowAlertAnalytics();
+        return;
+      }
+
+      renderAnalyticsBarList(
+        workflowResponseAnalytics,
+        [...items]
+          .filter((item) => Number(item.assigned_total || 0) > 0)
+          .sort((a, b) => {
+            const responseDelta = Number(b.response_rate || 0) - Number(a.response_rate || 0);
+            if (responseDelta !== 0) return responseDelta;
+            return Number(b.completed_total || 0) - Number(a.completed_total || 0);
+          })
+          .slice(0, 6)
+          .map((item) => ({
+            label: item.user_name || "Unknown",
+            value: Number(item.response_rate || 0),
+            meta: `${formatRoleName(item.user_role || "", item.user_role_label || "")} | Open ${Number(item.active_open || 0)} | Overdue ${Number(item.overdue_open || 0)}`,
+            tone: Number(item.overdue_open || 0) > 0 ? "warning" : "success"
+          })),
+        {
+          valueFormatter: (value) => `${Number(value || 0).toFixed(1)}%`,
+          emptyMessage: "Workflow response analytics will appear once tasks are assigned."
+        }
+      );
+
+      const totalOpen = Number(summary.total_open || 0);
+      const overdueOpen = Number(summary.overdue_open || 0);
+      const completed7d = Number(summary.completed_7d || 0);
+      const avgCompletion = Number(summary.avg_completion_hours || 0);
+      const bestResponder = [...items].sort((a, b) => Number(b.response_rate || 0) - Number(a.response_rate || 0))[0];
+      renderAnalyticsStatGrid(workflowInsightGrid, [
+        {
+          label: "Overdue Risk",
+          value: toPercent(overdueOpen, totalOpen || 1),
+          helper: `${pluralize(overdueOpen, "task")} overdue out of ${pluralize(totalOpen, "open task")}.`,
+          tone: overdueOpen > 0 ? "danger" : "success"
+        },
+        {
+          label: "7-Day Throughput",
+          value: pluralize(completed7d, "completion"),
+          helper: `Completed within the last seven days across the full workflow chain.`,
+          tone: "success"
+        },
+        {
+          label: "Average Completion",
+          value: formatDurationHours(avgCompletion),
+          helper: `Average time taken to close completed tasks.`,
+          tone: avgCompletion > 48 ? "warning" : "info"
+        },
+        {
+          label: "Pre-Workflow Escalations",
+          value: pluralize(verificationEscalatedCount, "submission"),
+          helper: `${pluralize(verificationDueSoonCount, "submission")} more are approaching the ${verificationEscalationWindowDays}-day verification-start deadline before entering live workflow.`,
+          tone: verificationEscalatedCount > 0 ? "danger" : (verificationDueSoonCount > 0 ? "warning" : "success")
+        },
+        {
+          label: "Best Response Lead",
+          value: bestResponder ? `${bestResponder.user_name} (${Number(bestResponder.response_rate || 0).toFixed(1)}%)` : "N/A",
+          helper: `Current top response-rate performer from live workflow monitoring.`,
+          tone: "info"
+        }
+      ]);
+
+      renderWorkflowPerformanceRows();
+
+      await renderWorkflowAlertAnalytics();
+      updateDashboardLiveStamp("workflowSection");
+    } catch (error) {
+      workflowSummaryCards.innerHTML = '<div class="workflow-empty-card">Failed to load workflow metrics.</div>';
+      workflowPerformanceBody.innerHTML = '<tr><td colspan="8">Failed to load workflow metrics.</td></tr>';
+      if (workflowAlertSummaryCards) {
+        workflowAlertSummaryCards.innerHTML = '<div class="workflow-empty-card">Failed to load workflow alert analytics.</div>';
+      }
+      if (workflowAlertRoleBody) {
+        workflowAlertRoleBody.innerHTML = '<tr><td colspan="6">Failed to load role analytics.</td></tr>';
+      }
+      if (workflowAlertUserBody) {
+        workflowAlertUserBody.innerHTML = '<tr><td colspan="6">Failed to load staff analytics.</td></tr>';
+      }
+      if (workflowAlertRecentFeed) {
+        workflowAlertRecentFeed.innerHTML = '<div class="workflow-feed-empty">Failed to load recent alerts.</div>';
+      }
+      setAnalyticsEmpty(workflowResponseAnalytics, "Unable to load workflow response analytics.");
+      setAnalyticsEmpty(workflowInsightGrid, "Unable to load workflow insight metrics.");
+      console.error('Error loading workflow performance:', error);
+    }
+  }
+
+  function toggleRecycleBinAccess(canManage, canPurge = false) {
+    recycleBinState.canManage = Boolean(canManage);
+    recycleBinState.canPurge = Boolean(canPurge);
+
+    if (recycleBinAccessNotice) {
+      recycleBinAccessNotice.classList.toggle("hidden", recycleBinState.canManage);
+    }
+    if (recycleBinWorkspace) {
+      recycleBinWorkspace.classList.toggle("hidden", !recycleBinState.canManage);
+    }
+    [recycleBinExportXlsxBtn, recycleBinExportPdfBtn, recycleBinExportCsvBtn].forEach((button) => {
+      if (!button) return;
+      button.classList.toggle("hidden", !recycleBinState.canManage);
+    });
+    if (recycleBinPurgeToggleBtn) {
+      recycleBinPurgeToggleBtn.classList.toggle("hidden", !recycleBinState.canPurge);
+    }
+  }
+
+  function recycleBinFilters() {
+    return {
+      search: (recycleBinSearchInput?.value || "").trim(),
+      state: recycleBinStateFilter?.value || "all",
+      actor_role: recycleBinRoleFilter?.value || "",
+      date_from: recycleBinDateFrom?.value || "",
+      date_to: recycleBinDateTo?.value || "",
+      page: recycleBinState.page,
+      limit: recycleBinState.limit
+    };
+  }
+
+  function populateRecycleBinRoleFilters(options = []) {
+    const rows = Array.isArray(options) ? options : [];
+    const currentValue = recycleBinRoleFilter?.value || "";
+    const optionMarkup = ['<option value="">All Roles</option>']
+      .concat(rows.map((item) => `<option value="${escapeHtml(item.value || "")}">${escapeHtml(item.label || item.value || "")}</option>`))
+      .join("");
+
+    if (recycleBinRoleFilter) {
+      recycleBinRoleFilter.innerHTML = optionMarkup;
+      recycleBinRoleFilter.value = currentValue;
+      if (recycleBinRoleFilter.value !== currentValue) {
+        recycleBinRoleFilter.value = "";
+      }
+    }
+
+    if (recycleBinPurgeRole) {
+      const purgeValue = recycleBinPurgeRole.value || "";
+      recycleBinPurgeRole.innerHTML = optionMarkup;
+      recycleBinPurgeRole.value = purgeValue;
+      if (recycleBinPurgeRole.value !== purgeValue) {
+        recycleBinPurgeRole.value = "";
+      }
+    }
+  }
+
+  function renderRecycleBinSummary(summary = {}) {
+    if (!recycleBinSummaryCards) return;
+    recycleBinSummaryCards.innerHTML = "";
+    recycleBinSummaryCards.appendChild(createCard("Recycle Bin Total", Number(summary.total || 0), "", "", "", "", "purple"));
+    recycleBinSummaryCards.appendChild(createCard("Deleted Records", Number(summary.deleted || 0), "", "", "", "", "red"));
+    recycleBinSummaryCards.appendChild(createCard("Restored Records", Number(summary.restored || 0), "", "", "", "", "green"));
+    recycleBinSummaryCards.appendChild(createCard("Direct Deletes", Number(summary.direct || 0), "", "", "", "", "orange"));
+    recycleBinSummaryCards.appendChild(createCard("Queued Deletes", Number(summary.queued || 0), "", "", "", "", "blue"));
+  }
+
+  function renderRecycleBinRows(items = []) {
+    if (!recycleBinTableBody) return;
+    if (!Array.isArray(items) || !items.length) {
+      recycleBinTableBody.innerHTML = '<tr><td colspan="11">No recycle bin records matched the current filters.</td></tr>';
+      return;
+    }
+
+    recycleBinTableBody.innerHTML = items.map((item) => {
+      const title = String(item.staff_title || "").trim();
+      const name = String(item.staff_name || "").trim() || "Unknown Applicant";
+      const deletedBy = [String(item.deleted_by_name || "").trim(), humanizeRole(item.deleted_by_role || "")]
+        .filter(Boolean)
+        .join(" - ");
+      const restoredBy = item.restored
+        ? [String(item.restored_by_name || "").trim(), humanizeRole(item.restored_by_role || "")]
+            .filter(Boolean)
+            .join(" - ")
+        : "N/A";
+      const statusLabel = item.restored ? "Restored" : "Deleted";
+      const statusClass = item.restored ? "status-restored" : "status-deleted";
+      const restoreBtn = !item.restored
+        ? `<button type="button" class="btn-action btn-small" data-recycle-action="restore" data-recycle-id="${Number(item.recycle_id || 0)}">Restore</button>`
+        : "";
+      const clearBtn = `<button type="button" class="btn-action btn-danger btn-small" data-recycle-action="clear" data-recycle-id="${Number(item.recycle_id || 0)}">Clear Record</button>`;
+
+      return `
+        <tr>
+          <td>${escapeHtml(item.regNo || "N/A")}</td>
+          <td>${escapeHtml(title || "N/A")}</td>
+          <td>${escapeHtml(name)}</td>
+          <td>${escapeHtml(item.delete_mode || "Direct Delete")}</td>
+          <td><span class="recycle-status-pill ${statusClass}">${escapeHtml(statusLabel)}</span></td>
+          <td>${escapeHtml(item.delete_reason || "N/A")}</td>
+          <td>${escapeHtml(deletedBy || "Unknown")}</td>
+          <td>${escapeHtml(formatDashboardDateTime(item.deleted_at))}</td>
+          <td>${escapeHtml(restoredBy)}</td>
+          <td>${escapeHtml(item.restored ? formatDashboardDateTime(item.restored_at) : "N/A")}</td>
+          <td>
+            <div class="recycle-table-actions">
+              ${restoreBtn}
+              ${clearBtn}
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    recycleBinTableBody.querySelectorAll("[data-recycle-action='restore']").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const recycleId = Number(button.getAttribute("data-recycle-id"));
+        if (!recycleId) return;
+        const confirmed = await window.appConfirm("Restore this registry record from the recycle bin?", {
+          title: "Restore Registry Record",
+          confirmText: "Restore",
+          cancelText: "Cancel"
+        });
+        if (!confirmed) return;
+        await runRecycleBinRowAction("../backend/api/restore_file_registry_recycle_item.php", { recycle_id: recycleId }, "Registry record restored successfully.");
+      });
+    });
+
+    recycleBinTableBody.querySelectorAll("[data-recycle-action='clear']").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const recycleId = Number(button.getAttribute("data-recycle-id"));
+        if (!recycleId) return;
+        const confirmed = await window.appConfirm("Clear this recycle bin record permanently? This action cannot be undone.", {
+          title: "Clear Recycle Bin Record",
+          confirmText: "Clear Record",
+          cancelText: "Cancel",
+          danger: true
+        });
+        if (!confirmed) return;
+        await runRecycleBinRowAction("../backend/api/clear_registry_recycle_item.php", { recycle_id: recycleId }, "Recycle bin record cleared permanently.");
+      });
     });
   }
 
-  // Payroll month/year filter
-  [payrollMonth, payrollYear].forEach((el) => {
-    if (el) {
-      el.addEventListener("change", () => {
-        const month = payrollMonth.value || "10";
-        const year = payrollYear.value || new Date().getFullYear();
-        renderPayrollMovements(month, year);
+  async function runRecycleBinRowAction(endpoint, payload, successMessage) {
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
       });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Unable to complete recycle bin action.");
+      }
+      notifyDashboard("success", data.message || successMessage, "Recycle Bin");
+      await renderRecycleBinSection();
+    } catch (error) {
+      console.error("Recycle bin action failed:", error);
+      notifyDashboard("error", error.message || "Unable to complete recycle bin action.", "Recycle Bin");
+    }
+  }
+
+  function updateRecycleBinPagination(page, totalPages) {
+    recycleBinState.page = Number(page || 1);
+    recycleBinState.totalPages = Number(totalPages || 1);
+    if (recycleBinPageLabel) {
+      recycleBinPageLabel.textContent = `Page ${recycleBinState.page} of ${recycleBinState.totalPages}`;
+    }
+    if (recycleBinPrevBtn) {
+      recycleBinPrevBtn.disabled = recycleBinState.page <= 1;
+    }
+    if (recycleBinNextBtn) {
+      recycleBinNextBtn.disabled = recycleBinState.page >= recycleBinState.totalPages;
+    }
+  }
+
+  async function renderRecycleBinSection() {
+    const canManage = canManageRecycleBin();
+    toggleRecycleBinAccess(canManage, canManage && getCurrentRole() === "admin");
+    if (!canManage) {
+      return;
+    }
+
+    if (recycleBinTableBody) {
+      recycleBinTableBody.innerHTML = '<tr><td colspan="11">Loading recycle bin records...</td></tr>';
+    }
+
+    try {
+      const params = new URLSearchParams(recycleBinFilters());
+      const response = await fetch(`../backend/api/get_registry_recycle_bin.php?${params.toString()}`, {
+        credentials: "include",
+        cache: "no-store"
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || `HTTP ${response.status}`);
+      }
+
+      toggleRecycleBinAccess(Boolean(data.permissions?.can_restore), Boolean(data.permissions?.can_purge));
+      populateRecycleBinRoleFilters(data.role_options || []);
+      renderRecycleBinSummary(data.summary || {});
+      renderRecycleBinRows(data.items || []);
+      updateRecycleBinPagination(data.page || 1, data.total_pages || 1);
+      updateDashboardLiveStamp("dataSection");
+    } catch (error) {
+      console.error("Unable to load registry recycle bin:", error);
+      if (recycleBinTableBody) {
+        recycleBinTableBody.innerHTML = `<tr><td colspan="11">${escapeHtml(error.message || "Unable to load recycle bin records.")}</td></tr>`;
+      }
+      renderRecycleBinSummary({});
+    }
+  }
+
+  async function exportRecycleBin(format, sourceButton = null) {
+    if (!canManageRecycleBin()) {
+      notifyDashboard("error", "You do not have permission to export recycle bin data.", "Recycle Bin");
+      return;
+    }
+    if (format === "pdf") {
+      await openDmPdfExportBuilder("registry_recycle_bin", sourceButton);
+      return;
+    }
+    await exportDashboardDataset("registry_recycle_bin", format, { sourceButton });
+  }
+
+  async function previewRecycleBinPurge() {
+    try {
+      const response = await fetch("../backend/api/purge_registry_recycle_bin.php", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dry_run: true,
+          older_than_days: Number(recycleBinPurgeDays?.value || 90),
+          state: recycleBinPurgeState?.value || "restored",
+          actor_role: recycleBinPurgeRole?.value || ""
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Unable to preview recycle bin purge.");
+      }
+
+      const preview = data.preview || {};
+      const sample = Array.isArray(preview.sample) ? preview.sample : [];
+      if (recycleBinPurgePreview) {
+        recycleBinPurgePreview.innerHTML = `
+          <div class="recycle-purge-preview-copy">
+            <strong>${Number(preview.summary?.total || 0)}</strong>
+            <span>records match the current purge rules.</span>
+          </div>
+          <ul class="recycle-purge-sample">
+            ${sample.length ? sample.map((item) => `<li>${escapeHtml(item.regNo || "N/A")} - ${escapeHtml(formatTitleName(item.staff_title || "", item.staff_name || "", "") || "Unknown Applicant")}</li>`).join("") : "<li>No sample records found.</li>"}
+          </ul>
+        `;
+      }
+    } catch (error) {
+      console.error("Recycle bin purge preview failed:", error);
+      if (recycleBinPurgePreview) {
+        recycleBinPurgePreview.innerHTML = `<p>${escapeHtml(error.message || "Unable to preview recycle bin purge.")}</p>`;
+      }
+    }
+  }
+
+  async function confirmRecycleBinPurge() {
+    const olderThanDays = Number(recycleBinPurgeDays?.value || 90);
+    const stateValue = recycleBinPurgeState?.value || "restored";
+    const confirmed = await window.appConfirm(
+      `Permanently purge recycle bin records older than ${olderThanDays} day(s) for scope "${stateValue}"?`,
+      {
+        title: "Purge Recycle Bin",
+        confirmText: "Purge Records",
+        cancelText: "Cancel",
+        danger: true
+      }
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const response = await fetch("../backend/api/purge_registry_recycle_bin.php", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          older_than_days: olderThanDays,
+          state: stateValue,
+          actor_role: recycleBinPurgeRole?.value || ""
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Unable to purge recycle bin records.");
+      }
+      notifyDashboard("success", data.message || "Recycle bin records purged successfully.", "Recycle Bin");
+      await renderRecycleBinSection();
+      await previewRecycleBinPurge();
+    } catch (error) {
+      console.error("Recycle bin purge failed:", error);
+      notifyDashboard("error", error.message || "Unable to purge recycle bin records.", "Recycle Bin");
+    }
+  }
+
+  async function renderWorkflowAlertAnalytics() {
+    if (!workflowAlertSummaryCards || !workflowAlertRoleBody || !workflowAlertUserBody || !workflowAlertRecentFeed) {
+      return;
+    }
+
+    try {
+      const response = await fetch('../backend/api/get_task_alerts_report.php', {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        const message = data.message || `HTTP ${response.status}`;
+        workflowAlertSummaryCards.innerHTML = `<div class="workflow-empty-card">${escapeHtml(message)}</div>`;
+        workflowAlertRoleBody.innerHTML = `<tr><td colspan="6">${escapeHtml(message)}</td></tr>`;
+        workflowAlertUserBody.innerHTML = `<tr><td colspan="6">${escapeHtml(message)}</td></tr>`;
+        workflowAlertRecentFeed.innerHTML = `<div class="workflow-feed-empty">${escapeHtml(message)}</div>`;
+        drawWorkflowAlertTrend({ labels: [], opened: [], resolved: [], critical: [] });
+        return;
+      }
+
+      const summary = data.summary || {};
+      workflowAlertSummaryCards.innerHTML = '';
+      workflowAlertSummaryCards.appendChild(createCard("Open Alerts", Number(summary.open_total || 0), "", "", "", "", "orange"));
+      workflowAlertSummaryCards.appendChild(createCard("Critical Alerts", Number(summary.critical_open || 0), "", "", "", "", "red"));
+      workflowAlertSummaryCards.appendChild(createCard("Resolved (7d)", Number(summary.resolved_7d || 0), "", "", "", "", "green"));
+      workflowAlertSummaryCards.appendChild(createCard("Avg Alert Resolution", formatDurationHours(summary.avg_resolution_hours || 0), "", "", "", "", "teal"));
+
+      const roleItems = Array.isArray(data.by_role) ? data.by_role : [];
+      if (!roleItems.length) {
+        workflowAlertRoleBody.innerHTML = '<tr><td colspan="6">No role-level alert metrics found.</td></tr>';
+      } else {
+        workflowAlertRoleBody.innerHTML = roleItems.map((item) => `
+          <tr>
+            <td>${escapeHtml(item.role_label || formatRoleName(item.role_key || ''))}</td>
+            <td>${Number(item.open_alerts || 0).toLocaleString()}</td>
+            <td>${Number(item.overdue_open || 0).toLocaleString()}</td>
+            <td>${Number(item.stalled_open || 0).toLocaleString()}</td>
+            <td>${Number(item.resolved_total || 0).toLocaleString()}</td>
+            <td>${escapeHtml(formatMinutesCompact(item.avg_ack_minutes || 0))}</td>
+          </tr>
+        `).join('');
+      }
+
+      const userItems = Array.isArray(data.by_user) ? data.by_user.slice(0, 15) : [];
+      if (!userItems.length) {
+        workflowAlertUserBody.innerHTML = '<tr><td colspan="6">No staff alert metrics found.</td></tr>';
+      } else {
+        workflowAlertUserBody.innerHTML = userItems.map((item) => `
+          <tr>
+            <td>${escapeHtml(item.user_name || 'Unassigned')}</td>
+            <td>${escapeHtml(item.user_role_label || formatRoleName(item.user_role || ''))}</td>
+            <td>${Number(item.open_alerts || 0).toLocaleString()}</td>
+            <td>${Number(item.overdue_open || 0).toLocaleString()}</td>
+            <td>${Number(item.critical_open || 0).toLocaleString()}</td>
+            <td>${escapeHtml(formatMinutesCompact(item.avg_ack_minutes || 0))}</td>
+          </tr>
+        `).join('');
+      }
+
+      const recentAlerts = Array.isArray(data.recent_alerts) ? data.recent_alerts : [];
+      if (!recentAlerts.length) {
+        workflowAlertRecentFeed.innerHTML = '<div class="workflow-feed-empty">No open alerts right now.</div>';
+      } else {
+        workflowAlertRecentFeed.innerHTML = recentAlerts.map((item) => `
+          <article class="workflow-feed-item">
+            <p class="workflow-feed-title">
+              <span class="workflow-alert-severity ${escapeHtml(item.severity || 'warning')}">${escapeHtml(item.severity || 'warning')}</span>
+              ${escapeHtml(item.task_title || 'Workflow Task')}
+            </p>
+            <p class="workflow-feed-meta">
+              ${escapeHtml(formatAlertTypeLabel(item.alert_type || ''))}
+              | File: ${escapeHtml(item.related_reg_no || 'N/A')}
+              | Assigned: ${escapeHtml(item.assigned_name || item.assigned_role_label || 'Unassigned')}
+              | ${escapeHtml(item.triggered_at || '')}
+            </p>
+          </article>
+        `).join('');
+      }
+
+      drawWorkflowAlertTrend(data.trend || {});
+      updateDashboardLiveStamp("workflowSection");
+    } catch (error) {
+      console.error('Error loading workflow alert analytics:', error);
+      workflowAlertSummaryCards.innerHTML = '<div class="workflow-empty-card">Failed to load workflow alert analytics.</div>';
+      workflowAlertRoleBody.innerHTML = '<tr><td colspan="6">Failed to load role analytics.</td></tr>';
+      workflowAlertUserBody.innerHTML = '<tr><td colspan="6">Failed to load staff analytics.</td></tr>';
+      workflowAlertRecentFeed.innerHTML = '<div class="workflow-feed-empty">Failed to load recent alerts.</div>';
+      drawWorkflowAlertTrend({ labels: [], opened: [], resolved: [], critical: [] });
+    }
+  }
+
+  // File Movement Analytics
+  async function renderFileMovementAnalytics() {
+    if (!fileMovementSummaryCards || !fileMovementOfficeBody || !fileMovementCustodyBody || !fileMovementRecentBody) return;
+
+    fileMovementSummaryCards.innerHTML = "";
+    fileMovementSummaryCards.appendChild(createCard("Total Movements", "...", "", "", "", "", "blue"));
+    fileMovementSummaryCards.appendChild(createCard("Open Files", "...", "", "", "", "", "orange"));
+    fileMovementSummaryCards.appendChild(createCard("Overdue Open", "...", "", "", "", "", "red"));
+    fileMovementSummaryCards.appendChild(createCard("Due Soon (24h)", "...", "", "", "", "", "teal"));
+    fileMovementSummaryCards.appendChild(createCard("Moved Today", "...", "", "", "", "", "green"));
+    fileMovementSummaryCards.appendChild(createCard("Avg Turnaround", "...", "", "", "", "", "purple"));
+    fileMovementOfficeBody.innerHTML = '<tr><td colspan="4">Loading office metrics...</td></tr>';
+    fileMovementCustodyBody.innerHTML = '<tr><td colspan="3">Loading custody metrics...</td></tr>';
+    fileMovementRecentBody.innerHTML = '<tr><td colspan="8">Loading movement timeline...</td></tr>';
+
+    try {
+      const response = await fetch('../backend/api/get_file_movement_summary.php', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        cache: 'no-store'
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        const msg = data.message || `HTTP ${response.status}`;
+        fileMovementSummaryCards.innerHTML = `<div class="workflow-empty-card">${msg}</div>`;
+        fileMovementOfficeBody.innerHTML = `<tr><td colspan="4">${msg}</td></tr>`;
+        fileMovementCustodyBody.innerHTML = `<tr><td colspan="3">${msg}</td></tr>`;
+        fileMovementRecentBody.innerHTML = `<tr><td colspan="8">${msg}</td></tr>`;
+        return;
+      }
+
+      const summary = data.summary || {};
+      fileMovementSummaryCards.innerHTML = "";
+      fileMovementSummaryCards.appendChild(createCard("Total Movements", Number(summary.total_movements || 0), "This Week", Number(summary.moved_this_week || 0), "", "", "blue"));
+      fileMovementSummaryCards.appendChild(createCard("Open Files", Number(summary.open_movements || 0), "Longest Open", formatDurationCompact(summary.longest_open_seconds || 0), "", "", "orange"));
+      fileMovementSummaryCards.appendChild(createCard("Overdue Open", Number(summary.overdue_open || 0), "", "", "", "", "red"));
+      fileMovementSummaryCards.appendChild(createCard("Due Soon (24h)", Number(summary.due_soon_open || 0), "", "", "", "", "teal"));
+      fileMovementSummaryCards.appendChild(createCard("Moved Today", Number(summary.moved_today || 0), "", "", "", "", "green"));
+      fileMovementSummaryCards.appendChild(createCard("Avg Turnaround", formatDurationCompact(summary.avg_turnaround_seconds || 0), "", "", "", "", "purple"));
+
+      const officeItems = Array.isArray(data.by_office) ? data.by_office : [];
+      if (!officeItems.length) {
+        fileMovementOfficeBody.innerHTML = '<tr><td colspan="4">No office movement records found.</td></tr>';
+      } else {
+        fileMovementOfficeBody.innerHTML = officeItems.map((item) => `
+          <tr>
+            <td>${item.to_office || 'Unspecified'}</td>
+            <td>${Number(item.total || 0).toLocaleString()}</td>
+            <td>${Number(item.open_count || 0).toLocaleString()}</td>
+            <td>${Number(item.returned_count || 0).toLocaleString()}</td>
+          </tr>
+        `).join("");
+      }
+
+      const custodyItems = Array.isArray(data.open_custody) ? data.open_custody : [];
+      if (!custodyItems.length) {
+        fileMovementCustodyBody.innerHTML = '<tr><td colspan="3">No open custody records.</td></tr>';
+      } else {
+        fileMovementCustodyBody.innerHTML = custodyItems.map((item) => `
+          <tr>
+            <td>${item.to_office || 'Unspecified'}</td>
+            <td>${Number(item.open_files || 0).toLocaleString()}</td>
+            <td>${formatDurationCompact(item.longest_seconds || 0)}</td>
+          </tr>
+        `).join("");
+      }
+
+      const recentItems = Array.isArray(data.recent_movements) ? data.recent_movements : [];
+      if (!recentItems.length) {
+        fileMovementRecentBody.innerHTML = '<tr><td colspan="8">No movement timeline records found.</td></tr>';
+      } else {
+        fileMovementRecentBody.innerHTML = recentItems.map((item) => {
+          const isReturned = !!item.returned_at;
+          const status = isReturned ? 'Returned' : 'Out';
+          return `
+            <tr>
+              <td>${item.regNo || 'N/A'}</td>
+              <td>${item.from_office || 'N/A'}</td>
+              <td>${item.to_office || 'N/A'}</td>
+              <td>${item.delivered_by || 'N/A'}</td>
+              <td>${item.moved_at || 'N/A'}</td>
+              <td>${status}</td>
+              <td>${formatDurationCompact(item.duration_seconds || 0)}</td>
+              <td>${item.reason || 'N/A'}</td>
+            </tr>
+          `;
+        }).join("");
+      }
+
+      renderAnalyticsBarList(
+        fileMovementOfficeAnalytics,
+        [...officeItems]
+          .sort((a, b) => Number(b.open_count || 0) - Number(a.open_count || 0))
+          .slice(0, 8)
+          .map((item) => ({
+            label: item.to_office || "Unspecified",
+            value: Number(item.open_count || 0),
+            meta: `Open ${Number(item.open_count || 0)} | Total ${Number(item.total || 0)} | Returned ${Number(item.returned_count || 0)}`,
+            tone: Number(item.open_count || 0) > 0 ? "warning" : "info"
+          })),
+        { emptyMessage: "No office movement distribution is currently available." }
+      );
+
+      renderAnalyticsStatGrid(fileMovementInsightGrid, [
+        {
+          label: "Open Custody Rate",
+          value: toPercent(summary.open_movements || 0, summary.total_movements || 1),
+          helper: `${pluralize(summary.open_movements || 0, "file")} remain open across all offices.`,
+          tone: Number(summary.overdue_open || 0) > 0 ? "warning" : "info"
+        },
+        {
+          label: "Overdue Exposure",
+          value: pluralize(summary.overdue_open || 0, "file"),
+          helper: `${toPercent(summary.overdue_open || 0, summary.open_movements || 1)} of open files are past expected return. ${pluralize(summary.due_soon_open || 0, "file")} are due within 24 hours.`,
+          tone: Number(summary.overdue_open || 0) > 0 ? "danger" : "success"
+        },
+        {
+          label: "Turnaround Time",
+          value: formatDurationCompact(summary.avg_turnaround_seconds || 0),
+          helper: `Average movement turnaround for returned files.`,
+          tone: Number(summary.avg_turnaround_seconds || 0) > 0 ? "info" : "success"
+        },
+        {
+          label: "Longest Open File",
+          value: formatDurationCompact(summary.longest_open_seconds || 0),
+          helper: `Current maximum custody duration among files still out of registry.`,
+          tone: Number(summary.longest_open_seconds || 0) > 604800 ? "danger" : "warning"
+        }
+      ]);
+
+      updateDashboardLiveStamp("fileMovementSection");
+    } catch (error) {
+      fileMovementSummaryCards.innerHTML = '<div class="workflow-empty-card">Failed to load file movement analytics.</div>';
+      fileMovementOfficeBody.innerHTML = '<tr><td colspan="4">Failed to load office metrics.</td></tr>';
+      fileMovementCustodyBody.innerHTML = '<tr><td colspan="3">Failed to load custody metrics.</td></tr>';
+      fileMovementRecentBody.innerHTML = '<tr><td colspan="8">Failed to load movement timeline.</td></tr>';
+      setAnalyticsEmpty(fileMovementOfficeAnalytics, "Unable to load office movement distribution.");
+      setAnalyticsEmpty(fileMovementInsightGrid, "Unable to load movement risk indicators.");
+      console.error('Error loading file movement analytics:', error);
+    }
+  }
+
+  function feedbackPriorityChip(priority) {
+    const value = String(priority || "normal").trim().toLowerCase() || "normal";
+    const label = value.charAt(0).toUpperCase() + value.slice(1);
+    const tone = value === "critical" ? "muted" : (value === "high" ? "warning" : (value === "low" ? "success" : "neutral"));
+    return `<span class="status-chip ${tone}">${escapeHtml(label)}</span>`;
+  }
+
+  function formatFeedbackStatusLabel(status) {
+    const normalized = String(status || "").trim().toLowerCase();
+    if (normalized === "reviewed") return "In Review";
+    if (normalized === "new") return "New";
+    if (normalized === "resolved") return "Resolved";
+    if (normalized === "closed") return "Closed";
+    return formatDashboardLabel(normalized || "new");
+  }
+
+  function formatFeedbackTypeLabel(type) {
+    const normalized = String(type || "").trim().toLowerCase();
+    return normalized ? normalized.split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ') : "General Feedback";
+  }
+
+  function feedbackStatusTone(status) {
+    const normalized = String(status || "").trim().toLowerCase();
+    if (normalized === "new") return "warning";
+    if (normalized === "reviewed") return "neutral";
+    if (normalized === "resolved") return "success";
+    if (normalized === "closed") return "muted";
+    return "neutral";
+  }
+
+  function populateFeedbackAssigneeOptions(selectEl, users = [], placeholder = "All Owners") {
+    if (!selectEl) return;
+    const currentValue = selectEl.value || "";
+    const options = [`<option value="">${escapeHtml(placeholder)}</option>`]
+      .concat((users || []).map((user) => {
+        const label = `${user.user_name || "User"}${user.role_label ? ` (${user.role_label})` : ""}`;
+        return `<option value="${escapeHtml(user.user_id || "")}">${escapeHtml(label)}</option>`;
+      }));
+    selectEl.innerHTML = options.join("");
+    if (currentValue && (users || []).some((user) => String(user.user_id || "") === currentValue)) {
+      selectEl.value = currentValue;
+    }
+  }
+
+  function setFeedbackWorkflowHelper(detail) {
+    if (!feedbackWorkflowHelper) return;
+    const submission = detail?.submission || {};
+    const canManage = Boolean(detail?.permissions?.can_manage);
+    const allowAssignment = Boolean(detail?.config?.allow_assignment);
+    const assigneeCount = Array.isArray(detail?.assignees) ? detail.assignees.length : 0;
+    const status = String(submission.status || "new").toLowerCase();
+
+    feedbackWorkflowHelper.classList.toggle("hidden", !canManage);
+    feedbackWorkflowHelper.dataset.state = status;
+
+    if (!canManage) {
+      feedbackWorkflowHelper.innerHTML = "";
+      return;
+    }
+
+    let title = "Workflow Actions";
+    let body = "Assign an owner, move the item into review, then resolve or close it with a clear summary for traceability.";
+
+    if (!allowAssignment) {
+      title = "Assignment Disabled";
+      body = "Assignment is currently disabled by settings. You can still review, resolve, or close the submission if your role permits.";
+    } else if (assigneeCount === 0) {
+      title = "No Assignable Staff";
+      body = "No eligible staff accounts are available for ownership. Add or activate staff users first, then reopen this workflow.";
+    } else if (status === "resolved") {
+      title = "Ready for Closure";
+      body = "This submission is resolved. Review the resolution summary, add any closing note if needed, then close the record.";
+    } else if (status === "closed") {
+      title = "Record Closed";
+      body = "This submission is already closed. Use Save Changes only if you need to correct priority, notes, or ownership history.";
+    }
+
+    feedbackWorkflowHelper.innerHTML = `
+      <strong>${escapeHtml(title)}</strong>
+      <span>${escapeHtml(body)}</span>
+    `;
+  }
+
+  function setFeedbackActionButtonState(button, { visible = false, disabled = false, label = "" } = {}) {
+    if (!button) return;
+    if (label) button.textContent = label;
+    button.classList.toggle("hidden", !visible);
+    button.disabled = disabled;
+  }
+
+  function refreshFeedbackWorkflowActions(detail) {
+    const submission = detail?.submission || {};
+    const canManage = Boolean(detail?.permissions?.can_manage);
+    const allowAssignment = Boolean(detail?.config?.allow_assignment);
+    const status = String(submission.status || "new").toLowerCase();
+    const assignedTo = String(submission.assigned_to_user_id || "");
+    const selectedAssignee = String(feedbackDetailAssignee?.value || assignedTo);
+    const resolutionText = String(feedbackDetailResolutionSummary?.value || submission.resolution_summary || "").trim();
+    const assigneeCount = Array.isArray(detail?.assignees) ? detail.assignees.length : 0;
+
+    setFeedbackWorkflowHelper(detail);
+
+    setFeedbackActionButtonState(feedbackDetailAssignBtn, {
+      visible: canManage && allowAssignment,
+      disabled: assigneeCount === 0 || !selectedAssignee || selectedAssignee === assignedTo,
+      label: assignedTo ? "Reassign Owner" : "Assign Owner"
+    });
+    setFeedbackActionButtonState(feedbackDetailReviewBtn, {
+      visible: canManage && !["resolved", "closed"].includes(status),
+      disabled: status === "reviewed",
+      label: status === "reviewed" ? "In Review" : "Mark In Review"
+    });
+    setFeedbackActionButtonState(feedbackDetailResolveBtn, {
+      visible: canManage && !["resolved", "closed"].includes(status),
+      disabled: resolutionText === "",
+      label: "Resolve Feedback"
+    });
+    setFeedbackActionButtonState(feedbackDetailCloseBtn, {
+      visible: canManage && status !== "closed",
+      disabled: resolutionText === "" && status !== "resolved",
+      label: "Close Record"
+    });
+    setFeedbackActionButtonState(feedbackDetailSaveBtn, {
+      visible: canManage,
+      disabled: false,
+      label: "Save Changes"
+    });
+  }
+
+  function buildFeedbackWorkflowPayload(overrides = {}) {
+    return {
+      submission_id: Number(feedbackDetailSubmissionId?.value || 0),
+      status: overrides.status || feedbackDetailStatus?.value || "new",
+      priority: overrides.priority || feedbackDetailPriority?.value || "normal",
+      assigned_to_user_id: Object.prototype.hasOwnProperty.call(overrides, "assigned_to_user_id")
+        ? overrides.assigned_to_user_id
+        : (feedbackDetailAssignee?.value || ""),
+      resolution_summary: Object.prototype.hasOwnProperty.call(overrides, "resolution_summary")
+        ? overrides.resolution_summary
+        : (feedbackDetailResolutionSummary?.value || ""),
+      internal_note: Object.prototype.hasOwnProperty.call(overrides, "internal_note")
+        ? overrides.internal_note
+        : (feedbackDetailInternalNote?.value || "")
+    };
+  }
+
+  function currentFeedbackFilters() {
+    return {
+      search: (feedbackSearchInput?.value || "").trim(),
+      feedback_type: feedbackTypeFilter?.value || "",
+      audience: feedbackAudienceFilter?.value || "",
+      status: feedbackStatusFilter?.value || "",
+      priority: feedbackPriorityFilter?.value || "",
+      assigned_to: feedbackAssigneeFilter?.value || "",
+      date_from: feedbackDateFrom?.value || "",
+      date_to: feedbackDateTo?.value || "",
+      overdue_only: feedbackOverdueOnly?.checked ? "1" : "0"
+    };
+  }
+
+  function setFeedbackAccessNotice(allowed) {
+    if (feedbackAccessNotice) feedbackAccessNotice.classList.toggle("hidden", allowed);
+    if (feedbackWorkspace) feedbackWorkspace.classList.toggle("hidden", !allowed);
+  }
+
+  function setFeedbackDetailTab(tabKey = "overview") {
+    feedbackDetailTabs.forEach((tab) => {
+      const active = (tab.dataset.feedbackTab || "") === tabKey;
+      tab.classList.toggle("active", active);
+    });
+    document.querySelectorAll(".feedback-detail-pane").forEach((pane) => {
+      pane.classList.toggle("active", (pane.dataset.feedbackPane || "") === tabKey);
+    });
+  }
+
+  function openFeedbackDetailModal() {
+    if (!feedbackDetailModal) return;
+    feedbackDetailModal.classList.add("open");
+    feedbackDetailModal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+  }
+
+  function closeFeedbackDetailModal() {
+    if (!feedbackDetailModal) return;
+    feedbackDetailModal.classList.remove("open");
+    feedbackDetailModal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("modal-open");
+    feedbackState.currentDetail = null;
+    if (feedbackDetailInternalNote) feedbackDetailInternalNote.value = "";
+    setFeedbackDetailTab("overview");
+  }
+
+  function feedbackActivityActionLabel(action) {
+    const normalized = String(action || "").trim().toLowerCase();
+    if (normalized === "feedback_submitted") return "Submitted";
+    if (normalized === "feedback_assigned") return "Assignment Updated";
+    if (normalized === "feedback_status_updated") return "Status Updated";
+    if (normalized === "feedback_note_added") return "Internal Note Added";
+    return formatDashboardLabel(normalized || "feedback_updated");
+  }
+
+  function renderFeedbackDetail(detail) {
+    if (!detail || !feedbackDetailOverview) return;
+    feedbackState.currentDetail = detail;
+    const submission = detail.submission || {};
+    const canManage = Boolean(detail.permissions?.can_manage);
+    const allowAssignment = Boolean(detail.config?.allow_assignment);
+    const submittedRole = submission.submitted_by_role_label || formatRoleName(submission.submitted_by_role || "");
+    if (feedbackDetailModalTitle) {
+      feedbackDetailModalTitle.textContent = submission.reference_no || "Feedback Details";
+    }
+    feedbackDetailOverview.innerHTML = `
+      <div class="feedback-detail-summary-grid">
+        <article class="feedback-detail-card tone-${escapeHtml(feedbackStatusTone(submission.status || "new"))}">
+          <span>Sender</span>
+          <strong>${escapeHtml(submission.full_name || "Unknown sender")}</strong>
+          <small>${escapeHtml(submission.audience_label || "Public")} | ${escapeHtml(submittedRole || "Public")}</small>
+        </article>
+        <article class="feedback-detail-card">
+          <span>Status</span>
+          <strong>${escapeHtml(submission.status_label || "New")}</strong>
+          <small>Due ${escapeHtml(formatDashboardDateTime(submission.due_at))}</small>
+        </article>
+        <article class="feedback-detail-card">
+          <span>Ownership</span>
+          <strong>${escapeHtml(submission.assigned_to_name || "Unassigned")}</strong>
+          <small>${escapeHtml(submission.assigned_to_role_label || "No owner yet")}</small>
+        </article>
+        <article class="feedback-detail-card">
+          <span>Priority</span>
+          <strong>${escapeHtml(submission.priority_label || "Normal")}</strong>
+          <small>${submission.is_overdue ? "Overdue against SLA" : `SLA ${escapeHtml(String(detail.config?.sla_days || 0))} day(s)`}</small>
+        </article>
+      </div>
+      <div class="feedback-detail-meta-grid">
+        <div><span>Subject</span><strong>${escapeHtml(submission.subject || "No subject")}</strong></div>
+        <div><span>Contact Email</span><strong>${escapeHtml(submission.email_address || "Not provided")}</strong></div>
+        <div><span>Contact Phone</span><strong>${escapeHtml(submission.phone_number || "Not provided")}</strong></div>
+        <div><span>Page Context</span><strong>${escapeHtml(submission.page_context || "feedback.html")}</strong></div>
+        <div><span>Submitted</span><strong>${escapeHtml(formatDashboardDateTime(submission.submitted_at))}</strong></div>
+        <div><span>Last Updated</span><strong>${escapeHtml(formatDashboardDateTime(submission.updated_at))}</strong></div>
+      </div>
+    `;
+
+    if (feedbackMessageMeta) {
+      feedbackMessageMeta.innerHTML = `
+        <span>${dashboardStatusChip(submission.status_label || submission.status || "New")}</span>
+        <span>${feedbackPriorityChip(submission.priority || "normal")}</span>
+        <span>${escapeHtml(submission.feedback_type_label || "General Feedback")}</span>
+      `;
+    }
+    if (feedbackMessageBody) {
+      feedbackMessageBody.innerHTML = `
+        <h4>${escapeHtml(submission.subject || "Feedback message")}</h4>
+        <p>${escapeHtml(submission.message || "No message was recorded for this submission.").replace(/\n/g, "<br>")}</p>
+      `;
+    }
+    if (feedbackActivityList) {
+      const activityRows = Array.isArray(detail.activity) ? detail.activity : [];
+      feedbackActivityList.innerHTML = activityRows.length
+        ? activityRows.map((item) => `
+            <article class="feedback-activity-item">
+              <div class="feedback-activity-topline">
+                <strong>${escapeHtml(feedbackActivityActionLabel(item.action || ""))}</strong>
+                <span>${escapeHtml(formatDashboardDateTime(item.created_at))}</span>
+              </div>
+              <div class="feedback-activity-meta">
+                ${escapeHtml(item.actor_name || "System")} ${item.actor_role_label ? `(${escapeHtml(item.actor_role_label)})` : ""}
+                ${item.from_status || item.to_status ? `| ${escapeHtml(item.from_status_label || "Current")} -> ${escapeHtml(item.to_status_label || "Current")}` : ""}
+              </div>
+              ${item.note ? `<p>${escapeHtml(item.note)}</p>` : ""}
+              ${item.field_changes && Object.keys(item.field_changes).length ? `
+                <ul class="feedback-activity-change-list">
+                  ${Object.entries(item.field_changes).map(([fieldKey, value]) => `<li><strong>${escapeHtml(formatDashboardLabel(fieldKey))}</strong>: ${escapeHtml(String(value?.from ?? "—"))} -> ${escapeHtml(String(value?.to ?? "—"))}</li>`).join("")}
+                </ul>
+              ` : ""}
+            </article>
+          `).join("")
+        : `<div class="workflow-empty-card">No workflow activity has been recorded for this feedback submission yet.</div>`;
+    }
+
+    if (feedbackDetailSubmissionId) feedbackDetailSubmissionId.value = String(submission.submission_id || "");
+    if (feedbackDetailStatus) feedbackDetailStatus.value = submission.status || "new";
+    if (feedbackDetailPriority) feedbackDetailPriority.value = submission.priority || "normal";
+    populateFeedbackAssigneeOptions(
+      feedbackDetailAssignee,
+      detail.assignees || [],
+      canManage && allowAssignment ? "Select owner" : "Unassigned"
+    );
+    if (feedbackDetailAssignee) feedbackDetailAssignee.value = submission.assigned_to_user_id || "";
+    if (feedbackDetailResolutionSummary) feedbackDetailResolutionSummary.value = submission.resolution_summary || "";
+    if (feedbackDetailInternalNote) feedbackDetailInternalNote.value = "";
+    if (feedbackDetailStatus) feedbackDetailStatus.disabled = !canManage;
+    if (feedbackDetailPriority) feedbackDetailPriority.disabled = !canManage;
+    if (feedbackDetailAssignee) feedbackDetailAssignee.disabled = !canManage || !allowAssignment;
+    if (feedbackDetailResolutionSummary) feedbackDetailResolutionSummary.disabled = !canManage;
+    if (feedbackDetailInternalNote) feedbackDetailInternalNote.disabled = !canManage;
+    refreshFeedbackWorkflowActions(detail);
+  }
+
+  async function loadFeedbackDetail(submissionId) {
+    if (!submissionId) return;
+    try {
+      const response = await fetch(`../backend/api/get_feedback_submission_detail.php?submission_id=${encodeURIComponent(String(submissionId))}`, {
+        credentials: "include",
+        cache: "no-store",
+        headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" }
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Unable to load feedback details.");
+      }
+      renderFeedbackDetail(data);
+      openFeedbackDetailModal();
+    } catch (error) {
+      notifyDashboard("error", error.message || "Unable to load feedback details.", "Feedback");
+    }
+  }
+
+  async function submitFeedbackWorkflowUpdate(payload, button = null, successMessage = "Feedback updated successfully.") {
+    const submissionId = Number(payload?.submission_id || 0);
+    if (!submissionId) return;
+    const originalLabel = button ? button.textContent : "";
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Saving...";
+    }
+    try {
+      const response = await fetch("../backend/api/update_feedback_submission.php", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Unable to update feedback submission.");
+      }
+      notifyDashboard("success", data.message || successMessage, "Feedback");
+      await renderFeedbackManagement();
+      await loadFeedbackDetail(submissionId);
+    } catch (error) {
+      notifyDashboard("error", error.message || "Unable to update feedback submission.", "Feedback");
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalLabel || "Save Changes";
+      }
+    }
+  }
+
+  async function saveFeedbackWorkflowUpdate() {
+    if (!feedbackState.currentDetail || !feedbackDetailSubmissionId) return;
+    await submitFeedbackWorkflowUpdate(buildFeedbackWorkflowPayload(), feedbackDetailSaveBtn, "Feedback updated successfully.");
+  }
+
+  async function runFeedbackWorkflowAction(action) {
+    if (!feedbackState.currentDetail) return;
+    const current = feedbackState.currentDetail.submission || {};
+    let payload = buildFeedbackWorkflowPayload();
+    let button = feedbackDetailSaveBtn;
+    let successMessage = "Feedback updated successfully.";
+
+    if (action === "assign") {
+      const assignee = feedbackDetailAssignee?.value || "";
+      if (!assignee) {
+        notifyDashboard("error", "Select a staff owner before assigning the feedback item.", "Feedback");
+        return;
+      }
+      payload = buildFeedbackWorkflowPayload({ assigned_to_user_id: assignee });
+      button = feedbackDetailAssignBtn;
+      successMessage = "Feedback ownership updated.";
+    } else if (action === "review") {
+      payload = buildFeedbackWorkflowPayload({ status: "reviewed" });
+      button = feedbackDetailReviewBtn;
+      successMessage = "Feedback marked in review.";
+    } else if (action === "resolve") {
+      const summary = String(feedbackDetailResolutionSummary?.value || "").trim();
+      if (summary === "") {
+        notifyDashboard("error", "Enter a resolution summary before marking feedback as resolved.", "Feedback");
+        return;
+      }
+      payload = buildFeedbackWorkflowPayload({ status: "resolved", resolution_summary: summary });
+      button = feedbackDetailResolveBtn;
+      successMessage = "Feedback resolved successfully.";
+    } else if (action === "close") {
+      const summary = String(feedbackDetailResolutionSummary?.value || current.resolution_summary || "").trim();
+      if (summary === "") {
+        notifyDashboard("error", "Enter a resolution summary before closing the feedback record.", "Feedback");
+        return;
+      }
+      payload = buildFeedbackWorkflowPayload({ status: "closed", resolution_summary: summary });
+      button = feedbackDetailCloseBtn;
+      successMessage = "Feedback record closed successfully.";
+    }
+
+    await submitFeedbackWorkflowUpdate(payload, button, successMessage);
+  }
+
+  async function renderFeedbackManagement() {
+    const canView = canViewFeedbackSection();
+    const canManage = canManageFeedbackSection();
+    feedbackState.canView = canView;
+    feedbackState.canManage = canManage;
+    setFeedbackAccessNotice(canView);
+    if (!canView) {
+      renderDataMetricCards(feedbackSummaryCards, []);
+      setAnalyticsEmpty(feedbackTypeAnalytics, "Feedback analytics are available only to authorized service managers.");
+      setAnalyticsEmpty(feedbackAudienceAnalytics, "Feedback analytics are available only to authorized service managers.");
+      setAnalyticsEmpty(feedbackTrendAnalytics, "Feedback trend data is not available.");
+      setAnalyticsEmpty(feedbackInsightGrid, "Feedback decision metrics are not available.");
+      setAnalyticsEmpty(feedbackNoteList, "Feedback action notes are not available.");
+      if (feedbackTableBody) setDataTableMessage(feedbackTableBody, 11, "Feedback management is not available for your account.");
+      return;
+    }
+
+    if (feedbackTableBody) setDataTableMessage(feedbackTableBody, 11, "Loading feedback submissions...");
+    try {
+      const params = new URLSearchParams({
+        page: String(feedbackState.page),
+        limit: String(feedbackState.limit)
+      });
+      const filters = currentFeedbackFilters();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) params.set(key, value);
+      });
+      const response = await fetch(`../backend/api/get_feedback_management.php?${params.toString()}`, {
+        credentials: "include",
+        cache: "no-store",
+        headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" }
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Unable to load feedback submissions.");
+      }
+
+      feedbackState.canManage = Boolean(data.permissions?.can_manage);
+      feedbackState.allowAssignment = Boolean(data.config?.allow_assignment);
+      feedbackState.allowExport = Boolean(data.config?.allow_export);
+      feedbackState.rows = Array.isArray(data.submissions) ? data.submissions : [];
+      feedbackState.totalRows = Number(data.pagination?.totalRows || 0);
+      feedbackState.totalPages = Number(data.pagination?.totalPages || 1);
+
+      if (feedbackExportXlsxBtn) feedbackExportXlsxBtn.classList.toggle("hidden", !feedbackState.allowExport);
+      if (feedbackExportPdfBtn) feedbackExportPdfBtn.classList.toggle("hidden", !feedbackState.allowExport);
+      if (feedbackExportCsvBtn) feedbackExportCsvBtn.classList.toggle("hidden", !feedbackState.allowExport);
+
+      renderDataMetricCards(feedbackSummaryCards, [
+        { title: "Open Feedback", value: Number(data.summary?.open_count || 0), subtitle1: "New", subvalue1: Number(data.summary?.new_count || 0), subtitle2: "Assigned", subvalue2: Number(data.summary?.assigned_open || 0), color: "orange" },
+        { title: "Overdue", value: Number(data.summary?.overdue_count || 0), subtitle1: "Resolved (30d)", subvalue1: Number(data.summary?.resolved_30d || 0), subtitle2: "Closed (30d)", subvalue2: Number(data.summary?.closed_30d || 0), color: "red" },
+        { title: "Completed", value: Number((data.summary?.resolved_count || 0) + (data.summary?.closed_count || 0)), subtitle1: "Resolved", subvalue1: Number(data.summary?.resolved_count || 0), subtitle2: "Closed", subvalue2: Number(data.summary?.closed_count || 0), color: "green" },
+        { title: "All Submissions", value: Number(data.summary?.total || 0), subtitle1: "SLA (days)", subvalue1: Number(data.config?.sla_days || 0), subtitle2: "Manage Access", subvalue2: feedbackState.canManage ? "Enabled" : "View Only", color: "blue" }
+      ]);
+      renderAnalyticsBarList(feedbackTypeAnalytics, data.analytics?.by_type || [], {
+        valueFormatter: (value) => Number(value || 0).toLocaleString(),
+        emptyMessage: "Feedback type analysis will appear as submissions accumulate."
+      });
+      renderAnalyticsBarList(feedbackAudienceAnalytics, data.analytics?.by_audience || [], {
+        valueFormatter: (value) => Number(value || 0).toLocaleString(),
+        emptyMessage: "Audience analysis will appear as feedback is received."
+      });
+      renderAnalyticsBarList(feedbackTrendAnalytics, data.analytics?.trend || [], {
+        valueFormatter: (value) => Number(value || 0).toLocaleString(),
+        emptyMessage: "Trend analytics will appear after feedback history builds up."
+      });
+      renderAnalyticsStatGrid(feedbackInsightGrid, data.analytics?.insights || [], {
+        emptyMessage: "Decision support metrics are not available for the current filters."
+      });
+      renderAnalyticsNotes(feedbackNoteList, data.analytics?.notes || [], {
+        emptyMessage: "No feedback action notes are currently required."
+      });
+
+      if (feedbackTypeFilter) {
+        const currentType = feedbackTypeFilter.value || "";
+        const rawTypes = data.options?.feedback_types || [];
+        feedbackTypeFilter.innerHTML = [`<option value="">All Types</option>`]
+          .concat(rawTypes.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(formatFeedbackTypeLabel(value))}</option>`))
+          .join("");
+        feedbackTypeFilter.value = rawTypes.includes(currentType) ? currentType : "";
+      }
+      populateSelectOptions(feedbackStatusFilter, (data.options?.statuses || []).map((value) => formatFeedbackStatusLabel(value)), "All Statuses");
+      if (feedbackStatusFilter) {
+        const currentValue = feedbackStatusFilter.dataset.rawValue || feedbackStatusFilter.value || "";
+        const rawStatuses = data.options?.statuses || [];
+        feedbackStatusFilter.innerHTML = [`<option value="">All Statuses</option>`]
+          .concat(rawStatuses.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(formatFeedbackStatusLabel(value))}</option>`))
+          .join("");
+        feedbackStatusFilter.value = rawStatuses.includes(currentValue) ? currentValue : "";
+      }
+      populateFeedbackAssigneeOptions(feedbackAssigneeFilter, data.options?.assignees || [], "All Owners");
+
+      updateManagedPagination(feedbackState, feedbackPageLabel, feedbackPrevBtn, feedbackNextBtn, feedbackState.totalRows);
+      if (!feedbackState.rows.length) {
+        setDataTableMessage(feedbackTableBody, 11, "No feedback submissions matched the selected filters.");
+      } else {
+        feedbackTableBody.innerHTML = feedbackState.rows.map((row) => `
+          <tr class="data-management-row is-actionable" data-feedback-id="${escapeHtml(String(row.submission_id || ""))}">
+            <td>${escapeHtml(row.reference_no || "N/A")}</td>
+            <td>${escapeHtml(formatDashboardDateTime(row.submitted_at))}</td>
+            <td>${escapeHtml(row.feedback_type_label || "General Feedback")}</td>
+            <td>${escapeHtml(row.audience_label || "Public")}</td>
+            <td>
+              <strong>${escapeHtml(row.full_name || "Unknown sender")}</strong>
+              <div class="table-subcopy">${escapeHtml(row.email_address || row.phone_number || "No contact provided")}</div>
+            </td>
+            <td>
+              <strong>${escapeHtml(row.subject || "No subject")}</strong>
+              <div class="table-subcopy">${escapeHtml(row.message_preview || "")}</div>
+            </td>
+            <td>${dashboardStatusChip(row.status_label || row.status || "New")}</td>
+            <td>${feedbackPriorityChip(row.priority || "normal")}</td>
+            <td>${escapeHtml(row.assigned_to_name || "Unassigned")}</td>
+            <td>
+              <strong>${escapeHtml(formatDashboardDateTime(row.due_at))}</strong>
+              <div class="table-subcopy">${row.is_overdue ? "Overdue" : "Within SLA"}</div>
+            </td>
+            <td class="action-col">
+              <div class="data-row-actions">
+                <button type="button" class="btn-action btn-secondary js-feedback-open" data-feedback-id="${escapeHtml(String(row.submission_id || ""))}">${feedbackState.canManage ? "Open Workflow" : "View Details"}</button>
+              </div>
+            </td>
+          </tr>
+        `).join("");
+        feedbackTableBody.querySelectorAll(".js-feedback-open").forEach((button) => {
+          button.addEventListener("click", () => loadFeedbackDetail(button.dataset.feedbackId || ""));
+        });
+        if (window.innerWidth <= 860) {
+          feedbackTableBody.querySelectorAll(".data-management-row.is-actionable").forEach((rowEl) => {
+            rowEl.addEventListener("click", (event) => {
+              if (event.target.closest("button")) return;
+              loadFeedbackDetail(rowEl.dataset.feedbackId || "");
+            });
+          });
+        }
+      }
+
+      updateDashboardLiveStamp("feedbackSection");
+    } catch (error) {
+      console.error("Unable to load feedback management:", error);
+      renderDataMetricCards(feedbackSummaryCards, []);
+      setAnalyticsEmpty(feedbackTypeAnalytics, "Unable to load feedback type analytics.");
+      setAnalyticsEmpty(feedbackAudienceAnalytics, "Unable to load audience analytics.");
+      setAnalyticsEmpty(feedbackTrendAnalytics, "Unable to load trend analytics.");
+      setAnalyticsEmpty(feedbackInsightGrid, "Unable to load feedback decision metrics.");
+      setAnalyticsEmpty(feedbackNoteList, "Unable to load feedback notes.");
+      setDataTableMessage(feedbackTableBody, 11, error.message || "Unable to load feedback submissions.");
+    }
+  }
+
+  async function exportFeedbackDataset(format = "xlsx") {
+    if (!feedbackState.allowExport) {
+      notifyDashboard("error", "Feedback export is currently disabled by policy.", "Feedback");
+      return;
+    }
+    try {
+      const response = await fetch("../backend/api/run_dashboard_data_export.php", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        body: JSON.stringify({
+          dataset_key: "feedback_submissions",
+          format,
+          filters: currentFeedbackFilters()
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success || !data.export?.download_url) {
+        throw new Error(data.message || "Unable to generate feedback export.");
+      }
+      notifyDashboard("success", data.message || "Feedback export generated successfully.", "Feedback");
+      deliverDashboardExport(data.export.download_url, {
+        format,
+        label: "Feedback Export",
+        fileName: data.export.file_name || ""
+      });
+    } catch (error) {
+      notifyDashboard("error", error.message || "Unable to generate feedback export.", "Feedback");
+    }
+  }
+
+  async function fetchGeneralStatisticsData(forceRefresh = false) {
+    const now = Date.now();
+    const cacheIsFresh = generalStatisticsState.cache && (now - generalStatisticsState.fetchedAt) < 60000;
+
+    if (!forceRefresh && cacheIsFresh) {
+      return generalStatisticsState.cache;
+    }
+
+    if (generalStatisticsState.pending) {
+      return generalStatisticsState.pending;
+    }
+
+    generalStatisticsState.pending = (async () => {
+      try {
+        const response = await fetch("../backend/api/get_dashboard_general_statistics.php", {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+          headers: { Accept: "application/json" }
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || `HTTP ${response.status}`);
+        }
+        generalStatisticsState.cache = data;
+        generalStatisticsState.fetchedAt = Date.now();
+        return data;
+      } catch (error) {
+        console.error("Error loading general statistics:", error);
+        return null;
+      } finally {
+        generalStatisticsState.pending = null;
+      }
+    })();
+
+    return generalStatisticsState.pending;
+  }
+
+  async function renderGeneralStatistics() {
+    if (!generalSummaryCards) return;
+
+    generalSummaryCards.innerHTML = "";
+    generalSummaryCards.appendChild(createCard("Registry Files", "...", "", "", "", "", "purple"));
+    generalSummaryCards.appendChild(createCard("Staff Due", "...", "", "", "", "", "teal"));
+    generalSummaryCards.appendChild(createCard("Open Workflow", "...", "", "", "", "", "orange"));
+    generalSummaryCards.appendChild(createCard("Claims Balance", "...", "", "", "", "", "red"));
+    generalSummaryCards.appendChild(createCard("Off Payroll", "...", "", "", "", "", "blue"));
+    generalSummaryCards.appendChild(createCard("Pending Life Certificates", "...", "", "", "", "", "green"));
+
+    try {
+      const data = await fetchGeneralStatisticsData();
+      if (!data) {
+        throw new Error("Unable to load general statistics.");
+      }
+
+      const highlights = data.highlights || {};
+      generalSummaryCards.innerHTML = "";
+      generalSummaryCards.appendChild(createCard("Registry Files", Number(highlights.totalFiles || 0), "", "", "", "", "purple"));
+      generalSummaryCards.appendChild(createCard("Staff Due", Number(highlights.staffDue || 0), "", "", "", "", "teal"));
+      generalSummaryCards.appendChild(createCard("Staff Due Escalations", Number(highlights.staffDueEscalations || 0), "", "", "", "", "red"));
+      generalSummaryCards.appendChild(createCard("Open Workflow", Number(highlights.openWorkflow || 0), "", "", "", "", "orange"));
+      generalSummaryCards.appendChild(createCard("Claims Balance", formatCurrencyUGX(highlights.claimsBalance || 0), "", "", "", "", "red"));
+      generalSummaryCards.appendChild(createCard("Off Payroll", Number(highlights.offPayroll || 0), "", "", "", "", "blue"));
+      generalSummaryCards.appendChild(createCard("Pending Life Certificates", Number(highlights.pendingLifeCertificates || 0), "", "", "", "", "green"));
+
+      renderAnalyticsBarList(generalVolumeAnalytics, data.volumes || [], {
+        valueFormatter: (value, item) => item?.format === "currency" ? formatCurrencyUGX(value) : Number(value || 0).toLocaleString(),
+        emptyMessage: "Operational volume analytics are not available."
+      });
+      renderAnalyticsBarList(generalRiskAnalytics, data.risks || [], {
+        valueFormatter: (value, item) => item?.format === "currency" ? formatCurrencyUGX(value) : Number(value || 0).toLocaleString(),
+        emptyMessage: "Compliance and risk analytics are not available."
+      });
+      renderAnalyticsStatGrid(generalInsightGrid, data.insights || [], {
+        emptyMessage: "Cross-application decision metrics are not available."
+      });
+      renderAnalyticsNotes(generalNoteList, data.notes || [], {
+        emptyMessage: "No executive outlook notes are currently available."
+      });
+
+      updateDashboardLiveStamp("generalSection");
+    } catch (error) {
+      console.error("Error loading general statistics:", error);
+      generalSummaryCards.innerHTML = '<div class="workflow-empty-card">Failed to load general statistics.</div>';
+      setAnalyticsEmpty(generalVolumeAnalytics, "Unable to load operational volume analytics.");
+      setAnalyticsEmpty(generalRiskAnalytics, "Unable to load compliance and risk analytics.");
+      setAnalyticsEmpty(generalInsightGrid, "Unable to load decision support metrics.");
+      setAnalyticsEmpty(generalNoteList, "Unable to load executive outlook notes.");
+    }
+  }
+
+  function invalidateGeneralSummaryCache() {
+    generalStatisticsState.cache = null;
+    generalStatisticsState.fetchedAt = 0;
+    generalStatisticsState.pending = null;
+    summaryReportState.model = null;
+  }
+
+  function buildSummaryBarMarkup(items = [], valueFormatter = null, emptyMessage = "No chart data available.") {
+    const rows = Array.isArray(items) ? items.filter((item) => item && Number(item.value || 0) >= 0) : [];
+    if (!rows.length) {
+      return `<div class="analytics-empty-state">${escapeHtml(emptyMessage)}</div>`;
+    }
+
+    const maxValue = Math.max(1, ...rows.map((item) => Number(item.value || 0)));
+    return rows.map((item) => {
+      const value = Number(item.value || 0);
+      const fillPercent = Math.max(4, Math.min(100, (value / maxValue) * 100));
+      const displayValue = typeof valueFormatter === "function"
+        ? valueFormatter(value, item)
+        : (item.displayValue || Number(value || 0).toLocaleString());
+      return `
+        <div class="analytics-bar-row tone-${escapeHtml(item.tone || "info")}">
+          <div class="analytics-bar-topline">
+            <span class="analytics-bar-label">${escapeHtml(item.label || "Item")}</span>
+            <span class="analytics-bar-value">${escapeHtml(displayValue)}</span>
+          </div>
+          <div class="analytics-bar-track">
+            <div class="analytics-bar-fill" style="--fill:${fillPercent.toFixed(2)}%;"></div>
+          </div>
+          ${item.meta ? `<div class="analytics-bar-meta">${escapeHtml(item.meta)}</div>` : ""}
+        </div>
+      `;
+    }).join("");
+  }
+
+  function buildSummaryListMarkup(items = [], emptyMessage = "No narrative points are currently available.") {
+    const rows = Array.isArray(items) ? items.filter((item) => item && item.title) : [];
+    if (!rows.length) {
+      return `<div class="analytics-empty-state">${escapeHtml(emptyMessage)}</div>`;
+    }
+
+    return `
+      <div class="summary-report-list">
+        ${rows.map((item) => `
+          <article class="summary-report-list-item tone-${escapeHtml(item.tone || "info")}">
+            <strong>${escapeHtml(item.title || "Note")}</strong>
+            <p>${escapeHtml(item.body || "")}</p>
+          </article>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function buildSummaryMetricTableMarkup(rows = []) {
+    const items = Array.isArray(rows) ? rows.filter((item) => item && item.metric) : [];
+    if (!items.length) {
+      return '<div class="analytics-empty-state">No summary metrics are available.</div>';
+    }
+
+    return `
+      <div class="summary-report-table-wrap">
+        <table class="summary-report-table">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Current Value</th>
+              <th>Operational Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map((item) => `
+              <tr>
+                <td>${escapeHtml(item.metric || "")}</td>
+                <td>${escapeHtml(item.value || "")}</td>
+                <td>${escapeHtml(item.note || "")}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function buildSummaryReportModel(generalData, demographicsData) {
+    const generatedAt = generalData?.generatedAt || new Date().toISOString();
+    const highlights = generalData?.highlights || {};
+    const context = generalData?.context || {};
+    const insights = Array.isArray(generalData?.insights) ? generalData.insights : [];
+    const notes = Array.isArray(generalData?.notes) ? generalData.notes : [];
+    const volumes = Array.isArray(generalData?.volumes) ? generalData.volumes : [];
+    const risks = Array.isArray(generalData?.risks) ? generalData.risks : [];
+    const demographicsSummary = demographicsData?.summary || {};
+    const demographicsTotals = demographicsSummary.totals || {};
+    const demographicsOverall = demographicsSummary.overall || {};
+    const demographicsLifespan = demographicsSummary.lifespan || {};
+    const byRegion = Array.isArray(demographicsSummary.byRegion) ? demographicsSummary.byRegion : [];
+    const byRetirementType = Array.isArray(demographicsSummary.byRetirementType) ? demographicsSummary.byRetirementType : [];
+
+    const totalFiles = Number(highlights.totalFiles || 0);
+    const pensionerFiles = Number(context.pensioner_files || 0);
+    const oneoffFiles = Number(context.oneoff_files || 0);
+    const claimsBalance = Number(highlights.claimsBalance || 0);
+    const oldestAlive = demographicsOverall.oldestAlive || null;
+    const youngestAlive = demographicsOverall.youngestAlive || null;
+
+    const executiveSummary = [
+      `The pension portfolio currently carries ${pluralize(totalFiles, "registry file")}, comprising ${pluralize(pensionerFiles, "pensioner file")} and ${pluralize(oneoffFiles, "one-off payment file")}. The intake and execution chain still holds ${pluralize(highlights.staffDue || 0, "staff-due record")} and ${pluralize(highlights.openWorkflow || 0, "open workflow task")} that require active operational ownership.`,
+      `Current pressure points remain concentrated in ${pluralize(highlights.offPayroll || 0, "off-payroll pensioner")}, ${pluralize(highlights.pendingLifeCertificates || 0, "pending life certificate case")}, and an unresolved claims exposure of ${formatCurrencyUGX(claimsBalance)}. These are the main workload drivers for registry, claims, and compliance follow-up.`,
+      `Longevity monitoring currently places the oldest alive pensioner at ${oldestAlive ? formatAgeValue(oldestAlive.ageYears) : "N/A"} and the youngest alive pensioner at ${youngestAlive ? formatAgeValue(youngestAlive.ageYears) : "N/A"}. Observed non-Death death records currently stand at ${pluralize(demographicsLifespan.observedDeaths || 0, "record")}, which gives the department a usable reference point for post-retirement lifespan tracking and estate follow-up.`
+    ];
+
+    const cards = [
+      { label: "Registry Portfolio", value: pluralize(totalFiles, "file"), helper: `${pluralize(pensionerFiles, "pensioner file")} | ${pluralize(oneoffFiles, "one-off file")}` },
+      { label: "Staff Due Pipeline", value: pluralize(highlights.staffDue || 0, "record"), helper: `${pluralize(highlights.staffDueEscalations || 0, "verification escalation")} currently flagged.` },
+      { label: "Open Workflow", value: pluralize(highlights.openWorkflow || 0, "task"), helper: "Active work items still in assignment, progress, deferment, or return states." },
+      { label: "Claims Balance", value: formatCurrencyUGX(claimsBalance), helper: "Outstanding arrears exposure that still needs settlement or accountability action." },
+      { label: "Oldest Alive", value: formatAgeValue(oldestAlive?.ageYears), helper: oldestAlive ? `${oldestAlive.name || oldestAlive.regNo || "Recorded pensioner"} | ${oldestAlive.region || "Region not mapped"}` : "No age data available." },
+      { label: "Youngest Alive", value: formatAgeValue(youngestAlive?.ageYears), helper: youngestAlive ? `${youngestAlive.name || youngestAlive.regNo || "Recorded pensioner"} | ${youngestAlive.region || "Region not mapped"}` : "No age data available." },
+      { label: "Estate Active", value: pluralize(demographicsTotals.activeEstates || 0, "estate"), helper: `${pluralize(demographicsTotals.expiredEstates || 0, "estate")} have already elapsed beyond the 15-year cap.` },
+      { label: "Observed Lifespan Records", value: pluralize(demographicsLifespan.observedDeaths || 0, "record"), helper: `Average observed years after retirement: ${formatAgeValue(demographicsLifespan.averageYearsAfterRetirement)}.` }
+    ];
+
+    const chartGroups = [
+      {
+        title: "Operational Volume",
+        description: "Core workload distribution across the pension operation.",
+        items: volumes.slice(0, 6).map((item) => ({
+          label: item.label || "Signal",
+          value: Number(item.value || 0),
+          displayValue: item.format === "currency" ? formatCurrencyUGX(item.value || 0) : Number(item.value || 0).toLocaleString(),
+          meta: item.meta || "",
+          tone: item.tone || "info"
+        }))
+      },
+      {
+        title: "Risk and Exposure",
+        description: "Current compliance and financial risk signals that deserve management attention.",
+        items: risks.slice(0, 6).map((item) => ({
+          label: item.label || "Signal",
+          value: Number(item.value || 0),
+          displayValue: item.format === "currency" ? formatCurrencyUGX(item.value || 0) : Number(item.value || 0).toLocaleString(),
+          meta: item.meta || "",
+          tone: item.tone || "warning"
+        }))
+      },
+      {
+        title: "Regional Longevity Peaks",
+        description: "Highest alive ages by political region to support outreach and survivorship planning.",
+        items: byRegion.slice(0, 6).map((item) => ({
+          label: item.group || "Region",
+          value: Number(item.oldest?.ageYears || 0),
+          displayValue: formatAgeValue(item.oldest?.ageYears),
+          meta: `${pluralize(item.aliveCount || 0, "alive pensioner")} | oldest ${item.oldest?.name || item.oldest?.regNo || "N/A"}`,
+          tone: "info"
+        }))
+      },
+      {
+        title: "Longevity by Retirement Label",
+        description: "Highest alive ages observed within each retirement pathway.",
+        items: byRetirementType.slice(0, 6).map((item) => ({
+          label: item.group || "Retirement label",
+          value: Number(item.oldest?.ageYears || 0),
+          displayValue: formatAgeValue(item.oldest?.ageYears),
+          meta: `${pluralize(item.aliveCount || 0, "alive pensioner")} | youngest ${formatAgeValue(item.youngest?.ageYears)}`,
+          tone: "success"
+        }))
+      }
+    ];
+
+    const priorityAreas = [];
+    if (Number(highlights.staffDueEscalations || 0) > 0) {
+      priorityAreas.push({
+        title: "Clear verification-start delays",
+        body: `${pluralize(highlights.staffDueEscalations || 0, "submitted staff-due file")} have already crossed the verification-start escalation window. These files should be assigned and opened immediately to protect service timelines.`,
+        tone: "danger"
+      });
+    }
+    if (Number(highlights.offPayroll || 0) > 0) {
+      priorityAreas.push({
+        title: "Reconcile off-payroll pensioners",
+        body: `${pluralize(highlights.offPayroll || 0, "pensioner")} remain off payroll in the latest cycle. This is a direct service-risk signal and should be worked against registry and supplier matching first.`,
+        tone: "warning"
+      });
+    }
+    if (Number(highlights.pendingLifeCertificates || 0) > 0) {
+      priorityAreas.push({
+        title: "Close current-year life certificate gaps",
+        body: `${pluralize(highlights.pendingLifeCertificates || 0, "current-year life certificate case")} are still pending. These should be isolated for targeted outreach before the annual compliance window tightens.`,
+        tone: "warning"
+      });
+    }
+    if (claimsBalance > 0) {
+      priorityAreas.push({
+        title: "Fund and track unsettled claims",
+        body: `The current claims balance stands at ${formatCurrencyUGX(claimsBalance)}. This should stay visible in finance follow-up and accountability reviews until the balance contracts materially.`,
+        tone: "warning"
+      });
+    }
+    if (Number(demographicsTotals.expiredEstates || 0) > 0) {
+      priorityAreas.push({
+        title: "Review elapsed estate earners",
+        body: `${pluralize(demographicsTotals.expiredEstates || 0, "estate")} have already crossed the 15-year earning cap and should remain under strict expired-estate controls in claims and registry follow-up.`,
+        tone: "danger"
+      });
+    }
+    if (!priorityAreas.length) {
+      priorityAreas.push({
+        title: "Operational pressure is currently controlled",
+        body: "No critical enterprise-level signal is currently elevated above the normal operating range. Continue with disciplined daily monitoring across workflow, payroll, registry, and compliance sections.",
+        tone: "success"
+      });
+    }
+
+    const recommendations = [];
+    if (Number(highlights.staffDueEscalations || 0) > 0) {
+      recommendations.push({
+        title: "Introduce a daily verification-start clearance routine",
+        body: "Review submitted staff-due files every day and assign ownership before the escalation window is breached. A short standing review cycle will protect the verification start rule.",
+        tone: "danger"
+      });
+    }
+    if (Number(highlights.offPayroll || 0) > 0) {
+      recommendations.push({
+        title: "Pair payroll exceptions with registry reconciliation",
+        body: "Run a recurring exception review using the latest payroll cut, matched registry records, and supplier references so off-payroll cases are cleared before the next upload cycle.",
+        tone: "warning"
+      });
+    }
+    if (Number(highlights.pendingLifeCertificates || 0) > 0) {
+      recommendations.push({
+        title: "Target compliance outreach by district and age profile",
+        body: "Use district, region, and age signals from the demographics explorer to focus follow-up on pensioners who are older, alive, and still pending life-certificate submission.",
+        tone: "warning"
+      });
+    }
+    if (claimsBalance > 0) {
+      recommendations.push({
+        title: "Keep arrears visibility tied to budget planning",
+        body: "Use the live claims balance and accountability status as standing inputs into budget discussion so pending liabilities remain visible, funded, and auditable.",
+        tone: "warning"
+      });
+    }
+    if (Number(demographicsTotals.activeEstates || 0) > 0) {
+      recommendations.push({
+        title: "Track estate-active cases against expiry dates",
+        body: "Review estate-active files monthly, using retirement date and death date to predict when each file will cross the 15-year cap and when claims controls should change state.",
+        tone: "info"
+      });
+    }
+    if (!recommendations.length) {
+      recommendations.push({
+        title: "Maintain the current control cadence",
+        body: "The present signals support a steady-state control routine. Continue using the dashboard sections as the common daily operating picture and refresh the summary report regularly.",
+        tone: "success"
+      });
+    }
+
+    const commendations = [];
+    if (Number(highlights.staffDueEscalations || 0) === 0) {
+      commendations.push({
+        title: "Verification-start control is holding",
+        body: "No submitted staff-due record is currently flagged as escalated. That is a healthy sign for intake ownership and workflow initiation discipline.",
+        tone: "success"
+      });
+    }
+    if (Number(highlights.offPayroll || 0) === 0) {
+      commendations.push({
+        title: "Payroll alignment is strong",
+        body: "The latest payroll cycle does not currently show off-payroll pensioner exceptions. That reduces short-term beneficiary service risk.",
+        tone: "success"
+      });
+    }
+    if (Number(highlights.pendingLifeCertificates || 0) === 0) {
+      commendations.push({
+        title: "Life-certificate compliance is fully current",
+        body: "All eligible files are currently compliant for the active reporting year after exemptions are considered.",
+        tone: "success"
+      });
+    }
+    if (claimsBalance === 0) {
+      commendations.push({
+        title: "Claims exposure is presently cleared",
+        body: "No outstanding claims balance is currently visible in the arrears ledger. That improves planning flexibility and reduces beneficiary follow-up pressure.",
+        tone: "success"
+      });
+    }
+    if (Number(demographicsLifespan.observedDeaths || 0) > 0) {
+      commendations.push({
+        title: "Longevity data is becoming decision-useful",
+        body: `${pluralize(demographicsLifespan.observedDeaths || 0, "observed death record")} now support lifespan-after-retirement analysis for non-Death retirees. This strengthens planning for estates and survivorship patterns.`,
+        tone: "info"
+      });
+    }
+    if (!commendations.length) {
+      commendations.push({
+        title: "The dashboard is providing a usable control picture",
+        body: "Even where attention points remain, the cross-module signals are now consolidated well enough to support faster and more consistent management review.",
+        tone: "info"
+      });
+    }
+
+    const managementSignals = notes.length
+      ? notes.map((item) => ({
+          title: item.title || "Management signal",
+          body: item.body || "",
+          tone: item.tone || "info"
+        }))
+      : [{
+          title: "Management outlook is stable",
+          body: "No additional management notes were generated for the current run.",
+          tone: "info"
+        }];
+
+    const metricsTable = [
+      ...insights.map((item) => ({
+        metric: item.label || "Metric",
+        value: String(item.value || "N/A"),
+        note: item.helper || ""
+      })),
+      {
+        metric: "Oldest Alive Pensioner",
+        value: formatAgeValue(oldestAlive?.ageYears),
+        note: oldestAlive ? `${oldestAlive.name || oldestAlive.regNo || "Recorded pensioner"} | ${oldestAlive.region || "Region not mapped"}` : "No age record available."
+      },
+      {
+        metric: "Youngest Alive Pensioner",
+        value: formatAgeValue(youngestAlive?.ageYears),
+        note: youngestAlive ? `${youngestAlive.name || youngestAlive.regNo || "Recorded pensioner"} | ${youngestAlive.region || "Region not mapped"}` : "No age record available."
+      },
+      {
+        metric: "Average Years After Retirement",
+        value: formatAgeValue(demographicsLifespan.averageYearsAfterRetirement),
+        note: "Observed average span lived after retirement for deceased pensioners whose retirement label was not Death."
+      },
+      {
+        metric: "Projected Remaining Span",
+        value: formatAgeValue(demographicsLifespan.projectedAverageRemainingYears),
+        note: "Forecast proxy for alive pensioners based on observed post-retirement lifespan records."
+      },
+      {
+        metric: "Estate Files Still Active",
+        value: pluralize(demographicsTotals.activeEstates || 0, "estate"),
+        note: "Deceased pensioner records still within the 15-year estate earning window."
+      },
+      {
+        metric: "Estate Files Elapsed",
+        value: pluralize(demographicsTotals.expiredEstates || 0, "estate"),
+        note: "Deceased pensioner records already beyond the 15-year estate earning window."
+      }
+    ];
+
+    return {
+      title: "Pension Performance Summary Report",
+      subtitle: "Cross-module operational analysis for the pension department.",
+      generatedAt,
+      generatedBy: getDashboardPreparedByName(),
+      executiveSummary,
+      cards,
+      chartGroups,
+      priorityAreas,
+      recommendations,
+      commendations,
+      managementSignals,
+      metricsTable
+    };
+  }
+
+  function renderSummaryReportContent(model) {
+    if (!summaryReportContent || !model) return;
+
+    const chartSections = Array.isArray(model.chartGroups) ? model.chartGroups : [];
+    summaryReportContent.innerHTML = `
+      <section class="summary-report-hero">
+        <div class="summary-report-hero-meta">
+          <span>Generated ${escapeHtml(formatDashboardDateTime(model.generatedAt || ""))}</span>
+          <span>${escapeHtml(model.generatedBy || "Dashboard user")}</span>
+          <span>UPS PensionsGo live operational summary</span>
+        </div>
+        <h4>${escapeHtml(model.title || "Pension Performance Summary Report")}</h4>
+        ${(model.executiveSummary || []).map((paragraph) => `<p>${escapeHtml(paragraph || "")}</p>`).join("")}
+      </section>
+
+      <section class="summary-report-card-grid">
+        ${(model.cards || []).map((card) => `
+          <article class="summary-report-card">
+            <span class="summary-report-card-label">${escapeHtml(card.label || "Metric")}</span>
+            <strong class="summary-report-card-value">${escapeHtml(card.value || "N/A")}</strong>
+            <p class="summary-report-card-helper">${escapeHtml(card.helper || "")}</p>
+          </article>
+        `).join("")}
+      </section>
+
+      <section class="summary-report-chart-grid">
+        ${chartSections.map((group) => `
+          <article class="summary-report-section">
+            <div class="summary-report-section-header">
+              <div>
+                <h4>${escapeHtml(group.title || "Chart")}</h4>
+                <p>${escapeHtml(group.description || "")}</p>
+              </div>
+            </div>
+            <div class="analytics-bar-list">
+              ${buildSummaryBarMarkup(group.items || [], null, "No chart data available for this section.")}
+            </div>
+          </article>
+        `).join("")}
+      </section>
+
+      <section class="summary-report-narrative-grid">
+        <article class="summary-report-section">
+          <div class="summary-report-section-header">
+            <div>
+              <h4>Priority Areas to Manage</h4>
+              <p>Operational pressure points that should stay on the department's short management list.</p>
+            </div>
+          </div>
+          ${buildSummaryListMarkup(model.priorityAreas || [], "No major priority areas are elevated right now.")}
+        </article>
+        <article class="summary-report-section">
+          <div class="summary-report-section-header">
+            <div>
+              <h4>Recommended Actions</h4>
+              <p>Practical response steps derived from the live signals in registry, workflow, compliance, and claims.</p>
+            </div>
+          </div>
+          ${buildSummaryListMarkup(model.recommendations || [], "No recommendations generated for the current report.")}
+        </article>
+      </section>
+
+      <section class="summary-report-narrative-grid">
+        <article class="summary-report-section">
+          <div class="summary-report-section-header">
+            <div>
+              <h4>Commendations</h4>
+              <p>Positive operating signals worth sustaining and reinforcing.</p>
+            </div>
+          </div>
+          ${buildSummaryListMarkup(model.commendations || [], "No commendations generated for the current report.")}
+        </article>
+        <article class="summary-report-section">
+          <div class="summary-report-section-header">
+            <div>
+              <h4>Management Signals</h4>
+              <p>Current cross-cutting observations synthesized from the live dashboard sections.</p>
+            </div>
+          </div>
+          ${buildSummaryListMarkup(model.managementSignals || [], "No management notes are available.")}
+        </article>
+      </section>
+
+      <section class="summary-report-section">
+        <div class="summary-report-section-header">
+          <div>
+            <h4>Decision Support Metrics</h4>
+            <p>Reference metrics and interpretations for management review, print packs, and export snapshots.</p>
+          </div>
+        </div>
+        ${buildSummaryMetricTableMarkup(model.metricsTable || [])}
+      </section>
+    `;
+  }
+
+  function summaryReportDocumentStyles() {
+    return `
+      :root { color-scheme: light; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 24px;
+        font-family: Tahoma, sans-serif;
+        color: #18212b;
+        background: #f6f7fb;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+      .summary-report-content { display: grid; gap: 16px; }
+      .summary-report-hero {
+        display: grid;
+        gap: 12px;
+        padding: 20px;
+        border-radius: 22px;
+        background: linear-gradient(135deg, #6d1116 0%, #17375b 100%);
+        color: #fff;
+      }
+      .summary-report-hero-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 16px;
+        font-size: 12px;
+        opacity: 0.94;
+      }
+      .summary-report-hero h4, .summary-report-section h4 { margin: 0; }
+      .summary-report-hero p {
+        margin: 0;
+        line-height: 1.6;
+        color: rgba(255,255,255,0.94);
+        text-align: justify;
+      }
+      .summary-report-card-grid, .summary-report-chart-grid, .summary-report-narrative-grid {
+        display: grid;
+        gap: 16px;
+      }
+      .summary-report-card-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .summary-report-chart-grid, .summary-report-narrative-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .summary-report-card, .summary-report-section {
+        background: #ffffff;
+        border: 1px solid #d7dce5;
+        border-radius: 18px;
+        padding: 16px;
+      }
+      .summary-report-card-label {
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #677488;
+      }
+      .summary-report-card-value {
+        display: block;
+        margin-top: 8px;
+        font-size: 22px;
+        font-weight: 800;
+        color: #152033;
+      }
+      .summary-report-card-helper, .summary-report-section-header p, .summary-report-list-item p, .analytics-bar-meta {
+        margin: 0;
+        color: #5e6b7d;
+        line-height: 1.55;
+        font-size: 13px;
+        text-align: justify;
+      }
+      .summary-report-section { display: grid; gap: 12px; }
+      .summary-report-list { display: grid; gap: 10px; }
+      .summary-report-list-item {
+        border: 1px solid #d7dce5;
+        border-radius: 14px;
+        padding: 12px 14px;
+        background: #fafbfd;
+      }
+      .summary-report-list-item strong { color: #152033; }
+      .analytics-bar-list { display: grid; gap: 10px; }
+      .analytics-bar-row { display: grid; gap: 6px; }
+      .analytics-bar-topline {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: baseline;
+      }
+      .analytics-bar-label {
+        font-size: 13px;
+        font-weight: 700;
+        color: #152033;
+      }
+      .analytics-bar-value {
+        font-size: 12px;
+        font-weight: 700;
+        color: #6d1116;
+      }
+      .analytics-bar-track {
+        height: 10px;
+        border-radius: 999px;
+        background: #e6ebf2;
+        overflow: hidden;
+      }
+      .analytics-bar-fill {
+        display: block;
+        height: 100%;
+        width: var(--fill, 0%);
+        background: linear-gradient(90deg, #6d1116 0%, #d0a11b 100%);
+      }
+      .summary-report-table-wrap {
+        overflow: hidden;
+        border-radius: 16px;
+        border: 1px solid #d7dce5;
+      }
+      .summary-report-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .summary-report-table th, .summary-report-table td {
+        padding: 12px;
+        border-bottom: 1px solid #e4e8ef;
+        text-align: left;
+        vertical-align: top;
+      }
+      .summary-report-table th {
+        background: #eff3f8;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #203047;
+      }
+      .summary-report-table td {
+        font-size: 13px;
+        color: #1f2937;
+      }
+      .summary-report-table td:last-child {
+        text-align: justify;
+      }
+      @media print {
+        body { background: #fff; padding: 0; }
+      }
+    `;
+  }
+
+  function createSummaryReportHtml(model, options = {}) {
+    const contentMarkup = `
+      <div class="summary-report-content">
+        ${summaryReportContent ? summaryReportContent.innerHTML : ""}
+      </div>
+    `;
+
+    if (!options.documentMode) {
+      return contentMarkup;
+    }
+
+    return `<!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>${escapeHtml(model?.title || "Pension Performance Summary Report")}</title>
+        <style>${summaryReportDocumentStyles()}</style>
+      </head>
+      <body>
+        ${contentMarkup}
+      </body>
+      </html>`;
+  }
+
+  async function renderSummaryReportModal(forceRefresh = false) {
+    if (!summaryReportContent) return;
+    summaryReportState.loading = true;
+    summaryReportContent.innerHTML = '<div class="analytics-empty-state">Preparing pension performance summary...</div>';
+
+    if (forceRefresh) {
+      invalidateGeneralSummaryCache();
+      invalidatePensionerAnalyticsCaches();
+    }
+
+    try {
+      const [generalData, demographicsData] = await Promise.all([
+        fetchGeneralStatisticsData(forceRefresh),
+        fetchDemographicsSummaryData(forceRefresh)
+      ]);
+
+      if (!generalData) {
+        throw new Error("Unable to load the general statistics dataset.");
+      }
+
+      const model = buildSummaryReportModel(generalData, demographicsData || null);
+      summaryReportState.model = model;
+      renderSummaryReportContent(model);
+    } catch (error) {
+      summaryReportState.model = null;
+      summaryReportContent.innerHTML = `<div class="analytics-empty-state">${escapeHtml(error.message || "Unable to build the summary report.")}</div>`;
+    } finally {
+      summaryReportState.loading = false;
+    }
+  }
+
+  async function openSummaryReportModal(forceRefresh = false) {
+    if (!summaryReportModal) return;
+    summaryReportModal.classList.add("open");
+    summaryReportModal.setAttribute("aria-hidden", "false");
+    syncDashboardModalBodyLock();
+    await renderSummaryReportModal(forceRefresh || !summaryReportState.model);
+  }
+
+  function closeSummaryReportModal() {
+    if (!summaryReportModal) return;
+    summaryReportModal.classList.remove("open");
+    summaryReportModal.setAttribute("aria-hidden", "true");
+    syncDashboardModalBodyLock();
+  }
+
+  function printSummaryReport() {
+    if (!summaryReportState.model) {
+      notifyDashboard("error", "Generate the summary report first, then print it.", "Summary Report");
+      return;
+    }
+
+    const printFrame = document.createElement("iframe");
+    printFrame.setAttribute("aria-hidden", "true");
+    printFrame.style.position = "fixed";
+    printFrame.style.width = "0";
+    printFrame.style.height = "0";
+    printFrame.style.right = "0";
+    printFrame.style.bottom = "0";
+    printFrame.style.border = "0";
+    document.body.appendChild(printFrame);
+
+    const cleanup = () => {
+      window.setTimeout(() => {
+        printFrame.remove();
+      }, 800);
+    };
+
+    const frameWindow = printFrame.contentWindow;
+    if (!frameWindow) {
+      cleanup();
+      notifyDashboard("error", "Unable to prepare the print view in this browser session.", "Summary Report");
+      return;
+    }
+
+    frameWindow.document.open();
+    frameWindow.document.write(createSummaryReportHtml(summaryReportState.model, { documentMode: true }));
+    frameWindow.document.close();
+    frameWindow.onafterprint = cleanup;
+    window.setTimeout(() => {
+      frameWindow.focus();
+      frameWindow.print();
+      cleanup();
+    }, 350);
+  }
+
+  function downloadSummaryReportWord() {
+    if (!summaryReportState.model) {
+      notifyDashboard("error", "Generate the summary report first, then export it to Word.", "Summary Report");
+      return;
+    }
+
+    const html = createSummaryReportHtml(summaryReportState.model, { documentMode: true });
+    const blob = new Blob(["\ufeff", html], { type: "application/msword" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
+    anchor.href = url;
+    anchor.download = `pension_summary_report_${stamp}.doc`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  async function exportSummaryReportPdf() {
+    if (!summaryReportState.model) {
+      notifyDashboard("error", "Generate the summary report first, then export it to PDF.", "Summary Report");
+      return;
+    }
+
+    try {
+      const response = await fetch("../backend/api/export_dashboard_summary_report.php", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          format: "pdf",
+          report: summaryReportState.model
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success || !data.export?.download_url) {
+        throw new Error(data.message || "Unable to generate the summary report PDF.");
+      }
+      notifyDashboard("success", data.message || "Summary report PDF generated successfully.", "Summary Report");
+      deliverDashboardExport(data.export.download_url, {
+        format: "pdf",
+        label: "Dashboard Summary Report PDF",
+        fileName: data.export.file_name || ""
+      });
+    } catch (error) {
+      notifyDashboard("error", error.message || "Unable to export the summary report PDF.", "Summary Report");
+    }
+  }
+
+  /* Filter Event Listeners*/
+  // Life Certificate year filter
+  if (lifeCertYear) {
+    lifeCertYear.addEventListener("change", () => {
+      lifeCertState.page = 1;
+      renderLifeCertificates();
+    });
+  }
+
+  if (lifeCertStatusFilter) {
+    lifeCertStatusFilter.addEventListener("change", () => {
+      lifeCertState.page = 1;
+      renderLifeCertificates();
+    });
+  }
+  if (lifeCertSearch) {
+    lifeCertSearch.addEventListener("input", () => {
+      if (lifeCertState.searchTimer) clearTimeout(lifeCertState.searchTimer);
+      lifeCertState.searchTimer = setTimeout(() => {
+        lifeCertState.page = 1;
+        renderLifeCertificates();
+      }, 220);
+    });
+  }
+  if (lifeCertRefreshBtn) {
+    lifeCertRefreshBtn.addEventListener("click", () => renderLifeCertificates());
+  }
+  if (lifeCertPrevBtn) {
+    lifeCertPrevBtn.addEventListener("click", () => {
+      if (lifeCertState.page <= 1) return;
+      lifeCertState.page -= 1;
+      renderLifeCertificates();
+    });
+  }
+  if (lifeCertNextBtn) {
+    lifeCertNextBtn.addEventListener("click", () => {
+      if (lifeCertState.page >= lifeCertState.totalPages) return;
+      lifeCertState.page += 1;
+      renderLifeCertificates();
+    });
+  }
+  if (lifeCertMarkBtn) {
+    lifeCertMarkBtn.addEventListener("click", () => submitLifeCertificate());
+  }
+  if (lifeCertExportXlsxBtn) {
+    lifeCertExportXlsxBtn.addEventListener("click", () => exportLifeCertificates("xlsx"));
+  }
+  if (lifeCertExportPdfBtn) {
+    lifeCertExportPdfBtn.addEventListener("click", () => exportLifeCertificates("pdf"));
+  }
+  if (lifeCertExportCsvBtn) {
+    lifeCertExportCsvBtn.addEventListener("click", () => exportLifeCertificates("csv"));
+  }
+
+  [payrollMonth, payrollYear, payrollFinancialYear, payrollQuarter, payrollStatusFilter].forEach((el) => {
+    if (!el) return;
+    el.addEventListener("change", () => {
+      payrollState.page = 1;
+      renderPayrollMovements();
+    });
+  });
+  if (payrollSearch) {
+    payrollSearch.addEventListener("input", () => {
+      if (payrollState.searchTimer) clearTimeout(payrollState.searchTimer);
+      payrollState.searchTimer = setTimeout(() => {
+        payrollState.page = 1;
+        renderPayrollMovements();
+      }, 220);
+    });
+  }
+  if (payrollRefreshBtn) {
+    payrollRefreshBtn.addEventListener("click", () => renderPayrollMovements());
+  }
+  if (payrollPrevBtn) {
+    payrollPrevBtn.addEventListener("click", () => {
+      if (payrollState.page <= 1) return;
+      payrollState.page -= 1;
+      renderPayrollMovements();
+    });
+  }
+  if (payrollNextBtn) {
+    payrollNextBtn.addEventListener("click", () => {
+      if (payrollState.page >= payrollState.totalPages) return;
+      payrollState.page += 1;
+      renderPayrollMovements();
+    });
+  }
+  if (openPayrollUploadModalBtn) {
+    openPayrollUploadModalBtn.addEventListener("click", () => openPayrollUploadModal());
+  }
+  if (openPayrollRegisterModalBtn) {
+    openPayrollRegisterModalBtn.addEventListener("click", () => openPayrollRegisterUploadModal());
+  }
+  if (payrollUploadBtn) {
+    payrollUploadBtn.addEventListener("click", () => uploadPayrollCycle());
+  }
+  if (payrollRegisterUploadBtn) {
+    payrollRegisterUploadBtn.addEventListener("click", () => uploadPayrollRegister());
+  }
+  if (payrollDownloadTemplateBtn) {
+    payrollDownloadTemplateBtn.addEventListener("click", () => downloadPayrollTemplate());
+  }
+  [payrollUploadModalCloseBtn, payrollUploadModalCancelBtn].forEach((button) => {
+    button?.addEventListener("click", closePayrollUploadModal);
+  });
+  [payrollRegisterUploadModalCloseBtn, payrollRegisterUploadCancelBtn].forEach((button) => {
+    button?.addEventListener("click", closePayrollRegisterUploadModal);
+  });
+  payrollUploadModal?.addEventListener("click", (event) => {
+    if (event.target === payrollUploadModal || event.target?.hasAttribute("data-payroll-upload-close")) {
+      closePayrollUploadModal();
+    }
+  });
+  payrollRegisterUploadModal?.addEventListener("click", (event) => {
+    if (event.target === payrollRegisterUploadModal || event.target?.hasAttribute("data-payroll-register-close")) {
+      closePayrollRegisterUploadModal();
     }
   });
 
-  /* ============================================================
-     INITIAL PAGE LOAD
-     ============================================================ */
+  if (exportWorkflowAlertsXlsBtn) {
+    exportWorkflowAlertsXlsBtn.addEventListener("click", () => exportWorkflowAlerts("xlsx"));
+  }
+  if (exportWorkflowAlertsPdfBtn) {
+    exportWorkflowAlertsPdfBtn.addEventListener("click", () => exportWorkflowAlerts("pdf"));
+  }
+  if (exportWorkflowPerformanceXlsxBtn) {
+    exportWorkflowPerformanceXlsxBtn.addEventListener("click", () => exportWorkflowPerformance("xlsx"));
+  }
+  if (exportWorkflowPerformancePdfBtn) {
+    exportWorkflowPerformancePdfBtn.addEventListener("click", () => exportWorkflowPerformance("pdf"));
+  }
+
+  [feedbackTypeFilter, feedbackAudienceFilter, feedbackStatusFilter, feedbackPriorityFilter, feedbackAssigneeFilter, feedbackDateFrom, feedbackDateTo].forEach((el) => {
+    if (!el) return;
+    el.addEventListener("change", () => {
+      feedbackState.page = 1;
+      renderFeedbackManagement();
+    });
+  });
+  if (feedbackOverdueOnly) {
+    feedbackOverdueOnly.addEventListener("change", () => {
+      feedbackState.page = 1;
+      renderFeedbackManagement();
+    });
+  }
+  if (feedbackSearchInput) {
+    feedbackSearchInput.addEventListener("input", () => {
+      if (feedbackState.searchTimer) clearTimeout(feedbackState.searchTimer);
+      feedbackState.searchTimer = setTimeout(() => {
+        feedbackState.page = 1;
+        renderFeedbackManagement();
+      }, 220);
+    });
+  }
+  if (feedbackRefreshBtn) {
+    feedbackRefreshBtn.addEventListener("click", () => renderFeedbackManagement());
+  }
+  if (feedbackClearBtn) {
+    feedbackClearBtn.addEventListener("click", () => {
+      if (feedbackSearchInput) feedbackSearchInput.value = "";
+      if (feedbackTypeFilter) feedbackTypeFilter.value = "";
+      if (feedbackAudienceFilter) feedbackAudienceFilter.value = "";
+      if (feedbackStatusFilter) feedbackStatusFilter.value = "";
+      if (feedbackPriorityFilter) feedbackPriorityFilter.value = "";
+      if (feedbackAssigneeFilter) feedbackAssigneeFilter.value = "";
+      if (feedbackDateFrom) feedbackDateFrom.value = "";
+      if (feedbackDateTo) feedbackDateTo.value = "";
+      if (feedbackOverdueOnly) feedbackOverdueOnly.checked = false;
+      feedbackState.page = 1;
+      renderFeedbackManagement();
+    });
+  }
+  if (feedbackPrevBtn) {
+    feedbackPrevBtn.addEventListener("click", () => {
+      if (feedbackState.page <= 1) return;
+      feedbackState.page -= 1;
+      renderFeedbackManagement();
+    });
+  }
+  if (feedbackNextBtn) {
+    feedbackNextBtn.addEventListener("click", () => {
+      if (feedbackState.page >= feedbackState.totalPages) return;
+      feedbackState.page += 1;
+      renderFeedbackManagement();
+    });
+  }
+  if (feedbackExportXlsxBtn) {
+    feedbackExportXlsxBtn.addEventListener("click", () => exportFeedbackDataset("xlsx"));
+  }
+  if (feedbackExportPdfBtn) {
+    feedbackExportPdfBtn.addEventListener("click", () => exportFeedbackDataset("pdf"));
+  }
+  if (feedbackExportCsvBtn) {
+    feedbackExportCsvBtn.addEventListener("click", () => exportFeedbackDataset("csv"));
+  }
+  if (feedbackDetailSaveBtn) {
+    feedbackDetailSaveBtn.addEventListener("click", () => saveFeedbackWorkflowUpdate());
+  }
+  if (feedbackDetailAssignBtn) {
+    feedbackDetailAssignBtn.addEventListener("click", () => runFeedbackWorkflowAction("assign"));
+  }
+  if (feedbackDetailReviewBtn) {
+    feedbackDetailReviewBtn.addEventListener("click", () => runFeedbackWorkflowAction("review"));
+  }
+  if (feedbackDetailResolveBtn) {
+    feedbackDetailResolveBtn.addEventListener("click", () => runFeedbackWorkflowAction("resolve"));
+  }
+  if (feedbackDetailCloseBtn) {
+    feedbackDetailCloseBtn.addEventListener("click", () => runFeedbackWorkflowAction("close"));
+  }
+  [feedbackDetailDismissBtn, feedbackDetailModalCloseBtn].forEach((button) => {
+    button?.addEventListener("click", closeFeedbackDetailModal);
+  });
+  feedbackDetailModal?.addEventListener("click", (event) => {
+    if (event.target === feedbackDetailModal || event.target?.hasAttribute("data-feedback-modal-close")) {
+      closeFeedbackDetailModal();
+    }
+  });
+  feedbackDetailTabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      setFeedbackDetailTab(tab.dataset.feedbackTab || "overview");
+    });
+  });
+  [feedbackDetailStatus, feedbackDetailPriority, feedbackDetailAssignee, feedbackDetailResolutionSummary, feedbackDetailInternalNote].forEach((field) => {
+    if (!field) return;
+    field.addEventListener("change", () => refreshFeedbackWorkflowActions(feedbackState.currentDetail));
+    field.addEventListener("input", () => refreshFeedbackWorkflowActions(feedbackState.currentDetail));
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && feedbackDetailModal?.classList.contains("open")) {
+      closeFeedbackDetailModal();
+    }
+  });
+
+  [recycleBinStateFilter, recycleBinRoleFilter, recycleBinDateFrom, recycleBinDateTo].forEach((el) => {
+    if (!el) return;
+    el.addEventListener("change", () => {
+      recycleBinState.page = 1;
+      renderRecycleBinSection();
+    });
+  });
+  if (recycleBinSearchInput) {
+    recycleBinSearchInput.addEventListener("input", () => {
+      if (recycleBinState.searchTimer) clearTimeout(recycleBinState.searchTimer);
+      recycleBinState.searchTimer = setTimeout(() => {
+        recycleBinState.page = 1;
+        renderRecycleBinSection();
+      }, 220);
+    });
+  }
+  if (recycleBinRefreshBtn) {
+    recycleBinRefreshBtn.addEventListener("click", () => renderRecycleBinSection());
+  }
+  if (recycleBinClearFiltersBtn) {
+    recycleBinClearFiltersBtn.addEventListener("click", () => {
+      if (recycleBinSearchInput) recycleBinSearchInput.value = "";
+      if (recycleBinStateFilter) recycleBinStateFilter.value = "all";
+      if (recycleBinRoleFilter) recycleBinRoleFilter.value = "";
+      if (recycleBinDateFrom) recycleBinDateFrom.value = "";
+      if (recycleBinDateTo) recycleBinDateTo.value = "";
+      recycleBinState.page = 1;
+      renderRecycleBinSection();
+    });
+  }
+  if (recycleBinPrevBtn) {
+    recycleBinPrevBtn.addEventListener("click", () => {
+      if (recycleBinState.page <= 1) return;
+      recycleBinState.page -= 1;
+      renderRecycleBinSection();
+    });
+  }
+  if (recycleBinNextBtn) {
+    recycleBinNextBtn.addEventListener("click", () => {
+      if (recycleBinState.page >= recycleBinState.totalPages) return;
+      recycleBinState.page += 1;
+      renderRecycleBinSection();
+    });
+  }
+  if (recycleBinExportXlsxBtn) {
+    recycleBinExportXlsxBtn.addEventListener("click", () => exportRecycleBin("xlsx", recycleBinExportXlsxBtn));
+  }
+  if (recycleBinExportPdfBtn) {
+    recycleBinExportPdfBtn.addEventListener("click", () => exportRecycleBin("pdf", recycleBinExportPdfBtn));
+  }
+  if (recycleBinExportCsvBtn) {
+    recycleBinExportCsvBtn.addEventListener("click", () => exportRecycleBin("csv", recycleBinExportCsvBtn));
+  }
+  if (recycleBinPurgeToggleBtn) {
+    recycleBinPurgeToggleBtn.addEventListener("click", async () => {
+      if (!recycleBinState.canPurge || !recycleBinPurgePanel) return;
+      recycleBinPurgePanel.classList.toggle("hidden");
+      if (!recycleBinPurgePanel.classList.contains("hidden")) {
+        await previewRecycleBinPurge();
+      }
+    });
+  }
+  if (recycleBinPurgeCloseBtn) {
+    recycleBinPurgeCloseBtn.addEventListener("click", () => {
+      if (recycleBinPurgePanel) recycleBinPurgePanel.classList.add("hidden");
+    });
+  }
+  if (recycleBinPurgePreviewBtn) {
+    recycleBinPurgePreviewBtn.addEventListener("click", () => previewRecycleBinPurge());
+  }
+  if (recycleBinPurgeConfirmBtn) {
+    recycleBinPurgeConfirmBtn.addEventListener("click", () => confirmRecycleBinPurge());
+  }
+
+  dataManagementTabs.forEach((button) => {
+    button.addEventListener("click", () => {
+      switchDataManagementTab(button.dataset.dataTab || "recycle");
+    });
+  });
+
+  dmExportButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const datasetKey = button.dataset.dmExport || "";
+      const format = button.dataset.format || "xlsx";
+      if (format === "pdf") {
+        openDmPdfExportBuilder(datasetKey, button);
+        return;
+      }
+      exportDashboardDataset(datasetKey, format, { sourceButton: button });
+    });
+  });
+
+  [dmRegistryGender, dmRegistryLivingStatus, dmRegistryPayType, dmRegistryPayrollStatus, dmRegistryAvailability, dmRegistryLifeCert].forEach((el) => {
+    if (!el) return;
+    el.addEventListener("change", () => {
+      dataManagementState.registry.page = 1;
+      renderManagedFileRegistry();
+    });
+  });
+  [dmRegistrySearch, dmRegistryBoxNumber].forEach((field) => {
+    if (!field) return;
+    field.addEventListener("input", () => {
+      if (dataManagementState.registry.searchTimer) clearTimeout(dataManagementState.registry.searchTimer);
+      dataManagementState.registry.searchTimer = setTimeout(() => {
+        dataManagementState.registry.page = 1;
+        renderManagedFileRegistry();
+      }, 220);
+    });
+  });
+  if (dmRegistryRefreshBtn) {
+    dmRegistryRefreshBtn.addEventListener("click", () => renderManagedFileRegistry());
+  }
+  if (dmRegistryClearBtn) {
+    dmRegistryClearBtn.addEventListener("click", () => {
+      if (dmRegistrySearch) dmRegistrySearch.value = "";
+      if (dmRegistryBoxNumber) {
+        dmRegistryBoxNumber.value = "";
+        syncDashboardFilterableSelect(dmRegistryBoxNumber);
+      }
+      if (dmRegistryGender) dmRegistryGender.value = "";
+      if (dmRegistryLivingStatus) dmRegistryLivingStatus.value = "";
+      if (dmRegistryPayType) dmRegistryPayType.value = "";
+      if (dmRegistryPayrollStatus) dmRegistryPayrollStatus.value = "";
+      if (dmRegistryAvailability) dmRegistryAvailability.value = "";
+      if (dmRegistryLifeCert) dmRegistryLifeCert.value = "";
+      dataManagementState.registry.page = 1;
+      renderManagedFileRegistry();
+    });
+  }
+
+  if (dmPdfSelectDefaultBtn) {
+    dmPdfSelectDefaultBtn.addEventListener("click", () => {
+      setDmPdfFieldSelection(dmPdfExportState.metadata?.default_fields || []);
+    });
+  }
+  if (dmPdfSelectAllBtn) {
+    dmPdfSelectAllBtn.addEventListener("click", () => {
+      setDmPdfFieldSelection(Object.keys(dmPdfExportState.metadata?.columns || {}));
+    });
+  }
+  if (dmPdfClearSelectionBtn) {
+    dmPdfClearSelectionBtn.addEventListener("click", () => {
+      setDmPdfFieldSelection([]);
+    });
+  }
+  [dmPdfExportModalCloseBtn, dmPdfExportModalCancelBtn].forEach((button) => {
+    button?.addEventListener("click", () => closeDmPdfExportModal());
+  });
+  if (dmPdfExportModalConfirmBtn) {
+    dmPdfExportModalConfirmBtn.addEventListener("click", async () => {
+      const selectedFields = Array.from(dmPdfExportState.selectedFields || []).filter(Boolean);
+      if (!selectedFields.length) {
+        notifyDashboard("error", "Choose at least one field before generating the PDF.", "Data Management");
+        return;
+      }
+
+      dmPdfExportState.loading = true;
+      updateDmPdfExportSelectionSummary();
+      await exportDashboardDataset(dmPdfExportState.datasetKey, "pdf", {
+        selectedFields,
+        closeOnSuccess: true,
+        sourceButton: dmPdfExportModalConfirmBtn
+      });
+      dmPdfExportState.loading = false;
+      updateDmPdfExportSelectionSummary();
+    });
+  }
+  if (dmPdfExportModal) {
+    dmPdfExportModal.addEventListener("click", (event) => {
+      if (event.target === dmPdfExportModal || event.target?.hasAttribute("data-dm-export-modal-close")) {
+        closeDmPdfExportModal();
+      }
+    });
+  }
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && dmPdfExportModal?.classList.contains("open")) {
+      closeDmPdfExportModal();
+    }
+  });
+  if (dmRegistryPrevBtn) {
+    dmRegistryPrevBtn.addEventListener("click", () => {
+      if (dataManagementState.registry.page <= 1) return;
+      dataManagementState.registry.page -= 1;
+      renderManagedFileRegistry();
+    });
+  }
+  if (dmRegistryNextBtn) {
+    dmRegistryNextBtn.addEventListener("click", () => {
+      if (dataManagementState.registry.page >= dataManagementState.registry.totalPages) return;
+      dataManagementState.registry.page += 1;
+      renderManagedFileRegistry();
+    });
+  }
+
+  [dmStaffDueRetirementType, dmStaffDueSubmissionStatus, dmStaffDueAppStatus].forEach((el) => {
+    if (!el) return;
+    el.addEventListener("change", () => {
+      dataManagementState.staffDue.page = 1;
+      renderManagedStaffDue();
+    });
+  });
+  if (dmStaffDueSearch) {
+    dmStaffDueSearch.addEventListener("input", () => {
+      if (dataManagementState.staffDue.searchTimer) clearTimeout(dataManagementState.staffDue.searchTimer);
+      dataManagementState.staffDue.searchTimer = setTimeout(() => {
+        dataManagementState.staffDue.page = 1;
+        renderManagedStaffDue();
+      }, 220);
+    });
+  }
+  if (dmStaffDueRefreshBtn) {
+    dmStaffDueRefreshBtn.addEventListener("click", () => renderManagedStaffDue());
+  }
+  if (dmStaffDueWorkspaceLink) {
+    dmStaffDueWorkspaceLink.style.display = canAccessStaffDueWorkspace() ? "" : "none";
+  }
+  if (dmStaffDueDeleteFilteredBtn) {
+    dmStaffDueDeleteFilteredBtn.style.display = canDeleteStaffDueDirectly() ? "" : "none";
+    dmStaffDueDeleteFilteredBtn.addEventListener("click", async () => {
+      try {
+        await deleteFilteredStaffDueRecords();
+      } catch (error) {
+        notifyDashboard("error", error.message || "Unable to delete filtered staff due records.", "Staff Due");
+      }
+    });
+  }
+  if (dmStaffDueClearBtn) {
+    dmStaffDueClearBtn.addEventListener("click", () => {
+      if (dmStaffDueSearch) dmStaffDueSearch.value = "";
+      if (dmStaffDueRetirementType) dmStaffDueRetirementType.value = "";
+      if (dmStaffDueSubmissionStatus) dmStaffDueSubmissionStatus.value = "";
+      if (dmStaffDueAppStatus) dmStaffDueAppStatus.value = "";
+      dataManagementState.staffDue.page = 1;
+      renderManagedStaffDue();
+    });
+  }
+  if (dmStaffDuePrevBtn) {
+    dmStaffDuePrevBtn.addEventListener("click", () => {
+      if (dataManagementState.staffDue.page <= 1) return;
+      dataManagementState.staffDue.page -= 1;
+      renderManagedStaffDue();
+    });
+  }
+  if (dmStaffDueNextBtn) {
+    dmStaffDueNextBtn.addEventListener("click", () => {
+      if (dataManagementState.staffDue.page >= dataManagementState.staffDue.totalPages) return;
+      dataManagementState.staffDue.page += 1;
+      renderManagedStaffDue();
+    });
+  }
+
+  [dmMovementsType, dmMovementsFromOffice, dmMovementsToOffice, dmMovementsDateFrom, dmMovementsDateTo].forEach((el) => {
+    if (!el) return;
+    el.addEventListener("change", () => {
+      dataManagementState.movements.page = 1;
+      renderManagedFileMovements();
+    });
+  });
+  if (dmMovementsSearch) {
+    dmMovementsSearch.addEventListener("input", () => {
+      if (dataManagementState.movements.searchTimer) clearTimeout(dataManagementState.movements.searchTimer);
+      dataManagementState.movements.searchTimer = setTimeout(() => {
+        dataManagementState.movements.page = 1;
+        renderManagedFileMovements();
+      }, 220);
+    });
+  }
+  if (dmMovementsRefreshBtn) {
+    dmMovementsRefreshBtn.addEventListener("click", () => renderManagedFileMovements());
+  }
+  if (dmMovementsClearBtn) {
+    dmMovementsClearBtn.addEventListener("click", () => {
+      if (dmMovementsSearch) dmMovementsSearch.value = "";
+      if (dmMovementsType) dmMovementsType.value = "";
+      if (dmMovementsFromOffice) dmMovementsFromOffice.value = "";
+      if (dmMovementsToOffice) dmMovementsToOffice.value = "";
+      if (dmMovementsDateFrom) dmMovementsDateFrom.value = "";
+      if (dmMovementsDateTo) dmMovementsDateTo.value = "";
+      dataManagementState.movements.page = 1;
+      renderManagedFileMovements();
+    });
+  }
+  if (dmMovementsPrevBtn) {
+    dmMovementsPrevBtn.addEventListener("click", () => {
+      if (dataManagementState.movements.page <= 1) return;
+      dataManagementState.movements.page -= 1;
+      renderManagedFileMovements();
+    });
+  }
+  if (dmMovementsNextBtn) {
+    dmMovementsNextBtn.addEventListener("click", () => {
+      if (dataManagementState.movements.page >= dataManagementState.movements.totalPages) return;
+      dataManagementState.movements.page += 1;
+      renderManagedFileMovements();
+    });
+  }
+
+  [dmClaimsType, dmClaimsStatus, dmClaimsQuarter].forEach((el) => {
+    if (!el) return;
+    el.addEventListener("change", () => {
+      dataManagementState.claims.page = 1;
+      renderManagedClaims();
+    });
+  });
+  if (dmClaimsYear) {
+    dmClaimsYear.addEventListener("input", () => {
+      dataManagementState.claims.page = 1;
+      renderManagedClaims();
+    });
+  }
+  if (dmClaimsSearch) {
+    dmClaimsSearch.addEventListener("input", () => {
+      if (dataManagementState.claims.searchTimer) clearTimeout(dataManagementState.claims.searchTimer);
+      dataManagementState.claims.searchTimer = setTimeout(() => {
+        dataManagementState.claims.page = 1;
+        renderManagedClaims();
+      }, 220);
+    });
+  }
+  if (dmClaimsRefreshBtn) {
+    dmClaimsRefreshBtn.addEventListener("click", () => renderManagedClaims());
+  }
+  if (dmClaimsDeleteFilteredBtn) {
+    dmClaimsDeleteFilteredBtn.addEventListener("click", async () => {
+      try {
+        await deleteFilteredClaimsRecords();
+      } catch (error) {
+        notifyDashboard("error", error.message || "Unable to delete filtered claims.", "Claims");
+      }
+    });
+  }
+  if (dmClaimsClearBtn) {
+    dmClaimsClearBtn.addEventListener("click", () => {
+      if (dmClaimsSearch) dmClaimsSearch.value = "";
+      if (dmClaimsType) dmClaimsType.value = "";
+      if (dmClaimsStatus) dmClaimsStatus.value = "";
+      if (dmClaimsYear) dmClaimsYear.value = "";
+      if (dmClaimsQuarter) dmClaimsQuarter.value = "";
+      dataManagementState.claims.page = 1;
+      renderManagedClaims();
+    });
+  }
+  if (dmClaimsPrevBtn) {
+    dmClaimsPrevBtn.addEventListener("click", () => {
+      if (dataManagementState.claims.page <= 1) return;
+      dataManagementState.claims.page -= 1;
+      renderManagedClaims();
+    });
+  }
+  if (dmClaimsNextBtn) {
+    dmClaimsNextBtn.addEventListener("click", () => {
+      if (dataManagementState.claims.page >= dataManagementState.claims.totalPages) return;
+      dataManagementState.claims.page += 1;
+      renderManagedClaims();
+    });
+  }
+
+  [dmTasksStatus, dmTasksPriority, dmTasksRole].forEach((el) => {
+    if (!el) return;
+    el.addEventListener("change", () => {
+      dataManagementState.tasks.page = 1;
+      renderManagedTasks();
+    });
+  });
+  if (dmTasksSearch) {
+    dmTasksSearch.addEventListener("input", () => {
+      if (dataManagementState.tasks.searchTimer) clearTimeout(dataManagementState.tasks.searchTimer);
+      dataManagementState.tasks.searchTimer = setTimeout(() => {
+        dataManagementState.tasks.page = 1;
+        renderManagedTasks();
+      }, 220);
+    });
+  }
+  if (dmTasksRefreshBtn) {
+    dmTasksRefreshBtn.addEventListener("click", () => renderManagedTasks());
+  }
+  if (dmTasksClearBtn) {
+    dmTasksClearBtn.addEventListener("click", () => {
+      if (dmTasksSearch) dmTasksSearch.value = "";
+      if (dmTasksStatus) dmTasksStatus.value = "";
+      if (dmTasksPriority) dmTasksPriority.value = "";
+      if (dmTasksRole) dmTasksRole.value = "";
+      dataManagementState.tasks.page = 1;
+      renderManagedTasks();
+    });
+  }
+  if (dmTasksPrevBtn) {
+    dmTasksPrevBtn.addEventListener("click", () => {
+      if (dataManagementState.tasks.page <= 1) return;
+      dataManagementState.tasks.page -= 1;
+      renderManagedTasks();
+    });
+  }
+  if (dmTasksNextBtn) {
+    dmTasksNextBtn.addEventListener("click", () => {
+      if (dataManagementState.tasks.page >= dataManagementState.tasks.totalPages) return;
+      dataManagementState.tasks.page += 1;
+      renderManagedTasks();
+    });
+  }
+
+  if (dataRowActionModal) {
+    dataRowActionModal.addEventListener("click", (event) => {
+      if (event.target.closest("[data-data-modal-close='1']")) {
+        closeDataRowActionModal();
+      }
+    });
+  }
+  if (dataRowActionModalCloseBtn) {
+    dataRowActionModalCloseBtn.addEventListener("click", () => closeDataRowActionModal());
+  }
+  if (dataRowActionModalDismissBtn) {
+    dataRowActionModalDismissBtn.addEventListener("click", () => closeDataRowActionModal());
+  }
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && dataRowActionModal?.classList.contains("open")) {
+      closeDataRowActionModal();
+    }
+  });
+
+  if (demographicsRefreshBtn) {
+    demographicsRefreshBtn.addEventListener("click", async () => {
+      invalidatePensionerAnalyticsCaches();
+      await renderDemographicsSection(true);
+    });
+  }
+  if (demographicsFilterBtn) {
+    demographicsFilterBtn.addEventListener("click", () => openDemographicsDetailModal());
+  }
+  if (demographicsApplyBtn) {
+    demographicsApplyBtn.addEventListener("click", () => renderDemographicsModalResults());
+  }
+  if (demographicsResetBtn) {
+    demographicsResetBtn.addEventListener("click", () => {
+      demographicsState.filters = {
+        focus: "oldest",
+        livingStatus: "Alive",
+        gender: "",
+        region: "",
+        district: "",
+        retirementType: "",
+        search: ""
+      };
+      demographicsState.selectedRowKey = "";
+      populateDemographicsFilters(demographicsState.cache || {});
+      renderDemographicsModalResults();
+    });
+  }
+  [
+    demographicsFocusFilter,
+    demographicsLivingStatusFilter,
+    demographicsGenderFilter,
+    demographicsRetirementTypeFilter
+  ].forEach((selectEl) => {
+    selectEl?.addEventListener("change", () => {
+      demographicsState.selectedRowKey = "";
+      scheduleDemographicsModalResults();
+    });
+  });
+  demographicsRegionFilter?.addEventListener("change", () => {
+    demographicsState.selectedRowKey = "";
+    syncDemographicsLocationOptions("region");
+    scheduleDemographicsModalResults();
+  });
+  demographicsDistrictFilter?.addEventListener("change", () => {
+    demographicsState.selectedRowKey = "";
+    syncDemographicsLocationOptions("district");
+    scheduleDemographicsModalResults();
+  });
+  if (demographicsSearchInput) {
+    demographicsSearchInput.addEventListener("input", () => {
+      demographicsState.selectedRowKey = "";
+      scheduleDemographicsModalResults(220);
+    });
+    demographicsSearchInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        renderDemographicsModalResults();
+      }
+    });
+  }
+  demographicsLiveResults?.addEventListener("click", (event) => {
+    const trigger = event.target.closest("[data-demographics-preview-index]");
+    if (!trigger) return;
+    const rowIndex = Number.parseInt(trigger.getAttribute("data-demographics-preview-index") || "-1", 10);
+    if (!Number.isFinite(rowIndex) || rowIndex < 0) return;
+    selectDemographicsRowByIndex(rowIndex, { scrollIntoView: true });
+  });
+  if (demographicsTableBody) {
+    demographicsTableBody.addEventListener("click", (event) => {
+      const trigger = event.target.closest("[data-demographics-action='report']");
+      if (trigger) {
+        const rowIndex = Number.parseInt(trigger.getAttribute("data-demographics-index") || "-1", 10);
+        if (!Number.isFinite(rowIndex) || rowIndex < 0) return;
+        const row = demographicsState.rows[rowIndex];
+        if (row) {
+          openDeathReportModal(row);
+        }
+        return;
+      }
+      const rowTarget = event.target.closest("tr[data-demographics-index]");
+      if (!rowTarget) return;
+      const rowIndex = Number.parseInt(rowTarget.getAttribute("data-demographics-index") || "-1", 10);
+      if (!Number.isFinite(rowIndex) || rowIndex < 0) return;
+      selectDemographicsRowByIndex(rowIndex);
+    });
+  }
+  [demographicsDetailModalCloseBtn, demographicsDetailModalDismissBtn].forEach((button) => {
+    button?.addEventListener("click", closeDemographicsDetailModal);
+  });
+  demographicsDetailModal?.addEventListener("click", (event) => {
+    if (event.target === demographicsDetailModal || event.target?.hasAttribute("data-demographics-modal-close")) {
+      closeDemographicsDetailModal();
+    }
+  });
+  [deathReportModalCloseBtn, deathReportCancelBtn].forEach((button) => {
+    button?.addEventListener("click", closeDeathReportModal);
+  });
+  deathReportModal?.addEventListener("click", (event) => {
+    if (event.target === deathReportModal || event.target?.hasAttribute("data-death-report-close")) {
+      closeDeathReportModal();
+    }
+  });
+  if (deathReportDateOfDeath && deathReportNotificationDate) {
+    deathReportDateOfDeath.addEventListener("change", () => {
+      const selectedDate = deathReportDateOfDeath.value || (demographicsState.currentSubject?.retirementDate || "");
+      deathReportNotificationDate.min = selectedDate;
+      if ((deathReportNotificationDate.value || "") < selectedDate) {
+        deathReportNotificationDate.value = selectedDate;
+      }
+    });
+  }
+  if (deathReportSaveBtn) {
+    deathReportSaveBtn.addEventListener("click", () => submitDeathReport());
+  }
+  if (openSummaryReportBtn) {
+    openSummaryReportBtn.addEventListener("click", () => openSummaryReportModal());
+  }
+  if (summaryReportRefreshBtn) {
+    summaryReportRefreshBtn.addEventListener("click", async () => {
+      await renderSummaryReportModal(true);
+      await renderGeneralStatistics();
+    });
+  }
+  if (summaryReportPrintBtn) {
+    summaryReportPrintBtn.addEventListener("click", () => printSummaryReport());
+  }
+  if (summaryReportWordBtn) {
+    summaryReportWordBtn.addEventListener("click", () => downloadSummaryReportWord());
+  }
+  if (summaryReportPdfBtn) {
+    summaryReportPdfBtn.addEventListener("click", () => exportSummaryReportPdf());
+  }
+  if (summaryReportModalCloseBtn) {
+    summaryReportModalCloseBtn.addEventListener("click", () => closeSummaryReportModal());
+  }
+  summaryReportModal?.addEventListener("click", (event) => {
+    if (event.target === summaryReportModal || event.target?.hasAttribute("data-summary-report-close")) {
+      closeSummaryReportModal();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && demographicsDetailModal?.classList.contains("open")) {
+      closeDemographicsDetailModal();
+    }
+    if (event.key === "Escape" && deathReportModal?.classList.contains("open")) {
+      closeDeathReportModal();
+    }
+    if (event.key === "Escape" && summaryReportModal?.classList.contains("open")) {
+      closeSummaryReportModal();
+    }
+    if (event.key === "Escape" && payrollUploadModal?.classList.contains("open")) {
+      closePayrollUploadModal();
+    }
+    if (event.key === "Escape" && payrollRegisterUploadModal?.classList.contains("open")) {
+      closePayrollRegisterUploadModal();
+    }
+  });
+
+  if (workflowSearchInput) {
+    workflowSearchInput.addEventListener("input", () => {
+      if (workflowState.searchTimer) clearTimeout(workflowState.searchTimer);
+      workflowState.searchTimer = setTimeout(() => {
+        renderWorkflowPerformanceRows();
+      }, 180);
+    });
+  }
+  if (workflowRoleFilter) {
+    workflowRoleFilter.addEventListener("change", () => renderWorkflowPerformanceRows());
+  }
+  if (workflowStateFilter) {
+    workflowStateFilter.addEventListener("change", () => renderWorkflowPerformanceRows());
+  }
+
+  /* Initial Page Load*/
   async function initializeDashboard() {
     try {
-      console.log('🚀 Initializing dashboard...');
+      console.log('Initializing dashboard...');
+
+      const validSession = await ensureActiveSession();
+      if (!validSession) {
+        return;
+      }
+      await loadDashboardPermissions();
+      await loadAnalyticsSettings();
+      if (lifeCertYear && !lifeCertYear.value) {
+        lifeCertYear.value = String(new Date().getFullYear());
+      }
+      applyPayrollPeriodDefaults();
+      const accessRole = currentSessionRole || getCurrentRole();
+      applyWorkflowMenuVisibility(accessRole);
+      applyFeedbackMenuVisibility();
+      applyDataManagementVisibility(accessRole);
       
       // Load all sections
-      renderClaimsSummary();
-      renderPensionersSummary();
-      renderModeOfRetirement();
+      await renderClaimsSummary();
+      await renderPensionersSummary();
+      await renderDemographicsSection();
+      await renderModeOfRetirement();
       renderLifeCertificates();
       renderPayrollMovements();
-      renderStaffDue();
-      renderFilesSummary();
+      await renderStaffDue();
+      await renderFilesSummary();
+      await renderFileMovementAnalytics();
+      if (canViewFeedbackSection()) {
+        await renderFeedbackManagement();
+      } else {
+        setFeedbackAccessNotice(false);
+      }
+      await renderGeneralStatistics();
+      if (canViewDataManagement(accessRole)) {
+        applyDataManagementTabSelection();
+        await renderActiveDataManagementTab();
+      }
       
-      // Load real users data
+      // Load real users data and workflow metrics
       await renderUsersSummary();
+      const role = getCurrentRole();
+      if (canViewWorkflow(role)) {
+        await renderWorkflowPerformance();
+      }
+
+      const analyticsRefreshMs = Math.max(60000, Number(analyticsSettings.refreshIntervalMs || 0));
+
+      if (role === 'admin' || role === 'oc_pen') {
+        setInterval(() => {
+          const workflowSection = document.getElementById('workflowSection');
+          if (workflowSection && workflowSection.classList.contains('active')) {
+            renderWorkflowPerformance();
+          }
+        }, analyticsRefreshMs);
+      }
+
+      setInterval(() => {
+        const movementSection = document.getElementById('fileMovementSection');
+        if (movementSection && movementSection.classList.contains('active')) {
+          renderFileMovementAnalytics();
+        }
+      }, analyticsRefreshMs);
+
+      setInterval(() => {
+        const feedbackSection = document.getElementById('feedbackSection');
+        if (feedbackSection && feedbackSection.classList.contains('active') && canViewFeedbackSection()) {
+          renderFeedbackManagement();
+        }
+      }, analyticsRefreshMs);
+
+      setInterval(() => {
+        const lifeSection = document.getElementById('lifeCertSection');
+        if (lifeSection && lifeSection.classList.contains('active')) {
+          renderLifeCertificates();
+        }
+        const payrollSection = document.getElementById('payrollSection');
+        if (payrollSection && payrollSection.classList.contains('active')) {
+          renderPayrollMovements();
+        }
+      }, analyticsRefreshMs);
+
+      setInterval(() => {
+        const activeSection = document.querySelector(".dashboard-section.active");
+        const activeSectionId = activeSection?.id || "";
+        if (activeSectionId === "claimsSection") renderClaimsSummary();
+        if (activeSectionId === "pensionersSection") renderPensionersSummary();
+        if (activeSectionId === "demographicsSection") renderDemographicsSection();
+        if (activeSectionId === "categoriesSection") renderModeOfRetirement();
+        if (activeSectionId === "staffDueSection") renderStaffDue();
+        if (activeSectionId === "filesSection") renderFilesSummary();
+        if (activeSectionId === "usersSection") renderUsersSummary();
+        if (activeSectionId === "generalSection") renderGeneralStatistics();
+        if (activeSectionId === "dataSection") renderActiveDataManagementTab();
+      }, analyticsRefreshMs);
       
-      console.log("✅ Dashboard loaded successfully");
+      console.log("Dashboard loaded successfully");
       
     } catch (error) {
-      console.error('❌ Error initializing dashboard:', error);
+      console.error('Error initializing dashboard:', error);
     }
   }
 
   initializeDashboard();
 });
+
+
+
+
+

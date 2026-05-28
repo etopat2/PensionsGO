@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#6d1116" />
+    <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+    <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
+    <title>UPS PensionsGo - Feedback</title>
+
+    <link rel="stylesheet" href="css/styles.css?v=20260507c" />
+    <link rel="stylesheet" href="css/feedback.css?v=20260504a" />
+
+    <script type="module" src="js/main.js?v=20260528b"></script>
+    <script defer src="js/feedback.js"></script>
+</head>
+<body class="feedback-page">
+    <main class="feedback-main">
+        <div class="feedback-shell">
+            <section class="feedback-hero">
+                <div class="feedback-hero-copy">
+                    <span class="feedback-kicker">Feedback Centre</span>
+                    <h1>Tell the pensions team what is working, what is blocked, and what should improve.</h1>
+                    <p class="feedback-hero-lead">
+                        Use this page to report a platform issue, request follow-up on a pension process,
+                        suggest an improvement, or flag a records concern. Clear feedback improves service quality,
+                        auditability, and decision-making across the platform.
+                    </p>
+                    <div class="feedback-hero-actions">
+                        <a href="faq.html" class="feedback-secondary-action">Read FAQs First</a>
+                        <a href="terms.html" class="feedback-secondary-action" id="feedbackUnderstandPlatformBtn">Understand the Platform</a>
+                        <a href="login.html" class="feedback-primary-action" id="feedbackAccessPlatformBtn">Access the Platform</a>
+                    </div>
+                    <dl class="feedback-hero-facts">
+                        <div>
+                            <dt>Service Scope</dt>
+                            <dd>Operational issues, workflow support, pensioner guidance, and improvement ideas.</dd>
+                        </div>
+                        <div>
+                            <dt>Response Use</dt>
+                            <dd>Feedback is reviewed for service recovery, design improvement, and administrative follow-up.</dd>
+                        </div>
+                        <div>
+                            <dt>Submission Record</dt>
+                            <dd>Every submission receives a reference number for easier follow-up and internal traceability.</dd>
+                        </div>
+                    </dl>
+                </div>
+                <aside class="feedback-hero-panel">
+                    <article class="feedback-hero-card">
+                        <span class="feedback-panel-label">When to use this page</span>
+                        <h2>Use the correct channel for a faster outcome.</h2>
+                        <p>
+                            This page is best for platform issues, process clarification, improvement requests,
+                            records concerns, or service complaints. Sensitive operational documents should still be
+                            submitted through the governed workflow tools, not through free-text feedback.
+                        </p>
+                    </article>
+                    <div class="feedback-stat-grid">
+                        <article class="feedback-stat-card">
+                            <strong>Operational support</strong>
+                            <span>System issues, access concerns, or unclear workflow behavior.</span>
+                        </article>
+                        <article class="feedback-stat-card">
+                            <strong>Pensioner care</strong>
+                            <span>Guidance questions on status, payroll visibility, life certificate, or claims.</span>
+                        </article>
+                        <article class="feedback-stat-card">
+                            <strong>Service quality</strong>
+                            <span>Suggestions that improve timeliness, traceability, or usability.</span>
+                        </article>
+                        <article class="feedback-stat-card">
+                            <strong>Data concerns</strong>
+                            <span>Correction requests where registry or application data appears incomplete or inaccurate.</span>
+                        </article>
+                    </div>
+                </aside>
+            </section>
+
+            <section class="feedback-topic-strip">
+                <div class="feedback-section-heading compact">
+                    <span class="feedback-section-tag">Choose a focus</span>
+                    <h2>Common feedback routes</h2>
+                </div>
+                <div class="feedback-topic-grid" id="feedbackTopicGrid">
+                    <button type="button" class="feedback-topic-card active" data-feedback-type="general_feedback">
+                        <strong>General Feedback</strong>
+                        <span>Overall service experience, guidance, or broad observations.</span>
+                    </button>
+                    <button type="button" class="feedback-topic-card" data-feedback-type="bug_report">
+                        <strong>Bug Report</strong>
+                        <span>Something in the app is failing, broken, or behaving unexpectedly.</span>
+                    </button>
+                    <button type="button" class="feedback-topic-card" data-feedback-type="data_correction">
+                        <strong>Data Correction</strong>
+                        <span>A record looks incomplete, inconsistent, or wrong and needs review.</span>
+                    </button>
+                    <button type="button" class="feedback-topic-card" data-feedback-type="service_request">
+                        <strong>Service Request</strong>
+                        <span>You need follow-up, support action, or help navigating a process.</span>
+                    </button>
+                    <button type="button" class="feedback-topic-card" data-feedback-type="suggestion">
+                        <strong>Suggestion</strong>
+                        <span>An idea that improves the service, reporting, workflow, or usability.</span>
+                    </button>
+                    <button type="button" class="feedback-topic-card" data-feedback-type="complaint">
+                        <strong>Complaint</strong>
+                        <span>A service concern that requires attention, acknowledgement, or review.</span>
+                    </button>
+                </div>
+            </section>
+
+            <section class="feedback-layout">
+                <aside class="feedback-side-panel">
+                    <article class="feedback-side-card feedback-submit-card">
+                        <span class="feedback-panel-label">Submit Feedback</span>
+                        <h2>Ready to send a formal feedback record?</h2>
+                        <p>Open the submission form when you are ready to provide a clear issue, request, suggestion, or service concern.</p>
+                        <ul class="feedback-guidance-list feedback-compact-list">
+                            <li>Use references such as file number, workflow stage, or payroll period where relevant.</li>
+                            <li>Provide enough detail for operational follow-up without sharing secrets or unrelated sensitive data.</li>
+                            <li>Submissions are recorded with a reference number for traceability.</li>
+                        </ul>
+                        <div class="feedback-submit-actions">
+                            <button type="button" class="feedback-primary-action" id="feedbackOpenFormBtn">Open Feedback Form</button>
+                        </div>
+                    </article>
+
+                    <article class="feedback-side-card">
+                        <span class="feedback-panel-label">What happens next</span>
+                        <div class="feedback-step-list">
+                            <div>
+                                <strong>1. Intake</strong>
+                                <p>Your submission is recorded with a reference number for traceability.</p>
+                            </div>
+                            <div>
+                                <strong>2. Routing</strong>
+                                <p>It is directed to the relevant support, operational, or administrative review path.</p>
+                            </div>
+                            <div>
+                                <strong>3. Follow-up</strong>
+                                <p>Where a response is needed, the team uses the contact details you provide.</p>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="feedback-side-card">
+                        <span class="feedback-panel-label">Expected content quality</span>
+                        <ul class="feedback-guidance-list">
+                            <li>State the exact issue, request, or suggestion.</li>
+                            <li>Include identifiers such as file number or process stage where relevant.</li>
+                            <li>Indicate whether the matter affects a pensioner, staff workflow, or the public portal.</li>
+                            <li>Keep the message factual, concise, and specific enough for follow-up.</li>
+                        </ul>
+                    </article>
+
+                    <article class="feedback-side-card">
+                        <span class="feedback-panel-label">Support contacts</span>
+                        <dl class="feedback-contact-list">
+                            <div>
+                                <dt>Support Email</dt>
+                                <dd><a id="feedbackSupportEmail" href="mailto:etopat2@gmail.com">etopat2@gmail.com</a></dd>
+                            </div>
+                            <div>
+                                <dt>Support Phone</dt>
+                                <dd><a id="feedbackSupportPhone" href="tel:+256123456789">+256 123 456 789</a></dd>
+                            </div>
+                            <div>
+                                <dt>Use when urgent</dt>
+                                <dd>Operational blockers, account access issues, or guidance that directly affects service delivery.</dd>
+                            </div>
+                        </dl>
+                    </article>
+                </aside>
+            </section>
+
+            <section class="feedback-standards-grid">
+                <article class="feedback-standard-card">
+                    <span class="feedback-section-tag">Service Standard</span>
+                    <h2>Clarity</h2>
+                    <p>Feedback should help the team understand the exact concern, affected process, and required next step.</p>
+                </article>
+                <article class="feedback-standard-card">
+                    <span class="feedback-section-tag">Service Standard</span>
+                    <h2>Traceability</h2>
+                    <p>Reference-driven submissions are easier to review, escalate, and reconcile with operational records.</p>
+                </article>
+                <article class="feedback-standard-card">
+                    <span class="feedback-section-tag">Service Standard</span>
+                    <h2>Respectful handling</h2>
+                    <p>Concerns should be addressed professionally, with sensitive data handled through governed channels.</p>
+                </article>
+            </section>
+        </div>
+    </main>
+
+    <div class="feedback-modal-overlay feedback-compose-overlay" id="feedbackFormModal" hidden>
+        <section class="feedback-form-panel feedback-compose-panel" role="dialog" aria-modal="true" aria-labelledby="feedbackComposeTitle">
+            <div class="feedback-modal-header">
+                <div>
+                    <span class="feedback-panel-label">Submit Feedback</span>
+                    <h2 id="feedbackComposeTitle">Send a clear, complete submission</h2>
+                    <p id="feedbackIntroText">The more precise the information, the easier it is to route and act on your feedback.</p>
+                </div>
+                <button type="button" class="feedback-modal-close" id="feedbackFormModalClose" aria-label="Close feedback form">&times;</button>
+            </div>
+            <div class="feedback-compose-content">
+                <div class="feedback-head-badge">
+                    <span>Status</span>
+                    <strong>Open for submissions</strong>
+                </div>
+
+                <section id="feedbackBanner" class="feedback-banner" hidden></section>
+
+                <form id="feedbackForm" class="feedback-form" novalidate>
+                    <input type="text" name="website" id="feedbackWebsite" class="feedback-honeypot" tabindex="-1" autocomplete="off" aria-hidden="true">
+                    <input type="hidden" name="page_context" id="feedbackPageContext" value="feedback.html">
+
+                    <div class="feedback-form-grid">
+                        <label class="feedback-field feedback-col-span-2">
+                            <span>Feedback Type</span>
+                            <select id="feedbackType" name="feedback_type" required>
+                                <option value="general_feedback">General Feedback</option>
+                                <option value="bug_report">Bug Report</option>
+                                <option value="data_correction">Data Correction</option>
+                                <option value="service_request">Service Request</option>
+                                <option value="suggestion">Suggestion</option>
+                                <option value="complaint">Complaint</option>
+                                <option value="pensioner_support">Pensioner Support</option>
+                            </select>
+                        </label>
+                        <label class="feedback-field">
+                            <span>Your Name</span>
+                            <input type="text" id="feedbackName" name="full_name" maxlength="180" placeholder="Enter your full name" required>
+                        </label>
+                        <label class="feedback-field">
+                            <span>Audience</span>
+                            <select id="feedbackAudience" name="audience" required>
+                                <option value="public">Public</option>
+                                <option value="staff">Staff</option>
+                                <option value="pensioner">Pensioner</option>
+                            </select>
+                        </label>
+                        <label class="feedback-field">
+                            <span>Email Address</span>
+                            <input type="email" id="feedbackEmail" name="email_address" maxlength="190" placeholder="name@example.com">
+                        </label>
+                        <label class="feedback-field">
+                            <span>Phone Number</span>
+                            <input type="tel" id="feedbackPhone" name="phone_number" maxlength="50" placeholder="+256700123456 or 0770123456">
+                        </label>
+                        <label class="feedback-field feedback-col-span-2">
+                            <span>Subject</span>
+                            <input type="text" id="feedbackSubject" name="subject" maxlength="220" placeholder="State the issue or suggestion briefly" required>
+                        </label>
+                        <label class="feedback-field feedback-col-span-2">
+                            <span>Message</span>
+                            <textarea id="feedbackMessage" name="message" rows="8" maxlength="5000" placeholder="Describe the issue, request, or suggestion clearly. Include file number, task stage, payroll month, or any other useful reference where relevant." required></textarea>
+                            <small class="feedback-field-meta"><span id="feedbackCharCount">0</span> / 5000 characters</small>
+                        </label>
+                    </div>
+
+                    <div class="feedback-form-note">
+                        <strong>Guidance:</strong>
+                        Do not share passwords, card details, or unrelated personal secrets. If your issue concerns a specific pension record,
+                        include only the references needed for identification and review.
+                    </div>
+
+                    <label class="feedback-checkbox">
+                        <input type="checkbox" id="feedbackConsent" required>
+                        <span>I confirm that the information I am submitting is accurate to the best of my knowledge and may be used for service follow-up.</span>
+                    </label>
+
+                    <div class="feedback-form-actions">
+                        <button type="button" class="feedback-secondary-action feedback-reset-btn" id="feedbackFormModalDismiss">Close</button>
+                        <button type="reset" class="feedback-secondary-action feedback-reset-btn" id="feedbackResetBtn">Clear Form</button>
+                        <button type="submit" class="feedback-primary-action" id="feedbackSubmitBtn">Submit Feedback</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </div>
+
+    <div class="feedback-modal-overlay" id="feedbackModal" hidden>
+        <div class="feedback-modal-panel" role="dialog" aria-modal="true" aria-labelledby="feedbackModalTitle">
+            <div class="feedback-modal-header">
+                <div>
+                    <span class="feedback-panel-label">Submission Status</span>
+                    <h2 id="feedbackModalTitle">Feedback submitted</h2>
+                </div>
+                <button type="button" class="feedback-modal-close" id="feedbackModalClose" aria-label="Close feedback status">&times;</button>
+            </div>
+            <div class="feedback-modal-body">
+                <p id="feedbackModalMessage">Your feedback has been recorded.</p>
+                <div class="feedback-reference-card">
+                    <span>Reference Number</span>
+                    <strong id="feedbackReferenceNo">-</strong>
+                </div>
+            </div>
+            <div class="feedback-modal-footer">
+                <button type="button" class="feedback-secondary-action" id="feedbackModalDismiss">Close</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+
+

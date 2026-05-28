@@ -1,15 +1,14 @@
 <?php
-// ============================================================================
+// 
 // send_message.php
 // Admin-only broadcast, exclude sender from recipients, security validation
 // Support for custom file names and enhanced recipient handling
-// ============================================================================
-
-// Enable error reporting for debugging
+// 
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', 0);
 
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../runtime_admin_tools.php';
 
 // Set header first to ensure JSON response
 header('Content-Type: application/json');
@@ -18,6 +17,103 @@ if (!isset($_SESSION['userId'])) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Session expired']);
     exit;
+}
+
+if (!currentUserCanAccessMessagingModule()) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access denied']);
+    exit;
+}
+
+function getAttachmentSettings(mysqli $conn): array {
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+
+    $maxSizeRaw = function_exists('getAppSetting') ? getAppSetting($conn, 'attachment_max_size_mb') : null;
+    $maxSizeMb = is_numeric($maxSizeRaw) ? (int)$maxSizeRaw : 10;
+    if ($maxSizeMb <= 0) {
+        $maxSizeMb = 10;
+    }
+
+    $allowedRaw = function_exists('getAppSetting') ? getAppSetting($conn, 'attachment_allowed_types') : null;
+    $allowedList = array_filter(array_map('trim', explode(',', strtolower((string)$allowedRaw))));
+    if (empty($allowedList)) {
+        $allowedList = ['jpg','jpeg','png','gif','pdf','doc','docx','xls','xlsx','txt','zip'];
+    }
+
+    $mimeMap = [
+        'jpg' => ['image/jpeg'],
+        'jpeg' => ['image/jpeg'],
+        'png' => ['image/png'],
+        'gif' => ['image/gif'],
+        'pdf' => ['application/pdf'],
+        'doc' => ['application/msword'],
+        'docx' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+        'xls' => ['application/vnd.ms-excel'],
+        'xlsx' => ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+        'txt' => ['text/plain'],
+        'zip' => ['application/zip', 'application/x-zip-compressed'],
+        'csv' => ['text/csv', 'application/vnd.ms-excel']
+    ];
+
+    $cache = [
+        'max_bytes' => $maxSizeMb * 1024 * 1024,
+        'allowed_extensions' => $allowedList,
+        'mime_map' => $mimeMap,
+        'dedupe_enabled' => getAppSettingBool($conn, 'attachment_dedupe_enabled', false),
+        'compress_enabled' => getAppSettingBool($conn, 'attachment_compress_enabled', false)
+    ];
+
+    return $cache;
+}
+
+function ensureAttachmentMetadataColumns(mysqli $conn): void {
+    static $checked = false;
+    if ($checked) {
+        return;
+    }
+
+    $columns = [];
+    $result = $conn->query("SHOW COLUMNS FROM tb_message_attachments");
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $columns[$row['Field']] = true;
+        }
+    }
+
+    if (!isset($columns['file_hash'])) {
+        $conn->query("ALTER TABLE tb_message_attachments ADD COLUMN file_hash varchar(64) DEFAULT NULL");
+    }
+    if (!isset($columns['is_compressed'])) {
+        $conn->query("ALTER TABLE tb_message_attachments ADD COLUMN is_compressed tinyint(1) DEFAULT 0");
+    }
+
+    $checked = true;
+}
+
+function compressAttachmentFile(string $filePath, string $mimeType): bool {
+    if (!file_exists($filePath)) {
+        return false;
+    }
+
+    $compressed = false;
+    if ($mimeType === 'image/jpeg') {
+        $image = imagecreatefromjpeg($filePath);
+        if ($image) {
+            $compressed = imagejpeg($image, $filePath, 80);
+            imagedestroy($image);
+        }
+    } elseif ($mimeType === 'image/png') {
+        $image = imagecreatefrompng($filePath);
+        if ($image) {
+            $compressed = imagepng($image, $filePath, 6);
+            imagedestroy($image);
+        }
+    }
+
+    return $compressed;
 }
 
 function handleFileUpload($file, $messageId, $conn, $customName = null) {
@@ -44,30 +140,94 @@ function handleFileUpload($file, $messageId, $conn, $customName = null) {
     // Use custom name if provided, otherwise use original name
     $displayName = $customName ?: $originalName;
     
-    // Basic file type validation
-    $allowedTypes = [
-        'image/jpeg', 'image/png', 'image/gif', 
-        'application/pdf', 
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'text/plain',
-        'application/zip',
-        'application/x-zip-compressed'
-    ];
+    $settings = getAttachmentSettings($conn);
+    $allowedExtensions = $settings['allowed_extensions'];
+    $mimeMap = $settings['mime_map'];
+    $maxSizeBytes = $settings['max_bytes'];
+    $dedupeEnabled = $settings['dedupe_enabled'];
+    $compressEnabled = $settings['compress_enabled'];
+    ensureAttachmentMetadataColumns($conn);
     
+    $fileExtension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+    if (!empty($allowedExtensions) && !in_array($fileExtension, $allowedExtensions, true)) {
+        throw new Exception("File type not allowed. Allowed: " . implode(', ', $allowedExtensions));
+    }
+
+    enforceUploadedFileSizeLimit($conn, $file, 'Message attachment');
+
     $finfo = finfo_open(FILEINFO_MIME_TYPE);
     $mimeType = finfo_file($finfo, $file['tmp_name']);
     finfo_close($finfo);
-    
-    if (!in_array($mimeType, $allowedTypes)) {
+
+    if (isset($mimeMap[$fileExtension]) && !in_array($mimeType, $mimeMap[$fileExtension], true)) {
         throw new Exception("File type not allowed: " . $mimeType);
     }
 
-    // Check file size (max 10MB)
-    if ($file['size'] > 10 * 1024 * 1024) {
-        throw new Exception("File size too large. Maximum 10MB allowed.");
+    // Check file size (from settings)
+    if ($file['size'] > $maxSizeBytes) {
+        $maxMb = round($maxSizeBytes / (1024 * 1024), 2);
+        throw new Exception("File size too large. Maximum {$maxMb}MB allowed.");
+    }
+
+    $fileHash = hash_file('sha256', $file['tmp_name']);
+    $scanResult = runVirusScanOnFile($conn, $file['tmp_name'], [
+        'storage_context' => 'message_attachment',
+        'file_name' => $originalName,
+        'file_path' => null,
+        'mime_type' => $mimeType,
+        'scanned_by' => $_SESSION['userId'] ?? null,
+        'scanned_by_name' => $_SESSION['userName'] ?? null,
+        'scanned_by_role' => $_SESSION['userRole'] ?? null
+    ]);
+    if (($scanResult['enabled'] ?? true) && in_array(($scanResult['status'] ?? ''), ['infected', 'suspicious', 'error'], true)) {
+        $reason = trim((string)($scanResult['findings'] ?? 'Upload blocked by file scanning policy.'));
+        throw new Exception($reason !== '' ? $reason : 'Attachment failed the configured virus scan.');
+    }
+    if ($dedupeEnabled && $fileHash) {
+        $dupStmt = $conn->prepare("
+            SELECT file_path, file_size, mime_type, is_compressed
+            FROM tb_message_attachments
+            WHERE file_hash = ?
+            LIMIT 1
+        ");
+        if ($dupStmt) {
+            $dupStmt->bind_param("s", $fileHash);
+            $dupStmt->execute();
+            $dupResult = $dupStmt->get_result();
+            if ($dupRow = $dupResult->fetch_assoc()) {
+                $dupStmt->close();
+                $existingPath = $dupRow['file_path'];
+                $absolutePath = __DIR__ . '/../' . $existingPath;
+                if (file_exists($absolutePath)) {
+                    $stmt = $conn->prepare("
+                        INSERT INTO tb_message_attachments 
+                        (message_id, file_name, file_path, file_size, mime_type, file_hash, is_compressed) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ");
+                    if (!$stmt) {
+                        throw new Exception("Prepare failed: " . $conn->error);
+                    }
+                    $isCompressed = (int)($dupRow['is_compressed'] ?? 0);
+                    $stmt->bind_param(
+                        "ississi",
+                        $messageId,
+                        $displayName,
+                        $existingPath,
+                        $dupRow['file_size'],
+                        $dupRow['mime_type'],
+                        $fileHash,
+                        $isCompressed
+                    );
+                    if (!$stmt->execute()) {
+                        throw new Exception("Failed to save attachment to database: " . $stmt->error);
+                    }
+                    $stmt->close();
+                    return true;
+                }
+            } else {
+                $dupStmt->close();
+            }
+        }
     }
 
     // Move uploaded file
@@ -75,11 +235,19 @@ function handleFileUpload($file, $messageId, $conn, $customName = null) {
         throw new Exception("Failed to move uploaded file");
     }
 
+    $isCompressed = 0;
+    if ($compressEnabled) {
+        if (compressAttachmentFile($filePath, $mimeType)) {
+            $isCompressed = 1;
+            $file['size'] = filesize($filePath) ?: $file['size'];
+        }
+    }
+
     // Insert into database
     $stmt = $conn->prepare("
         INSERT INTO tb_message_attachments 
-        (message_id, file_name, file_path, file_size, mime_type) 
-        VALUES (?, ?, ?, ?, ?)
+        (message_id, file_name, file_path, file_size, mime_type, file_hash, is_compressed) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     ");
     
     if (!$stmt) {
@@ -88,7 +256,7 @@ function handleFileUpload($file, $messageId, $conn, $customName = null) {
     }
     
     $relativePath = 'uploads/messages/' . $fileName;
-    $stmt->bind_param("issis", $messageId, $displayName, $relativePath, $file['size'], $mimeType);
+    $stmt->bind_param("ississi", $messageId, $displayName, $relativePath, $file['size'], $mimeType, $fileHash, $isCompressed);
     
     if (!$stmt->execute()) {
         unlink($filePath);
@@ -100,7 +268,7 @@ function handleFileUpload($file, $messageId, $conn, $customName = null) {
 
 try {
     $userId = $_SESSION['userId'];
-    $userRole = $_SESSION['userRole'] ?? '';
+    $userRole = getSessionEffectiveRoleKey($conn);
     
     // Determine input method
     $messageData = [];
@@ -165,6 +333,10 @@ try {
         throw new Exception("Subject is too long (max 255 characters)");
     }
 
+    $messageCompressEnabled = getAppSettingBool($conn, 'message_compress_enabled', false);
+    $storedMessageText = encodeMessageText($messageText, $messageCompressEnabled);
+    $messageTextSize = strlen($storedMessageText);
+
     // Broadcast permissions validation
     if ($isBroadcast) {
         if ($userRole !== 'admin') {
@@ -191,20 +363,32 @@ try {
 
     // Check storage limit before sending
     $storageCheckStmt = $conn->prepare("
-        SELECT COALESCE(SUM(att.file_size), 0) as current_usage
-        FROM tb_message_attachments att
-        INNER JOIN tb_messages m ON att.message_id = m.message_id
-        WHERE m.sender_id = ?
-        AND (m.is_deleted_by_sender = FALSE OR m.is_deleted_by_sender IS NULL)
+        SELECT
+            (SELECT COALESCE(SUM(CHAR_LENGTH(m.message_text)), 0)
+             FROM tb_messages m
+             WHERE m.sender_id = ?
+             AND (m.is_deleted_by_sender = FALSE OR m.is_deleted_by_sender IS NULL)
+            ) AS message_usage,
+            (SELECT COALESCE(SUM(att.file_size), 0)
+             FROM tb_message_attachments att
+             INNER JOIN tb_messages m2 ON att.message_id = m2.message_id
+             WHERE m2.sender_id = ?
+             AND (m2.is_deleted_by_sender = FALSE OR m2.is_deleted_by_sender IS NULL)
+            ) AS attachment_usage
     ");
-    $storageCheckStmt->bind_param("s", $userId);
+    $storageCheckStmt->bind_param("ss", $userId, $userId);
     $storageCheckStmt->execute();
     $storageResult = $storageCheckStmt->get_result();
     $storageData = $storageResult->fetch_assoc();
     $storageCheckStmt->close();
 
-    $currentUsage = $storageData['current_usage'] ?? 0;
-    $maxStorage = 100 * 1024 * 1024; // 300MB
+    $currentUsage = (int)($storageData['message_usage'] ?? 0) + (int)($storageData['attachment_usage'] ?? 0);
+    $quotaRaw = function_exists('getAppSetting') ? getAppSetting($conn, 'message_storage_quota_mb') : null;
+    $quotaMb = is_numeric($quotaRaw) ? (int)$quotaRaw : 100;
+    if ($quotaMb <= 0) {
+        $quotaMb = 100;
+    }
+    $maxStorage = $quotaMb * 1024 * 1024;
 
     // Calculate new attachments size if any
     $newAttachmentsSize = 0;
@@ -224,7 +408,7 @@ try {
     }
 
     // Check if new message would exceed storage limit
-    if (($currentUsage + $newAttachmentsSize) > $maxStorage) {
+    if (($currentUsage + $newAttachmentsSize + $messageTextSize) > $maxStorage) {
         $remainingMB = round(($maxStorage - $currentUsage) / (1024 * 1024), 2);
         throw new Exception("Storage limit exceeded. You have {$remainingMB}MB remaining. Please delete some messages or attachments.");
     }
@@ -244,13 +428,14 @@ try {
             throw new Exception("Prepare failed: " . $conn->error);
         }
         
-        $stmt->bind_param("ssssi", $userId, $subject, $messageText, $messageType, $isUrgent);
+        $stmt->bind_param("ssssi", $userId, $subject, $storedMessageText, $messageType, $isUrgent);
         
         if (!$stmt->execute()) {
             throw new Exception("Failed to create message: " . $stmt->error);
         }
 
         $messageId = $conn->insert_id;
+        $recipientCount = 0;
 
         // Handle broadcast
         if ($isBroadcast) {
@@ -270,10 +455,10 @@ try {
                 throw new Exception("Failed to create broadcast: " . $broadcastStmt->error);
             }
             
-            // For broadcasts, get all users except sender and add as recipients
+            // For broadcasts, get all eligible staff users except sender and add as recipients
             $getUsersStmt = $conn->prepare("
                 SELECT userId FROM tb_users 
-                WHERE userId != ? AND userRole != 'pensioner'
+                WHERE userId != ? AND userRole NOT IN ('pensioner', 'user')
             ");
             $getUsersStmt->bind_param("s", $userId);
             $getUsersStmt->execute();
@@ -296,12 +481,16 @@ try {
                     
                     if ($userData && in_array($userData['userRole'], $targetRoles)) {
                         $recipientStmt->bind_param("is", $messageId, $user['userId']);
-                        $recipientStmt->execute();
+                        if ($recipientStmt->execute()) {
+                            $recipientCount++;
+                        }
                     }
                 } else {
                     // No role filtering, send to all non-pensioner users
                     $recipientStmt->bind_param("is", $messageId, $user['userId']);
-                    $recipientStmt->execute();
+                    if ($recipientStmt->execute()) {
+                        $recipientCount++;
+                    }
                 }
             }
             
@@ -329,12 +518,34 @@ try {
                     if ($recipientId === $userId) {
                         continue;
                     }
+
+                    $recipientUserStmt = $conn->prepare("
+                        SELECT userRole
+                        FROM tb_users
+                        WHERE userId = ?
+                        LIMIT 1
+                    ");
+                    if ($recipientUserStmt) {
+                        $recipientUserStmt->bind_param("s", $recipientId);
+                        $recipientUserStmt->execute();
+                        $recipientUser = $recipientUserStmt->get_result()->fetch_assoc();
+                        $recipientUserStmt->close();
+                        if (!$recipientUser || !canRoleAccessMessagingModule((string)($recipientUser['userRole'] ?? ''))) {
+                            continue;
+                        }
+                    }
                     
                     $recipientStmt->bind_param("is", $messageId, $recipientId);
                     
                     if (!$recipientStmt->execute()) {
                         error_log("Failed to add recipient $recipientId: " . $recipientStmt->error);
+                    } else {
+                        $recipientCount++;
                     }
+                }
+
+                if ($recipientCount === 0) {
+                    throw new Exception("Select at least one eligible staff recipient.");
                 }
             }
         }
@@ -370,6 +581,79 @@ try {
 
         // Commit transaction
         $conn->commit();
+        try {
+            maybeCreateMessageStorageSnapshot($conn, [
+                'notes' => $isBroadcast ? 'Automatic snapshot after broadcast message send.' : 'Automatic snapshot after message send.',
+                'created_by' => $_SESSION['userId'] ?? null,
+                'created_by_name' => $_SESSION['userName'] ?? null,
+                'created_by_role' => $_SESSION['userRole'] ?? null
+            ]);
+        } catch (Throwable $snapshotError) {
+            error_log('Message snapshot warning: ' . $snapshotError->getMessage());
+        }
+
+        if (function_exists('logAuditEvent')) {
+            logAuditEvent($conn, [
+                'actor_id' => $_SESSION['userId'] ?? 'system',
+                'actor_name' => $_SESSION['userName'] ?? 'System',
+                'actor_role' => $_SESSION['userRole'] ?? 'system',
+                'action' => $isBroadcast ? 'broadcast_sent' : 'message_sent',
+                'entity_type' => 'message',
+                'entity_id' => (string)$messageId,
+                'details' => [
+                    'message_type' => $messageType,
+                    'is_broadcast' => $isBroadcast,
+                    'recipient_count' => $recipientCount
+                ]
+            ]);
+        }
+
+        if ($isBroadcast && getAppSettingBool($conn, 'notify_email_enabled', true) && getAppSettingBool($conn, 'notify_broadcast_enabled', true)) {
+            $recipientEmailStmt = $conn->prepare("
+                SELECT u.userId, u.userName, u.userEmail
+                FROM tb_message_recipients mr
+                INNER JOIN tb_users u ON u.userId = mr.recipient_user_id
+                WHERE mr.message_id = ?
+                  AND u.userEmail IS NOT NULL
+                  AND TRIM(u.userEmail) <> ''
+                ORDER BY u.userName ASC
+            ");
+            if ($recipientEmailStmt) {
+                $recipientEmailStmt->bind_param('i', $messageId);
+                $recipientEmailStmt->execute();
+                $recipientEmailResult = $recipientEmailStmt->get_result();
+                $broadcastSubject = 'Broadcast message: ' . $subject;
+                while ($recipientRow = $recipientEmailResult->fetch_assoc()) {
+                    $recipientEmail = trim((string)($recipientRow['userEmail'] ?? ''));
+                    if ($recipientEmail === '' || !filter_var($recipientEmail, FILTER_VALIDATE_EMAIL)) {
+                        continue;
+                    }
+                    $recipientName = trim((string)($recipientRow['userName'] ?? 'Colleague'));
+                    $textBody = implode("\n", [
+                        'A new broadcast message has been posted in UPS PensionsGo.',
+                        'Subject: ' . $subject,
+                        'From: ' . ($_SESSION['userName'] ?? 'System'),
+                        '',
+                        $messageText,
+                        '',
+                        'Open the messaging workspace to read the full message and attachments.'
+                    ]);
+                    $htmlBody = '<p>A new broadcast message has been posted in UPS PensionsGo.</p>'
+                        . '<p><strong>To:</strong> ' . htmlspecialchars($recipientName, ENT_QUOTES, 'UTF-8') . '<br>'
+                        . '<strong>Subject:</strong> ' . htmlspecialchars($subject, ENT_QUOTES, 'UTF-8') . '<br>'
+                        . '<strong>From:</strong> ' . htmlspecialchars((string)($_SESSION['userName'] ?? 'System'), ENT_QUOTES, 'UTF-8') . '</p>'
+                        . '<p>' . nl2br(htmlspecialchars($messageText, ENT_QUOTES, 'UTF-8')) . '</p>'
+                        . '<p>Open the messaging workspace to read the full message and attachments.</p>';
+                    queueNotification($conn, 'email', $recipientEmail, $broadcastSubject, $textBody, [
+                        'source' => 'broadcast_message',
+                        'message_id' => $messageId,
+                        'recipient_user_id' => (string)($recipientRow['userId'] ?? ''),
+                        'html_body' => $htmlBody
+                    ]);
+                }
+                $recipientEmailStmt->close();
+            }
+        }
 
         echo json_encode([
             'success' => true,
@@ -394,3 +678,4 @@ if (isset($conn)) {
     $conn->close();
 }
 ?>
+

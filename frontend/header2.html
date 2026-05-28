@@ -11,32 +11,34 @@
     <div class="header-right">
       <!-- User Profile Section -->
       <div class="user-profile" id="userProfile">
-        <img src="../backend/uploads/profiles/default-user.png" alt="Profile Picture" id="profilePicture" class="profile-picture" />
+        <img src="../backend/api/get_image.php?file=default-user.png&type=profile" alt="Profile Picture" id="profilePicture" class="profile-picture" />
         <button id="profileDropdownToggle" class="profile-dropdown-toggle">
           <span id="profileName">User</span>
           <span>&#x25BC;</span>
         </button>
         <div id="profileDropdownMenu" class="profile-dropdown hidden">
           <ul>
-            <li><a href="profile.html">View Profile</a></li>
-            <li><a href="edit_user.html">Edit Profile</a></li>
+            <li id="profileViewMenuItem" data-auth-required="true"><a href="profile.html">View Profile</a></li>
+            <li id="profileEditMenuItem" data-auth-required="true"><a href="edit_user.html">Edit Profile</a></li>
+            <li id="profileDashboardMenuItem" data-auth-required="true"><a href="pensioner_lookup.html" id="profileDashboardLink">Find Pensioners</a></li>
             <!-- My Tasks with task count - visible to all except user/pensioner -->
-            <li id="myTasksMenuItem">
+            <li id="myTasksMenuItem" data-auth-required="true">
               <a href="tasks.html" class="tasks-link">
                 My Tasks
                 <span class="task-bubble hidden">0</span>
               </a>
             </li>
             <!-- Messages with unread count - visible to all except user/pensioner -->
-            <li id="messagesMenuItem">
+            <li id="messagesMenuItem" data-auth-required="true">
               <a href="messages.html" class="messages-link">
                 Messages
                 <span class="message-bubble hidden">0</span>
               </a>
             </li>
             <!-- Settings - admin only -->
-            <li id="settingsMenuItem"><a href="admin_dashboard.html">Settings</a></li>
-            <li><a href="#" id="logoutBtn">Logout</a></li>
+            <li id="settingsMenuItem" data-auth-required="true"><a href="admin_dashboard.html">Settings</a></li>
+            <li data-auth-required="true"><a href="#" id="hardRefreshBtn" data-hard-refresh="true">Refresh App</a></li>
+            <li data-auth-required="true"><a href="#" id="logoutBtn">Logout</a></li>
           </ul>
         </div>
       </div>
@@ -50,41 +52,43 @@
   <nav id="dropdownMenu" class="dropdown-menu hidden">
     <ul>
       <!-- Staff Due for Retirement - hidden for pensioners -->
-      <li id="staffDueMenuItem"><a href="staff_due.html">Staff Due for Retirement</a></li>
+      <li id="staffDueMenuItem" data-auth-required="true"><a href="staff_due.html">Staff Due for Retirement</a></li>
       
       <!-- Pension File Registry - hidden for pensioners -->
-      <li id="pensionRegistryMenuItem"><a href="pension_file_registry.html">Pension File Registry</a></li>
+      <li id="pensionRegistryMenuItem" data-auth-required="true"><a href="pension_file_registry.html">Pension File Registry</a></li>
       
       <!-- Application Status - hidden for pensioners -->
-      <li id="applicationStatusMenuItem"><a href="application_status.html">Application Status</a></li>
+      <li id="applicationStatusMenuItem" data-auth-required="true"><a href="application_status.html">Application Status</a></li>
       
       <!-- File Tracking - visible to admin, clerk, oc_pen, writeup_officer, file_creator, data_entry -->
-      <li id="fileTrackingMenuItem"><a href="file_tracking.html">File Tracking</a></li>
+      <li id="fileTrackingMenuItem" data-auth-required="true"><a href="file_tracking.html">File Tracking</a></li>
       
       <!-- Claim Form - visible to all -->
-      <li><a href="claim_form.html">Claim Form</a></li>
+      <li id="claimFormMenuItem" data-auth-required="true"><a href="claim_form.html">Claim Form</a></li>
       
       <!-- Claims - hidden for pensioners -->
-      <li id="claimsMenuItem"><a href="claims.html">Claims</a></li>
+      <li id="claimsMenuItem" data-auth-required="true"><a href="claims.html">Claims</a></li>
+      <li id="budgetMenuItem" data-auth-required="true"><a href="budgeting.html">Budget Forecast</a></li>
       
       <hr />
       
       <!-- Calculate Benefits - visible to all -->
-      <li><a href="benefits_calculator.html">Calculate Benefits</a></li>
+      <li id="benefitsCalculatorMenuItem" data-auth-required="true"><a href="benefits_calculator.html">Calculate Benefits</a></li>
+      <li id="podcastMenuItem" data-auth-required="true"><a href="podcast.html">Podcast</a></li>
       
       <!-- Dashboard - hidden for pensioners -->
-      <li id="dashboardMenuItem"><a href="dashboard.html">Dashboard</a></li>
+      <li id="dashboardMenuItem" data-auth-required="true"><a href="dashboard.html">Dashboard</a></li>
       
       <!-- Users - admin only -->
-      <li id="usersMenuItem"><a href="users.html">Users</a></li>
+      <li id="usersMenuItem" data-auth-required="true"><a href="users.html">Users</a></li>
       
       <hr />
       
       <!-- Feedback - visible to all -->
-      <li><a href="feedback.html">Feedback</a></li>
+      <li id="feedbackMenuItem"><a href="feedback.html">Feedback</a></li>
       
       <!-- About - visible to all -->
-      <li><a href="terms.html">Terms</a></li>
+      <li id="termsMenuItem"><a href="terms.html">Terms</a></li>
     </ul>
   </nav>
 </header>

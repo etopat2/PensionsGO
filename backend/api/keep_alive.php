@@ -1,45 +1,53 @@
 <?php
 /**
- * ============================================================
  * keep_alive.php
- * ------------------------------------------------------------
- * Purpose:
- *   - Silently refreshes the user's session timestamp during
- *     in-page activity events (click, scroll, input, etc.).
- *   - Prevents PHP session timeout while the user is active.
- *   - Ensures consistent behavior with check_session.php.
- * ============================================================
  */
 
-session_start();
-header('Content-Type: application/json');
-header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-header('Pragma: no-cache');
-header('Expires: 0');
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
 
-// ------------------------------------------------------------
-// 1️⃣ Ensure session exists before updating
-// ------------------------------------------------------------
-if (!isset($_SESSION['userId']) || !isset($_SESSION['userRole'])) {
-    echo json_encode([
-        'success' => false,
-        'message' => 'No active session found'
-    ]);
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/SessionManager.php';
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
     exit;
 }
 
-// ------------------------------------------------------------
-// 2️⃣ Update the session timestamp
-// ------------------------------------------------------------
-$_SESSION['last_activity'] = time();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-// ------------------------------------------------------------
-// 3️⃣ Respond success
-// ------------------------------------------------------------
-echo json_encode([
-    'success' => true,
-    'message' => 'Session refreshed successfully',
-    'userId' => $_SESSION['userId'],
-    'timestamp' => $_SESSION['last_activity']
-]);
+if (!isset($_SESSION['session_id'], $_SESSION['userId'])) {
+    echo json_encode(['success' => true, 'noop' => true]);
+    exit;
+}
+
+try {
+    $requestDeviceId = null;
+    if (!validateSessionDeviceBinding($conn, $_SESSION['session_id'], $_SESSION['userId'] ?? '', $requestDeviceId)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Device verification failed']);
+        exit;
+    }
+
+    $sm = SessionManager::getInstance($conn);
+    $sm->cleanupExpiredSessions();
+    $touched = $sm->touchSession($_SESSION['session_id'], $requestDeviceId);
+    if (!$touched) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Session is not active on this device']);
+        exit;
+    }
+
+    $_SESSION['last_activity'] = time();
+
+    echo json_encode(['success' => true]);
+} catch (Throwable $e) {
+    error_log("keep_alive error: " . $e->getMessage());
+    echo json_encode(['success' => true]); // silent success
+}
 ?>

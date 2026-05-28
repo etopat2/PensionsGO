@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
+  <title>Podcast - PensionsGo</title>
+  <link rel="stylesheet" href="css/styles.css?v=20260507c" />
+  <link rel="stylesheet" href="css/overlay.css?v=20260504a" />
+  <link rel="stylesheet" href="css/podcast.css?v=20260504a" />
+  <script type="module" src="js/main.js?v=20260528b"></script>
+  <script defer src="js/podcast.js"></script>
+</head>
+<body data-podcast-mode="auto">
+  <main class="podcast-page-main">
+    <section class="podcast-hero-shell">
+      <div class="podcast-hero-copy">
+        <span class="podcast-kicker">Podcast & Video Guidance</span>
+        <h1 id="podcastHeroTitle">PensionsGo Media Centre</h1>
+        <p id="podcastHeroSubtitle">Loading curated pension videos tailored to your role.</p>
+      </div>
+      <div class="podcast-hero-side">
+        <div class="podcast-side-card">
+          <span>Audience</span>
+          <strong id="podcastAudienceLabel">Secure Access</strong>
+        </div>
+        <div class="podcast-side-card">
+          <span>Available Videos</span>
+          <strong id="podcastVideoCount">0</strong>
+        </div>
+      </div>
+    </section>
+
+    <section id="podcastFeedback" class="podcast-feedback" hidden></section>
+
+    <section class="podcast-layout">
+      <div class="podcast-primary-column">
+        <article class="podcast-feature-panel">
+          <div class="podcast-panel-head">
+            <div>
+              <h2>Featured Video</h2>
+              <p>Play guidance, common pension questions, or service updates without leaving the system.</p>
+            </div>
+            <button type="button" class="podcast-refresh-btn" id="refreshPodcastFeedBtn">Refresh</button>
+          </div>
+          <div class="podcast-feature-player" id="podcastFeaturedPlayer"></div>
+          <div class="podcast-feature-meta">
+            <div>
+              <h3 id="podcastFeaturedTitle">Select a video</h3>
+              <div id="podcastFeaturedDescription" class="podcast-featured-description">
+                <p>Use the library on the right to open a video.</p>
+              </div>
+            </div>
+            <div class="podcast-feature-tags" id="podcastFeaturedTags"></div>
+          </div>
+        </article>
+
+        <article class="podcast-insight-grid">
+          <div class="podcast-insight-card">
+            <span>What you can watch</span>
+            <strong>FAQs, payroll notices, process guidance, and service updates.</strong>
+          </div>
+          <div class="podcast-insight-card">
+            <span>Publishing model</span>
+            <strong>Videos are managed centrally and filtered by intended audience.</strong>
+          </div>
+          <div class="podcast-insight-card accent">
+            <span>Access control</span>
+            <strong>Only the channels assigned to your role are displayed here.</strong>
+          </div>
+        </article>
+      </div>
+
+      <aside class="podcast-library-panel">
+        <div class="podcast-panel-head compact">
+          <div>
+            <h2>Video Library</h2>
+            <p>Find the right video quickly by channel or topic.</p>
+          </div>
+        </div>
+
+        <div class="podcast-filter-bar">
+          <div class="podcast-filter-chips" id="podcastFilterChips"></div>
+          <label class="podcast-search-field">
+            <span>Search videos</span>
+            <input type="search" id="podcastSearchInput" placeholder="Search title, topic, or keyword">
+          </label>
+        </div>
+
+        <div class="podcast-library-list" id="podcastLibraryList"></div>
+      </aside>
+    </section>
+  </main>
+</body>
+</html>
+
+
+

@@ -4,6 +4,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
   <title>Add Staff Record</title>
 
   <!-- Prevent browser caching of protected pages -->
@@ -11,191 +16,318 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
 
-  <link rel="stylesheet" href="../frontend/css/color-variables.css" />
-  <link rel="stylesheet" href="../frontend/css/auth.css" />
-  <link rel="stylesheet" href="../frontend/css/styles.css" />
-  <link rel="stylesheet" href="../frontend/css/profile.css" />
-  <link rel="stylesheet" href="../frontend/css/menu.css" />
-  <link rel="stylesheet" href="../frontend/css/overlay.css" />
+  <link rel="stylesheet" href="../frontend/css/color-variables.css?v=20260504b" />
+  <link rel="stylesheet" href="../frontend/css/auth.css?v=20260504a" />
+  <link rel="stylesheet" href="../frontend/css/styles.css?v=20260507c" />
+  <link rel="stylesheet" href="../frontend/css/profile.css?v=20260504a" />
+  <link rel="stylesheet" href="../frontend/css/menu.css?v=20260504d" />
+  <link rel="stylesheet" href="../frontend/css/overlay.css?v=20260504a" />
   
-  <link rel="stylesheet" href="../frontend/css/forms.css" />
-  <link rel="stylesheet" href="../frontend/css/add_staff.css" />
+  <link rel="stylesheet" href="../frontend/css/forms.css?v=20260504b" />
+  <link rel="stylesheet" href="../frontend/css/add_staff.css?v=20260504b" />
+  <link rel="stylesheet" href="../frontend/css/staff_workspaces.css?v=20260504b" />
 
-  <script type="module" src="../frontend/js/main.js"></script>
+  <script defer src="../frontend/js/modules/filterable_select.js?v=20260429a"></script>
+  <script type="module" src="../frontend/js/main.js?v=20260528b"></script>
+  <script defer src="../frontend/js/modules/retirement-types.js"></script>
   <script defer src="../frontend/js/add_staff.js"></script>
 </head>
 
 <body>
-  <main class="main-wrapper">
-    <h2>Add Staff Due for Retirement</h2>
-
-    <form id="addStaffForm" class="fade-in">
-      <div class="form-group">
-        <label>Reg No</label>
-        <input type="text" id="regNo" name="regNo" required />
-      </div>
-
-      <div class="form-group">
-        <label>Supplier No</label>
-        <input type="text" id="supplierNo" name="supplierNo" />
-      </div>
-
-      <div class="form-group">
-        <label>Title</label>
-        <input type="text" id="title" name="title" />
-      </div>
-
-      <div class="form-group">
-        <label>Surname</label>
-        <input type="text" id="sName" name="sName" required />
-      </div>
-
-      <div class="form-group">
-        <label>First Name</label>
-        <input type="text" id="fName" name="fName" required />
-      </div>
-
-      <div class="form-group">
-        <label>Gender</label>
-        <select id="gender" name="gender" required>
-          <option value="">Select</option>
-          <option value="Male">Male</option>
-          <option value="Female">Female</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label>Prison Unit</label>
-        
-        <select id="prisonUnit" required class="desktop-only">
-          <option value="">Loading prison units...</option>
-        </select>
-
-        <div id="mobilePrisonSelect" class="mobile-only prison-select-trigger">Tap to select Prison Unit</div>
-
-        <div id="prisonModal" class="logout-modal-overlay" style="display:none;">
-          <div class="logout-modal" style="max-height:80vh; overflow-y:auto;">
-            <h3>Select Prison Unit</h3>
-            <input type="text" id="prisonSearch" placeholder="Search prison unit..." />
-            <div id="prisonList"></div>
+  <main class="main-wrapper add-staff-page">
+    <section class="workspace-shell add-staff-shell">
+      <div class="workspace-header-stack">
+        <header class="workspace-header">
+          <div>
+            <h2>Add Staff Due for Retirement</h2>
+            <p>Capture a retirement-intake record section by section. Tabs show whether required information is complete before you submit the file into workflow.</p>
           </div>
+          <div class="workspace-header-actions">
+            <button type="button" id="staffDueBulkUploadBtn" class="workspace-btn secondary hidden">Upload Bulk</button>
+            <button type="button" id="staffDueBackBtn" class="workspace-btn ghost">Back</button>
+          </div>
+        </header>
+
+        <div class="workspace-banner add-staff-banner registry-edit-form-banner">
+          <strong>Intake Guidance</strong>
+          <p>Complete the officer identity details first, review the system-computed benefit estimates next, and confirm the workflow defaults before you save. Bulk upload is available for validated schedules only.</p>
+        </div>
+      </div>
+
+      <div class="workspace-tabs registry-edit-tabs" id="addStaffTabs" role="tablist" aria-label="Add staff sections">
+        <button type="button" class="workspace-tab registry-edit-tab is-active" data-tab-target="identity" data-valid-state="neutral">
+          <span>Identity Profile</span><span class="workspace-tab-status" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="workspace-tab registry-edit-tab" data-tab-target="service" data-valid-state="neutral">
+          <span>Service &amp; Benefits</span><span class="workspace-tab-status" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="workspace-tab registry-edit-tab" data-tab-target="workflow" data-valid-state="neutral">
+          <span>Workflow Snapshot</span><span class="workspace-tab-status" aria-hidden="true"></span>
+        </button>
+      </div>
+
+      <form id="addStaffForm" class="fade-in add-staff-form">
+        <div class="workspace-panels registry-edit-panels">
+          <section class="workspace-panel registry-edit-panel-group is-active" data-panel="identity" role="tabpanel">
+            <div class="workspace-panel-scroll">
+              <h3 class="workspace-section-title">Identity Profile</h3>
+              <p class="workspace-section-copy">Capture the official file reference, name details, station information, and core contact identifiers exactly as they appear on the service record.</p>
+              <div class="form-grid add-staff-grid edit-grid">
+                <label class="form-group edit-field">
+                  <span>Reg No</span>
+                  <input type="text" id="regNo" name="regNo" data-text-case="upper" required />
+                </label>
+
+                <label class="form-group edit-field">
+                  <span>Computer No</span>
+                  <input type="text" id="computerNo" name="computerNo" />
+                </label>
+
+                <label class="form-group edit-field">
+                  <span>Title</span>
+                  <select id="title" name="title" required data-filterable-select>
+                    <option value="">Select Title</option>
+                  </select>
+                </label>
+
+                <label class="form-group edit-field">
+                  <span>Surname</span>
+                  <input type="text" id="sName" name="sName" required />
+                </label>
+
+                <label class="form-group edit-field">
+                  <span>First Name</span>
+                  <input type="text" id="fName" name="fName" required />
+                </label>
+
+                <label class="form-group edit-field">
+                  <span>Gender</span>
+                  <select id="gender" name="gender" required data-filterable-select>
+                    <option value="">Select</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </label>
+
+                <div class="form-group edit-field edit-field-span-2">
+                  <span>Prison Unit</span>
+                  <select id="prisonUnit" class="desktop-only" data-filterable-select>
+                    <option value="">Loading prison units...</option>
+                  </select>
+
+                  <div id="mobilePrisonSelect" class="mobile-only prison-select-trigger">Tap to select Prison Unit</div>
+
+                  <div id="prisonModal" class="logout-modal-overlay workflow-modal-overlay" style="display:none;">
+                    <div class="logout-modal" style="max-height:90vh; overflow-y:auto;">
+                      <div class="logout-modal-header">
+                        <div>
+                          <h3>Select Prison Unit</h3>
+                          <p>Search and choose the prison unit that matches the staff record.</p>
+                        </div>
+                      </div>
+                      <input type="text" id="prisonSearch" placeholder="Search prison unit..." />
+                      <div id="prisonList"></div>
+                      <div class="modal-actions">
+                        <button type="button" id="closePrisonModalBtn" class="btn-cancel">Close</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <label class="form-group edit-field">
+                  <span>NIN</span>
+                  <input type="text" id="NIN" name="NIN" />
+                </label>
+
+                <label class="form-group edit-field">
+                  <span>Tel No</span>
+                  <input type="text" id="telNo" name="telNo" placeholder="+256700123456 or 0770123456" />
+                </label>
+
+                <label class="form-group edit-field">
+                  <span>Birth Date</span>
+                  <input type="date" id="birthDate" name="birthDate" />
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section class="workspace-panel registry-edit-panel-group" data-panel="service" role="tabpanel">
+            <div class="workspace-panel-scroll">
+              <h3 class="workspace-section-title">Service &amp; Benefits</h3>
+              <p class="workspace-section-copy">Enter the service dates, retirement label, and salary once. The system then computes service duration, benefit estimates, and policy guidance automatically.</p>
+              <div class="form-grid add-staff-grid edit-grid">
+                <label class="form-group edit-field">
+                  <span>Enlistment Date</span>
+                  <input type="date" id="enlistmentDate" name="enlistmentDate" />
+                </label>
+
+                <label class="form-group edit-field">
+                  <span>Retirement Date</span>
+                  <input type="date" id="retirementDate" name="retirementDate" />
+                </label>
+
+                <label class="form-group edit-field">
+                  <span>Financial Year</span>
+                  <input type="text" id="financialYear" name="financialYear" readonly />
+                </label>
+
+                <label class="form-group edit-field">
+                  <span>Retirement Type</span>
+                  <select id="retirementType" name="retirementType" required data-filterable-select>
+                    <option value="">Select Type</option>
+                    <option value="mandatory">Mandatory Retirement</option>
+                    <option value="early">Early Retirement</option>
+                    <option value="death">Death</option>
+                    <option value="aor">Discharge (A.O.R)</option>
+                    <option value="medical">Discharge (Medical)</option>
+                    <option value="marriage">Discharge (Marriage)</option>
+                    <option value="cbe">Discharge (C.B.E)</option>
+                    <option value="ube">Discharge (U.B.E)</option>
+                    <option value="public">Discharge (Public Interest)</option>
+                    <option value="contract">End of Contract</option>
+                    <option value="tx">Discharge (T.X)</option>
+                    <option value="voluntary">Voluntary</option>
+                    <option value="oldAge">Old Age</option>
+                    <option value="abolition">Abolition of Office</option>
+                  </select>
+                </label>
+
+                <div class="form-group edit-field edit-field-span-2 workspace-inline-hint" id="retirementPolicyHint" data-state="neutral" hidden></div>
+
+                <label class="form-group edit-field">
+                  <span>Monthly Salary (UGX)</span>
+                  <input type="number" id="monthlySalary" name="monthlySalary" step="0.01" data-money-input data-money-fixed-decimals="2" />
+                </label>
+
+                <label class="form-group edit-field">
+                  <span>Length of Service (Months)</span>
+                  <input type="number" id="lengthOfService" name="lengthOfService" readonly />
+                </label>
+
+                <label class="form-group edit-field">
+                  <span>Annual Salary (UGX)</span>
+                  <input type="number" id="annualSalary" name="annualSalary" readonly data-money-input data-money-fixed-decimals="2" />
+                </label>
+
+                <label class="form-group edit-field">
+                  <span>Expected Reduced Monthly Pension (UGX)</span>
+                  <input type="number" id="reducedPension" name="reducedPension" readonly data-money-input data-money-fixed-decimals="2" />
+                </label>
+
+                <label class="form-group edit-field">
+                  <span>Expected Full Pension (UGX)</span>
+                  <input type="number" id="fullPension" name="fullPension" readonly data-money-input data-money-fixed-decimals="2" />
+                </label>
+
+                <label class="form-group edit-field">
+                  <span>Expected Commuted Pension Gratuity (UGX)</span>
+                  <input type="number" id="gratuity" name="gratuity" readonly data-money-input data-money-fixed-decimals="2" />
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section class="workspace-panel registry-edit-panel-group" data-panel="workflow" role="tabpanel">
+            <div class="workspace-panel-scroll">
+              <h3 class="workspace-section-title">Workflow Snapshot</h3>
+              <p class="workspace-section-copy">Review the initial intake status that will move with this record into the workflow queue after saving.</p>
+              <div class="form-grid add-staff-grid edit-grid">
+                <label class="form-group edit-field">
+                  <span>Submission Status</span>
+                  <input type="text" id="submissionStatus" name="submissionStatus" value="pending" readonly />
+                </label>
+
+                <label class="form-group edit-field">
+                  <span>Application Status</span>
+                  <input type="text" id="appnStatus" name="appnStatus" value="pending" readonly />
+                </label>
+              </div>
+            </div>
+          </section>
         </div>
 
-      </div>
-
-      <div class="form-group">
-        <label>NIN</label>
-        <input type="text" id="NIN" name="NIN" />
-      </div>
-
-      <div class="form-group">
-        <label>Tel No</label>
-        <input type="text" id="telNo" name="telNo" />
-      </div>
-
-      <div class="form-group">
-        <label>Birth Date</label>
-        <input type="date" id="birthDate" name="birthDate" />
-      </div>
-
-      <div class="form-group">
-        <label>Enlistment Date</label>
-        <input type="date" id="enlistmentDate" name="enlistmentDate" />
-      </div>
-
-      <div class="form-group">
-        <label>Retirement Date</label>
-        <input type="date" id="retirementDate" name="retirementDate" />
-      </div>
-
-      <div class="form-group">
-        <label>Financial Year</label>
-        <input type="text" id="financialYear" name="financialYear" readonly />
-      </div>
-
-      <div class="form-group">
-        <label>Retirement Type</label>
-        <select id="retirementType" name="retirementType" required>
-          <option value="">Select Type</option>
-          <option value="Mandatory">Mandatory</option>
-          <option value="Early">Early Retirement</option>
-          <option value="AOR">Discharge AOR</option>
-          <option value="Death">Death</option>
-          <option value="Medical">Medical</option>
-          <option value="Marriage">Marriage Grounds</option>
-          <option value="CBE">Discharge CBE</option>
-          <option value="UBE">Discharge UBE</option>
-          <option value="Contract">Contract</option>
-          <option value="TX">Time Expired</option>
-          <option value="Voluntary">Voluntary</option>
-          <option value="oldAge">Old Age</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label>Monthly Salary</label>
-        <input type="number" id="monthlySalary" name="monthlySalary" step="0.01" />
-      </div>
-
-      <div class="form-group">
-        <label>Length of Service (Months)</label>
-        <input type="number" id="lengthOfService" name="lengthOfService" readonly />
-      </div>
-
-      <div class="form-group">
-        <label>Annual Salary</label>
-        <input type="number" id="annualSalary" name="annualSalary" readonly />
-      </div>
-
-      <div class="form-group">
-        <label>Reduced Pension</label>
-        <input type="number" id="reducedPension" name="reducedPension" readonly />
-      </div>
-
-      <div class="form-group">
-        <label>Full Pension</label>
-        <input type="number" id="fullPension" name="fullPension" readonly />
-      </div>
-
-      <div class="form-group">
-        <label>Gratuity</label>
-        <input type="number" id="gratuity" name="gratuity" readonly />
-      </div>
-
-      <div class="form-group">
-        <label>Submission Status</label>
-        <select id="submissionStatus" name="submissionStatus" required>
-          <option value="pending">Pending</option>
-          <option value="submitted">Submitted</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label>Application Status</label>
-        <select id="appnStatus" name="appnStatus" required>
-          <option value="pending">Pending</option>
-          <option value="verified">Verified</option>
-          <option value="querried">Queried</option>
-          <option value="rejected">Rejected</option>
-        </select>
-      </div>
-
-      <div class="button-group">
-        <button type="submit" class="btn">Add Staff</button>
-        <button type="reset" class="btn btn-reset">Clear</button>
-      </div>
-    </form>
+        <div class="workspace-navigation">
+          <div class="workspace-navigation-group">
+            <button type="button" id="addStaffPrevBtn" class="workspace-nav-btn secondary">Previous</button>
+            <button type="button" id="addStaffNextBtn" class="workspace-nav-btn secondary">Next</button>
+          </div>
+          <div class="workspace-navigation-group">
+            <button type="reset" class="workspace-btn ghost">Clear</button>
+            <button type="submit" class="workspace-btn primary">Add Staff</button>
+          </div>
+        </div>
+        <p id="addStaffFormMessage" class="workspace-form-message"></p>
+      </form>
+    </section>
   </main>
 
-  <!-- Success Modal -->
-  <div id="successModal" class="logout-modal-overlay" style="display:none;">
-    <div class="logout-modal">
-      <h3>✅ Success</h3>
-      <p>Staff added successfully!</p>
-      <div class="modal-actions">
-        <button id="okButton" class="btn-confirm">OK</button>
-      </div>
-    </div>
+  <div id="staffDueBulkUploadModal" class="workspace-modal-overlay hidden" aria-hidden="true">
+    <div class="workspace-modal-backdrop" data-close-modal="staff-due-bulk"></div>
+    <section class="workspace-modal-panel" role="dialog" aria-modal="true" aria-labelledby="staffDueBulkUploadTitle">
+      <header class="workspace-modal-header">
+        <div>
+          <h3 id="staffDueBulkUploadTitle">Bulk Upload Staff Due Records</h3>
+          <p>Use the official CSV or XLSX template, run a dry check first, then apply the upload after reviewing the report.</p>
+        </div>
+        <button type="button" class="workspace-modal-close" data-close-modal="staff-due-bulk" aria-label="Close">&times;</button>
+      </header>
+      <form id="staffDueBulkUploadForm">
+        <div class="workspace-modal-body">
+          <div class="registry-bulk-upload-summary">
+            <span class="registry-meta-chip">Dataset: <strong>Staff Due for Retirement</strong></span>
+            <span class="registry-meta-chip">Accepted Files: <strong>CSV, XLSX</strong></span>
+            <span class="registry-meta-chip">Primary Key: <strong>File Number</strong></span>
+          </div>
+          <div class="registry-bulk-upload-note">
+            <div class="registry-bulk-upload-note-icon" aria-hidden="true">i</div>
+            <div>
+              <strong>Upload workflow</strong>
+              <p>Keep the headers intact, dry-check first, and only import validated staff-due schedules. Blank cells do not overwrite populated records during merges.</p>
+            </div>
+          </div>
+          <div class="registry-bulk-upload-grid">
+            <section class="registry-bulk-upload-card">
+              <div class="registry-bulk-upload-card-head">
+                <div>
+                  <h4>Template &amp; Source File</h4>
+                  <p>Download the official template, populate it, and upload it here.</p>
+                </div>
+                <button type="button" class="workspace-btn secondary" id="staffDueBulkDownloadTemplateBtn">Download CSV Template</button>
+              </div>
+              <div class="form-group">
+                <label>Import File</label>
+                <input type="file" id="staffDueBulkUploadFile" name="import_file" accept=".csv,.xlsx" required>
+              </div>
+            </section>
+            <section class="registry-bulk-upload-card">
+              <div class="registry-bulk-upload-card-head">
+                <div>
+                  <h4>Validation Highlights</h4>
+                  <p>The dry check reports row-level issues before anything is imported.</p>
+                </div>
+              </div>
+              <ul class="registry-bulk-upload-list">
+                <li>File Number is the primary matching key.</li>
+                <li>Title and prison unit values should match approved master data.</li>
+                <li>Retirement dates automatically derive the financial year.</li>
+                <li>Computed benefits are recalculated server-side during import.</li>
+              </ul>
+            </section>
+          </div>
+          <div id="staffDueBulkUploadReport" class="registry-bulk-upload-report hidden"></div>
+        </div>
+        <footer class="workspace-modal-footer">
+          <button type="button" class="workspace-btn ghost" data-close-modal="staff-due-bulk">Close</button>
+          <button type="button" class="workspace-btn secondary" id="staffDueBulkDryRunBtn">Run Dry Check</button>
+          <button type="submit" class="workspace-btn primary" id="staffDueBulkImportBtn">Import Data</button>
+        </footer>
+      </form>
+    </section>
   </div>
 </body>
 </html>
+
+
+
+

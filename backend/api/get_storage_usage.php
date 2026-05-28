@@ -1,9 +1,8 @@
 <?php
-// ============================================================================
+// 
 // get_storage_usage.php
 // Purpose: Calculate user's storage usage for messages and attachments
-// ============================================================================
-
+// 
 require_once __DIR__ . '/../config.php';
 header('Content-Type: application/json');
 
@@ -14,7 +13,12 @@ if (!isset($_SESSION['userId'])) {
 
 try {
     $userId = $_SESSION['userId'];
-    $maxStorage = 100 * 1024 * 1024; // 100MB in bytes
+    $quotaRaw = function_exists('getAppSetting') ? getAppSetting($conn, 'message_storage_quota_mb') : null;
+    $quotaMb = is_numeric($quotaRaw) ? (int)$quotaRaw : 100;
+    if ($quotaMb <= 0) {
+        $quotaMb = 100;
+    }
+    $maxStorage = $quotaMb * 1024 * 1024;
     
     // Calculate storage used by attachments
     $attachmentStmt = $conn->prepare("
@@ -57,7 +61,7 @@ try {
             'used_bytes' => (int)$totalUsed,
             'max_bytes' => $maxStorage,
             'used_mb' => round($totalUsed / (1024 * 1024), 2),
-            'max_mb' => 100,
+            'max_mb' => $quotaMb,
             'percentage' => round($usagePercentage, 1),
             'remaining_mb' => round(($maxStorage - $totalUsed) / (1024 * 1024), 2)
         ]
@@ -73,3 +77,4 @@ try {
 
 $conn->close();
 ?>
+

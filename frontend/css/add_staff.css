@@ -1,204 +1,489 @@
 @import url("color-variables.css");
 
-.add-staff-wrapper {
-  max-width: 900px;
-  margin: auto;
-  padding: 1.5rem;
-  background: var(--card-bg);
-  border-radius: 10px;
-  box-shadow: 0 2px 12px var(--shadow-light);
+.add-staff-page {
+  min-height: 100vh;
+  padding: 1rem;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--card-bg) 92%, var(--primary-blue) 8%), color-mix(in srgb, var(--card-bg) 98%, var(--primary-maroon) 2%));
 }
 
-.form-header h2 {
-  color: var(--primary-blue);
-  margin-bottom: 0.2rem;
+.add-staff-page *,
+.add-staff-page *::before,
+.add-staff-page *::after {
+  box-sizing: border-box;
 }
 
-.form-header p {
-  color: var(--muted-color);
-  margin-bottom: 1.5rem;
+.add-staff-shell {
+  max-width: 1120px;
+  margin: 0 auto;
+  gap: 0.75rem;
 }
 
-.form-grid {
+.workspace-header-stack {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1rem;
+  gap: 0.65rem;
 }
 
-.form-group label {
-  font-weight: 600;
-  color: var(--label-color);
+.add-staff-form {
+  display: grid;
+  gap: 0.75rem;
 }
 
-.form-group input,
-.form-group select {
-  width: 100%;
-  padding: 0.6rem;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background: var(--input-bg);
-  color: var(--input-text);
+.add-staff-shell .workspace-header {
+  padding: 0.95rem 1rem;
 }
 
-.form-group input:focus,
-.form-group select:focus {
-  border-color: var(--focus-color);
-  outline: none;
+.add-staff-shell .workspace-header h2 {
+  font-size: 1.28rem;
 }
 
-.full-width {
-  grid-column: 1 / -1;
+.add-staff-shell .workspace-header p {
+  font-size: 0.84rem;
+  max-width: 68ch;
 }
 
-.form-actions {
-  margin-top: 1.5rem;
+.add-staff-banner.registry-edit-form-banner {
   display: flex;
-  gap: 1rem;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin: 0;
+  padding: 0.82rem 0.92rem;
+  border: 1px solid color-mix(in srgb, var(--primary-blue) 22%, var(--border-color) 78%);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--primary-gold) 20%, transparent) 0, transparent 44%),
+    linear-gradient(145deg, color-mix(in srgb, var(--card-bg) 86%, var(--primary-blue) 14%), color-mix(in srgb, var(--card-bg) 94%, var(--primary-maroon) 6%));
 }
 
-.btn-submit {
-  background: var(--primary-maroon);
+.add-staff-banner strong {
+  display: block;
+  color: var(--heading-color);
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+.add-staff-banner p {
+  margin: 0.25rem 0 0;
+  color: var(--muted-color);
+  font-size: 0.83rem;
+  line-height: 1.5;
+  max-width: 70ch;
+}
+
+.add-staff-shell .registry-edit-tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.3rem;
+  margin: 0;
+  scrollbar-width: thin;
+}
+
+.add-staff-shell .registry-edit-tab {
+  border: 1px solid color-mix(in srgb, var(--primary-blue) 24%, var(--border-color) 76%);
+  background: color-mix(in srgb, var(--card-bg) 94%, var(--menu-bg-dark) 6%);
+  color: var(--heading-color);
+  border-radius: 999px;
+  padding: 0.46rem 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.48rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+
+.add-staff-shell .registry-edit-tab:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--primary-blue) 45%, var(--border-color) 55%);
+}
+
+.add-staff-shell .registry-edit-tab.is-active {
+  background: linear-gradient(145deg, var(--primary-blue), color-mix(in srgb, var(--primary-blue) 76%, #001b38 24%));
+  border-color: color-mix(in srgb, var(--primary-blue) 60%, var(--border-color) 40%);
   color: #fff;
-  padding: 0.8rem 1.5rem;
-  border: none;
-  border-radius: 6px;
+}
+
+.add-staff-shell .workspace-tab-status {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  font-weight: 800;
+  flex: 0 0 auto;
+  background: color-mix(in srgb, var(--border-color) 76%, transparent 24%);
+  color: transparent;
+}
+
+.add-staff-shell .workspace-tab[data-valid-state="valid"] .workspace-tab-status {
+  background: color-mix(in srgb, var(--success-color) 18%, transparent 82%);
+  color: var(--success-color);
+}
+
+.add-staff-shell .workspace-tab[data-valid-state="valid"] .workspace-tab-status::before {
+  content: "\2713";
+}
+
+.add-staff-shell .workspace-tab[data-valid-state="invalid"] .workspace-tab-status {
+  background: color-mix(in srgb, var(--error-color) 18%, transparent 82%);
+  color: var(--error-color);
+}
+
+.add-staff-shell .workspace-tab[data-valid-state="invalid"] .workspace-tab-status::before {
+  content: "!";
+}
+
+.add-staff-shell .workspace-tab[data-valid-state="neutral"] .workspace-tab-status::before,
+.add-staff-shell .workspace-tab:not([data-valid-state]) .workspace-tab-status::before {
+  content: "\2022";
+  color: color-mix(in srgb, var(--muted-color) 74%, transparent 26%);
+}
+
+.add-staff-shell .registry-edit-panels {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: color-mix(in srgb, var(--card-bg) 96%, var(--menu-bg-dark) 4%);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.add-staff-shell .registry-edit-panel-group {
+  display: none;
+}
+
+.add-staff-shell .registry-edit-panel-group.is-active {
+  display: block;
+}
+
+.add-staff-shell .workspace-panel-scroll {
+  max-height: min(62vh, 760px);
+  overflow-y: auto;
+  padding-right: 0.15rem;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable both-edges;
+}
+
+.add-staff-shell .workspace-section-title {
+  margin: 0 0 0.3rem;
+  color: var(--heading-color);
+  font-size: 0.95rem;
+}
+
+.workspace-section-copy {
+  margin: 0 0 0.7rem;
+  color: var(--muted-color);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.add-staff-shell .edit-grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.add-staff-shell .edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  margin: 0;
+}
+
+.add-staff-shell .edit-field > span {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.28px;
+  color: var(--muted-color);
+  font-weight: 700;
+}
+
+.add-staff-shell .edit-field input,
+.add-staff-shell .edit-field select,
+.add-staff-shell .edit-field textarea,
+.add-staff-shell .prison-select-trigger,
+.add-staff-shell .filterable-select-control {
+  width: 100%;
+  min-height: 39px;
+  padding: 0.54rem 0.65rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text-color);
+}
+
+.add-staff-shell .edit-field input:focus,
+.add-staff-shell .edit-field select:focus,
+.add-staff-shell .prison-select-trigger:focus,
+.add-staff-shell .filterable-select-control:focus-within {
+  outline: none;
+  border-color: color-mix(in srgb, var(--primary-blue) 55%, var(--border-color) 45%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-blue) 12%, transparent 88%);
+}
+
+.add-staff-shell .edit-field input[readonly],
+.add-staff-shell .edit-field input:read-only {
+  background: color-mix(in srgb, var(--menu-bg-dark) 78%, var(--card-bg) 22%);
+  color: var(--muted-color);
+  cursor: not-allowed;
+}
+
+.add-staff-shell .edit-field select:disabled {
+  opacity: 1;
+  color: var(--text-color);
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--primary-blue) 22%, var(--border-color) 78%);
+  background: color-mix(in srgb, var(--card-bg) 88%, var(--primary-blue) 12%);
+  cursor: not-allowed;
+}
+
+.add-staff-shell .edit-field-span-2 {
+  grid-column: span 2;
+}
+
+.add-staff-shell .workspace-inline-hint {
+  grid-column: 1 / -1;
+  margin: -0.1rem 0 0;
+  padding: 0.76rem 0.88rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--primary-blue) 16%, var(--border-color) 84%);
+  background: color-mix(in srgb, var(--primary-blue) 5%, var(--card-bg) 95%);
+  color: var(--muted-color);
+  font-size: 0.81rem;
+  line-height: 1.5;
+}
+
+.add-staff-shell .workspace-inline-hint[data-state="warning"] {
+  border-color: color-mix(in srgb, var(--warning-color) 38%, var(--border-color) 62%);
+  background: color-mix(in srgb, var(--warning-color) 10%, var(--card-bg) 90%);
+  color: color-mix(in srgb, var(--warning-color) 78%, var(--text-color) 22%);
+}
+
+.add-staff-shell .workspace-inline-hint[data-state="error"] {
+  border-color: color-mix(in srgb, var(--danger-color) 36%, var(--border-color) 64%);
+  background: color-mix(in srgb, var(--danger-color) 8%, var(--card-bg) 92%);
+  color: color-mix(in srgb, var(--danger-color) 76%, var(--text-color) 24%);
+}
+
+.add-staff-shell .workspace-inline-hint[data-state="valid"] {
+  border-color: color-mix(in srgb, var(--success-color) 36%, var(--border-color) 64%);
+  background: color-mix(in srgb, var(--success-color) 9%, var(--card-bg) 91%);
+  color: color-mix(in srgb, var(--success-color) 72%, var(--text-color) 28%);
+}
+
+.add-staff-shell .filterable-select-shell {
+  position: relative;
+  width: 100%;
+}
+
+.add-staff-shell .filterable-select-input {
+  min-height: calc(var(--control-height) - 2px);
+  padding: 0.58rem 0.72rem;
+}
+
+.add-staff-shell .filterable-select-toggle {
+  min-height: calc(var(--control-height) - 2px);
+}
+
+.add-staff-shell .filterable-select-menu {
+  border-radius: 12px;
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.16);
+}
+
+.prison-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
   cursor: pointer;
-  transition: all 0.3s ease;
 }
 
-.btn-submit:hover {
-  background: var(--primary-maroon-dark);
-  transform: translateY(-2px);
+.prison-select-trigger::after {
+  content: "Browse";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary-blue) 12%, transparent 88%);
+  color: var(--primary-blue);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
-.btn-cancel {
-  background: #ccc;
-  color: #000;
-  padding: 0.8rem 1.5rem;
-  border: none;
-  border-radius: 6px;
+.add-staff-shell .workspace-navigation {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.add-staff-shell .workspace-navigation-group {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.add-staff-shell .workspace-btn,
+.add-staff-shell .workspace-nav-btn {
+  padding: 0.56rem 0.92rem;
+  font-size: 0.8rem;
+}
+
+.add-staff-shell .workspace-form-message {
+  margin: 0;
+  min-height: 1rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.add-staff-shell .workspace-form-message.success {
+  color: var(--success-color);
+}
+
+.add-staff-shell .workspace-form-message.error {
+  color: var(--error-color);
+}
+
+.add-staff-page #prisonModal {
+  position: fixed;
+  inset: 0;
+  z-index: 14060;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(10, 10, 10, 0.6);
+  backdrop-filter: blur(2px);
+}
+
+.add-staff-page #prisonModal .logout-modal {
+  width: min(700px, 94vw);
+  max-height: min(82vh, 700px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding: 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
+}
+
+.add-staff-page #prisonModal h3 {
+  margin: 0;
+  color: var(--heading-color);
+}
+
+.add-staff-page #prisonModal input#prisonSearch {
+  width: 100%;
+  margin: 0;
+  padding: 0.62rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-color);
+}
+
+.add-staff-page #prisonList {
+  display: grid;
+  gap: 0.45rem;
+  max-height: min(54vh, 420px);
+  overflow-y: auto;
+}
+
+.add-staff-page #prisonList .prison-item {
+  padding: 0.62rem 0.72rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--card-bg) 95%, var(--menu-bg-dark) 5%);
   cursor: pointer;
+  transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
 }
 
-.btn-cancel:hover {
-  background: #bbb;
+.add-staff-page #prisonList .prison-item:hover {
+  border-color: color-mix(in srgb, var(--primary-blue) 42%, var(--border-color) 58%);
+  background: color-mix(in srgb, var(--primary-blue) 8%, var(--card-bg) 92%);
+  transform: translateY(-1px);
 }
 
-/* Prison Unit Modal Styling */
-    .mobile-search-modal {
-      position: fixed;
-      top: 15%;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 90%;
-      max-width: 400px;
-      height: 65vh;
-      background: var(--form-bg);
-      border: 1px solid var(--input-border);
-      border-radius: 10px;
-      box-shadow: 0 4px 12px var(--shadow-medium);
-      z-index: 9999;
-      display: none;
-      flex-direction: column;
-      padding: 1rem;
-      overflow: hidden;
-    }
+body.modal-open {
+  overflow: hidden;
+  touch-action: none;
+}
 
-    .mobile-search-modal input {
-      padding: 0.6rem;
-      border: 1px solid var(--input-border);
-      border-radius: 6px;
-      margin-bottom: 0.6rem;
-      width: 100%;
-      color: var(--input-text);
-      background: var(--input-bg);
-    }
+.mobile-only {
+  display: none;
+}
 
-    .mobile-search-modal select {
-      flex: 1;
-      overflow-y: auto;
-      border: 1px solid var(--input-border);
-      border-radius: 6px;
-      background: var(--input-bg);
-      color: var(--input-text);
-      padding: 0.3rem;
-    }
+.desktop-only {
+  display: block;
+}
 
-    .mobile-search-modal button {
-      margin-top: 0.6rem;
-      padding: 0.6rem;
-      background: var(--primary-color);
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: bold;
-    }
+@media (max-width: 960px) {
+  .add-staff-shell .workspace-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
 
-    .mobile-search-modal button:hover {
-      background: var(--primary-dark);
-    }
+  .add-staff-shell .workspace-header-actions {
+    justify-content: flex-start;
+  }
 
-    /* Hide native dropdown arrow for mobile */
-    @media (max-width: 768px) {
-      select#prisonUnit {
-        pointer-events: none;
+  .add-staff-shell .edit-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 
-      }
-    }
+  .add-staff-shell .edit-field-span-2 {
+    grid-column: 1 / -1;
+  }
+}
 
+@media (max-width: 768px) {
+  .add-staff-page {
+    padding: 0.8rem;
+  }
 
-    .mobile-only { display: none; }
-    .desktop-only { display: block; }
+  .mobile-only {
+    display: block;
+  }
 
-    .prison-select-trigger {
-      background: var(--input-bg);
-      padding: 0.6rem;
-      border-radius: 5px;
-      border: 1px solid var(--input-border);
-      cursor: pointer;
-      color: var(--input-text);
-    }
+  .desktop-only {
+    display: none;
+  }
 
-    @media (max-width: 768px) {
-      .mobile-only { display: block; }
-      .desktop-only { display: none; }
-    }
+  .add-staff-shell .edit-grid {
+    grid-template-columns: 1fr;
+  }
 
-    /* Better layout for mobile search bar */
-    #prisonModal input#prisonSearch {
-      width: 92%;
-      margin: 10px auto;
-      display: block;
-      padding: 0.6rem;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-    }
+  .add-staff-shell .edit-field-span-2 {
+    grid-column: 1 / -1;
+  }
 
-    /* Lock body scroll when modal is active */
-    body.modal-open {
-      overflow: hidden;
-      touch-action: none;
-    }
+  .add-staff-shell .workspace-navigation {
+    flex-direction: column;
+    align-items: stretch;
+  }
 
-    /* ================================
-   ✅ SELECT DROPDOWN IMPROVEMENT
-   ================================ */
-    select {
-      max-height: 150px; /* Show ~5 options */
-      overflow-y: auto;
-    }
+  .add-staff-shell .workspace-navigation-group {
+    width: 100%;
+  }
 
-    select option {
-      padding: 8px;
-      font-size: 0.95rem;
-    }
-
-    /* Improve appearance on desktop */
-    @media (min-width: 769px) {
-      select {
-        height: auto;
-        line-height: 1.5;
-      }
-    }
+  .add-staff-shell .workspace-navigation-group .workspace-btn,
+  .add-staff-shell .workspace-navigation-group .workspace-nav-btn {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+}

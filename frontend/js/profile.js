@@ -1,5 +1,15 @@
 // frontend/js/profile.js
 document.addEventListener('DOMContentLoaded', () => {
+    function resolveCurrentUserId() {
+        const sessionId = sessionStorage.getItem('userId');
+        if (sessionId) return sessionId;
+        try {
+            const stored = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
+            return stored.id || stored.userId || '';
+        } catch (_error) {
+            return '';
+        }
+    }
     // DOM Elements
     const profileAvatar = document.getElementById('profileAvatar');
     const profileName = document.getElementById('profileName');
@@ -10,16 +20,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const profileTitleLabel = document.getElementById('profileTitleLabel');
     const editProfileBtn = document.getElementById('editProfileBtn');
     const backToDashboardBtn = document.getElementById('backToDashboardBtn');
+    const lookupVisibilityCard = document.getElementById('pensionerLookupVisibilityCard');
+    const lookupVisibilityStatus = document.getElementById('pensionerLookupVisibilityStatus');
+    const lookupVisibilityHelp = document.getElementById('pensionerLookupVisibilityHelp');
+    const lookupVisibilityToggle = document.getElementById('pensionerLookupVisibilityToggle');
+    const lookupVisibilityToggleText = document.getElementById('pensionerLookupVisibilityToggleText');
+    let lookupContext = null;
 
     initializeProfilePage();
 
-    // ------------------ Event Listeners ------------------
+    // Event Listeners
     if (editProfileBtn) editProfileBtn.addEventListener('click', redirectToEditProfile);
     if (backToDashboardBtn) backToDashboardBtn.addEventListener('click', redirectToDashboard);
+    if (lookupVisibilityToggle) lookupVisibilityToggle.addEventListener('click', toggleLookupVisibility);
 
-    // ------------------ Initialize Profile ------------------
+    // Initialize Profile
     async function initializeProfilePage() {
         const currentUser = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
+        const resolvedUserId = resolveCurrentUserId();
+        if (!currentUser.id && resolvedUserId) {
+            currentUser.id = resolvedUserId;
+        }
 
         if (!currentUser.id) {
             showError('User not logged in. Redirecting to login...');
@@ -42,14 +63,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 localStorage.setItem('loggedInUser', JSON.stringify(completeUserData));
                 populateProfileData(completeUserData);
-            } else populateProfileData(currentUser);
+                initializePensionerLookupVisibility(completeUserData.role);
+            } else {
+                populateProfileData(currentUser);
+                initializePensionerLookupVisibility(currentUser.role);
+            }
         } catch (error) {
             console.error('Error fetching user data:', error);
             populateProfileData(currentUser);
+            initializePensionerLookupVisibility(currentUser.role);
         }
     }
 
-    // ------------------ Fetch User from API ------------------
+    // Fetch User from API
     async function fetchUserData(userId) {
         try {
             const res = await fetch(`../backend/api/get_user.php?userId=${userId}`);
@@ -64,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ------------------ Populate Profile ------------------
+    // Populate Profile
     function populateProfileData(user) {
         console.log('Populating profile with:', user);
 
@@ -103,7 +129,115 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ------------------ Helpers ------------------
+    async function initializePensionerLookupVisibility(role) {
+        const normalizedRole = String(role || '').trim().toLowerCase();
+        if (normalizedRole !== 'pensioner') {
+            if (lookupVisibilityCard) lookupVisibilityCard.hidden = true;
+            return;
+        }
+
+        if (lookupVisibilityCard) lookupVisibilityCard.hidden = false;
+        try {
+            const response = await fetch('../backend/api/get_pensioner_lookup_context.php', {
+                credentials: 'include',
+                cache: 'no-store',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Unable to load pensioner directory visibility.');
+            }
+            lookupContext = data;
+            renderLookupVisibilityState();
+        } catch (error) {
+            console.error('Unable to load pensioner lookup visibility:', error);
+            if (lookupVisibilityStatus) lookupVisibilityStatus.textContent = 'Unavailable';
+            if (lookupVisibilityHelp) lookupVisibilityHelp.textContent = error.message || 'Unable to load pensioner directory visibility.';
+            if (lookupVisibilityToggle) {
+                lookupVisibilityToggle.disabled = true;
+                lookupVisibilityToggle.textContent = 'Off';
+                lookupVisibilityToggle.classList.remove('is-on');
+                lookupVisibilityToggle.setAttribute('aria-pressed', 'false');
+            }
+            lookupVisibilityCard?.classList.add('is-disabled');
+        }
+    }
+
+    function renderLookupVisibilityState() {
+        if (!lookupVisibilityCard) return;
+        const enabled = Boolean(lookupContext?.enabled);
+        const visible = Boolean(lookupContext?.visibilityEnabled);
+
+        lookupVisibilityCard.classList.toggle('is-disabled', !enabled);
+
+        if (lookupVisibilityStatus) {
+            lookupVisibilityStatus.textContent = enabled
+                ? (visible ? 'Visible to fellow pensioners' : 'Hidden from directory')
+                : 'Directory disabled';
+        }
+
+        if (lookupVisibilityHelp) {
+            lookupVisibilityHelp.textContent = enabled
+                ? (visible
+                    ? 'Fellow pensioners can find your shared contact details in the directory.'
+                    : 'Your contact details are currently hidden from the pensioner directory.')
+                : 'The pensioner directory is currently disabled by the pensions office.';
+        }
+
+        if (lookupVisibilityToggle) {
+            lookupVisibilityToggle.disabled = !enabled;
+            lookupVisibilityToggle.classList.toggle('is-on', visible && enabled);
+            lookupVisibilityToggle.setAttribute('aria-pressed', visible && enabled ? 'true' : 'false');
+        }
+        if (lookupVisibilityToggleText) {
+            lookupVisibilityToggleText.textContent = visible && enabled ? 'On' : 'Off';
+        }
+    }
+
+    async function toggleLookupVisibility() {
+        if (!lookupContext?.enabled || !lookupVisibilityToggle) {
+            return;
+        }
+
+        const nextVisible = !Boolean(lookupContext.visibilityEnabled);
+        lookupVisibilityToggle.disabled = true;
+        try {
+            const response = await fetch('../backend/api/update_pensioner_lookup_visibility.php', {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ visible: nextVisible })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Unable to update pensioner directory visibility.');
+            }
+
+            lookupContext = {
+                ...(lookupContext || {}),
+                visibilityEnabled: Boolean(data.visible)
+            };
+            renderLookupVisibilityState();
+        } catch (error) {
+            console.error('Unable to update pensioner lookup visibility:', error);
+            if (lookupVisibilityHelp) {
+                lookupVisibilityHelp.textContent = error.message || 'Unable to update pensioner directory visibility.';
+            }
+        } finally {
+            if (lookupVisibilityToggle) {
+                lookupVisibilityToggle.disabled = !lookupContext?.enabled;
+            }
+        }
+    }
+
+    // Helpers
     function resolveImagePath(imagePath) {
         if (!imagePath || imagePath === 'images/default-user.png') return 'images/default-user.png';
         if (imagePath.startsWith('http') || imagePath.startsWith('data:')) return imagePath;
@@ -116,9 +250,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function formatRole(role) {
         const map = {
+            super_admin: 'Super Administrator',
             admin: 'Administrator',
             clerk: 'Clerk',
-            oc_pen: 'OC Pen Officer',
+            oc_pen: 'OC/Pension',
+            dep_oc: 'Deputy OC/Pension',
+            deputy_oc: 'Deputy OC/Pension',
+            deputy_oc_pen: 'Deputy OC/Pension',
+            deputy_oc_pension: 'Deputy OC/Pension',
             writeup_officer: 'Writeup Officer',
             file_creator: 'File Creator',
             data_entry: 'Data Entrant',
@@ -133,7 +272,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function redirectToEditProfile() {
         const currentUser = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
-        if (currentUser.id) window.location.href = `edit_user.html?user_id=${currentUser.id}`;
+        const resolvedId = currentUser.id || currentUser.userId || resolveCurrentUserId();
+        if (resolvedId) window.location.href = `edit_user.html?user_id=${encodeURIComponent(resolvedId)}`;
         else showError('Unable to determine user ID. Please login again.');
     }
 
@@ -141,12 +281,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const user = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
         const role = user.role?.toLowerCase() || 'user';
         const dashboards = {
+            super_admin: 'dashboard.html',
             admin: 'dashboard.html',
             user: 'dashboard.html',
-            clerk: 'file_registry.html',
-            pensioner: 'pensioner_board.html'
+            clerk: 'pension_file_registry.html',
+            pensioner: 'pensioner_board.html',
+            oc_pen: 'dashboard.html',
+            dep_oc: 'dashboard.html',
+            deputy_oc: 'dashboard.html',
+            deputy_oc_pen: 'dashboard.html',
+            deputy_oc_pension: 'dashboard.html',
+            writeup_officer: 'tasks.html',
+            file_creator: 'tasks.html',
+            data_entry: 'tasks.html',
+            assessor: 'tasks.html',
+            auditor: 'tasks.html',
+            approver: 'tasks.html'
         };
-        window.location.href = dashboards[role] || 'taskboard.html';
+        window.location.href = dashboards[role] || 'tasks.html';
     }
 
     function showError(msg) {
@@ -174,3 +326,4 @@ document.addEventListener('DOMContentLoaded', () => {
         populateProfileData(u);
     };
 });
+

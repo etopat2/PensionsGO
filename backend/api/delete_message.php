@@ -1,11 +1,11 @@
 <?php
-// ============================================================================
+// 
 // delete_message.php
 // Purpose: Proper soft deletion that respects foreign key constraints
 //          Correct deletion order, proper soft delete logic
-// ============================================================================
-
+// 
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../runtime_admin_tools.php';
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -18,6 +18,11 @@ if (!isset($_SESSION['userId'])) {
     exit;
 }
 
+if (!currentUserCanAccessMessagingModule()) {
+    echo json_encode(['success' => false, 'message' => 'Access denied']);
+    exit;
+}
+
 $data = json_decode(file_get_contents('php://input'), true);
 $messageIds = $data["ids"] ?? [];
 if (!is_array($messageIds) || empty($messageIds)) {
@@ -25,13 +30,78 @@ if (!is_array($messageIds) || empty($messageIds)) {
     exit;
 }
 
+function ensureMessageDeletionSchema(mysqli $conn): void {
+    static $checked = false;
+    if ($checked) {
+        return;
+    }
+
+    $tableColumns = [];
+    foreach (['tb_messages', 'tb_message_recipients', 'tb_user_broadcast_status'] as $tableName) {
+        $tableColumns[$tableName] = [];
+        $result = $conn->query("SHOW COLUMNS FROM {$tableName}");
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $tableColumns[$tableName][$row['Field']] = true;
+            }
+            $result->close();
+        }
+    }
+
+    $requiredColumns = [
+        'tb_messages' => [
+            'is_deleted_by_sender' => "TINYINT(1) NOT NULL DEFAULT 0",
+            'deleted_by_sender_at' => "DATETIME DEFAULT NULL"
+        ],
+        'tb_message_recipients' => [
+            'is_deleted' => "TINYINT(1) NOT NULL DEFAULT 0",
+            'deleted_at' => "DATETIME DEFAULT NULL",
+            'is_read' => "TINYINT(1) NOT NULL DEFAULT 0",
+            'read_at' => "DATETIME DEFAULT NULL"
+        ],
+        'tb_user_broadcast_status' => [
+            'is_deleted' => "TINYINT(1) NOT NULL DEFAULT 0",
+            'deleted_at' => "DATETIME DEFAULT NULL",
+            'is_seen' => "TINYINT(1) NOT NULL DEFAULT 0",
+            'seen_at' => "DATETIME DEFAULT NULL"
+        ]
+    ];
+
+    foreach ($requiredColumns as $tableName => $columns) {
+        foreach ($columns as $column => $definition) {
+            if (empty($tableColumns[$tableName][$column])) {
+                $conn->query("ALTER TABLE {$tableName} ADD COLUMN {$column} {$definition}");
+            }
+        }
+    }
+
+    $checked = true;
+}
+
+function attachmentHashColumnExists($conn): bool {
+    static $checked = false;
+    static $exists = false;
+    if ($checked) {
+        return $exists;
+    }
+
+    $result = $conn->query("SHOW COLUMNS FROM tb_message_attachments LIKE 'file_hash'");
+    $exists = $result && $result->num_rows > 0;
+    $checked = true;
+    return $exists;
+}
+
 // Function to delete physical attachment files
 function deleteAttachmentFiles($messageId, $conn) {
     $deletedFiles = 0;
+    $dedupeEnabled = function_exists('getAppSettingBool')
+        ? getAppSettingBool($conn, 'attachment_dedupe_enabled', false)
+        : false;
+    $hasHash = attachmentHashColumnExists($conn);
     
     // Get all attachments for this message
     $stmt = $conn->prepare("
-        SELECT file_path 
+        SELECT file_path, file_hash 
         FROM tb_message_attachments 
         WHERE message_id = ?
     ");
@@ -42,7 +112,39 @@ function deleteAttachmentFiles($messageId, $conn) {
         
         while ($row = $result->fetch_assoc()) {
             $filePath = __DIR__ . '/../' . $row['file_path'];
-            if (file_exists($filePath)) {
+            $shouldDelete = true;
+
+            if ($dedupeEnabled) {
+                if ($hasHash && !empty($row['file_hash'])) {
+                    $checkStmt = $conn->prepare("
+                        SELECT COUNT(*) AS cnt
+                        FROM tb_message_attachments
+                        WHERE file_hash = ? AND message_id != ?
+                    ");
+                    if ($checkStmt) {
+                        $checkStmt->bind_param("si", $row['file_hash'], $messageId);
+                        $checkStmt->execute();
+                        $countRow = $checkStmt->get_result()->fetch_assoc();
+                        $checkStmt->close();
+                        $shouldDelete = ((int)($countRow['cnt'] ?? 0) === 0);
+                    }
+                } else {
+                    $checkStmt = $conn->prepare("
+                        SELECT COUNT(*) AS cnt
+                        FROM tb_message_attachments
+                        WHERE file_path = ? AND message_id != ?
+                    ");
+                    if ($checkStmt) {
+                        $checkStmt->bind_param("si", $row['file_path'], $messageId);
+                        $checkStmt->execute();
+                        $countRow = $checkStmt->get_result()->fetch_assoc();
+                        $checkStmt->close();
+                        $shouldDelete = ((int)($countRow['cnt'] ?? 0) === 0);
+                    }
+                }
+            }
+
+            if ($shouldDelete && file_exists($filePath)) {
                 if (unlink($filePath)) {
                     $deletedFiles++;
                 }
@@ -143,7 +245,18 @@ function shouldDeleteCompletely($messageId, $conn) {
 
 try {
     $userId = $_SESSION['userId'];
-    $userRole = $_SESSION['userRole'] ?? '';
+    $userRole = getSessionEffectiveRoleKey($conn);
+    $allowSoftDelete = getAppSettingBool($conn, 'message_allow_soft_delete', true);
+    ensureMessageDeletionSchema($conn);
+    if (getAppSettingBool($conn, 'message_backup_enabled', false)) {
+        createMessageStorageSnapshot($conn, [
+            'snapshot_type' => 'manual',
+            'notes' => 'Snapshot captured before message deletion workflow.',
+            'created_by' => $_SESSION['userId'] ?? null,
+            'created_by_name' => $_SESSION['userName'] ?? null,
+            'created_by_role' => $_SESSION['userRole'] ?? null
+        ]);
+    }
     $conn->begin_transaction();
 
     // Validate and cast to integers
@@ -174,7 +287,13 @@ try {
     ");
     
     $types = str_repeat('i', count($validIds));
-    $checkStmt->bind_param("s" . $types, $userId, ...$validIds);
+    $bindParams = [];
+    $bindParams[] = "s" . $types;
+    $paramValues = array_merge([$userId], $validIds);
+    foreach ($paramValues as $key => $value) {
+        $bindParams[] = &$paramValues[$key];
+    }
+    call_user_func_array([$checkStmt, 'bind_param'], $bindParams);
     $checkStmt->execute();
     $messages = $checkStmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $checkStmt->close();
@@ -196,15 +315,38 @@ try {
                 $completelyDeletedMessages++;
                 
             } else {
-                // Non-admin users mark broadcast as deleted for themselves only
-                $userBroadcastStmt = $conn->prepare("
-                    INSERT INTO tb_user_broadcast_status (user_id, broadcast_id, is_seen, seen_at, is_deleted)
-                    VALUES (?, ?, TRUE, NOW(), TRUE)
-                    ON DUPLICATE KEY UPDATE is_deleted = TRUE, deleted_at = NOW()
-                ");
-                $userBroadcastStmt->bind_param("si", $userId, $message['broadcast_id']);
-                $userBroadcastStmt->execute();
-                $userBroadcastStmt->close();
+                if ($allowSoftDelete) {
+                    // Non-admin users mark broadcast as deleted for themselves only
+                    $userBroadcastStmt = $conn->prepare("
+                        INSERT INTO tb_user_broadcast_status (user_id, broadcast_id, is_seen, seen_at, is_deleted)
+                        VALUES (?, ?, TRUE, NOW(), TRUE)
+                        ON DUPLICATE KEY UPDATE is_deleted = TRUE, deleted_at = NOW()
+                    ");
+                    $userBroadcastStmt->bind_param("si", $userId, $message['broadcast_id']);
+                    $userBroadcastStmt->execute();
+                    $userBroadcastStmt->close();
+                } else {
+                    // Hard delete recipient view for broadcast
+                    $deleteRecipientStmt = $conn->prepare("
+                        DELETE FROM tb_message_recipients
+                        WHERE message_id = ? AND recipient_user_id = ?
+                    ");
+                    if ($deleteRecipientStmt) {
+                        $deleteRecipientStmt->bind_param("is", $messageId, $userId);
+                        $deleteRecipientStmt->execute();
+                        $deleteRecipientStmt->close();
+                    }
+
+                    $deleteStatusStmt = $conn->prepare("
+                        DELETE FROM tb_user_broadcast_status
+                        WHERE user_id = ? AND broadcast_id = ?
+                    ");
+                    if ($deleteStatusStmt) {
+                        $deleteStatusStmt->bind_param("si", $userId, $message['broadcast_id']);
+                        $deleteStatusStmt->execute();
+                        $deleteStatusStmt->close();
+                    }
+                }
             }
         }
         // Handle regular message deletion
@@ -244,26 +386,44 @@ try {
                 $senderDelStmt->close();
                 
             } else {
-                // Recipient marks message as deleted for themselves ONLY
-                // This should NOT affect the sender's view of the message
-                $recipientDelStmt = $conn->prepare("
-                    UPDATE tb_message_recipients
-                    SET is_deleted = TRUE, deleted_at = NOW()
-                    WHERE message_id = ? AND recipient_user_id = ?
-                ");
-                $recipientDelStmt->bind_param("is", $messageId, $userId);
-                $recipientDelStmt->execute();
-                
-                if ($recipientDelStmt->affected_rows > 0) {
-                    // FIXED: Check if we should delete the message completely
-                    // This should only happen if sender has ALSO deleted AND no other recipients remain
-                    if (shouldDeleteCompletely($messageId, $conn)) {
-                        $attachmentsDeleted = deleteMessageCompletely($messageId, $conn);
-                        $deletedAttachments += $attachmentsDeleted;
-                        $completelyDeletedMessages++;
+                if ($allowSoftDelete) {
+                    // Recipient marks message as deleted for themselves ONLY
+                    // This should NOT affect the sender's view of the message
+                    $recipientDelStmt = $conn->prepare("
+                        UPDATE tb_message_recipients
+                        SET is_deleted = TRUE, deleted_at = NOW()
+                        WHERE message_id = ? AND recipient_user_id = ?
+                    ");
+                    $recipientDelStmt->bind_param("is", $messageId, $userId);
+                    $recipientDelStmt->execute();
+                    
+                    if ($recipientDelStmt->affected_rows > 0) {
+                        // FIXED: Check if we should delete the message completely
+                        // This should only happen if sender has ALSO deleted AND no other recipients remain
+                        if (shouldDeleteCompletely($messageId, $conn)) {
+                            $attachmentsDeleted = deleteMessageCompletely($messageId, $conn);
+                            $deletedAttachments += $attachmentsDeleted;
+                            $completelyDeletedMessages++;
+                        }
                     }
+                    $recipientDelStmt->close();
+                } else {
+                    $recipientDelStmt = $conn->prepare("
+                        DELETE FROM tb_message_recipients
+                        WHERE message_id = ? AND recipient_user_id = ?
+                    ");
+                    $recipientDelStmt->bind_param("is", $messageId, $userId);
+                    $recipientDelStmt->execute();
+                    
+                    if ($recipientDelStmt->affected_rows > 0) {
+                        if (shouldDeleteCompletely($messageId, $conn)) {
+                            $attachmentsDeleted = deleteMessageCompletely($messageId, $conn);
+                            $deletedAttachments += $attachmentsDeleted;
+                            $completelyDeletedMessages++;
+                        }
+                    }
+                    $recipientDelStmt->close();
                 }
-                $recipientDelStmt->close();
             }
         }
     }
@@ -287,3 +447,4 @@ try {
 }
 $conn->close();
 ?>
+

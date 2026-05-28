@@ -1,177 +1,353 @@
-/* ================= Calculator Styles ================= */
 @import url("color-variables.css");
 
-/* Calculator Container */
-.calculator-section {
-    background-color: var(--card-bg);
-    padding: 1.5rem;
-    border-radius: 10px;
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
-    width: 100%;
-    margin: 2rem auto;
-    color: var(--text-color);
-    transition: background-color 0.3s ease, color 0.3s ease;
+.benefits-page {
+  padding: 0 0 1.2rem;
 }
 
+.benefits-shell {
+  width: min(1360px, calc(100% - 2rem));
+  margin: 0.45rem auto 1.4rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.benefits-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.8fr);
+  gap: 1rem;
+  padding: 1.15rem 1.2rem;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--primary-maroon) 18%, var(--border-color) 82%);
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--primary-gold) 18%, transparent 82%), transparent 42%),
+    linear-gradient(145deg, color-mix(in srgb, var(--card-bg) 84%, var(--primary-blue) 16%), color-mix(in srgb, var(--card-bg) 90%, var(--primary-maroon) 10%));
+  box-shadow: 0 18px 40px color-mix(in srgb, var(--shadow-light) 88%, transparent 12%);
+}
+
+.benefits-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.34rem 0.72rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary-gold) 20%, transparent 80%);
+  color: var(--primary-maroon);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.benefits-hero h2,
 .calculator-section h2 {
-    text-align: center;
-    margin-bottom: 2rem;
-    color: var(--heading-color);
+  margin: 0.28rem 0 0.45rem;
+  color: var(--heading-color);
 }
 
-/* ================= Benefits Form ================= */
+.benefits-hero p,
+.section-subtitle,
+.results-subtitle {
+  margin: 0;
+  color: var(--muted-color);
+  line-height: 1.6;
+}
+
+.benefits-hero-side,
+.benefits-note-stack {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.benefits-mini-card,
+.benefits-side-card,
+.calculator-section,
+#benefitsForm,
+.benefits-results-panel,
+.milestone-card,
+.benefits-inline-tile,
+.benefits-kpi {
+  border-radius: 18px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+}
+
+.benefits-mini-card {
+  padding: 0.92rem 1rem;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--shadow-light) 72%, transparent 28%);
+}
+
+.mini-label,
+.tile-label,
+.kpi-label,
+.milestone-label,
+.note-label {
+  display: block;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted-color);
+}
+
+.benefits-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.9fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.calculator-section {
+  padding: 1.1rem;
+  box-shadow: 0 16px 36px color-mix(in srgb, var(--shadow-light) 70%, transparent 30%);
+}
+
+.section-title-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
 #benefitsForm {
-    background-color: var(--form-bg);
-    padding: 1.5rem;
-    border-radius: 10px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-    transition: background-color 0.3s ease;
+  padding: 1rem;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--form-bg) 92%, #fff 8%), var(--form-bg));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-/* ================= Results Section ================= */
-#results {
-    margin-top: 1.5rem;
-    text-align: left;
-    background: var(--result-bg);
-    padding: 1rem;
-    border: 1px solid var(--result-border);
-    border-radius: 6px;
-    color: var(--text-color);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+.benefits-form-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem 1rem;
 }
 
-#results h3 {
-    margin-bottom: 0.7rem;
-    color: var(--accent-color);
-    text-align: center;
-    font-size: 1.2rem;
-    text-decoration: underline;
-}
-
-#results p {
-    margin-bottom: 0.5rem;
-}
-
-.result-note {
-  margin-top: 1rem;
-  font-style: italic;
-  color: var(--accent-color);
-}
-
-
-/* ================= Form Groups ================= */
 .form-group {
-    margin-bottom: 1rem;
+  margin-bottom: 0;
 }
 
 .form-group label {
-    display: block;
-    margin-bottom: 0.3rem;
-    font-weight: bold;
-    color: var(--label-color);
+  display: block;
+  margin-bottom: 0.38rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--label-color);
 }
 
-.form-group input {
-    width: 97%;
-    padding: 0.5rem;
-    border: 1px solid var(--input-border);
-    background-color: var(--input-bg);
-    color: var(--input-text);
-    border-radius: 4px;
-    transition: all 0.3s ease;
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 0.72rem 0.8rem;
+  border-radius: 12px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--input-text);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
-.form-group input:focus {
-    outline: none;
-    border-color: var(--accent-color);
-    box-shadow: 0 0 4px var(--accent-color);
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--primary-blue) 38%, var(--input-border) 62%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-blue) 16%, transparent 84%);
 }
 
-/* ================= Button Styles ================= */
-.button-group {
-    margin-top: 1rem;
+.salary-wrapper {
+  width: 100%;
+}
+
+.salary-prefix {
+  font-size: 0.82rem;
+}
+
+.benefits-inline-summary,
+.benefits-kpi-grid,
+.benefits-milestone-grid {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.benefits-inline-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.benefits-inline-tile,
+.benefits-kpi,
+.milestone-card {
+  padding: 0.88rem 0.95rem;
+}
+
+.benefits-inline-tile strong,
+.benefits-kpi strong,
+.milestone-card strong {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 1rem;
+  color: var(--text-color);
+}
+
+.kpi-helper {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--muted-color);
+}
+
+.benefits-button-row {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 0.2rem;
 }
 
 .btn {
-    padding: 0.5rem 1.2rem;
-    border: none;
-    background: var(--primary-color);
-    color: #fff;
-    border-radius: 5px;
-    cursor: pointer;
-    font-weight: 600;
-    transition: background 0.3s ease;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.72rem 1.1rem;
+  cursor: pointer;
+  font-weight: 700;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
 }
 
 .btn:hover {
-    background: var(--primary-dark);
+  transform: translateY(-1px);
 }
 
-.btn.btn-reset {
-    background: var(--muted-color);
-    margin-left: 1rem;
+.btn-submit {
+  background: linear-gradient(135deg, var(--primary-maroon), var(--primary-blue));
+  color: #fff;
+  box-shadow: 0 12px 26px color-mix(in srgb, var(--primary-maroon) 24%, transparent 76%);
 }
 
-.btn.btn-reset:hover {
-    background: var(--muted-dark);
+.btn-reset {
+  background: color-mix(in srgb, var(--muted-color) 18%, var(--card-bg) 82%);
+  border-color: color-mix(in srgb, var(--muted-color) 30%, var(--border-color) 70%);
+  color: var(--text-color);
 }
 
-/* ================= Utilities ================= */
+.btn-secondary {
+  background: color-mix(in srgb, var(--primary-gold) 22%, var(--card-bg) 78%);
+  border-color: color-mix(in srgb, var(--primary-gold) 34%, var(--border-color) 66%);
+  color: var(--text-color);
+}
+
+.benefits-results-panel {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--result-bg) 95%, #fff 5%), var(--result-bg));
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--shadow-light) 62%, transparent 38%);
+}
+
+.results-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 0.9rem;
+}
+
+.results-heading h3 {
+  margin: 0;
+  color: var(--accent-color);
+  font-size: 1.18rem;
+}
+
+.benefits-kpi-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.benefits-kpi {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--card-bg) 86%, var(--primary-blue) 14%), var(--card-bg));
+}
+
+.benefits-kpi strong {
+  font-size: 1.08rem;
+}
+
+.benefits-milestone-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 0.85rem;
+}
+
+.milestone-card.emphasis {
+  border-color: color-mix(in srgb, var(--primary-gold) 52%, var(--border-color) 48%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary-gold) 18%, var(--card-bg) 82%), var(--card-bg));
+}
+
+.benefits-advice {
+  margin-top: 1rem;
+  padding: 0.95rem 1rem;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--primary-blue) 20%, var(--border-color) 80%);
+  background: color-mix(in srgb, var(--card-bg) 92%, var(--primary-blue) 8%);
+  color: var(--text-color);
+  line-height: 1.6;
+}
+
+.benefits-side-panel {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.benefits-side-card {
+  padding: 1rem 1.05rem;
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--shadow-light) 62%, transparent 38%);
+}
+
+.benefits-side-card h3 {
+  margin: 0 0 0.8rem;
+  color: var(--heading-color);
+}
+
+.benefits-checklist {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.55rem;
+  color: var(--text-color);
+}
+
+.benefits-note-item p {
+  margin: 0.26rem 0 0;
+  color: var(--muted-color);
+  line-height: 1.55;
+}
+
 .hidden {
-    display: none;
+  display: none !important;
 }
 
-/* ============================================================
-   Eligibility Alert Box Styles (Color-Coded + Fade-In)
-   ============================================================ */
 .eligibility-alert {
-  padding: 1em;
-  border-radius: 6px;
-  margin-top: 1em;
+  margin-top: 0.95rem;
+  padding: 0.95rem 1rem;
+  border-radius: 16px;
+  line-height: 1.6;
   font-weight: 500;
   opacity: 0;
-  animation: fade-in 0.8s ease-in-out forwards; /* Keep visible after fade */
+  transform: translateY(8px);
+  animation: fadeInAlert 0.5s ease-out forwards;
 }
 
-/* ---- Color Variations ---- */
 .eligibility-alert.red {
-  color: #b30000;
-  background-color: #ffe5e5;
-  border: 1px solid #ff9999;
+  color: #7d1010;
+  background-color: #ffe4e4;
+  border: 1px solid #ef9a9a;
+  box-shadow: 0 10px 18px rgba(181, 32, 32, 0.12);
 }
 
 .eligibility-alert.yellow {
-  color: #856404;
-  background-color: #fff3cd;
-  border: 1px solid #ffeeba;
+  color: #7a5600;
+  background-color: #fff4d2;
+  border: 1px solid #efd18b;
+  box-shadow: 0 10px 18px rgba(196, 150, 38, 0.12);
 }
 
 .eligibility-alert.blue {
-  color: #004085;
-  background-color: #cce5ff;
-  border: 1px solid #99ccff;
-}
-
-/* ---- Fade-In Animation ---- */
-@keyframes fade-in {
-  from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* ============================================================
-   ENHANCED ELIGIBILITY ALERT STYLES WITH ANIMATIONS
-   ============================================================ */
-
-/* Common fade-in for all alerts */
-.eligibility-alert {
-  opacity: 0;
-  transform: translateY(5px);
-  border-radius: 6px;
-  padding: 0.9rem 1rem;
-  font-weight: 500;
-  line-height: 1.6;
-  margin-top: 1rem;
-  animation: fadeInAlert 0.6s ease-out forwards;
+  color: #0f4279;
+  background-color: #dcecff;
+  border: 1px solid #a8c8f0;
+  box-shadow: 0 10px 18px rgba(41, 102, 182, 0.12);
 }
 
 @keyframes fadeInAlert {
@@ -185,68 +361,110 @@
   }
 }
 
-/* ============================================================
-   1️⃣ RED ALERT — NOT ELIGIBLE (PULSATING)
-   ============================================================ */
-.eligibility-alert.red {
-  color: #b30000;
-  background-color: #ffe5e5;
-  border: 1.5px solid #ff6666;
-  box-shadow: 0 0 8px rgba(255, 0, 0, 0.15);
-  animation: fadeInAlert 0.8s ease-in-out forwards, pulseBorder 2s infinite;
-}
+@media (max-width: 1180px) {
+  .benefits-hero,
+  .benefits-grid {
+    grid-template-columns: 1fr;
+  }
 
-@keyframes pulseBorder {
-  0% {
-    box-shadow: 0 0 0 rgba(255, 0, 0, 0.2);
-    border-color: #ff9999;
-  }
-  50% {
-    box-shadow: 0 0 8px rgba(255, 0, 0, 0.5);
-    border-color: #ff0000;
-  }
-  100% {
-    box-shadow: 0 0 0 rgba(255, 0, 0, 0.2);
-    border-color: #ff9999;
+  .benefits-kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
-/* ============================================================
-   2️⃣ YELLOW ALERT — PARTIAL BENEFITS (SOFT GLOW)
-   ============================================================ */
-.eligibility-alert.yellow {
-  color: #856404;
-  background-color: #fff3cd;
-  border: 1.5px solid #ffe58f;
-  box-shadow: 0 0 6px rgba(255, 213, 79, 0.4);
-  animation: fadeInAlert 0.8s ease-in-out forwards, softGlowYellow 3s ease-in-out;
-}
-
-@keyframes softGlowYellow {
-  0%, 100% {
-    box-shadow: 0 0 6px rgba(255, 213, 79, 0.3);
+@media (max-width: 860px) {
+  .benefits-shell {
+    width: min(100%, calc(100% - 1rem));
   }
-  50% {
-    box-shadow: 0 0 10px rgba(255, 213, 79, 0.6);
+
+  .benefits-form-layout,
+  .benefits-inline-summary,
+  .benefits-kpi-grid,
+  .benefits-milestone-grid {
+    grid-template-columns: 1fr 1fr;
   }
 }
 
-/* ============================================================
-   3️⃣ BLUE ALERT — FULL BENEFITS (SUBTLE GLOW)
-   ============================================================ */
-.eligibility-alert.blue {
-  color: #004085;
-  background-color: #cce5ff;
-  border: 1.5px solid #99ccff;
-  box-shadow: 0 0 6px rgba(100, 181, 246, 0.3);
-  animation: fadeInAlert 0.8s ease-in-out forwards, softGlowBlue 3s ease-in-out;
+@media (max-width: 640px) {
+  .benefits-hero,
+  .calculator-section,
+  #benefitsForm,
+  .benefits-results-panel,
+  .benefits-side-card {
+    border-radius: 16px;
+  }
+
+  .benefits-form-layout,
+  .benefits-inline-summary,
+  .benefits-kpi-grid,
+  .benefits-milestone-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .benefits-button-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .btn {
+    width: 100%;
+  }
 }
 
-@keyframes softGlowBlue {
-  0%, 100% {
-    box-shadow: 0 0 6px rgba(100, 181, 246, 0.3);
+@media print {
+  @page {
+    margin: 0.45in 0.4in 0.45in;
   }
-  50% {
-    box-shadow: 0 0 10px rgba(100, 181, 246, 0.6);
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  #results,
+  #results * {
+    visibility: visible !important;
+  }
+
+  #mainHeader {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  #results {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0.12in 0 0;
+    border: none;
+    box-shadow: none;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .results-heading h3,
+  .results-subtitle,
+  .kpi-label,
+  .milestone-label,
+  .benefits-advice,
+  .eligibility-alert {
+    color: #000 !important;
+  }
+
+  .benefits-kpi,
+  .milestone-card,
+  .benefits-advice,
+  .eligibility-alert {
+    border: 1px solid #c7c7c7 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    break-inside: avoid;
+  }
+
+  .benefits-kpi-grid,
+  .benefits-milestone-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

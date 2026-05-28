@@ -1,10 +1,9 @@
 <?php
 /**
- * ============================================================
- * DASHBOARD DATA API
- * ============================================================
- * Purpose:
- * Returns summarized dashboard statistics for the PensionsGo system.
+ * 
+ * Dashboard Data Api
+ * 
+ * Purpose: * Returns summarized dashboard statistics for the PensionsGo system.
  * 
  * Structure:
  * - Claims Summary
@@ -19,7 +18,7 @@
  * Notes:
  * - Integrates with `config.php` for database access.
  * - Designed to be consumed by `dashboard.js` via fetch().
- * ============================================================
+ * 
  */
 
 header('Content-Type: application/json; charset=utf-8');
@@ -37,9 +36,7 @@ function respond($success, $message, $data = [])
 }
 
 try {
-    /* ============================================================
-       1. CLAIMS SUMMARY (Counts by Type)
-       ============================================================ */
+    /* 1. CLAIMS SUMMARY (Counts by Type) */
     $claims = [
         ['type' => 'Pension', 'count' => 0],
         ['type' => 'Gratuity', 'count' => 0],
@@ -65,9 +62,7 @@ try {
         $res->free();
     }
 
-    /* ============================================================
-       2. PENSIONERS SUMMARY (Alive / Deceased / Total / Gender)
-       ============================================================ */
+    /* 2. PENSIONERS SUMMARY (Alive / Deceased / Total / Gender) */
     $pensioners = [
         'total' => ['total' => 0, 'male' => 0, 'female' => 0],
         'alive' => ['total' => 0, 'male' => 0, 'female' => 0],
@@ -98,9 +93,7 @@ try {
         $res->free();
     }
 
-    /* ============================================================
-       3. MODE OF RETIREMENT SUMMARY
-       ============================================================ */
+    /* 3. MODE OF RETIREMENT SUMMARY */
     $modes = [];
     $modeQuery = "
         SELECT retirementType,
@@ -123,9 +116,7 @@ try {
         $res->free();
     }
 
-    /* ============================================================
-       4. LIFE CERTIFICATES SUMMARY (Current Year)
-       ============================================================ */
+    /* 4. LIFE CERTIFICATES SUMMARY (Current Year) */
     $year = date('Y');
     $lifeCert = ['submitted' => 0, 'notSubmitted' => 0];
 
@@ -141,9 +132,7 @@ try {
         $res->free();
     }
 
-    /* ============================================================
-       5. PAYROLL MOVEMENTS (Current Month)
-       ============================================================ */
+    /* 5. PAYROLL MOVEMENTS (Current Month) */
     $month = date('m');
     $payroll = ['new' => 0, 'removed' => 0];
 
@@ -162,9 +151,7 @@ try {
         $res->free();
     }
 
-    /* ============================================================
-       6. STAFF DUE FOR RETIREMENT
-       ============================================================ */
+    /* 6. STAFF DUE FOR RETIREMENT */
     $staffDue = ['total' => 0, 'Male' => 0, 'Female' => 0, 'submitted' => 0, 'notSubmitted' => 0];
 
     $staffQuery = "
@@ -188,9 +175,7 @@ try {
         $res->free();
     }
 
-    /* ============================================================
-       7. FILE REGISTRY SUMMARY
-       ============================================================ */
+    /* 7. FILE REGISTRY SUMMARY */
     $files = ['inRegistry' => 0, 'outRegistry' => 0];
     $fileQuery = "
         SELECT
@@ -204,9 +189,7 @@ try {
         $res->free();
     }
 
-    /* ============================================================
-       8. SYSTEM USERS SUMMARY
-       ============================================================ */
+    /* 8. SYSTEM USERS SUMMARY */
     $users = [];
     $usersQuery = "
         SELECT userRole, COUNT(*) AS total
@@ -224,9 +207,7 @@ try {
         $res->free();
     }
 
-    /* ============================================================
-       SUCCESS RESPONSE
-       ============================================================ */
+    /* Success Response*/
     $summary = [
         'claims' => $claims,
         'pensioners' => $pensioners,
@@ -244,3 +225,4 @@ try {
 }
 
 $conn->close();
+

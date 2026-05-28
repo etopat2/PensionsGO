@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
+  <title>File Movement - PensionsGo</title>
+  <link rel="stylesheet" href="css/color-variables.css?v=20260504a">
+  <link rel="stylesheet" href="css/styles.css?v=20260507c">
+  <link rel="stylesheet" href="css/menu.css?v=20260504d">
+  <link rel="stylesheet" href="css/profile.css?v=20260504a">
+  <link rel="stylesheet" href="css/overlay.css?v=20260504a">
+  <link rel="stylesheet" href="css/file_tracking.css?v=20260504a">
+  <script type="module" src="js/main.js?v=20260528b"></script>
+  <script defer src="js/file_tracking.js?v=20260218a"></script>
+</head>
+<body>
+  <header id="dynamicHeader"></header>
+
+  <main class="main-wrapper">
+    <section class="file-track-card tracker-panel">
+      <h2>File Movement Tracker</h2>
+      <p>Search by file number or applicant name to view movement history.</p>
+
+      <form id="fileTrackForm" class="file-track-form">
+        <input type="text" id="fileTrackRegNo" placeholder="Type file number or applicant name..." list="trackerRegistryFiles" autocomplete="off">
+        <datalist id="trackerRegistryFiles"></datalist>
+        <button type="submit" class="btn-secondary btn-tracker-load">Load History</button>
+      </form>
+      <div id="fileTrackMatches" class="file-track-matches"></div>
+
+      <div id="fileTrackResults" class="file-track-results">Select a file to open movement history.</div>
+    </section>
+
+    <section class="file-track-card recorder-panel">
+      <h3>Record Movement</h3>
+      <form id="fileMoveForm" class="file-move-form">
+        <input type="text" id="moveRegNo" placeholder="File Number (Reg No)" list="registryFileNumbers" autocomplete="off" data-text-case="upper" required>
+        <datalist id="registryFileNumbers"></datalist>
+        <input type="text" id="moveFrom" value="Front Desk" readonly>
+        <input type="text" id="moveTo" placeholder="To Office" required>
+        <input type="text" id="moveReason" placeholder="Reason">
+        <input type="text" id="moveDeliveredBy" placeholder="Delivered By" required>
+        <input type="text" id="moveTimestamp" readonly>
+        <input type="datetime-local" id="moveExpectedReturn">
+        <button type="submit" class="btn-secondary btn-move-save">Record Movement</button>
+      </form>
+      <div id="fileMoveMessage" class="file-move-message"></div>
+    </section>
+  </main>
+
+  <div id="fileHistoryModalOverlay" class="file-history-modal-overlay" style="display: none;">
+    <div class="file-history-modal" role="dialog" aria-modal="true" aria-labelledby="fileHistoryModalTitle">
+      <div class="file-history-modal-header">
+        <div class="file-history-modal-heading">
+          <h3 id="fileHistoryModalTitle">Movement History</h3>
+          <p id="fileHistoryModalFileInfo">File details</p>
+        </div>
+        <button type="button" class="file-history-close" id="fileHistoryModalCloseBtn" aria-label="Close">&times;</button>
+      </div>
+      <div class="file-history-modal-tools">
+        <button type="button" class="btn-secondary" id="fileHistoryRefreshBtn">Refresh History</button>
+        <button type="button" class="btn-secondary" id="fileHistoryRecordBtn">Record New Movement</button>
+      </div>
+      <div id="fileHistoryModalBody" class="file-history-modal-body">
+        <div class="app-state-message app-state-neutral">No movement history loaded.</div>
+      </div>
+      <div class="file-history-modal-footer">
+        <button type="button" class="btn-secondary" id="fileHistoryModalCloseFooterBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <footer id="dynamicFooter"></footer>
+</body>
+</html>
+
+
+

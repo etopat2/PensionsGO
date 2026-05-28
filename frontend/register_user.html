@@ -3,19 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Register User – PensionsGo</title>
+  <title>Register User - PensionsGo</title>
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
 
   <!-- =============== CSS FILES =============== -->
-  <link rel="stylesheet" href="css/overlay.css" />
-  <link rel="stylesheet" href="css/forms.css" />
-  <link rel="stylesheet" href="css/styles.css" />
-  <link rel="stylesheet" href="css/menu.css" />
-  <link rel="stylesheet" href="css/auth.css" />
-  
-  <link rel="icon" href="assets/icons/favicon.ico" type="image/x-icon" />
+  <link rel="stylesheet" href="css/overlay.css?v=20260504a" />
+  <link rel="stylesheet" href="css/forms.css?v=20260504a" />
+  <link rel="stylesheet" href="css/styles.css?v=20260507c" />
+  <link rel="stylesheet" href="css/menu.css?v=20260504d" />
+  <link rel="stylesheet" href="css/auth.css?v=20260504a" />
 
   <!-- =============== JS FILES =============== -->
-  <script type="module" src="js/main.js"></script>
+  <script type="module" src="js/main.js?v=20260528b"></script>
   <script defer src="js/register_user.js"></script>
   <script defer src="js/menu_toggle.js"></script>
   <script defer src="js/users.js"></script>
@@ -72,17 +75,16 @@
 
           <!-- ========== PHONE NUMBER ========== -->
           <div class="form-group">
-            <label for="phoneNo">Phone Number (International Format)</label>
+            <label for="phoneNo">Phone Number</label>
             <input
               id="phoneNo"
               type="tel"
               name="phoneNo"
-              placeholder="+256700123456"
-              pattern="^\\+[1-9][0-9]{7,14}$"
-              title="Enter phone number in international format (e.g., +256700123456)"
+              placeholder="+256700123456 or 0770123456"
+              title="Enter international or local Uganda format (e.g., +256700123456, 0770123456, 0312123456, 0800123456)"
               required
             />
-            <small>Use full international format starting with ‘+’ and country code.</small>
+            <small>Accepted: international format and Uganda local format (07..., 03..., 0800...).</small>
           </div>
 
           <!-- ========== PASSWORD ========== -->
@@ -124,3 +126,6 @@
   </main>
 </body>
 </html>
+
+
+

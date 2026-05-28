@@ -1,105 +1,119 @@
 <?php
-// backend/api/get_users_summary.php
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+require_once __DIR__ . '/../config.php';
 
-// Handle preflight requests
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    http_response_code(200);
-    exit();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 
-// Include your existing config file
-require_once '../config.php';
+if (!isset($_SESSION['userId']) && !isset($_SESSION['user_id'])) {
+    http_response_code(401);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Unauthorized access. Please log in.'
+    ]);
+    exit;
+}
+
+ensureRoleGovernanceTables($conn);
 
 try {
-    // Check if user is logged in using your existing session validation
-    if (!isset($_SESSION['user_id']) && !isset($_SESSION['last_activity'])) {
-        echo json_encode([
-            'success' => false, 
-            'message' => 'Unauthorized access. Please log in.',
-            'redirect' => '../../frontend/login.html?expired=1'
-        ]);
-        exit();
-    }
+    $roleLabels = getRoleLabelMap($conn, false);
 
-    // Query to get user counts by role from tb_users table
-    $sql = "
-        SELECT 
-            userRole as role,
-            COUNT(*) as count
-        FROM tb_users 
-        GROUP BY userRole 
-        ORDER BY 
-            FIELD(userRole, 'admin', 'clerk', 'oc_pen', 'writeup_officer', 'file_creator', 'data_entry', 'assessor', 'auditor', 'approver', 'user', 'pensioner'),
-            count DESC
-    ";
-
-    $result = $conn->query($sql);
-    
-    if (!$result) {
-        throw new Exception("Query failed: " . $conn->error);
+    $roleCounts = [];
+    $countResult = $conn->query("
+        SELECT
+            COALESCE(userRole, '') AS role_key,
+            COUNT(*) AS total_count
+        FROM tb_users
+        GROUP BY COALESCE(userRole, '')
+    ");
+    if ($countResult) {
+        while ($row = $countResult->fetch_assoc()) {
+            $key = resolveRoleKeyFromInput($conn, (string)($row['role_key'] ?? ''), false);
+            if ($key === '') {
+                $key = 'user';
+            }
+            $roleCounts[$key] = (int)($roleCounts[$key] ?? 0) + (int)($row['total_count'] ?? 0);
+        }
     }
 
     $users = [];
-    while ($row = $result->fetch_assoc()) {
-        $users[] = $row;
+    $seen = [];
+
+    $roleResult = $conn->query("
+        SELECT role_key, role_label, is_active, is_system
+        FROM tb_roles
+        ORDER BY is_system DESC, role_label ASC, role_key ASC
+    ");
+    if ($roleResult) {
+        while ($role = $roleResult->fetch_assoc()) {
+            $roleKey = strtolower(trim((string)($role['role_key'] ?? '')));
+            if ($roleKey === '') {
+                continue;
+            }
+
+            $users[] = [
+                'role' => $roleKey,
+                'role_label' => trim((string)($role['role_label'] ?? getRoleLabel($conn, $roleKey))),
+                'count' => (int)($roleCounts[$roleKey] ?? 0),
+                'is_active' => ((int)($role['is_active'] ?? 0)) === 1,
+                'is_system' => ((int)($role['is_system'] ?? 0)) === 1
+            ];
+            $seen[$roleKey] = true;
+        }
     }
 
-    if (empty($users)) {
-        // If no users found, return empty array with success
-        echo json_encode([
-            'success' => true,
-            'users' => [],
-            'total_users' => 0,
-            'message' => 'No users found in the database'
-        ]);
-        exit();
-    }
-
-    // Format the response and calculate total
-    $formattedUsers = [];
-    $totalUsers = 0;
-    
-    foreach ($users as $user) {
-        $count = (int)$user['count'];
-        $formattedUsers[] = [
-            'role' => $user['role'],
-            'count' => $count
+    // Include legacy/unknown roles still present in tb_users but not in tb_roles.
+    $unknownRoles = [];
+    foreach ($roleCounts as $roleKey => $count) {
+        if (isset($seen[$roleKey])) {
+            continue;
+        }
+        $unknownRoles[] = [
+            'role' => $roleKey,
+            'role_label' => (string)($roleLabels[$roleKey] ?? ucwords(str_replace('_', ' ', $roleKey))),
+            'count' => (int)$count,
+            'is_active' => true,
+            'is_system' => false
         ];
-        $totalUsers += $count;
     }
 
-    // Successful response
-    $response = [
+    if (!empty($unknownRoles)) {
+        usort($unknownRoles, static function (array $a, array $b): int {
+            $countCmp = (int)($b['count'] ?? 0) <=> (int)($a['count'] ?? 0);
+            if ($countCmp !== 0) {
+                return $countCmp;
+            }
+            return strcasecmp((string)($a['role_label'] ?? ''), (string)($b['role_label'] ?? ''));
+        });
+        $users = array_merge($users, $unknownRoles);
+    }
+
+    $totalUsers = array_sum(array_map(static function (array $entry): int {
+        return (int)($entry['count'] ?? 0);
+    }, $users));
+
+    echo json_encode([
         'success' => true,
-        'users' => $formattedUsers,
+        'users' => $users,
         'total_users' => $totalUsers,
-        'table_used' => 'tb_users',
+        'role_labels' => $roleLabels,
         'query_info' => [
-            'users_found' => count($formattedUsers),
-            'roles_found' => array_column($formattedUsers, 'role')
+            'users_found' => count($users),
+            'roles_found' => array_values(array_map(static function (array $entry): string {
+                return (string)($entry['role'] ?? '');
+            }, $users))
         ]
-    ];
-
-    echo json_encode($response);
-
-} catch (Exception $e) {
-    error_log("Error in get_users_summary.php: " . $e->getMessage());
-    
-    $error_response = [
-        'success' => false, 
-        'message' => $e->getMessage(),
-        'suggestion' => 'Check if tb_users table exists and has data'
-    ];
-    
-    echo json_encode($error_response);
+    ]);
+} catch (Throwable $e) {
+    error_log('Error in get_users_summary.php: ' . $e->getMessage());
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Unable to load users summary.'
+    ]);
 }
 
-// Close connection
-if (isset($conn)) {
-    $conn->close();
-}
+$conn->close();
 ?>

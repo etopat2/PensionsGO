@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
+  <title>Find Pensioners - PensionsGo</title>
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <link rel="stylesheet" href="css/styles.css?v=20260507c" />
+  <link rel="stylesheet" href="css/profile.css?v=20260504a" />
+  <link rel="stylesheet" href="css/menu.css?v=20260504d" />
+  <link rel="stylesheet" href="css/pensioner_lookup.css?v=20260504a" />
+  <script type="module" src="js/main.js?v=20260528b"></script>
+  <script defer src="js/pensioner_lookup.js"></script>
+</head>
+<body>
+  <main class="pensioner-lookup-main">
+    <section class="lookup-hero">
+      <div class="lookup-hero-copy">
+        <span class="lookup-kicker">Pensioner Directory</span>
+        <h1>Find Pensioners</h1>
+        <p>Reconnect with fellow pensioners who have chosen to share their contact details for welfare follow-up, friendship, and support.</p>
+      </div>
+      <div class="lookup-hero-actions">
+        <a class="lookup-action-btn secondary" href="pensioner_board.html">Back to Portal</a>
+      </div>
+    </section>
+
+    <section class="lookup-feedback" id="lookupFeedback" hidden></section>
+
+    <section class="lookup-top-grid">
+      <article class="lookup-panel lookup-search-panel">
+        <div class="lookup-panel-head">
+          <div>
+            <h2>Search Directory</h2>
+            <p>Search by force number or by name. Only pensioners allowed by the directory rules are shown.</p>
+          </div>
+          <div class="lookup-directory-stat" id="lookupDirectoryStat">0 visible records</div>
+        </div>
+        <div class="lookup-search-bar">
+          <input type="search" id="pensionerLookupInput" placeholder="Search by force number or name" autocomplete="off" spellcheck="false" />
+          <button type="button" class="lookup-action-btn" id="clearPensionerLookupBtn">Clear</button>
+        </div>
+        <div class="lookup-search-meta">
+          <span id="lookupSearchStatus">Start typing to search the directory.</span>
+        </div>
+        <div class="lookup-recent-searches" id="lookupRecentSearches" hidden></div>
+      </article>
+    </section>
+
+    <section class="lookup-results-layout">
+      <section class="lookup-panel lookup-results-panel">
+        <div class="lookup-panel-head">
+          <div>
+            <h2>Matching Pensioners</h2>
+            <p>Choose a pensioner from the list to view the available contact details.</p>
+          </div>
+        </div>
+        <div class="lookup-result-list" id="lookupResultList"></div>
+      </section>
+
+      <section class="lookup-panel lookup-detail-panel">
+        <div class="lookup-panel-head">
+          <div>
+            <h2>Selected Record</h2>
+            <p>Contact details shown here are provided according to the pensioner&apos;s own visibility preference.</p>
+          </div>
+        </div>
+        <div class="lookup-detail-body" id="lookupDetailBody">
+          <div class="lookup-empty-state">Select a pensioner from the directory results to review the available contact details.</div>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>
+
+
+

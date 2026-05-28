@@ -7,18 +7,39 @@ if (!isset($_SESSION['userId'])) {
     exit;
 }
 
-$file = $_GET['file'] ?? '';
+if (!currentUserCanAccessMessagingModule()) {
+    http_response_code(403);
+    exit;
+}
+
+$file = trim((string)($_GET['file'] ?? ''));
 $type = $_GET['type'] ?? 'attachment';
 
-// Basic checks
-if (empty($file)) {
+$allowedTypes = ['attachment', 'profile'];
+if (!in_array($type, $allowedTypes, true)) {
     http_response_code(400);
     exit;
 }
-// disallow slashes or .. in file
-if (strpos($file, '..') !== false || strpos($file, '/') !== false || strpos($file, '\\') !== false) {
-    http_response_code(400);
-    exit;
+
+if ($type === 'profile') {
+    if ($file === '' || $file === 'images/default-user.png' || str_ends_with($file, '/default-user.png') || str_ends_with($file, '\\default-user.png')) {
+        $file = 'default-user.png';
+    } else {
+        $file = basename(str_replace('\\', '/', $file));
+        if ($file === '') {
+            $file = 'default-user.png';
+        }
+    }
+} else {
+    // Basic checks for attachments.
+    if ($file === '') {
+        http_response_code(400);
+        exit;
+    }
+    if (strpos($file, '..') !== false || strpos($file, '/') !== false || strpos($file, '\\') !== false) {
+        http_response_code(400);
+        exit;
+    }
 }
 
 // determine content-type by extension
@@ -31,9 +52,6 @@ elseif (str_ends_with($lc, '.doc') || str_ends_with($lc, '.docx')) header('Conte
 elseif (str_ends_with($lc, '.xls') || str_ends_with($lc, '.xlsx')) header('Content-Type: application/vnd.ms-excel');
 elseif (str_ends_with($lc, '.txt')) header('Content-Type: text/plain');
 else header('Content-Type: application/octet-stream');
-
-$allowedTypes = ['attachment', 'profile'];
-if (!in_array($type, $allowedTypes)) { http_response_code(400); exit; }
 
 // choose directory
 if ($type === 'profile') {
@@ -68,6 +86,32 @@ if (file_exists($filePath) && is_file($filePath)) {
         $hasAccess = $stmt->get_result()->num_rows > 0;
         $stmt->close();
         if (!$hasAccess) { http_response_code(403); exit; }
+
+        $retentionRaw = function_exists('getAppSetting') ? getAppSetting($conn, 'attachment_retention_days') : null;
+        $retentionDays = is_numeric($retentionRaw) ? (int)$retentionRaw : 0;
+        if ($retentionDays > 0) {
+            $retStmt = $conn->prepare("
+                SELECT uploaded_at
+                FROM tb_message_attachments
+                WHERE file_path LIKE ?
+                LIMIT 1
+            ");
+            if ($retStmt) {
+                $retStmt->bind_param("s", $like);
+                $retStmt->execute();
+                $retRow = $retStmt->get_result()->fetch_assoc();
+                $retStmt->close();
+
+                if (!empty($retRow['uploaded_at'])) {
+                    $cutoff = strtotime("-{$retentionDays} days");
+                    $uploadedAt = strtotime($retRow['uploaded_at']);
+                    if ($uploadedAt && $uploadedAt < $cutoff) {
+                        http_response_code(410);
+                        exit;
+                    }
+                }
+            }
+        }
     }
 
     // serve the file
@@ -75,8 +119,10 @@ if (file_exists($filePath) && is_file($filePath)) {
     exit;
 }
 
-// fallback default icon
-$defaultPath = __DIR__ . '/../../frontend/images/default-file.png';
+// fallback default asset
+$defaultPath = $type === 'profile'
+    ? __DIR__ . '/../../frontend/images/default-user.png'
+    : __DIR__ . '/../../frontend/images/default-file.png';
 if (file_exists($defaultPath)) {
     readfile($defaultPath);
 } else {

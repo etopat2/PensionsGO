@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
+  <title>UPS PensionsGo - Offline</title>
+  <link rel="stylesheet" href="css/styles.css?v=20260507c">
+  <style>
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 2rem;
+      background:
+        radial-gradient(circle at top, rgba(212, 175, 55, 0.18), transparent 34%),
+        linear-gradient(180deg, rgba(109, 17, 22, 0.92), rgba(0, 51, 102, 0.96));
+      color: #fff7ea;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+    }
+
+    .offline-card {
+      width: min(720px, 100%);
+      background: rgba(19, 24, 36, 0.82);
+      border: 1px solid rgba(255, 215, 0, 0.22);
+      border-radius: 24px;
+      box-shadow: 0 28px 60px rgba(0, 0, 0, 0.3);
+      padding: 2rem;
+      backdrop-filter: blur(14px);
+    }
+
+    .offline-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      padding: 0.5rem 0.85rem;
+      border-radius: 999px;
+      background: rgba(212, 175, 55, 0.14);
+      color: #ffe08a;
+      font-size: 0.82rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+
+    h1 {
+      margin: 0 0 0.8rem;
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      line-height: 1.1;
+    }
+
+    p {
+      margin: 0 0 1rem;
+      color: rgba(255, 247, 234, 0.88);
+      line-height: 1.6;
+    }
+
+    .offline-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.85rem;
+      margin-top: 1.5rem;
+    }
+
+    .offline-actions a,
+    .offline-actions button {
+      appearance: none;
+      border: none;
+      text-decoration: none;
+      cursor: pointer;
+      border-radius: 14px;
+      padding: 0.9rem 1.15rem;
+      font-weight: 700;
+      color: #fffaf2;
+      background: linear-gradient(135deg, #8b0000, #003366);
+      box-shadow: 0 14px 24px rgba(0, 0, 0, 0.24);
+    }
+
+    .offline-actions .secondary {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: none;
+    }
+
+    .offline-list {
+      margin: 1.25rem 0 0;
+      padding-left: 1.1rem;
+      color: rgba(255, 247, 234, 0.9);
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <section class="offline-card">
+    <div class="offline-badge">Offline Access</div>
+    <h1>UPS PensionsGo is offline</h1>
+    <p>The app shell is still available on this device. Cached pages and the benefits calculator can continue to open. Live workflow actions, uploads, approvals, and other server-backed updates will resume when the connection returns.</p>
+    <div class="offline-actions">
+      <a href="login.html">Return to Login</a>
+      <a href="benefits_calculator.html" class="secondary">Open Benefits Calculator</a>
+      <button type="button" onclick="window.location.reload()">Try Again</button>
+    </div>
+    <ul class="offline-list">
+      <li>Previously opened pages may still load from cache.</li>
+      <li>Tracked data shown while offline may be stale until the next sync.</li>
+      <li>Save, upload, approval, and messaging actions require a live connection.</li>
+    </ul>
+  </section>
+</body>
+</html>
+
+
+

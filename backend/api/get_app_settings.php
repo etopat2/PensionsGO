@@ -1,0 +1,446 @@
+<?php
+/**
+ * get_app_settings.php
+ * Fetch application-wide settings (admin only).
+ */
+
+header('Content-Type: application/json; charset=UTF-8');
+ob_start();
+
+try {
+    require_once __DIR__ . '/../config.php';
+    require_once __DIR__ . '/../notification_sound_library.php';
+
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    if (!isset($_SESSION['userId']) || !sessionRoleIn($conn, ['admin'])) {
+        http_response_code(403);
+        ob_clean();
+        echo json_encode([
+            'success' => false,
+            'message' => 'Admin access required'
+        ]);
+        exit;
+    }
+
+    $defaults = [
+        'app_name' => 'PensionsGo',
+        'app_tagline' => 'Unified pension administration',
+        'support_email' => '',
+        'support_phone' => '',
+        'public_footer_org_name' => 'Uganda Prisons Service Headquarters',
+        'public_footer_address' => 'P.O. Box 7182, Kampala (U)',
+        'public_footer_tech_support_email' => 'etopat2@gmail.com',
+        'public_footer_social_facebook' => 'https://www.facebook.com/UPSRetirement',
+        'public_footer_social_twitter' => 'https://www.twitter.com/UPSRetirement',
+        'public_footer_social_instagram' => 'https://www.instagram.com/UPSRetirement',
+        'public_footer_social_linkedin' => 'https://www.linkedin.com/company/UPSRetirement',
+        'public_footer_developer_name' => 'Patrick',
+        'public_footer_developer_email' => 'etomet2patrick@gmail.com',
+        'public_footer_developer_phone' => '+256773959039',
+        'default_user_role' => 'user',
+        'login_banner' => '',
+        'maintenance_mode' => '0',
+        'timezone' => 'Africa/Kampala',
+        'date_format' => 'YYYY-MM-DD',
+        'time_format' => '24h',
+        'currency' => 'UGX',
+        'session_timeout_minutes' => '30',
+        'grace_period_minutes' => '5',
+        'task_due_business_days' => '3',
+        'task_grace_business_days' => '0',
+        'task_alerts_enabled' => '1',
+        'task_alert_due_soon_hours' => '24',
+        'task_alert_stalled_hours' => '72',
+        'task_alert_escalation_hours' => '24',
+        'task_skip_weekends' => '1',
+        'task_skip_ug_holidays' => '1',
+        'payroll_reconcile_debounce_seconds' => '60',
+        'max_concurrent_sessions' => '1',
+        'allow_multiple_devices' => '0',
+        'auto_logout_on_conflict' => '1',
+        'login_attempt_limit' => '5',
+        'lockout_minutes' => '15',
+        'password_min_length' => '8',
+        'password_expiry_days' => '0',
+        'password_require_uppercase' => '1',
+        'password_require_lowercase' => '1',
+        'password_require_number' => '1',
+        'password_require_special' => '0',
+        'session_idle_warning_minutes' => '5',
+        'security_alert_email' => '',
+        'security_alert_sms' => '',
+        'security_block_developer_tools' => '0',
+        'security_block_context_menu' => '0',
+        'security_block_copy' => '0',
+        'security_block_cut' => '0',
+        'security_block_paste' => '0',
+        'security_block_text_selection' => '0',
+        'security_block_drag' => '0',
+        'security_enforce_csrf' => '1',
+        'security_validate_origin' => '1',
+        'security_allowed_origins' => '',
+        'security_admin_reauth_window_minutes' => '10',
+        'security_max_upload_size_mb' => '25',
+        'security_max_zip_uncompressed_mb' => '64',
+        'security_max_import_rows' => '5000',
+        'security_max_zip_entries' => '2000',
+        'log_retention_days' => '90',
+        'enable_activity_logs' => '1',
+        'enable_audit_logs' => '1',
+        'enable_notifications' => '1',
+        'notify_email_enabled' => '1',
+        'notify_sms_enabled' => '0',
+        'notify_push_enabled' => '1',
+        'notify_sender_name' => 'PensionsGo Notifications',
+        'notify_sender_email' => '',
+        'notify_test_recipient' => '',
+        'notify_system_alerts_enabled' => '1',
+        'notify_task_alerts_enabled' => '1',
+        'notify_user_activity_enabled' => '1',
+        'notify_broadcast_enabled' => '1',
+        'notify_broadcast_sound_enabled' => '1',
+        'notify_broadcast_sound_path' => 'audio/notification.mp3',
+        'notify_broadcast_sound_volume' => '85',
+        'notify_broadcast_sound_repeat_count' => '1',
+        'notify_broadcast_desktop_enabled' => '1',
+        'notify_broadcast_desktop_hidden_only' => '1',
+        'live_call_incoming_sound_enabled' => '1',
+        'live_call_outgoing_sound_enabled' => '1',
+        'live_call_desktop_alerts_enabled' => '1',
+        'live_call_incoming_sound_path' => 'audio/notification.mp3',
+        'live_call_outgoing_sound_path' => 'audio/notification.mp3',
+        'live_call_incoming_sound_volume' => '85',
+        'live_call_outgoing_sound_volume' => '55',
+        'live_call_incoming_sound_repeat_count' => '0',
+        'live_call_outgoing_sound_repeat_count' => '0',
+        'live_call_ringing_timeout_seconds' => '45',
+        'live_message_sound_enabled' => '1',
+        'live_message_desktop_alerts_enabled' => '1',
+        'live_message_sound_path' => 'audio/notification.mp3',
+        'live_message_sound_volume' => '70',
+        'live_message_sound_repeat_count' => '1',
+        'notify_quiet_hours_start' => '22:00',
+        'notify_quiet_hours_end' => '06:00',
+        'notify_admin_digest_enabled' => '1',
+        'notify_digest_time' => '07:30',
+        'notify_queue_worker_enabled' => '1',
+        'notify_queue_process_on_request' => '0',
+        'notify_queue_batch_size' => '10',
+        'notify_queue_retry_limit' => '3',
+        'notify_queue_retry_delay_minutes' => '10',
+        'notify_queue_min_interval_seconds' => '60',
+        'message_retention_days' => '365',
+        'message_archive_after_days' => '90',
+        'message_allow_soft_delete' => '1',
+        'message_storage_quota_mb' => '2048',
+        'message_compress_enabled' => '1',
+        'message_backup_enabled' => '1',
+        'attachment_max_size_mb' => '25',
+        'attachment_allowed_types' => 'pdf,jpg,jpeg,png,doc,docx,xls,xlsx',
+        'attachment_scan_enabled' => '0',
+        'attachment_retention_days' => '365',
+        'attachment_dedupe_enabled' => '1',
+        'attachment_compress_enabled' => '1',
+
+        'storage_warning_threshold_mb' => '5120',
+        'storage_critical_threshold_mb' => '10240',
+        'storage_cleanup_backup_before_delete' => '1',
+        'storage_cleanup_dry_run_default' => '1',
+        'storage_cleanup_sessions_days' => '30',
+        'storage_cleanup_notification_days' => '30',
+        'storage_cleanup_imports_days' => '90',
+        'storage_cleanup_exports_days' => '90',
+        'storage_cleanup_backups_days' => '180',
+        'storage_cleanup_orphan_documents_days' => '30',
+        'backup_retention_days' => '90',
+        'export_retention_days' => '90',
+        'backup_include_uploads_default' => '1',
+        'document_storage_enabled' => '1',
+        'document_max_size_mb' => '25',
+        'document_allowed_types' => 'pdf,jpg,jpeg,png,doc,docx,xls,xlsx',
+        'document_retention_days' => '3650',
+        'document_archive_after_days' => '730',
+        'document_classification_required' => '1',
+        'document_dedupe_enabled' => '1',
+        'document_preview_enabled' => '1',
+        'document_access_audit_enabled' => '1',
+        'document_link_registry_required' => '1',
+        'document_naming_scheme' => 'regno_doc_type_timestamp',
+        'workflow_logs_enabled' => '1',
+        'workflow_logs_retention_days' => '1825',
+        'staff_due_verification_escalation_days' => '60',
+        'workflow_logs_include_comments' => '1',
+        'workflow_logs_capture_assignment' => '1',
+        'workflow_logs_export_enabled' => '1',
+        'task_delegation_logs_enabled' => '1',
+        'task_delegation_retention_days' => '1095',
+        'task_delegation_require_reason' => '1',
+        'task_delegation_escalation_enabled' => '1',
+        'task_delegation_export_enabled' => '1',
+        'system_logs_enabled' => '1',
+        'system_logs_retention_days' => '365',
+        'system_logs_capture_warnings' => '1',
+        'system_logs_capture_errors' => '1',
+        'system_logs_capture_security_events' => '1',
+        'system_logs_capture_integrations' => '1',
+        'system_logs_min_level' => 'info',
+        'analytics_refresh_interval_minutes' => '15',
+        'analytics_dashboard_snapshots_enabled' => '1',
+        'analytics_snapshot_retention_days' => '365',
+        'analytics_export_enabled' => '1',
+        'analytics_auto_digest_enabled' => '0',
+        'analytics_digest_frequency' => 'weekly',
+        'analytics_digest_time' => '08:00',
+        'analytics_digest_recipient' => '',
+        'analytics_show_predictive_cards' => '1',
+        'analytics_include_financial_forecasts' => '1',
+        'analytics_include_operational_kpis' => '1',
+        'analytics_anomaly_detection_enabled' => '1',
+        'feedback_public_enabled' => '1',
+        'feedback_staff_enabled' => '1',
+        'feedback_pensioner_enabled' => '1',
+        'feedback_email_notifications_enabled' => '1',
+        'feedback_allow_assignment' => '1',
+        'feedback_allow_export' => '1',
+        'feedback_response_sla_days' => '5',
+        'pensioner_login_enabled' => '1',
+        'pensioner_dashboard_enable_claims' => '1',
+        'pensioner_dashboard_enable_documents' => '1',
+        'pensioner_dashboard_enable_status_explanations' => '1',
+        'pensioner_dashboard_enable_activity_log' => '1',
+        'pensioner_lookup_enabled' => '1',
+        'pensioner_lookup_require_consent' => '1',
+        'pensioner_lookup_log_activity' => '1',
+        'podcast_enabled' => '1',
+        'podcast_public_enabled' => '1',
+        'podcast_staff_enabled' => '1',
+        'podcast_pensioner_enabled' => '1',
+        'podcast_show_public_about_button' => '1',
+        'podcast_log_views' => '1',
+        'podcast_allow_metadata_edit' => '1',
+        'podcast_allow_video_replace' => '1',
+        'podcast_allow_delete' => '1'
+    ];
+
+    ensureAppSettingsTable($conn);
+    $result = $conn->query("SELECT setting_key, setting_value FROM tb_app_settings");
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $key = $row['setting_key'];
+            if (array_key_exists($key, $defaults)) {
+                $defaults[$key] = $row['setting_value'];
+            }
+        }
+    }
+
+    $boolKeys = [
+        'maintenance_mode',
+        'allow_multiple_devices',
+        'auto_logout_on_conflict',
+        'task_skip_weekends',
+        'task_skip_ug_holidays',
+        'task_alerts_enabled',
+        'password_require_uppercase',
+        'password_require_lowercase',
+        'password_require_number',
+        'password_require_special',
+        'security_block_developer_tools',
+        'security_block_context_menu',
+        'security_block_copy',
+        'security_block_cut',
+        'security_block_paste',
+        'security_block_text_selection',
+        'security_block_drag',
+        'security_enforce_csrf',
+        'security_validate_origin',
+        'enable_activity_logs',
+        'enable_audit_logs',
+        'enable_notifications',
+        'notify_email_enabled',
+        'notify_sms_enabled',
+        'notify_push_enabled',
+        'notify_system_alerts_enabled',
+        'notify_task_alerts_enabled',
+        'notify_user_activity_enabled',
+        'notify_broadcast_enabled',
+        'notify_broadcast_sound_enabled',
+        'notify_broadcast_desktop_enabled',
+        'notify_broadcast_desktop_hidden_only',
+        'live_call_incoming_sound_enabled',
+        'live_call_outgoing_sound_enabled',
+        'live_call_desktop_alerts_enabled',
+        'live_message_sound_enabled',
+        'live_message_desktop_alerts_enabled',
+        'notify_admin_digest_enabled',
+        'notify_queue_worker_enabled',
+        'notify_queue_process_on_request',
+        'message_allow_soft_delete',
+        'message_compress_enabled',
+        'message_backup_enabled',
+        'backup_include_uploads_default',
+        'document_storage_enabled',
+        'document_classification_required',
+        'document_dedupe_enabled',
+        'document_preview_enabled',
+        'document_access_audit_enabled',
+        'document_link_registry_required',
+        'attachment_scan_enabled',
+        'attachment_dedupe_enabled',
+        'attachment_compress_enabled',
+        'workflow_logs_enabled',
+        'workflow_logs_include_comments',
+        'workflow_logs_capture_assignment',
+        'workflow_logs_export_enabled',
+        'task_delegation_logs_enabled',
+        'task_delegation_require_reason',
+        'task_delegation_escalation_enabled',
+        'task_delegation_export_enabled',
+        'system_logs_enabled',
+        'system_logs_capture_warnings',
+        'system_logs_capture_errors',
+        'system_logs_capture_security_events',
+        'system_logs_capture_integrations',
+        'analytics_dashboard_snapshots_enabled',
+        'analytics_export_enabled',
+        'analytics_auto_digest_enabled',
+        'analytics_show_predictive_cards',
+        'analytics_include_financial_forecasts',
+        'analytics_include_operational_kpis',
+        'analytics_anomaly_detection_enabled',
+        'feedback_public_enabled',
+        'feedback_staff_enabled',
+        'feedback_pensioner_enabled',
+        'feedback_email_notifications_enabled',
+        'feedback_allow_assignment',
+        'feedback_allow_export',
+        'pensioner_login_enabled',
+        'pensioner_dashboard_enable_claims',
+        'pensioner_dashboard_enable_documents',
+        'pensioner_dashboard_enable_status_explanations',
+        'pensioner_dashboard_enable_activity_log',
+        'pensioner_lookup_enabled',
+        'pensioner_lookup_require_consent',
+        'pensioner_lookup_log_activity',
+        'podcast_enabled',
+        'podcast_public_enabled',
+        'podcast_staff_enabled',
+        'podcast_pensioner_enabled',
+        'podcast_show_public_about_button',
+        'podcast_log_views',
+        'podcast_allow_metadata_edit',
+        'podcast_allow_video_replace',
+        'podcast_allow_delete'
+    ];
+
+    $intKeys = [
+        'session_timeout_minutes',
+        'grace_period_minutes',
+        'task_due_business_days',
+        'task_grace_business_days',
+        'task_alert_due_soon_hours',
+        'task_alert_stalled_hours',
+        'task_alert_escalation_hours',
+        'payroll_reconcile_debounce_seconds',
+        'notify_broadcast_sound_volume',
+        'notify_broadcast_sound_repeat_count',
+        'live_call_incoming_sound_volume',
+        'live_call_outgoing_sound_volume',
+        'live_call_incoming_sound_repeat_count',
+        'live_call_outgoing_sound_repeat_count',
+        'live_call_ringing_timeout_seconds',
+        'live_message_sound_volume',
+        'live_message_sound_repeat_count',
+        'notify_queue_batch_size',
+        'notify_queue_retry_limit',
+        'notify_queue_retry_delay_minutes',
+        'notify_queue_min_interval_seconds',
+        'max_concurrent_sessions',
+        'login_attempt_limit',
+        'lockout_minutes',
+        'password_min_length',
+        'password_expiry_days',
+        'session_idle_warning_minutes',
+        'security_admin_reauth_window_minutes',
+        'security_max_upload_size_mb',
+        'security_max_zip_uncompressed_mb',
+        'security_max_import_rows',
+        'security_max_zip_entries',
+        'log_retention_days',
+        'message_retention_days',
+        'message_archive_after_days',
+        'message_storage_quota_mb',
+        'attachment_max_size_mb',
+        'attachment_retention_days',
+        'feedback_response_sla_days',
+        'storage_warning_threshold_mb',
+        'storage_critical_threshold_mb',
+        'storage_cleanup_sessions_days',
+        'storage_cleanup_notification_days',
+        'storage_cleanup_imports_days',
+        'storage_cleanup_exports_days',
+        'storage_cleanup_backups_days',
+        'storage_cleanup_orphan_documents_days',
+        'backup_retention_days',
+        'export_retention_days',
+        'document_max_size_mb',
+        'document_retention_days',
+        'document_archive_after_days',
+        'workflow_logs_retention_days',
+        'staff_due_verification_escalation_days',
+        'task_delegation_retention_days',
+        'system_logs_retention_days',
+        'analytics_refresh_interval_minutes',
+        'analytics_snapshot_retention_days',
+    ];
+
+    $defaults['notify_broadcast_sound_path'] = notificationResolveSelectedSoundPath(
+        $defaults['notify_broadcast_sound_path'] ?? 'audio/notification.mp3'
+    );
+    $defaults['live_call_incoming_sound_path'] = notificationResolveSelectedSoundPath(
+        $defaults['live_call_incoming_sound_path'] ?? 'audio/notification.mp3'
+    );
+    $defaults['live_call_outgoing_sound_path'] = notificationResolveSelectedSoundPath(
+        $defaults['live_call_outgoing_sound_path'] ?? 'audio/notification.mp3'
+    );
+    $defaults['live_message_sound_path'] = notificationResolveSelectedSoundPath(
+        $defaults['live_message_sound_path'] ?? 'audio/notification.mp3'
+    );
+
+    $settings = [];
+    foreach ($defaults as $key => $value) {
+        if (in_array($key, $boolKeys, true)) {
+            $normalized = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            $settings[$key] = ($normalized === null) ? ($value === '1') : (bool)$normalized;
+            continue;
+        }
+
+        if (in_array($key, $intKeys, true)) {
+            $settings[$key] = (int)$value;
+            continue;
+        }
+
+        $settings[$key] = (string)$value;
+    }
+
+    ob_clean();
+    echo json_encode([
+        'success' => true,
+        'settings' => $settings
+    ]);
+} catch (Throwable $e) {
+    ob_clean();
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Server error: ' . $e->getMessage()
+    ]);
+} finally {
+    if (isset($conn)) {
+        $conn->close();
+    }
+    ob_end_flush();
+}
+?>

@@ -1,1 +1,336 @@
-<!-- tasks.html HTML scaffold -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
+  <title>My Tasks - PensionsGo</title>
+
+  <link rel="stylesheet" href="css/color-variables.css?v=20260504a" />
+  <link rel="stylesheet" href="css/styles.css?v=20260507c" />
+  <link rel="stylesheet" href="css/profile.css?v=20260504a" />
+  <link rel="stylesheet" href="css/menu.css?v=20260504d" />
+  <link rel="stylesheet" href="css/overlay.css?v=20260504a" />
+  <link rel="stylesheet" href="css/tasks.css?v=20260504a" />
+</head>
+<body>
+  <main class="tasks-wrapper">
+    <div class="tasks-header">
+      <div>
+        <h2 id="tasksHeading">My Tasks</h2>
+        <p id="tasksSubheading">Track assignments, collaborate with colleagues, and move workflows forward.</p>
+      </div>
+      <div class="tasks-controls">
+        <select id="taskBucketFilter">
+          <option value="all">All Tasks</option>
+          <option value="received">Received</option>
+          <option value="delegated">Delegated</option>
+          <option value="pending">Pending</option>
+          <option value="in_progress">In Progress</option>
+          <option value="scheduled">Scheduled</option>
+          <option value="returned">Returned</option>
+          <option value="completed">Completed</option>
+          <option value="declined_rejected">Declined/Rejected</option>
+          <option value="due_soon">Due Soon</option>
+          <option value="overdue">Overdue</option>
+        </select>
+        <select id="taskStatusFilter">
+          <option value="">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="assigned">Assigned</option>
+          <option value="in_progress">In Progress</option>
+          <option value="deferred">Scheduled</option>
+          <option value="returned">Returned</option>
+          <option value="completed">Completed</option>
+          <option value="declined">Declined</option>
+        </select>
+        <select id="taskUserFilter">
+          <option value="">All Users</option>
+        </select>
+        <select id="taskRoleFilter">
+          <option value="">All Roles</option>
+        </select>
+        <input type="text" id="taskSearchInput" placeholder="Search tasks..." />
+        <button id="refreshTasksBtn" class="btn-secondary">Refresh</button>
+        <button id="openTaskQueueBtn" class="btn-secondary" type="button" style="display:none;">Completion Queue</button>
+        <button id="taskAlertsToggleBtn" class="btn-secondary" type="button" style="display:none;">Hide Task Alerts</button>
+      </div>
+    </div>
+
+    <section class="task-alerts-panel" id="taskAlertsPanel">
+      <div class="task-alerts-header">
+        <div>
+          <h3>Task Alerts</h3>
+          <p>Auto-generated reminders for due-soon, overdue, and stalled assignments.</p>
+        </div>
+        <button id="refreshTaskAlertsBtn" class="btn-secondary" type="button">Refresh Alerts</button>
+      </div>
+      <div class="task-alerts-summary" id="taskAlertsSummary">
+        <div class="task-alerts-empty">Loading alert summary...</div>
+      </div>
+      <div class="task-alerts-list" id="taskAlertsList">
+        <div class="task-alerts-empty">Loading alerts...</div>
+      </div>
+    </section>
+
+    <section class="tasks-list" id="tasksList">
+      <div class="tasks-empty">Loading tasks...</div>
+    </section>
+  </main>
+
+  <div class="task-modal hidden" id="taskQueueModal" aria-hidden="true">
+    <div class="task-modal-backdrop" id="taskQueueBackdrop"></div>
+    <section class="task-modal-panel task-queue-modal-panel" role="dialog" aria-modal="true" aria-labelledby="taskQueueTitle">
+      <header class="task-modal-header">
+        <h3 id="taskQueueTitle">Completion Queue</h3>
+        <button type="button" class="task-modal-close" id="taskQueueClose" aria-label="Close">&times;</button>
+      </header>
+      <div class="task-queue-panel in-modal" id="taskQueuePanel">
+        <div class="task-queue-header">
+          <div>
+            <h3>Completion Queue</h3>
+            <p>Queue verified work, review the next assignee and note, then forward the batch at once.</p>
+          </div>
+          <div class="task-queue-controls">
+            <select id="taskQueueStatusFilter">
+              <option value="active">Ready / Needs Review</option>
+              <option value="queued">Ready Only</option>
+              <option value="failed">Needs Review Only</option>
+              <option value="processed">Recently Processed</option>
+              <option value="all">All Queue Records</option>
+            </select>
+            <input type="text" id="taskQueueSearchInput" placeholder="Search queue..." />
+            <button id="refreshTaskQueueBtn" class="btn-secondary" type="button">Refresh Queue</button>
+            <button id="processTaskQueueBtn" class="btn-secondary" type="button">Process Ready Queue</button>
+          </div>
+        </div>
+        <div class="task-queue-summary" id="taskQueueSummary">
+          <div class="task-alerts-empty">Loading completion queue summary...</div>
+        </div>
+        <div class="task-queue-list" id="taskQueueList">
+          <div class="task-alerts-empty">Loading queued task completions...</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="task-modal hidden" id="taskDetailsModal" aria-hidden="true">
+    <div class="task-modal-backdrop" id="taskDetailsBackdrop"></div>
+    <section class="task-modal-panel" role="dialog" aria-modal="true" aria-labelledby="taskModalTitle">
+      <header class="task-modal-header">
+        <h3 id="taskModalTitle">Task Details</h3>
+        <button type="button" class="task-modal-close" id="taskDetailsClose" aria-label="Close">&times;</button>
+      </header>
+      <div class="task-details" id="taskDetails">
+        <div class="task-empty">
+          <h3>Select a task</h3>
+          <p>Choose a task from the list to view details, comments, and actions.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="task-modal hidden" id="scheduleAdjustModal" aria-hidden="true">
+    <div class="task-modal-backdrop" id="scheduleAdjustBackdrop"></div>
+    <section class="task-modal-panel schedule-panel" role="dialog" aria-modal="true" aria-labelledby="scheduleAdjustTitle">
+      <header class="task-modal-header">
+        <h3 id="scheduleAdjustTitle">Adjust Task Schedule</h3>
+        <button type="button" class="task-modal-close" id="scheduleAdjustClose" aria-label="Close">&times;</button>
+      </header>
+      <div class="schedule-form-grid">
+        <div class="inline-field">
+          <label>Extend By (Days)</label>
+          <input type="number" id="scheduleAdjustDays" min="1" step="1" value="3">
+        </div>
+        <div class="inline-field">
+          <label>Or Set Exact Due Date/Time</label>
+          <input type="datetime-local" id="scheduleAdjustDueAt">
+        </div>
+        <div class="inline-field full">
+          <label>Reason/Note</label>
+          <input type="text" id="scheduleAdjustNote" placeholder="Optional note for schedule adjustment">
+        </div>
+      </div>
+      <div class="button-row schedule-actions">
+        <button class="secondary" type="button" id="scheduleAdjustCancelBtn">Cancel</button>
+        <button class="primary" type="button" id="scheduleAdjustApplyBtn">Apply Schedule</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="task-modal hidden" id="writeupCheckpointModal" aria-hidden="true">
+    <div class="task-modal-backdrop" id="writeupCheckpointBackdrop"></div>
+    <section class="task-modal-panel checkpoint-panel" role="dialog" aria-modal="true" aria-labelledby="writeupCheckpointTitle">
+      <header class="task-modal-header">
+        <h3 id="writeupCheckpointTitle">Write-up Verification</h3>
+        <button type="button" class="task-modal-close" id="writeupCheckpointClose" aria-label="Close">&times;</button>
+      </header>
+      <div class="checkpoint-form-grid">
+        <div class="inline-field">
+          <label>Rank/Title</label>
+          <input type="text" id="writeupTitle">
+        </div>
+        <div class="inline-field">
+          <label>Mode of Retirement</label>
+          <select id="writeupRetirementType">
+            <option value="">Select</option>
+            <option value="mandatory">Mandatory Retirement</option>
+            <option value="early">Early Retirement</option>
+            <option value="death">Death</option>
+            <option value="aor">Discharge (A.O.R)</option>
+            <option value="medical">Discharge (Medical)</option>
+            <option value="marriage">Discharge (Marriage)</option>
+            <option value="cbe">Discharge (C.B.E)</option>
+            <option value="ube">Discharge (U.B.E)</option>
+            <option value="public">Discharge (Public Interest)</option>
+            <option value="contract">End of Contract</option>
+            <option value="tx">Discharge (T.X)</option>
+            <option value="voluntary">Voluntary</option>
+            <option value="oldAge">Old Age</option>
+            <option value="abolition">Abolition of Office</option>
+          </select>
+        </div>
+        <div class="inline-field">
+          <label>Date of Birth</label>
+          <input type="date" id="writeupBirthDate">
+        </div>
+        <div class="inline-field">
+          <label>Date of Enlistment</label>
+          <input type="date" id="writeupEnlistmentDate">
+        </div>
+        <div class="inline-field">
+          <label>Date of Retirement</label>
+          <input type="date" id="writeupRetirementDate">
+        </div>
+        <div class="inline-field">
+          <label>Last Monthly Salary</label>
+          <input type="number" id="writeupMonthlySalary" min="0" step="0.01" data-money-input data-money-fixed-decimals="2">
+        </div>
+      </div>
+      <p class="checkpoint-hint" id="writeupCheckpointPolicyHint" data-state="neutral" hidden></p>
+      <div class="checkpoint-preview-grid">
+        <div class="detail-field"><span>Financial Year</span><strong id="writeupFinancialYear">-</strong></div>
+        <div class="detail-field"><span>Service (Months)</span><strong id="writeupLengthOfService">0</strong></div>
+        <div class="detail-field"><span>Annual Salary</span><strong id="writeupAnnualSalary">UGX 0.00</strong></div>
+        <div class="detail-field"><span>Reduced Pension</span><strong id="writeupReducedPension">UGX 0.00</strong></div>
+        <div class="detail-field"><span>Full Pension</span><strong id="writeupFullPension">UGX 0.00</strong></div>
+        <div class="detail-field"><span>Commuted Gratuity</span><strong id="writeupGratuity">UGX 0.00</strong></div>
+      </div>
+      <div class="button-row checkpoint-actions">
+        <button class="secondary" type="button" id="writeupCheckpointCancelBtn">Cancel</button>
+        <button class="primary" type="button" id="writeupCheckpointSaveBtn">Save & Continue</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="task-modal hidden" id="assessorCheckpointModal" aria-hidden="true">
+    <div class="task-modal-backdrop" id="assessorCheckpointBackdrop"></div>
+    <section class="task-modal-panel checkpoint-panel" role="dialog" aria-modal="true" aria-labelledby="assessorCheckpointTitle">
+      <header class="task-modal-header">
+        <h3 id="assessorCheckpointTitle">Assessment Benefits Verification</h3>
+        <button type="button" class="task-modal-close" id="assessorCheckpointClose" aria-label="Close">&times;</button>
+      </header>
+      <div class="checkpoint-form-grid">
+        <div class="inline-field">
+          <label>Reduced Pension</label>
+          <input type="number" id="assessorReducedPension" min="0" step="0.01" data-money-input data-money-fixed-decimals="2">
+        </div>
+        <div class="inline-field">
+          <label>Full Pension</label>
+          <input type="number" id="assessorFullPension" min="0" step="0.01" data-money-input data-money-fixed-decimals="2">
+        </div>
+        <div class="inline-field">
+          <label>Commuted Pension Gratuity</label>
+          <input type="number" id="assessorGratuity" min="0" step="0.01" data-money-input data-money-fixed-decimals="2">
+        </div>
+        <div class="inline-field">
+          <label>Pay Type</label>
+          <select id="assessorPayType" disabled title="Auto-determined from the retirement label and, where required, service dates.">
+            <option value="">Auto-determined from retirement label and, where required, service dates</option>
+            <option value="Pensioner">Pensioner</option>
+            <option value="One-off Payment">One-off Payment</option>
+          </select>
+        </div>
+      </div>
+      <div class="button-row checkpoint-actions">
+        <button class="secondary" type="button" id="assessorCheckpointCancelBtn">Cancel</button>
+        <button class="primary" type="button" id="assessorCheckpointSaveBtn">Save & Continue</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="task-modal hidden" id="dataEntryCheckpointModal" aria-hidden="true">
+    <div class="task-modal-backdrop" id="dataEntryCheckpointBackdrop"></div>
+    <section class="task-modal-panel checkpoint-panel" role="dialog" aria-modal="true" aria-labelledby="dataEntryCheckpointTitle">
+      <header class="task-modal-header">
+        <h3 id="dataEntryCheckpointTitle">Data Entry Verification</h3>
+        <button type="button" class="task-modal-close" id="dataEntryCheckpointClose" aria-label="Close">&times;</button>
+      </header>
+      <p class="checkpoint-hint" id="dataEntryCheckpointHint">
+        Complete the contact and banking details before forwarding. Pay Type is auto-determined from the retirement label and, where required, service dates. Applicant email is optional. Next of kin details become mandatory for Death records.
+      </p>
+      <div class="checkpoint-form-grid">
+        <div class="inline-field">
+          <label>Living Status</label>
+          <select id="dataEntryLivingStatus">
+            <option value="Alive">Alive</option>
+            <option value="Deceased">Deceased</option>
+          </select>
+        </div>
+        <div class="inline-field">
+          <label>Pay Type</label>
+          <select id="dataEntryPayType" disabled title="Auto-determined from the retirement label and, where required, service dates.">
+            <option value="">Auto-determined from retirement label and, where required, service dates</option>
+            <option value="Pensioner">Pensioner</option>
+            <option value="One-off Payment">One-off Payment</option>
+          </select>
+        </div>
+        <div class="inline-field checkpoint-field-span-2">
+          <label id="dataEntryAddressLabel">District of Residence</label>
+          <input type="text" id="dataEntryAddress" autocomplete="off">
+        </div>
+        <div class="inline-field checkpoint-field-span-2">
+          <label>Applicant Email <small>(Optional)</small></label>
+          <input type="email" id="dataEntryApplicantEmail" placeholder="name@example.com">
+        </div>
+        <div class="inline-field">
+          <label id="dataEntryNextOfKinLabel">Next of Kin</label>
+          <input type="text" id="dataEntryNextOfKin">
+        </div>
+        <div class="inline-field">
+          <label id="dataEntryNextOfKinContactLabel">Next of Kin Contact</label>
+          <input type="text" id="dataEntryNextOfKinContact" placeholder="+256700123456 or 0770123456">
+        </div>
+        <div class="inline-field">
+          <label>Bank Name</label>
+          <input type="text" id="dataEntryBankName">
+        </div>
+        <div class="inline-field">
+          <label>Bank Account Number</label>
+          <input type="text" id="dataEntryBankAccount">
+        </div>
+        <div class="inline-field checkpoint-field-span-2">
+          <label>Bank Branch</label>
+          <input type="text" id="dataEntryBankBranch">
+        </div>
+      </div>
+      <div class="button-row checkpoint-actions">
+        <button class="secondary" type="button" id="dataEntryCheckpointCancelBtn">Cancel</button>
+        <button class="primary" type="button" id="dataEntryCheckpointSaveBtn">Save & Continue</button>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="js/main.js?v=20260528b"></script>
+  <script defer src="js/modules/district_selector.js?v=20260429a"></script>
+  <script src="js/modules/retirement-types.js"></script>
+  <script src="js/tasks.js?v=20260331a"></script>
+</body>
+</html>
+
+
+

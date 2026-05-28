@@ -1,398 +1,476 @@
 <?php
 /**
- * ============================================================
- * LOGIN API (Enhanced with Comprehensive User Logging)
- * ============================================================
- * Authenticates users using either Email OR Phone Number.
- * - Uses the correct userId (varchar) from your tb_users table
- * - Single device login enforcement
- * - SMART detection: Only considers RECENTLY active sessions as "existing"
- * - Complete cleanup of expired sessions during login
- * - COMPREHENSIVE USER ACTIVITY LOGGING
- * ============================================================
+ * 
+ * login.php
+ * 
  */
 
-session_start();
+// Set error reporting
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
 
-// Clear any existing session if this is a login attempt
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Clear previous session data to prevent conflicts
-    session_unset();
-    
-    // Generate new session ID for fresh login
-    session_regenerate_id(true);
-}
+// Set headers for CORS and JSON response
+header('Content-Type: application/json; charset=UTF-8');
 
-header('Content-Type: application/json');
-require_once __DIR__ . '/../config.php';
+// Handle preflight OPTIONS request
+// Start output buffering
+ob_start();
+$responseSent = false;
 
-// Session timeout in seconds (for smart session detection)
-$timeout = 1800;
+$sendJsonResponse = static function (array $payload, int $statusCode = 200) use (&$responseSent): void {
+    if (!headers_sent()) {
+        http_response_code($statusCode);
+        header('Content-Type: application/json; charset=UTF-8');
+    }
 
-// ------------------------------------------------------------
-// 1️⃣ Validate Request Method
-// ------------------------------------------------------------
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    echo json_encode(['success' => false, 'message' => 'Invalid request method']);
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+
+    echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    $responseSent = true;
     exit;
-}
+};
 
-// ------------------------------------------------------------
-// 2️⃣ Get and Validate Input
-// ------------------------------------------------------------
-$username = trim($_POST['email'] ?? ''); // may be email or phone number
-$password = trim($_POST['password'] ?? '');
+register_shutdown_function(static function () use (&$responseSent, $sendJsonResponse): void {
+    if ($responseSent) {
+        return;
+    }
 
-if ($username === '' || $password === '') {
-    echo json_encode(['success' => false, 'message' => 'Please enter your email/phone and password']);
-    exit;
-}
+    $lastError = error_get_last();
+    if (!$lastError) {
+        return;
+    }
 
-// ------------------------------------------------------------
-// 3️⃣ Determine if Input is Email or Phone Number
-// ------------------------------------------------------------
-$isEmail = filter_var($username, FILTER_VALIDATE_EMAIL);
-$isPhone = preg_match('/^\+[1-9][0-9]{7,14}$/', $username); // E.164 format e.g., +256700123456
+    $fatalTypes = [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR, E_RECOVERABLE_ERROR];
+    if (!in_array((int)$lastError['type'], $fatalTypes, true)) {
+        return;
+    }
 
-if (!$isEmail && !$isPhone) {
-    echo json_encode(['success' => false, 'message' => 'Enter a valid email or phone number (e.g., +256700123456)']);
-    exit;
-}
+    error_log('LOGIN FATAL: ' . ($lastError['message'] ?? 'Unknown fatal error'));
+    $sendJsonResponse([
+        'success' => false,
+        'message' => 'Login failed due to a server error.',
+        'errorCode' => 500
+    ], 500);
+});
 
-// ------------------------------------------------------------
-// 4️⃣ Prepare SQL Query Based on Input Type
-// ------------------------------------------------------------
 try {
+    // 
+    // Load config
+    // 
+    require_once __DIR__ . '/../config.php';
+    applyApiCorsPolicy($conn, ['POST', 'OPTIONS']);
+
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        http_response_code(200);
+        exit;
+    }
+    
+    // Check if database connection is available
+    if (!isset($conn) || !($conn instanceof mysqli)) {
+        throw new Exception('Database connection not available');
+    }
+    
+    // Check if SessionManager is available
+    if (!isset($sessionManager) || !($sessionManager instanceof SessionManager)) {
+        throw new Exception('SessionManager not available');
+    }
+
+    if (function_exists('ensureUserPasswordUpdatedAtColumn')) {
+        ensureUserPasswordUpdatedAtColumn($conn);
+    }
+
+    // 
+    // Validate request
+    // 
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        throw new Exception('Invalid request method. Only POST is allowed.', 405);
+    }
+
+    // Get and validate input
+    $identifierRaw = isset($_POST['email']) ? trim($_POST['email']) : '';
+    $password = isset($_POST['password']) ? trim($_POST['password']) : '';
+
+    if (empty($identifierRaw) || empty($password)) {
+        throw new Exception('Missing credentials. Please provide both email/phone and password.', 400);
+    }
+
+    // 
+    // Identify login method (email or phone)
+    // 
+    $isEmail = filter_var($identifierRaw, FILTER_VALIDATE_EMAIL);
+    $normalizedPhone = $isEmail ? null : normalizePhoneNumber($identifierRaw);
+    $isPhone = (!$isEmail && $normalizedPhone !== null);
+
+    if (!$isEmail && !$isPhone) {
+        throw new Exception('Enter a valid email or phone number (e.g., +256700123456, 0770123456, 0312123456, 0800123456).', 400);
+    }
+
+    // 
+    // Fetch user from database
+    // 
+    $user = null;
     if ($isEmail) {
-        $stmt = $conn->prepare("
-            SELECT userId, userName, userRole, userPassword, userPhoto, phoneNo 
-            FROM tb_users 
-            WHERE userEmail = ?
-        ");
+        $stmt = $conn->prepare("SELECT userId, userName, userRole, userPassword, userPhoto, phoneNo, userEmail, password_updated_at, timeStamp FROM tb_users WHERE userEmail = ? LIMIT 1");
+        if (!$stmt) {
+            throw new Exception('Database query preparation failed: ' . $conn->error);
+        }
+        $stmt->bind_param('s', $identifierRaw);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($result && $result->num_rows > 0) {
+            $user = $result->fetch_assoc();
+        }
+        $stmt->close();
     } else {
-        $stmt = $conn->prepare("
-            SELECT userId, userName, userRole, userPassword, userPhoto, phoneNo 
-            FROM tb_users 
-            WHERE phoneNo = ?
-        ");
+        $phoneCandidates = buildPhoneLookupCandidates($identifierRaw);
+        $stmt = $conn->prepare("SELECT userId, userName, userRole, userPassword, userPhoto, phoneNo, userEmail, password_updated_at, timeStamp FROM tb_users WHERE phoneNo = ? LIMIT 1");
+        if (!$stmt) {
+            throw new Exception('Database query preparation failed: ' . $conn->error);
+        }
+
+        foreach ($phoneCandidates as $candidate) {
+            $stmt->bind_param('s', $candidate);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            if ($result && $result->num_rows > 0) {
+                $user = $result->fetch_assoc();
+                break;
+            }
+        }
+        $stmt->close();
     }
 
-    if (!$stmt) {
-        throw new Exception("Failed to prepare statement: " . $conn->error);
+    if (!$user) {
+        throw new Exception('Invalid credentials. User not found.', 401);
     }
 
-    $stmt->bind_param("s", $username);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    // ------------------------------------------------------------
-    // 5️⃣ Validate Credentials
-    // ------------------------------------------------------------
-    if ($row = $result->fetch_assoc()) {
-        if (password_verify($password, $row['userPassword'])) {
-            $userId = $row['userId']; // This is the VARCHAR userId
-            
-            // 🔥 ENHANCED: Clean up expired sessions before checking for existing ones
-            cleanupExpiredSessionsBeforeLogin($conn, $timeout);
-            
-            // ------------------------------------------------------------
-            // 6️⃣ SMART SINGLE DEVICE LOGIN: Check for RECENTLY active sessions only
-            // ------------------------------------------------------------
-            $deviceId = generateDeviceId();
-            $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
-            $ipAddress = $_SERVER['REMOTE_ADDR'] ?? 'Unknown';
-            $sessionId = session_id();
-            $deviceType = detectDeviceType($userAgent);
-            $location = getLocationFromIP($ipAddress);
-            
-            // 🔥 ENHANCED: Only consider sessions active within the timeout period
-            $activeTimeThreshold = date('Y-m-d H:i:s', time() - $timeout);
-            
-            $checkStmt = $conn->prepare("
-                SELECT session_id, login_time, last_activity 
-                FROM tb_user_sessions 
-                WHERE user_id = ? 
-                AND is_active = 1 
-                AND last_activity >= ?
-                ORDER BY last_activity DESC 
-                LIMIT 1
-            ");
-            
-            if (!$checkStmt) {
-                throw new Exception("Failed to prepare check statement: " . $conn->error);
-            }
-            
-            $checkStmt->bind_param("ss", $userId, $activeTimeThreshold);
-            $checkStmt->execute();
-            $existingSession = $checkStmt->get_result()->fetch_assoc();
-            $checkStmt->close();
-            
-            // 🔥 ENHANCED: Only show conflict if there's a RECENT active session
-            $hasExistingSession = !empty($existingSession);
-            $existingSessionId = $existingSession['session_id'] ?? null;
-            
-            // Log for debugging
-            if ($hasExistingSession) {
-                error_log("🔍 Login: Found recent active session for user $userId - " . $existingSessionId);
-            } else {
-                error_log("🔍 Login: No recent active sessions found for user $userId");
-            }
-            
-            // ------------------------------------------------------------
-            // 7️⃣ Create new session in database
-            // ------------------------------------------------------------
-            $insertStmt = $conn->prepare("
-                INSERT INTO tb_user_sessions (session_id, user_id, device_id, user_agent, ip_address, is_active)
-                VALUES (?, ?, ?, ?, ?, 1)
-                ON DUPLICATE KEY UPDATE 
-                    device_id = VALUES(device_id),
-                    user_agent = VALUES(user_agent),
-                    ip_address = VALUES(ip_address),
-                    is_active = 1,
-                    last_activity = CURRENT_TIMESTAMP
-            ");
-            
-            if (!$insertStmt) {
-                throw new Exception("Failed to prepare insert statement: " . $conn->error);
-            }
-            
-            $insertStmt->bind_param("sssss", $sessionId, $userId, $deviceId, $userAgent, $ipAddress);
-            $insertSuccess = $insertStmt->execute();
-            
-            if (!$insertSuccess) {
-                throw new Exception("Failed to insert session: " . $conn->error);
-            }
-            
-            $insertStmt->close();
-            
-            // 🔥 NEW: LOG SUCCESSFUL LOGIN ACTIVITY
-            logUserActivity($conn, [
-                'user_id' => $userId,
-                'user_name' => $row['userName'],
-                'user_role' => $row['userRole'],
-                'activity_type' => 'login',
-                'ip_address' => $ipAddress,
-                'user_agent' => $userAgent,
-                'device_type' => $deviceType,
-                'location' => $location,
-                'session_id' => $sessionId,
-                'details' => 'Successful login via ' . ($isEmail ? 'email' : 'phone')
-            ]);
-            
-            // ------------------------------------------------------------
-            // 8️⃣ Create secure PHP session
-            // ------------------------------------------------------------
-            $_SESSION['userId'] = $row['userId'];
-            $_SESSION['userName'] = $row['userName'];
-            $_SESSION['userRole'] = $row['userRole'];
-            $_SESSION['userPhoto'] = $row['userPhoto'] ?: '../uploads/profiles/default-user.png';
-            $_SESSION['phoneNo'] = $row['phoneNo'];
-            $_SESSION['last_activity'] = time();
-            $_SESSION['session_id'] = $sessionId;
-            $_SESSION['device_id'] = $deviceId;
-            $_SESSION['login_log_id'] = getLastLoginLogId($conn, $sessionId); // Store for logout logging
-            
-            echo json_encode([
-                'success' => true,
-                'message' => 'Login successful',
-                'userId' => $row['userId'],
-                'userName' => $row['userName'],
-                'userRole' => $row['userRole'],
-                'userPhoto' => $row['userPhoto'] ?: '../uploads/profiles/default-user.png',
-                'phoneNo' => $row['phoneNo'],
-                'hasExistingSession' => $hasExistingSession,
-                'existingSessionId' => $existingSessionId
-            ]);
-        } else {
-            // 🔥 NEW: LOG FAILED LOGIN ATTEMPT
+    // Verify password
+    if (!password_verify($password, $user['userPassword'])) {
+        // Log failed attempt
+        if (function_exists('logUserActivity')) {
             logUserActivity($conn, [
                 'user_id' => 'unknown',
                 'user_name' => 'Unknown User',
                 'user_role' => 'guest',
-                'activity_type' => 'login',
-                'ip_address' => $_SERVER['REMOTE_ADDR'] ?? 'Unknown',
+                'activity_type' => 'login_failed',
+                'ip_address' => getClientIP(),
                 'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown',
                 'device_type' => detectDeviceType($_SERVER['HTTP_USER_AGENT'] ?? ''),
-                'location' => getLocationFromIP($_SERVER['REMOTE_ADDR'] ?? ''),
+                'location' => getLocationFromIP(getClientIP()),
                 'session_id' => session_id(),
-                'details' => 'Failed login attempt for username: ' . $username
+                'details' => "Failed login attempt for: {$identifierRaw}"
             ]);
-            
-            echo json_encode(['success' => false, 'message' => 'Incorrect password']);
         }
-    } else {
-        // 🔥 NEW: LOG ATTEMPT WITH NON-EXISTENT USERNAME
-        logUserActivity($conn, [
-            'user_id' => 'unknown',
-            'user_name' => 'Unknown User',
-            'user_role' => 'guest',
-            'activity_type' => 'login',
-            'ip_address' => $_SERVER['REMOTE_ADDR'] ?? 'Unknown',
-            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown',
-            'device_type' => detectDeviceType($_SERVER['HTTP_USER_AGENT'] ?? ''),
-            'location' => getLocationFromIP($_SERVER['REMOTE_ADDR'] ?? ''),
-            'session_id' => session_id(),
-            'details' => 'Attempted login with non-existent username: ' . $username
-        ]);
-        
-        echo json_encode(['success' => false, 'message' => 'No user found with that email or phone number']);
+        throw new Exception('Invalid credentials. Please check your email/phone and password.', 401);
     }
-} catch (Exception $e) {
-    error_log("Login error: " . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => 'Server error: ' . $e->getMessage()]);
-} finally {
-    if (isset($stmt) && $stmt instanceof mysqli_stmt) {
-        $stmt->close();
+
+    // 
+    // Pensioner portal access control
+    // 
+    $pensionerLoginEnabled = function_exists('getAppSettingBool')
+        ? getAppSettingBool($conn, 'pensioner_login_enabled', true)
+        : true;
+
+    if (($user['userRole'] ?? '') === 'pensioner' && !$pensionerLoginEnabled) {
+        if (function_exists('logUserActivity')) {
+            logUserActivity($conn, [
+                'user_id' => $user['userId'],
+                'user_name' => $user['userName'],
+                'user_role' => $user['userRole'],
+                'activity_type' => 'login_failed',
+                'ip_address' => getClientIP(),
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown',
+                'device_type' => detectDeviceType($_SERVER['HTTP_USER_AGENT'] ?? ''),
+                'location' => getLocationFromIP(getClientIP()),
+                'session_id' => session_id(),
+                'details' => 'Login blocked: Pensioner login is currently disabled'
+            ]);
+        }
+
+        throw new Exception('Pensioner login is currently disabled. Please contact the pensions office for assistance.', 403);
     }
-    $conn->close();
-}
 
-// ============================================================
-// 🔥 NEW: COMPREHENSIVE LOGGING FUNCTIONS
-// ============================================================
+    // 
+    // Password expiry enforcement
+    // 
+    $expiryRaw = function_exists('getAppSetting') ? getAppSetting($conn, 'password_expiry_days') : null;
+    $expiryDays = is_numeric($expiryRaw) ? (int)$expiryRaw : 0;
+    if ($expiryDays > 0) {
+        $updatedAt = $user['password_updated_at'] ?? $user['timeStamp'] ?? null;
+        if (!empty($updatedAt)) {
+            $expiryCutoff = strtotime("-{$expiryDays} days");
+            $updatedAtTs = strtotime($updatedAt);
+            if ($updatedAtTs && $updatedAtTs < $expiryCutoff) {
+                if (function_exists('logUserActivity')) {
+                    logUserActivity($conn, [
+                        'user_id' => $user['userId'],
+                        'user_name' => $user['userName'],
+                        'user_role' => $user['userRole'],
+                        'activity_type' => 'login_failed',
+                        'ip_address' => getClientIP(),
+                        'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown',
+                        'device_type' => detectDeviceType($_SERVER['HTTP_USER_AGENT'] ?? ''),
+                        'location' => getLocationFromIP(getClientIP()),
+                        'session_id' => session_id(),
+                        'details' => 'Password expired'
+                    ]);
+                }
+                throw new Exception('Password expired. Please contact your administrator to reset it.', 403);
+            }
+        }
+    }
 
-/**
- * Log user activity to tb_user_logs table
- */
-function logUserActivity($conn, $logData) {
-    try {
+    // 
+    // Maintenance mode enforcement
+    // 
+    $maintenanceRaw = function_exists('getAppSetting') ? getAppSetting($conn, 'maintenance_mode') : null;
+    $maintenanceFlag = filter_var($maintenanceRaw, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+    $maintenanceEnabled = ($maintenanceFlag === null) ? ($maintenanceRaw === '1') : (bool)$maintenanceFlag;
+
+    $loginRoleEffective = function_exists('resolveRoleAccessKey')
+        ? resolveRoleAccessKey($conn, (string)($user['userRole'] ?? ''))
+        : (string)($user['userRole'] ?? '');
+    if ($maintenanceEnabled && $loginRoleEffective !== 'admin') {
+        if (function_exists('logUserActivity')) {
+            logUserActivity($conn, [
+                'user_id' => $user['userId'],
+                'user_name' => $user['userName'],
+                'user_role' => $user['userRole'],
+                'activity_type' => 'login_failed',
+                'ip_address' => getClientIP(),
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown',
+                'device_type' => detectDeviceType($_SERVER['HTTP_USER_AGENT'] ?? ''),
+                'location' => getLocationFromIP(getClientIP()),
+                'session_id' => session_id(),
+                'details' => 'Login blocked: Maintenance mode is enabled'
+            ]);
+        }
+        throw new Exception('The system is currently under maintenance. Please try again later.', 403);
+    }
+
+    // 
+    // Login attempt throttling
+    // 
+    $attemptLimitRaw = function_exists('getAppSetting') ? getAppSetting($conn, 'login_attempt_limit') : null;
+    $lockoutMinutesRaw = function_exists('getAppSetting') ? getAppSetting($conn, 'lockout_minutes') : null;
+    $attemptLimit = is_numeric($attemptLimitRaw) ? (int)$attemptLimitRaw : 5;
+    $lockoutMinutes = is_numeric($lockoutMinutesRaw) ? (int)$lockoutMinutesRaw : 15;
+
+    if ($attemptLimit > 0 && $lockoutMinutes > 0) {
         $stmt = $conn->prepare("
-            INSERT INTO tb_user_logs 
-            (user_id, user_name, user_role, activity_type, ip_address, user_agent, device_type, location, session_id, details)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            SELECT COUNT(*) AS fail_count
+            FROM tb_user_logs
+            WHERE user_id = ?
+              AND activity_type = 'login_failed'
+              AND created_at >= (NOW() - INTERVAL ? MINUTE)
         ");
-        
-        $stmt->bind_param(
-            "ssssssssss",
-            $logData['user_id'],
-            $logData['user_name'],
-            $logData['user_role'],
-            $logData['activity_type'],
-            $logData['ip_address'],
-            $logData['user_agent'],
-            $logData['device_type'],
-            $logData['location'],
-            $logData['session_id'],
-            $logData['details']
-        );
-        
-        $stmt->execute();
-        $stmt->close();
-        
-        return true;
-    } catch (Exception $e) {
-        error_log("Failed to log user activity: " . $e->getMessage());
-        return false;
-    }
-}
+        if ($stmt) {
+            $stmt->bind_param('si', $user['userId'], $lockoutMinutes);
+            $stmt->execute();
+            $row = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
 
-/**
- * Detect device type from user agent string
- */
-function detectDeviceType($userAgent) {
-    $userAgent = strtolower($userAgent);
-    
-    if (strpos($userAgent, 'mobile') !== false) {
-        return 'Mobile';
-    } elseif (strpos($userAgent, 'tablet') !== false) {
-        return 'Tablet';
-    } elseif (strpos($userAgent, 'android') !== false) {
-        return 'Android Mobile';
-    } elseif (strpos($userAgent, 'iphone') !== false) {
-        return 'iPhone';
-    } elseif (strpos($userAgent, 'ipad') !== false) {
-        return 'iPad';
-    } elseif (strpos($userAgent, 'windows') !== false) {
-        return 'Windows PC';
-    } elseif (strpos($userAgent, 'macintosh') !== false) {
-        return 'Macintosh';
-    } elseif (strpos($userAgent, 'linux') !== false) {
-        return 'Linux PC';
-    } else {
-        return 'Unknown Device';
+            $failCount = (int)($row['fail_count'] ?? 0);
+            if ($failCount >= $attemptLimit) {
+                throw new Exception('Too many failed attempts. Please wait before trying again.', 429);
+            }
+        }
     }
-}
 
-/**
- * Get location from IP address (basic implementation)
- * Note: For production, consider using a proper IP geolocation service
- */
-function getLocationFromIP($ip) {
-    // Simple implementation - in production, use a service like ipinfo.io or MaxMind
-    if ($ip === '127.0.0.1' || $ip === '::1') {
-        return 'Localhost';
-    }
-    
-    // You can integrate with a free service like ipapi.co
-    // For now, returning the IP itself as location
-    return "IP: $ip";
-    
-    /*
-    // Example with ipapi.co (requires API key for production)
-    try {
-        $response = file_get_contents("http://ipapi.co/$ip/json/");
-        $data = json_decode($response, true);
-        return $data['city'] . ', ' . $data['country_name'] ?? 'Unknown Location';
-    } catch (Exception $e) {
-        return "IP: $ip";
-    }
-    */
-}
-
-/**
- * Get the last login log ID for a session (to link logout with login)
- */
-function getLastLoginLogId($conn, $sessionId) {
-    try {
-        $stmt = $conn->prepare("
-            SELECT log_id FROM tb_user_logs 
-            WHERE session_id = ? AND activity_type = 'login' 
-            ORDER BY created_at DESC LIMIT 1
-        ");
-        $stmt->bind_param("s", $sessionId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $row = $result->fetch_assoc();
-        $stmt->close();
-        
-        return $row['log_id'] ?? null;
-    } catch (Exception $e) {
-        error_log("Failed to get last login log ID: " . $e->getMessage());
-        return null;
-    }
-}
-
-/**
- * Generate a unique device identifier
- */
-function generateDeviceId() {
     $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
-    $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
-    $language = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '';
-    
-    $deviceString = $userAgent . $ip . $accept . $language;
-    return hash('sha256', $deviceString);
-}
+    $ip = getClientIP();
 
-/**
- * Clean up expired sessions before login check
- * This ensures we only check for truly active sessions
- */
-function cleanupExpiredSessionsBeforeLogin($conn, $timeout) {
-    $expiryTime = date('Y-m-d H:i:s', time() - $timeout);
-    
-    $stmt = $conn->prepare("
-        DELETE FROM tb_user_sessions 
-        WHERE last_activity < ? OR is_active = 0
+    // 
+    // App-level session defaults
+    // 
+    $timeoutMinutesRaw = function_exists('getAppSetting') ? getAppSetting($conn, 'session_timeout_minutes') : null;
+    $graceMinutesRaw = function_exists('getAppSetting') ? getAppSetting($conn, 'grace_period_minutes') : null;
+    $allowMultipleRaw = function_exists('getAppSetting') ? getAppSetting($conn, 'allow_multiple_devices') : null;
+
+    $timeoutMinutes = is_numeric($timeoutMinutesRaw) ? (int)$timeoutMinutesRaw : 30;
+    $graceMinutes = is_numeric($graceMinutesRaw) ? (int)$graceMinutesRaw : 5;
+    $allowMultipleFlag = filter_var($allowMultipleRaw, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+    $allowMultipleDevices = ($allowMultipleFlag === null) ? ($allowMultipleRaw === '1') : (bool)$allowMultipleFlag;
+
+    if ($timeoutMinutes <= 0) {
+        $timeoutMinutes = 30;
+    }
+    if ($graceMinutes < 0) {
+        $graceMinutes = 5;
+    }
+
+    // 
+    // Check for existing active sessions using the stable device token hash.
+    // Same-device re-logins should not be treated as another device conflict.
+    // 
+    $deviceId = resolveClientDeviceIdentifierHash();
+
+    $checkStmt = $conn->prepare("
+        SELECT
+            COUNT(*) AS active_count,
+            SUM(CASE WHEN device_id = ? THEN 1 ELSE 0 END) AS same_device_count
+        FROM tb_user_sessions 
+        WHERE user_id = ? AND is_active = 1
     ");
-    $stmt->bind_param("s", $expiryTime);
-    $stmt->execute();
-    $affectedRows = $stmt->affected_rows;
-    $stmt->close();
+    if (!$checkStmt) {
+        throw new Exception('Failed to check existing sessions: ' . $conn->error);
+    }
     
-    if ($affectedRows > 0) {
-        error_log("🧹 Pre-login cleanup: Removed $affectedRows expired sessions");
+    $checkStmt->bind_param('ss', $deviceId, $user['userId']);
+    $checkStmt->execute();
+    $checkResult = $checkStmt->get_result()->fetch_assoc();
+    $checkStmt->close();
+    
+    $activeCount = (int)($checkResult['active_count'] ?? 0);
+    $sameDeviceCount = (int)($checkResult['same_device_count'] ?? 0);
+    $otherActiveCount = max(0, $activeCount - $sameDeviceCount);
+    $hasExistingSession = $otherActiveCount > 0;
+    
+    if ($hasExistingSession && function_exists('logUserActivity')) {
+        logUserActivity($conn, [
+            'user_id' => $user['userId'],
+            'user_name' => $user['userName'],
+            'user_role' => $user['userRole'],
+            'activity_type' => 'device_conflict_detected',
+            'ip_address' => $ip,
+            'user_agent' => $userAgent,
+            'device_type' => detectDeviceType($userAgent),
+            'location' => getLocationFromIP($ip),
+            'session_id' => session_id(),
+            'details' => 'Login attempted while another session is active'
+        ]);
+    }
+
+    // 
+    // Enforce max concurrent sessions & auto-logout behavior
+    // 
+    $maxConcurrentRaw = function_exists('getAppSetting') ? getAppSetting($conn, 'max_concurrent_sessions') : null;
+    $autoLogoutRaw = function_exists('getAppSetting') ? getAppSetting($conn, 'auto_logout_on_conflict') : null;
+    $maxConcurrent = is_numeric($maxConcurrentRaw) ? (int)$maxConcurrentRaw : 1;
+    if ($maxConcurrent <= 0) {
+        $maxConcurrent = 1;
+    }
+    $autoLogoutFlag = filter_var($autoLogoutRaw, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+    $autoLogoutOnConflict = ($autoLogoutFlag === null) ? ($autoLogoutRaw === '1') : (bool)$autoLogoutFlag;
+
+    if ($allowMultipleDevices && $otherActiveCount >= $maxConcurrent) {
+        if ($autoLogoutOnConflict) {
+            $terminateCount = ($otherActiveCount - $maxConcurrent) + 1;
+            if ($terminateCount > 0 && method_exists($sessionManager, 'terminateOldestSessions')) {
+                $sessionManager->terminateOldestSessions($user['userId'], $terminateCount, 'auto_logout');
+            }
+        } else {
+            throw new Exception('Maximum active sessions reached. Please log out from another device.', 409);
+        }
+    }
+
+    // 
+    // Create new session via SessionManager
+    // 
+    $sessionInfo = $sessionManager->initializeSession(
+        $user['userId'],
+        $user['userName'],
+        $user['userRole'],
+        $deviceId,
+        'web',
+        [
+            'allow_multiple_devices' => $allowMultipleDevices,
+            'timeout' => $timeoutMinutes * 60,
+            'grace_period' => $graceMinutes * 60
+        ]
+    );
+
+      $effectiveRole = function_exists('resolveRoleAccessKey')
+          ? resolveRoleAccessKey($conn, (string)($user['userRole'] ?? ''))
+          : (string)($user['userRole'] ?? '');
+
+      // 
+      // Store session data
+      // 
+      $_SESSION['userId']        = $user['userId'];
+      $_SESSION['userName']      = $user['userName'];
+      $_SESSION['userRole']      = $user['userRole'];
+      $_SESSION['userRoleEffective'] = $effectiveRole;
+    $_SESSION['userPhoto']     = $user['userPhoto'] ?? null;
+    $_SESSION['phoneNo']       = $user['phoneNo'] ?? null;
+    $_SESSION['userEmail']     = $user['userEmail'] ?? null;
+    $_SESSION['session_id']    = $sessionInfo['session_id'];
+    $_SESSION['last_activity'] = time();
+    $_SESSION['device_id']     = $deviceId;
+    
+    // Regenerate session ID for security
+    session_regenerate_id(true);
+
+    // 
+    // Log successful login
+    // 
+    if (function_exists('logUserActivity')) {
+        logUserActivity($conn, [
+            'user_id' => $user['userId'],
+            'user_name' => $user['userName'],
+            'user_role' => $user['userRole'],
+            'activity_type' => 'login',
+            'ip_address' => getClientIP(),
+            'user_agent' => $userAgent,
+            'device_type' => detectDeviceType($userAgent),
+            'location' => getLocationFromIP($ip),
+            'session_id' => $sessionInfo['session_id'],
+            'details' => "Successful login via " . ($isEmail ? 'email' : 'phone')
+        ]);
+    }
+
+        // 
+        // Prepare success response
+        // 
+      $response = [
+          'success'              => true,
+          'message'              => 'Login successful',
+          'userId'               => $user['userId'],
+          'userName'             => $user['userName'],
+          'userRole'             => $user['userRole'],
+          'userRoleEffective'    => $effectiveRole,
+          'userPhoto'            => $user['userPhoto'] ?? 'images/default-user.png',
+          'phoneNo'              => $user['phoneNo'] ?? '',
+          'userEmail'            => $user['userEmail'] ?? '',
+        'sessionTimeout'       => $sessionInfo['timeout'] ?? 1800,
+        'gracePeriod'          => $sessionInfo['grace_period'] ?? 300,
+        'allowMultipleDevices' => $sessionInfo['allow_multiple_devices'] ?? $allowMultipleDevices,
+        'hasExistingSession'   => $hasExistingSession,
+        'sessionId'            => $sessionInfo['session_id']
+    ];
+
+    // Clear output buffer and send response
+    $sendJsonResponse($response, 200);
+
+} catch (Throwable $e) {
+    // Handle errors
+    error_log("LOGIN ERROR: " . $e->getMessage());
+
+    $statusCode = $e->getCode() ?: 500;
+    if ($statusCode < 400 || $statusCode > 599) {
+        $statusCode = 500;
+    }
+
+    $sendJsonResponse([
+        'success' => false,
+        'message' => $e->getMessage(),
+        'errorCode' => $statusCode
+    ], $statusCode);
+} finally {
+    // Avoid emitting buffered warnings/notices after JSON has been sent.
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    
+    // Close database connection if it exists
+    if (isset($conn) && $conn instanceof mysqli) {
+        $conn->close();
     }
 }
+
+exit;
 ?>
+

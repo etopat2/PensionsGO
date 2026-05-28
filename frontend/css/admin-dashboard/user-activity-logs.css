@@ -1,4 +1,3 @@
-/* ====================================================================
    USER ACTIVITY LOGS STYLES
    Professional styling for user activity logs table
    ==================================================================== */
@@ -28,6 +27,93 @@
     gap: 1rem;
     align-items: center;
     flex: 1;
+}
+
+.geo-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.geo-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--card-bg);
+}
+
+.geo-label {
+    font-weight: 600;
+    color: var(--heading-color);
+    font-size: 0.85rem;
+}
+
+.geo-status {
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    background: var(--menu-bg-dark);
+    color: var(--muted-color);
+}
+
+.geo-status.on {
+    background: #e7f7ee;
+    color: #1b7a3a;
+}
+
+.geo-status.off {
+    background: #fbe9ea;
+    color: #a0262d;
+}
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 46px;
+    height: 24px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #cfd8e3;
+    transition: 0.3s;
+    border-radius: 999px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: var(--primary-blue);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(22px);
 }
 
 .filter-select,
@@ -125,6 +211,23 @@
     vertical-align: top;
 }
 
+/* Location Styling */
+.location-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.location-info strong {
+    color: var(--heading-color);
+    font-weight: 600;
+}
+
+.location-info small {
+    color: var(--muted-color);
+    font-size: 0.8rem;
+}
+
 /* User Info Styling */
 .user-info {
     display: flex;
@@ -179,6 +282,127 @@
     color: white;
 }
 
+.activity-session_start {
+    background: linear-gradient(135deg, #007bff, #00b4d8);
+    color: white;
+}
+
+.activity-session_started {
+    background: linear-gradient(135deg, #007bff, #00b4d8);
+    color: white;
+}
+
+/* Notification queue status badges */
+.queue-status {
+    display: inline-block;
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.queue-status-queued {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.queue-status-sent {
+    background: #e6f4ea;
+    color: #1e7e34;
+}
+
+.queue-status-failed {
+    background: #f8d7da;
+    color: #b02a37;
+}
+
+.queue-channel {
+    display: inline-block;
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    background: var(--menu-bg-dark);
+    color: var(--muted-color);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+.queue-channel-email {
+    border: 1px solid rgba(0, 123, 255, 0.2);
+    color: var(--primary-blue);
+}
+
+.queue-channel-sms {
+    border: 1px solid rgba(40, 167, 69, 0.25);
+    color: #1f7a38;
+}
+
+.queue-channel-push {
+    border: 1px solid rgba(255, 193, 7, 0.35);
+    color: #a17007;
+}
+
+/* Queue summary chips */
+.queue-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0 1.5rem 1rem;
+}
+
+.queue-chip {
+    padding: 0.4rem 0.9rem;
+    border-radius: 999px;
+    background: var(--menu-bg-dark);
+    color: var(--text-color);
+    font-size: 0.8rem;
+    font-weight: 600;
+    box-shadow: 0 2px 6px var(--shadow-light);
+}
+
+.queue-chip.queued {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.queue-chip.sent {
+    background: #e6f4ea;
+    color: #1e7e34;
+}
+
+.queue-chip.failed {
+    background: #f8d7da;
+    color: #b02a37;
+}
+
+/* Audit trail styling */
+.audit-action {
+    display: inline-block;
+    padding: 0.35rem 0.75rem;
+    border-radius: 8px;
+    background: rgba(0, 51, 102, 0.08);
+    color: var(--primary-blue);
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+.role-pill {
+    display: inline-block;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    background: var(--menu-bg-dark);
+    color: var(--muted-color);
+    font-size: 0.75rem;
+    text-transform: capitalize;
+    font-weight: 600;
+}
+
+.compact-table th,
+.compact-table td {
+    padding: 0.75rem 0.6rem;
+}
+
 /* IP Address Styling */
 .logs-table td:nth-child(3) {
     font-family: 'Courier New', monospace;
@@ -188,26 +412,26 @@
 }
 
 /* Device Type Styling */
-.logs-table td:nth-child(4) {
+.logs-table td:nth-child(5) {
     text-transform: capitalize;
     color: var(--muted-dark);
 }
 
 /* Duration Styling */
-.logs-table td:nth-child(5) {
+.logs-table td:nth-child(6) {
     font-weight: 600;
     color: var(--primary-maroon);
 }
 
 /* Timestamp Styling */
-.logs-table td:nth-child(6) {
+.logs-table td:nth-child(7) {
     color: var(--muted-color);
     font-size: 0.85rem;
     white-space: nowrap;
 }
 
 /* Details Styling */
-.logs-table td:nth-child(7) {
+.logs-table td:nth-child(8) {
     max-width: 200px;
     word-wrap: break-word;
     color: var(--text-color);
@@ -269,10 +493,7 @@
     border-radius: 8px;
 }
 
-/* ====================================================================
-   USER LOGS RESPONSIVE DESIGN
-   ==================================================================== */
-
+/* User Logs Responsive Design*/
 @media (max-width: 1200px) {
     .content-toolbar {
         padding: 1rem;
@@ -324,10 +545,10 @@
     }
     
     /* Make table more compact on mobile */
-    .logs-table thead th:nth-child(4), /* Device */
-    .logs-table thead th:nth-child(5), /* Duration */
-    .logs-table tbody td:nth-child(4),
-    .logs-table tbody td:nth-child(5) {
+    .logs-table thead th:nth-child(5), /* Device */
+    .logs-table thead th:nth-child(6), /* Duration */
+    .logs-table tbody td:nth-child(5),
+    .logs-table tbody td:nth-child(6) {
         display: none;
     }
 }
@@ -344,9 +565,9 @@
     
     /* Hide less important columns on very small screens */
     .logs-table thead th:nth-child(3), /* IP Address */
-    .logs-table thead th:nth-child(7), /* Details */
+    .logs-table thead th:nth-child(8), /* Details */
     .logs-table tbody td:nth-child(3),
-    .logs-table tbody td:nth-child(7) {
+    .logs-table tbody td:nth-child(8) {
         display: none;
     }
     
@@ -495,3 +716,4 @@
     text-align: center;
     color: var(--muted-color);
 }
+

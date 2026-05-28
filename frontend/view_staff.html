@@ -1,32 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>View Staff - PensionsGo</title>
-
-<!-- Prevent browser caching of protected pages -->
+  <meta charset="UTF-8">
+  <title>View Staff - PensionsGo</title>
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
 
-  <link rel="stylesheet" href="css/color-variables.css" />
-  <link rel="stylesheet" href="css/styles.css" />
-  <link rel="stylesheet" href="css/menu.css" />
-  <link rel="stylesheet" href="css/profile.css" />
-  
-  
-  <link rel="stylesheet" href="../frontend/css/overlay.css" />
-  <link rel="stylesheet" href="../frontend/css/forms.css" />
-  
-  <!-- <link rel="stylesheet" href="../frontend/css/add_staff.css" /> -->
+  <link rel="stylesheet" href="css/color-variables.css?v=20260504a">
+  <link rel="stylesheet" href="css/styles.css?v=20260507c">
+  <link rel="stylesheet" href="css/menu.css?v=20260504d">
+  <link rel="stylesheet" href="css/profile.css?v=20260504a">
+  <link rel="stylesheet" href="css/overlay.css?v=20260504a">
+  <link rel="stylesheet" href="css/view_staff.css?v=20260504a">
+  <link rel="stylesheet" href="css/staff_workspaces.css?v=20260504a">
 
-  <script type="module" src="../frontend/js/main.js"></script>
-  <script defer src="../frontend/js/profile.js"></script>
+  <script type="module" src="js/main.js?v=20260528b"></script>
+  <script defer src="js/modules/retirement-types.js"></script>
   <script defer src="js/view_staff.js"></script>
-  <!-- <script defer src="../frontend/js/auth.js"></script> -->
 </head>
 <body>
-<main id="staffDetails" class="main-wrapper"></main>
-
+  <header id="dynamicHeader"></header>
+  <main id="staffDetails" class="staff-view-page main-wrapper"></main>
+  <footer id="dynamicFooter"></footer>
 </body>
 </html>
+
+
+

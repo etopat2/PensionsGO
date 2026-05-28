@@ -3,13 +3,25 @@
 
 <head>
     <meta charset="UTF-8" />
+    <script>
+        (function () {
+            var targetUrl = new URL("frontend/index.html", window.location.href);
+            targetUrl.search = window.location.search;
+            targetUrl.hash = window.location.hash;
+            window.location.replace(targetUrl.href);
+        })();
+    </script>
     <meta http-equiv="refresh" content="0; URL=frontend/index.html" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#6d1116" />
+    <link rel="manifest" href="frontend/manifest.webmanifest?v=20260521a" />
+    <link rel="apple-touch-icon" href="frontend/assets/pwa/apple-touch-icon.png" />
     <title>Redirecting...</title>
-    <script>
-        // In case meta refresh fails (some old browsers), use JS fallback
-        window.location.href = "frontend/index.html";
-    </script>
+    <style>
+        body {
+            display: none;
+        }
+    </style>
 </head>
 
 <body>

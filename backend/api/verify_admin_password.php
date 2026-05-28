@@ -1,18 +1,21 @@
 <?php
 /**
- * ============================================================
+ * 
  * verify_admin_password.php
  * Purpose: Verify admin password for re-authentication
  * Access: Admin only (requires active session)
- * ============================================================
+ * 
  */
 
-session_start();
 header('Content-Type: application/json');
 require_once __DIR__ . '/../config.php';
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 // Check if user is logged in and is admin
-if (!isset($_SESSION['userId']) || $_SESSION['userRole'] !== 'admin') {
+if (!isset($_SESSION['userId']) || !sessionRoleIn($conn, ['admin'])) {
     echo json_encode([
         'success' => false,
         'valid' => false,
@@ -51,6 +54,7 @@ try {
         if ($isValid) {
             // Update session activity timestamp
             $_SESSION['last_activity'] = time();
+            markAdminSensitiveActionVerified($conn, 'admin_password_reauth');
             
             // Log the successful re-authentication
             error_log("Admin re-authentication successful for user: " . $_SESSION['userId']);
@@ -58,7 +62,9 @@ try {
             echo json_encode([
                 'success' => true,
                 'valid' => true,
-                'message' => 'Password verified successfully'
+                'message' => 'Password verified successfully',
+                'verified_at' => (int)($_SESSION['admin_reauth_verified_at'] ?? time()),
+                'reauth_window_seconds' => getAdminReauthWindowSeconds($conn)
             ]);
         } else {
             // Log failed attempt
@@ -91,3 +97,4 @@ try {
 
 $conn->close();
 ?>
+

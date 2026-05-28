@@ -1,0 +1,203 @@
+@import url("color-variables.css");
+
+.app-ui-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 12050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: color-mix(in srgb, #0b1324 58%, transparent 42%);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.app-ui-modal {
+  width: min(520px, 100%);
+  max-height: 90vh;
+  border: 1px solid color-mix(in srgb, var(--border-color) 88%, #ffffff 12%);
+  border-radius: 14px;
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--card-bg) 95%, var(--menu-bg-dark) 5%) 0%,
+    color-mix(in srgb, var(--card-bg) 98%, var(--menu-bg-dark) 2%) 100%
+  );
+  color: var(--text-color);
+  box-shadow: 0 22px 50px color-mix(in srgb, #0f172a 35%, transparent 65%);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-ui-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.8rem 0.95rem;
+  border-bottom: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--menu-bg-dark) 22%, var(--card-bg) 78%);
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.app-ui-modal-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--heading-color);
+  letter-spacing: 0.01em;
+}
+
+.app-ui-modal-body {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.95rem 0.95rem 0.4rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.app-ui-modal-message {
+  margin: 0;
+  color: var(--text-color);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.app-ui-modal-input {
+  width: 100%;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--input-bg);
+  color: var(--input-text);
+  padding: 0.62rem 0.68rem;
+  font-size: 0.9rem;
+}
+
+.app-ui-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  padding: 0.85rem 0.95rem 0.95rem;
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  border-top: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--card-bg) 95%, var(--menu-bg-dark) 5%);
+}
+
+.app-ui-btn {
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--card-bg) 84%, var(--menu-bg-dark) 16%);
+  color: var(--heading-color);
+  font-size: 0.84rem;
+  font-weight: 700;
+  padding: 0.45rem 0.88rem;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.app-ui-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 15px color-mix(in srgb, var(--primary-blue) 20%, transparent 80%);
+}
+
+.app-ui-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.app-ui-btn-primary {
+  border-color: color-mix(in srgb, var(--primary-blue) 45%, #ffffff 55%);
+  background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-maroon) 100%);
+  color: #ffffff;
+}
+
+.app-ui-btn-primary:hover {
+  border-color: color-mix(in srgb, var(--primary-blue) 70%, #ffffff 30%);
+}
+
+.app-ui-toast-stack {
+  position: fixed;
+  top: calc(var(--main-header-height, 0px) + 0.8rem);
+  right: 1rem;
+  display: grid;
+  gap: 0.55rem;
+  z-index: 12040;
+  width: min(360px, calc(100vw - 1.2rem));
+}
+
+.app-ui-toast {
+  border: 1px solid color-mix(in srgb, var(--border-color) 85%, #ffffff 15%);
+  border-left-width: 4px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--card-bg) 95%, var(--menu-bg-dark) 5%);
+  color: var(--text-color);
+  padding: 0.62rem 0.72rem;
+  box-shadow: 0 8px 20px color-mix(in srgb, #0f172a 24%, transparent 76%);
+  animation: appUiToastIn 0.2s ease;
+}
+
+.app-ui-toast-title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--heading-color);
+}
+
+.app-ui-toast-message {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--text-color);
+}
+
+.app-ui-toast-info {
+  border-left-color: #2563eb;
+}
+
+.app-ui-toast-success {
+  border-left-color: #16a34a;
+}
+
+.app-ui-toast-warning {
+  border-left-color: #d97706;
+}
+
+.app-ui-toast-error {
+  border-left-color: #dc2626;
+}
+
+@keyframes appUiToastIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+body.app-ui-open {
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .app-ui-toast-stack {
+    right: 0.6rem;
+    left: 0.6rem;
+    width: auto;
+  }
+
+  .app-ui-modal {
+    width: min(480px, 100%);
+  }
+}

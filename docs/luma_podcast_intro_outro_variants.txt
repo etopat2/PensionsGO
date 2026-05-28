@@ -1,0 +1,201 @@
+UPS PENSIONSGO LUMA PROMPT SUITE
+ALTERNATE INTRO / OUTRO CONCEPT FAMILIES
+Generated: 2026-03-25
+
+PURPOSE
+-------
+This file provides three alternate creative directions for UPS PensionsGo branded video packaging. Each concept family includes:
+- a distinct creative personality
+- a matching intro sequence
+- a matching outro sequence
+- two 5-second clips for the intro
+- two 5-second clips for the outro
+
+The concepts are designed to stay on-brand with Uganda Prisons Service visual identity while giving you three different editorial moods:
+1. formal
+2. cinematic
+3. tech-forward
+
+SHARED BRAND CONSTANTS
+----------------------
+Use these constants across every concept family.
+
+Core palette:
+- Deep maroon: #8B0000 or #6D1116
+- Authority blue: #003366
+- Heritage gold: #D4AF37
+- Warm ivory / parchment: #F6F2EB or #FFF7E8
+- Charcoal accent: #2B2B2B
+
+Shared styling rules:
+- premium public-service design
+- Uganda Prisons Service-aligned maroon, blue, and gold world
+- modern civic-tech rather than generic corporate style
+- elegant glass, metal, and volumetric lighting
+- no clutter, no neon overload, no chaotic transitions
+- no aggressive prison imagery, no weapons, no fear-based mood
+- if AI text becomes unstable, use title-safe empty space and add final text in editing
+
+How to keep continuity inside one concept family:
+- use the same seed, reference frame, and style controls for all prompts inside the concept family
+- generate Part 1 first, then use its last frame as a reference for Part 2
+- keep the same camera direction and material language for intro and outro of the same family
+
+GLOBAL NEGATIVE PROMPT
+----------------------
+Use this avoid list for every concept:
+- low-resolution output
+- broken or unreadable text
+- malformed logos or crests
+- distorted anatomy
+- childish cartoon style
+- social media influencer style
+- oversaturated purple or neon cyberpunk look
+- chaotic glitch transitions
+- prison bars as the main visual theme
+- oppressive or violent mood
+- aggressive military posturing
+
+======================================================================
+CONCEPT FAMILY 1: FORMAL
+======================================================================
+
+Creative intent:
+This version is the most official and institution-forward. It should feel disciplined, ceremonial, balanced, and trustworthy. The visual weight comes from symmetry, controlled motion, polished materials, and a sense of documentation, order, and authority.
+
+Best use cases:
+- official announcements
+- leadership messages
+- policy or service guidance
+- evergreen institutional videos
+
+Style DNA:
+- slower camera movement
+- cleaner geometry and more symmetry
+- less particle chaos, more deliberate lines and rings
+- elegant plaque-like end cards
+- restrained use of characters, almost symbolic only
+- premium official broadcast package
+
+FORMAL INTRO - CLIP 1 OF 2
+--------------------------
+Prompt:
+"Create a 5-second formal branded intro for UPS PensionsGo, the Uganda Prisons Service pension platform. Open in a stately maroon and deep navy environment with polished gold trims, warm ivory highlights, soft fog, and refined architectural symmetry. Thin gold process lines illuminate in an orderly pattern across glass and metal surfaces like verified workflow routes. Use restrained infographic motifs such as secure document outlines, clean shield arcs, circular seal rings, and dignified registry-card silhouettes. The camera moves slowly forward on a perfectly centered axis, building a ceremonial sense of order and authority. The scene should feel official, balanced, premium, and trustworthy, like a modern state institution adopting polished digital service design. End by moving into a centered gold seal-tunnel or formal insignia portal that can continue seamlessly into the next clip. 4K, 16:9, modern, elegant, highly professional."
+
+FORMAL INTRO - CLIP 2 OF 2
+--------------------------
+Prompt:
+"Create the second 5-second clip of the same formal intro, matching exactly the same maroon, navy, gold, and ivory palette, the same centered camera path, and the same polished official visual style. Start inside the same gold insignia portal from Part 1. Emerge into a refined ceremonial digital chamber with floating glass panels, subtle registry-card outlines, shield geometry, and orderly gold signal routes. Let the elements align into a centered premium lockup zone for UPS PensionsGo. The composition should feel calm, official, and enduring rather than dramatic. Hold the final frame steady for at least the last 0.7 seconds with a clean title-safe center and minimal background movement. 4K, 16:9, formal civic-tech broadcast identity."
+
+FORMAL OUTRO - CLIP 1 OF 2
+--------------------------
+Prompt:
+"Create a 5-second formal branded outro for UPS PensionsGo in the same official style as the formal intro. Begin in a refined maroon and navy digital chamber with gold lines already present. Let workflow lines, document icons, and seal rings glide inward in disciplined symmetry, suggesting completion, verification, and closure. Use soft ivory highlights and polished metallic reflections. The camera should make a slow, centered settling move as the visual elements gather into a luminous formal seal-field. Keep the mood authoritative, calm, and complete. End inside that centered seal-field so the second outro clip can continue seamlessly. 4K, 16:9."
+
+FORMAL OUTRO - CLIP 2 OF 2
+--------------------------
+Prompt:
+"Create the second 5-second clip of the same formal outro, matching exactly the same palette, lighting, symmetry, and restrained camera motion of Part 1. Start inside the same luminous seal-field and resolve into an elegant end card with a centered title-safe area for UPS PensionsGo or Official Pension Guidance. Preserve subtle gold trims, faint moving signal lines, and soft maroon-blue depth in the background, but keep the central area almost still. The final second should feel stately, balanced, and ready for a clean fade or end-screen. 4K, 16:9, formal official finish."
+
+======================================================================
+CONCEPT FAMILY 2: CINEMATIC
+======================================================================
+
+Creative intent:
+This version is more emotional and immersive. It keeps the same brand discipline but uses deeper atmosphere, more volumetric light, richer contrast, and stronger visual storytelling. It should feel premium and moving without becoming melodramatic.
+
+Best use cases:
+- flagship podcast episodes
+- public-facing service explainers
+- leadership narratives
+- promotional or milestone videos
+
+Style DNA:
+- richer atmosphere and light shafts
+- more cinematic camera travel
+- elegant particles and signal trails
+- symbolic human presence used respectfully
+- bigger visual crescendo on reveal and resolve
+
+CINEMATIC INTRO - CLIP 1 OF 2
+-----------------------------
+Prompt:
+"Create a 5-second cinematic branded intro for UPS PensionsGo with strong emotional polish and premium public-service gravitas. Begin in a dark maroon-to-navy environment with floating gold particles, sweeping volumetric light, and soft ivory haze. Elegant gold workflow lines and holographic record-card fragments drift into view as if the system is waking up. A brief dignified silhouette of a Uganda Prisons Service-inspired ceremonial officer appears in the midground for a fraction of a second, lit by gold edge light, then dissolves into particles. The camera glides forward with cinematic confidence through rings, document symbols, waveform pulses, and shield-inspired geometry. The scene should feel nationally significant, humane, and secure. End by accelerating into a radiant circular gold-and-maroon tunnel so the next clip can continue as one uninterrupted movement. 4K, 16:9, cinematic, premium, visually powerful."
+
+CINEMATIC INTRO - CLIP 2 OF 2
+-----------------------------
+Prompt:
+"Create the second 5-second clip of the same cinematic intro, matching the exact color palette, light direction, atmosphere, lens feel, and camera speed of Part 1. Start already inside the same radiant tunnel from the first clip. Exit into a majestic digital brand space filled with floating glass layers, refined gold signal paths, waveform energy rings, and secure document iconography. Briefly reveal a respectful pensioner-civilian silhouette and the Uganda Prisons Service-inspired figure in far depth as symbols of trusted service delivery, then let them dissolve into gold particles. Bring all motion into a clean hero lockup area for UPS PensionsGo. Hold the final frame steady and elegant for the last 0.7 seconds. 4K, 16:9, cinematic, premium, human-centered, official."
+
+CINEMATIC OUTRO - CLIP 1 OF 2
+-----------------------------
+Prompt:
+"Create a 5-second cinematic branded outro for UPS PensionsGo that feels like a graceful emotional resolution. Begin in a maroon and navy environment with gold particles, soft fog, and luminous rings already present. Let waveform pulses, secure document lines, and gold process trails draw inward, as if the story is closing with clarity and confidence. A faint service silhouette may appear in the background only briefly, then fade away into light. The camera should arc gently and begin slowing into a glowing convergence field of gold rings and crest-like geometry. The mood should be resolved, dignified, and memorable, never melodramatic. End inside that glowing convergence zone so Part 2 can continue seamlessly. 4K, 16:9."
+
+CINEMATIC OUTRO - CLIP 2 OF 2
+-----------------------------
+Prompt:
+"Create the second 5-second clip of the same cinematic outro, matching the exact palette, lighting, camera movement, and premium materials from Part 1. Start inside the same glowing convergence zone and resolve into a polished closing lockup with a centered title-safe area for UPS PensionsGo, Uganda Prisons Service, or Official Pension Guidance. Keep soft particle motion, gentle gold shimmer, and faint waveform energy behind the title-safe space. The final second should feel emotionally complete, visually elegant, and perfectly ready for a clean fade to black or end screen. 4K, 16:9, cinematic, premium, secure, modern."
+
+======================================================================
+CONCEPT FAMILY 3: TECH-FORWARD
+======================================================================
+
+Creative intent:
+This version leans into the platform's digital strength. It should feel sharper, faster, and more data-driven while still staying grounded in the Uganda Prisons Service palette and institutional tone. It is modern, efficient, intelligent, and visibly systems-oriented.
+
+Best use cases:
+- product demos
+- dashboard explainers
+- platform walkthroughs
+- analytics, workflow, registry, and process videos
+
+Style DNA:
+- cleaner HUD motion and data choreography
+- slightly faster camera movement than the other concepts
+- more glass panels, nodes, grids, and route lines
+- less ceremonial, more systems-intelligent
+- still premium, not neon hacker aesthetics
+
+TECH-FORWARD INTRO - CLIP 1 OF 2
+--------------------------------
+Prompt:
+"Create a 5-second tech-forward branded intro for UPS PensionsGo, a secure Uganda Prisons Service pension platform. Begin in a premium maroon and navy digital environment with crisp gold data lines, sharp glass panels, subtle holographic workflow nodes, and refined ivory highlights. Show dynamic but controlled process routes, registry-card outlines, secure folder icons, check marks, and waveform pulses moving across a modern civic-tech grid. The camera should move confidently forward through a layered system of connected data surfaces and luminous pathways. The aesthetic must feel intelligent, precise, secure, and high-trust, like a premium government technology platform. End by pushing into a bright gold network tunnel or circular data-gateway that can continue seamlessly into the next clip. 4K, 16:9, modern, sharp, premium, data-driven."
+
+TECH-FORWARD INTRO - CLIP 2 OF 2
+--------------------------------
+Prompt:
+"Create the second 5-second clip of the same tech-forward intro, matching the exact same palette, glass-and-metal materials, camera direction, sharp HUD style, and controlled energy of Part 1. Start inside the same circular data-gateway tunnel and continue the same forward movement without any visible break. Emerge into a sophisticated central system chamber with floating dashboard panels, gold route maps, waveform signals, secure document layers, and crest-inspired ring geometry. Let the interface elements converge into a clean title-safe hero area for UPS PensionsGo. Keep the visual motion precise, modern, and polished, then hold the final frame steady for the last 0.7 seconds. 4K, 16:9, tech-forward civic-tech identity, premium and professional."
+
+TECH-FORWARD OUTRO - CLIP 1 OF 2
+--------------------------------
+Prompt:
+"Create a 5-second tech-forward branded outro for UPS PensionsGo using the same premium maroon, navy, gold, and ivory design language as the tech-forward intro. Begin in a sharp digital system environment with clean grid overlays, glass panels, and gold process lines already active. Gradually pull the motion inward so the signal routes, icons, registry-card outlines, and workflow nodes collapse into an ordered central data-core. The camera should slow from confident motion into a stable convergence field made of refined gold rings, crisp interface layers, and subtle waveform pulses. The mood should feel efficient, intelligent, complete, and trustworthy. End inside that data-core field for seamless continuation. 4K, 16:9."
+
+TECH-FORWARD OUTRO - CLIP 2 OF 2
+--------------------------------
+Prompt:
+"Create the second 5-second clip of the same tech-forward outro, matching exactly the same materials, palette, HUD language, and camera motion from Part 1. Start inside the same central data-core field and resolve into a clean closing end card with a centered title-safe area for UPS PensionsGo or Official Pension Guidance. Keep subtle route-line motion, faint dashboard glow, and soft gold pulses alive in the background while the center stays calm and readable. The final second should feel smart, stable, and polished, ready for fade-out or direct end-screen use. 4K, 16:9, tech-forward, secure, premium, modern public-service platform."
+
+RECOMMENDED EDITORIAL MATCHING
+------------------------------
+If you want a simple decision rule:
+- choose FORMAL when the message is institutional or policy-heavy
+- choose CINEMATIC when the message is flagship, public-facing, or inspirational
+- choose TECH-FORWARD when the message is about systems, workflow, platform capability, or digital modernization
+
+SHORT OPTIONAL TEXT VARIANTS
+----------------------------
+Only use these if Luma renders text cleanly:
+- UPS PensionsGo
+- Official Pension Guidance
+- PensionsGo Media Centre
+- Uganda Prisons Service
+
+ASSEMBLY NOTES
+--------------
+For best results in Luma:
+- generate each concept family as a closed set using the same seed and style controls
+- if the tool supports frame continuation, always feed the last frame of Part 1 into Part 2
+- if the tool supports reference images, use the app logo or intro stills only as supporting style references, not as direct text/logo generation requests
+- add exact logos and exact typography in post-production when precision matters

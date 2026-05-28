@@ -3,6 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
 
     <!-- Cache Control for Latest Updates -->
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
@@ -13,15 +18,15 @@
     <title>Users Management - PensionsGo</title>
 
     <!-- Styles -->
-    <link rel="stylesheet" href="css/styles.css">
-    <link rel="stylesheet" href="css/menu.css">
-    <link rel="stylesheet" href="css/color_variables.css">
-    <link rel="stylesheet" href="css/users.css">
-    <link rel="stylesheet" href="css/auth.css">
-    <link rel="stylesheet" href="css/overlay.css">
+    <link rel="stylesheet" href="css/styles.css?v=20260507c">
+    <link rel="stylesheet" href="css/menu.css?v=20260504d">
+    <link rel="stylesheet" href="css/color_variables.css?v=20260504a">
+    <link rel="stylesheet" href="css/users.css?v=20260504a">
+    <link rel="stylesheet" href="css/auth.css?v=20260504a">
+    <link rel="stylesheet" href="css/overlay.css?v=20260504a">
 
     <!-- Scripts -->
-    <script type="module" src="js/main.js"></script>
+    <script type="module" src="js/main.js?v=20260528b"></script>
     <script src="js/users.js"></script>
 </head>
 <body>
@@ -36,26 +41,30 @@
         <!-- Filter and Action Controls -->
         <div class="users-controls">
             <div class="filter-section">
-                <label for="roleFilter">Filter by Role:</label>
-                <select id="roleFilter">
-                    <option value="">All Roles</option>
-                    <option value="admin">Admin</option>
-                    <option value="clerk">Clerk</option>
-                    <option value="oc_pen">OC Pen</option>
-                    <option value="writeup_officer">Writeup Officer</option>
-                    <option value="file_creator">File Creator</option>
-                    <option value="data_entry">Data Entry</option>
-                    <option value="assessor">Assessor</option>
-                    <option value="auditor">Auditor</option>
-                    <option value="approver">Approver</option>
-                    <option value="user">User</option>
-                    <option value="pensioner">Pensioner</option>
-                </select>
-                <button id="clearFilterButton" class="clear-filter-btn">Clear Filter</button>
+                <div class="search-group">
+                    <label for="userSearchFilter">Search:</label>
+                    <input type="text" id="userSearchFilter" placeholder="Name, email, phone, or role">
+                </div>
+                <div class="select-filters-row">
+                    <div class="select-group">
+                        <label for="roleFilter">Role:</label>
+                        <select id="roleFilter">
+                            <option value="">All Roles</option>
+                        </select>
+                    </div>
+                    <div class="select-group">
+                        <label for="accountTypeFilter">Account Type:</label>
+                        <select id="accountTypeFilter">
+                            <option value="">All Accounts</option>
+                            <option value="staff">Staff Only</option>
+                            <option value="pensioner">Pensioners Only</option>
+                        </select>
+                    </div>
+                </div>
             </div>
 
-            <!-- Add User Button -->
             <div class="action-section">
+                <button id="clearFilterButton" class="clear-filter-btn">Clear Filter</button>
                 <button id="addUserButton" class="add-user-btn">
                     <span style="margin-right: 0.5rem;">+</span> Add User
                 </button>
@@ -80,6 +89,25 @@
                 </tbody>
             </table>
         </div>
+
+        <section class="users-pagination" id="usersPagination" hidden>
+            <div class="users-pagination-summary" id="usersPaginationSummary"></div>
+            <div class="users-pagination-controls" id="usersPaginationControls"></div>
+        </section>
+    </div>
+
+    <!-- User Details Modal -->
+    <div id="userDetailsModal" class="modal">
+        <div class="modal-content user-details-modal-content">
+            <button class="close-modal" id="closeUserDetailsModal">&times;</button>
+            <div class="modal-header">
+                <h2>User Details</h2>
+            </div>
+            <div class="modal-body" id="userDetailsBody">
+                Loading...
+            </div>
+            <div class="modal-footer" id="userDetailsActions"></div>
+        </div>
     </div>
 
     <!-- Delete Confirmation Modal -->
@@ -103,3 +131,6 @@
     <!-- Footer will be dynamically inserted by main.js -->
 </body>
 </html>
+
+
+
