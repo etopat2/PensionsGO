@@ -87,6 +87,7 @@ try {
           AND sender_id <> ?
           AND delivered_at IS NULL
           AND deleted_at IS NULL
+          AND admin_deleted_at IS NULL
     ");
     if ($deliveredStmt) {
         $deliveredStmt->bind_param('ss', $userId, $userId);
@@ -100,15 +101,19 @@ try {
         FROM tb_live_chat_messages m
         LEFT JOIN tb_live_chat_message_reads r
           ON r.chat_message_id = m.chat_message_id AND r.user_id = ?
+        LEFT JOIN tb_live_chat_message_deletions d
+          ON d.chat_message_id = m.chat_message_id AND d.user_id = ?
         WHERE m.recipient_id = ?
           AND m.sender_id <> ?
           AND m.deleted_at IS NULL
+          AND m.admin_deleted_at IS NULL
           AND m.is_read = 0
           AND r.chat_message_id IS NULL
+          AND d.chat_message_id IS NULL
         GROUP BY m.sender_id
     ");
     if ($directUnreadStmt) {
-        $directUnreadStmt->bind_param('sss', $userId, $userId, $userId);
+        $directUnreadStmt->bind_param('ssss', $userId, $userId, $userId, $userId);
         $directUnreadStmt->execute();
         $directUnreadResult = $directUnreadStmt->get_result();
         while ($row = $directUnreadResult->fetch_assoc()) {
@@ -125,13 +130,17 @@ try {
           ON gm.group_id = m.recipient_id AND gm.user_id = ?
         LEFT JOIN tb_live_chat_message_reads r
           ON r.chat_message_id = m.chat_message_id AND r.user_id = ?
+        LEFT JOIN tb_live_chat_message_deletions d
+          ON d.chat_message_id = m.chat_message_id AND d.user_id = ?
         WHERE m.sender_id <> ?
           AND m.deleted_at IS NULL
+          AND m.admin_deleted_at IS NULL
           AND r.chat_message_id IS NULL
+          AND d.chat_message_id IS NULL
         GROUP BY m.recipient_id
     ");
     if ($groupUnreadStmt) {
-        $groupUnreadStmt->bind_param('sss', $userId, $userId, $userId);
+        $groupUnreadStmt->bind_param('ssss', $userId, $userId, $userId, $userId);
         $groupUnreadStmt->execute();
         $groupUnreadResult = $groupUnreadStmt->get_result();
         while ($row = $groupUnreadResult->fetch_assoc()) {
@@ -155,8 +164,25 @@ try {
         'success' => true,
         'currentUserId' => $userId,
         'users' => $users,
-        'groups' => $groups,
+        'groups' => liveChatFeatureEnabled($conn, 'live_chat_group_chats_enabled', true) ? $groups : [],
         'unreadTotal' => $totalUnread,
+        'featureSettings' => [
+            'enabled' => true,
+            'groupsEnabled' => liveChatFeatureEnabled($conn, 'live_chat_group_chats_enabled', true),
+            'audioCallsEnabled' => liveChatFeatureEnabled($conn, 'live_chat_audio_calls_enabled', true),
+            'videoCallsEnabled' => liveChatFeatureEnabled($conn, 'live_chat_video_calls_enabled', true),
+            'attachmentsEnabled' => liveChatFeatureEnabled($conn, 'live_chat_attachments_enabled', true),
+            'voiceNotesEnabled' => liveChatFeatureEnabled($conn, 'live_chat_voice_notes_enabled', true),
+            'pollsEnabled' => liveChatFeatureEnabled($conn, 'live_chat_polls_enabled', true),
+            'typingPresenceEnabled' => liveChatFeatureEnabled($conn, 'live_chat_typing_presence_enabled', true),
+            'readReceiptsEnabled' => liveChatFeatureEnabled($conn, 'live_chat_read_receipts_enabled', true),
+            'draftsEnabled' => liveChatFeatureEnabled($conn, 'live_chat_drafts_enabled', true),
+            'typingIdleSeconds' => liveChatSettingInt($conn, 'live_chat_typing_idle_seconds', 5, 2, 30),
+            'messagePollMs' => liveChatSettingInt($conn, 'live_chat_message_poll_ms', 350, 150, 5000),
+            'receiptPollMs' => liveChatSettingInt($conn, 'live_chat_receipt_poll_ms', 250, 150, 5000),
+            'callPollMs' => liveChatSettingInt($conn, 'live_chat_call_poll_ms', 900, 300, 10000),
+            'signalPollMs' => liveChatSettingInt($conn, 'live_chat_signal_poll_ms', 350, 150, 5000)
+        ],
         'messageSettings' => [
             'messageSoundEnabled' => getAppSettingBool($conn, 'live_message_sound_enabled', true),
             'desktopAlertsEnabled' => getAppSettingBool($conn, 'live_message_desktop_alerts_enabled', true),

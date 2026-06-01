@@ -27,6 +27,12 @@ function liveChatRequireStaff(mysqli $conn): string
         exit;
     }
 
+    if (function_exists('getAppSettingBool') && !getAppSettingBool($conn, 'live_chat_enabled', true)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Live chat is currently disabled by the administrator.']);
+        exit;
+    }
+
     $userId = (string)$_SESSION['userId'];
     if (session_status() === PHP_SESSION_ACTIVE) {
         session_write_close();
@@ -34,9 +40,20 @@ function liveChatRequireStaff(mysqli $conn): string
     return $userId;
 }
 
+function liveChatFeatureEnabled(mysqli $conn, string $key, bool $default = true): bool
+{
+    return function_exists('getAppSettingBool') ? getAppSettingBool($conn, $key, $default) : $default;
+}
+
+function liveChatSettingInt(mysqli $conn, string $key, int $default, int $min, int $max): int
+{
+    $value = function_exists('getAppSettingInt') ? getAppSettingInt($conn, $key, $default) : $default;
+    return max($min, min($max, (int)$value));
+}
+
 function liveChatEnsureTables(mysqli $conn): void
 {
-    $schemaMarker = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'live_chat_schema_ready_v3.json';
+    $schemaMarker = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'live_chat_schema_ready_v5.json';
     if (is_file($schemaMarker)) {
         return;
     }
@@ -60,6 +77,9 @@ function liveChatEnsureTables(mysqli $conn): void
             read_at TIMESTAMP NULL DEFAULT NULL,
             edited_at TIMESTAMP NULL DEFAULT NULL,
             deleted_at TIMESTAMP NULL DEFAULT NULL,
+            admin_deleted_at TIMESTAMP NULL DEFAULT NULL,
+            admin_deleted_by VARCHAR(100) DEFAULT NULL,
+            admin_delete_reason VARCHAR(255) DEFAULT NULL,
             client_nonce VARCHAR(80) DEFAULT NULL,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (chat_message_id),
@@ -139,6 +159,51 @@ function liveChatEnsureTables(mysqli $conn): void
     ");
 
     $conn->query("
+        CREATE TABLE IF NOT EXISTS tb_live_chat_message_deletions (
+            chat_message_id BIGINT UNSIGNED NOT NULL,
+            user_id VARCHAR(100) NOT NULL,
+            deleted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (chat_message_id, user_id),
+            KEY idx_live_chat_message_deletions_user (user_id, deleted_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS tb_live_chat_message_audit_archive (
+            archive_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            chat_message_id BIGINT UNSIGNED NOT NULL,
+            sender_id VARCHAR(100) NOT NULL,
+            recipient_id VARCHAR(100) NOT NULL,
+            message_kind VARCHAR(30) NOT NULL DEFAULT 'text',
+            message_text LONGTEXT DEFAULT NULL,
+            file_name VARCHAR(255) DEFAULT NULL,
+            file_path VARCHAR(500) DEFAULT NULL,
+            file_size INT DEFAULT NULL,
+            mime_type VARCHAR(120) DEFAULT NULL,
+            reply_to_message_id BIGINT UNSIGNED DEFAULT NULL,
+            reaction_emoji VARCHAR(24) DEFAULT NULL,
+            is_pinned TINYINT(1) NOT NULL DEFAULT 0,
+            delivered_at TIMESTAMP NULL DEFAULT NULL,
+            is_read TINYINT(1) NOT NULL DEFAULT 0,
+            read_at TIMESTAMP NULL DEFAULT NULL,
+            edited_at TIMESTAMP NULL DEFAULT NULL,
+            deleted_at TIMESTAMP NULL DEFAULT NULL,
+            admin_deleted_at TIMESTAMP NULL DEFAULT NULL,
+            admin_deleted_by VARCHAR(100) DEFAULT NULL,
+            client_nonce VARCHAR(80) DEFAULT NULL,
+            created_at TIMESTAMP NULL DEFAULT NULL,
+            archived_by VARCHAR(100) DEFAULT NULL,
+            archive_reason VARCHAR(80) NOT NULL DEFAULT 'delete',
+            archived_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (archive_id),
+            UNIQUE KEY uniq_live_chat_archive_message (chat_message_id),
+            KEY idx_live_chat_archive_sender (sender_id),
+            KEY idx_live_chat_archive_recipient (recipient_id),
+            KEY idx_live_chat_archive_archived (archived_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+
+    $conn->query("
         CREATE TABLE IF NOT EXISTS tb_live_chat_signals (
             signal_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             call_id VARCHAR(80) NOT NULL,
@@ -200,14 +265,17 @@ function liveChatEnsureTables(mysqli $conn): void
     liveChatAddColumnIfMissing($conn, 'tb_live_chat_messages', 'read_at', 'TIMESTAMP NULL DEFAULT NULL AFTER is_read');
     liveChatAddColumnIfMissing($conn, 'tb_live_chat_messages', 'edited_at', 'TIMESTAMP NULL DEFAULT NULL AFTER is_read');
     liveChatAddColumnIfMissing($conn, 'tb_live_chat_messages', 'deleted_at', 'TIMESTAMP NULL DEFAULT NULL AFTER edited_at');
-    liveChatAddColumnIfMissing($conn, 'tb_live_chat_messages', 'client_nonce', 'VARCHAR(80) DEFAULT NULL AFTER deleted_at');
+    liveChatAddColumnIfMissing($conn, 'tb_live_chat_messages', 'admin_deleted_at', 'TIMESTAMP NULL DEFAULT NULL AFTER deleted_at');
+    liveChatAddColumnIfMissing($conn, 'tb_live_chat_messages', 'admin_deleted_by', 'VARCHAR(100) DEFAULT NULL AFTER admin_deleted_at');
+    liveChatAddColumnIfMissing($conn, 'tb_live_chat_messages', 'admin_delete_reason', 'VARCHAR(255) DEFAULT NULL AFTER admin_deleted_by');
+    liveChatAddColumnIfMissing($conn, 'tb_live_chat_messages', 'client_nonce', 'VARCHAR(80) DEFAULT NULL AFTER admin_delete_reason');
     liveChatAddColumnIfMissing($conn, 'tb_live_chat_calls', 'answered_at', 'TIMESTAMP NULL DEFAULT NULL AFTER created_at');
     $conn->query("
         ALTER TABLE tb_live_chat_signals
         MODIFY signal_type ENUM('offer','answer','ice','hangup','call_accept','video_request','video_accept','video_decline') NOT NULL
     ");
 
-    foreach (['tb_live_chat_messages', 'tb_live_chat_message_reads', 'tb_live_chat_presence', 'tb_live_chat_typing', 'tb_live_chat_calls', 'tb_live_chat_signals', 'tb_live_chat_groups', 'tb_live_chat_group_members', 'tb_live_chat_polls', 'tb_live_chat_poll_options', 'tb_live_chat_poll_votes'] as $tableName) {
+    foreach (['tb_live_chat_messages', 'tb_live_chat_message_reads', 'tb_live_chat_message_deletions', 'tb_live_chat_message_audit_archive', 'tb_live_chat_presence', 'tb_live_chat_typing', 'tb_live_chat_calls', 'tb_live_chat_signals', 'tb_live_chat_groups', 'tb_live_chat_group_members', 'tb_live_chat_polls', 'tb_live_chat_poll_options', 'tb_live_chat_poll_votes'] as $tableName) {
         liveChatNormalizeTableCollation($conn, $tableName);
     }
 
@@ -221,7 +289,7 @@ function liveChatEnsureTables(mysqli $conn): void
     }
     @file_put_contents($schemaMarker, json_encode([
         'ready' => true,
-        'schema' => 3,
+        'schema' => 5,
         'checked_at' => date('c')
     ], JSON_PRETTY_PRINT), LOCK_EX);
 }
@@ -266,6 +334,62 @@ function liveChatAppendCacheMessage(string $peerType, string $senderId, string $
         $lines = array_slice($lines, -400);
         @file_put_contents($path, implode(PHP_EOL, $lines) . PHP_EOL, LOCK_EX);
     }
+}
+
+function liveChatRemoveCacheMessage(string $peerType, string $senderId, string $recipientId, int $messageId): void
+{
+    if ($messageId <= 0) {
+        return;
+    }
+    $path = liveChatCacheDir() . DIRECTORY_SEPARATOR . liveChatThreadCacheKey($peerType, $senderId, $recipientId) . '.jsonl';
+    if (!is_file($path) || !is_readable($path)) {
+        return;
+    }
+    $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+    $kept = [];
+    foreach ($lines as $line) {
+        $message = json_decode($line, true);
+        if (is_array($message) && (int)($message['id'] ?? 0) === $messageId) {
+            continue;
+        }
+        $kept[] = $line;
+    }
+    @file_put_contents($path, $kept ? implode(PHP_EOL, $kept) . PHP_EOL : '', LOCK_EX);
+}
+
+function liveChatArchiveMessage(mysqli $conn, int $messageId, string $archivedBy = '', string $reason = 'delete'): void
+{
+    if ($messageId <= 0) {
+        return;
+    }
+    if (!liveChatFeatureEnabled($conn, 'live_chat_admin_archive_enabled', true)) {
+        return;
+    }
+    $stmt = $conn->prepare("
+        INSERT IGNORE INTO tb_live_chat_message_audit_archive (
+            chat_message_id, sender_id, recipient_id, message_kind, message_text,
+            file_name, file_path, file_size, mime_type, reply_to_message_id,
+            reaction_emoji, is_pinned, delivered_at, is_read, read_at,
+            edited_at, deleted_at, admin_deleted_at, admin_deleted_by,
+            client_nonce, created_at, archived_by, archive_reason
+        )
+        SELECT
+            chat_message_id, sender_id, recipient_id, message_kind, message_text,
+            file_name, file_path, file_size, mime_type, reply_to_message_id,
+            reaction_emoji, is_pinned, delivered_at, is_read, read_at,
+            edited_at, deleted_at, admin_deleted_at, admin_deleted_by,
+            client_nonce, created_at, ?, ?
+        FROM tb_live_chat_messages
+        WHERE chat_message_id = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return;
+    }
+    $safeReason = substr(trim($reason) ?: 'delete', 0, 80);
+    $stmt->bind_param('ssi', $archivedBy, $safeReason, $messageId);
+    $stmt->execute();
+    $stmt->close();
 }
 
 function liveChatReadCacheMessages(string $peerType, string $userId, string $peerId, int $sinceId): array

@@ -14,6 +14,10 @@ try {
     liveChatEnsureTables($conn);
     liveChatTouchPresence($conn, $userId);
 
+    if (!liveChatFeatureEnabled($conn, 'live_chat_polls_enabled', true)) {
+        throw new RuntimeException('Polls are currently disabled.');
+    }
+
     $data = liveChatJsonInput();
     $action = trim((string)($data['action'] ?? 'create'));
 

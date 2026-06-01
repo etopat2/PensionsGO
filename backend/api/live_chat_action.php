@@ -10,6 +10,9 @@ try {
     $action = trim((string)($data['action'] ?? ''));
 
     if ($action === 'typing') {
+        if (!liveChatFeatureEnabled($conn, 'live_chat_typing_presence_enabled', true)) {
+            liveChatRespond(['success' => true, 'disabled' => true]);
+        }
         $peerType = trim((string)($data['peer_type'] ?? 'user'));
         $peerId = trim((string)($data['peer_id'] ?? ''));
         if (!in_array($peerType, ['user', 'group'], true) || $peerId === '') {
@@ -45,6 +48,9 @@ try {
     }
 
     if ($action === 'read') {
+        if (!liveChatFeatureEnabled($conn, 'live_chat_read_receipts_enabled', true)) {
+            liveChatRespond(['success' => true, 'updated' => 0, 'disabled' => true]);
+        }
         $messageIds = $data['message_ids'] ?? [];
         if (!is_array($messageIds)) {
             $messageIds = [$messageIds];
@@ -63,6 +69,7 @@ try {
               AND recipient_id = ?
               AND sender_id <> ?
               AND deleted_at IS NULL
+              AND admin_deleted_at IS NULL
         ");
         if (!$stmt) {
             throw new RuntimeException('Unable to update read receipts.');
@@ -73,6 +80,30 @@ try {
             $updated += max(0, $stmt->affected_rows);
         }
         $stmt->close();
+        $readStmt = $conn->prepare("
+            INSERT IGNORE INTO tb_live_chat_message_reads (chat_message_id, user_id)
+            SELECT chat_message_id, ?
+            FROM tb_live_chat_messages
+            WHERE chat_message_id = ?
+              AND sender_id <> ?
+              AND deleted_at IS NULL
+              AND admin_deleted_at IS NULL
+              AND (
+                recipient_id = ?
+                OR recipient_id IN (
+                  SELECT group_id
+                  FROM tb_live_chat_group_members
+                  WHERE user_id = ?
+                )
+              )
+        ");
+        if ($readStmt) {
+            foreach ($messageIds as $id) {
+                $readStmt->bind_param('sisss', $userId, $id, $userId, $userId, $userId);
+                $readStmt->execute();
+            }
+            $readStmt->close();
+        }
         liveChatRespond(['success' => true, 'updated' => $updated]);
     }
 
@@ -106,7 +137,8 @@ try {
             throw new RuntimeException('Message cannot be empty.');
         }
         $createdAt = strtotime((string)($message['created_at'] ?? ''));
-        if ($createdAt <= 0 || (time() - $createdAt) > 300) {
+        $editWindowSeconds = liveChatSettingInt($conn, 'live_chat_edit_window_minutes', 5, 1, 60) * 60;
+        if ($createdAt <= 0 || (time() - $createdAt) > $editWindowSeconds) {
             throw new RuntimeException('This message can no longer be edited.');
         }
         $stmt = $conn->prepare("UPDATE tb_live_chat_messages SET message_text = ?, edited_at = NOW() WHERE chat_message_id = ? AND sender_id = ? AND deleted_at IS NULL");
@@ -115,17 +147,32 @@ try {
         liveChatRespond(['success' => true]);
     }
 
-    if ($action === 'delete') {
-        if (!empty($message['deleted_at'])) {
-            $stmt = $conn->prepare("DELETE FROM tb_live_chat_messages WHERE chat_message_id = ?");
-            $stmt->bind_param('i', $messageId);
-            $stmt->execute();
-            liveChatRespond(['success' => true, 'removed' => true]);
+    if ($action === 'delete_for_me') {
+        $stmt = $conn->prepare("
+            INSERT INTO tb_live_chat_message_deletions (chat_message_id, user_id)
+            VALUES (?, ?)
+            ON DUPLICATE KEY UPDATE deleted_at = CURRENT_TIMESTAMP
+        ");
+        if (!$stmt) {
+            throw new RuntimeException('Unable to delete message for you.');
         }
+        $stmt->bind_param('is', $messageId, $userId);
+        $stmt->execute();
+        $stmt->close();
+        liveChatRemoveCacheMessage(liveChatCanAccessGroup($conn, (string)$message['recipient_id'], (string)$message['sender_id']) ? 'group' : 'user', (string)$message['sender_id'], (string)$message['recipient_id'], $messageId);
+        liveChatRespond(['success' => true, 'scope' => 'me']);
+    }
+
+    if ($action === 'delete_for_everyone' || $action === 'delete') {
+        if (!$isSender) {
+            throw new RuntimeException('Only the sender can delete this message for everyone.');
+        }
+        liveChatArchiveMessage($conn, $messageId, $userId, 'peer_delete_for_everyone');
         $stmt = $conn->prepare("UPDATE tb_live_chat_messages SET deleted_at = NOW(), message_text = '', file_name = NULL, file_path = NULL, mime_type = NULL WHERE chat_message_id = ?");
         $stmt->bind_param('i', $messageId);
         $stmt->execute();
-        liveChatRespond(['success' => true]);
+        liveChatRemoveCacheMessage(liveChatCanAccessGroup($conn, (string)$message['recipient_id'], (string)$message['sender_id']) ? 'group' : 'user', (string)$message['sender_id'], (string)$message['recipient_id'], $messageId);
+        liveChatRespond(['success' => true, 'scope' => 'everyone']);
     }
 
     if ($action === 'react') {

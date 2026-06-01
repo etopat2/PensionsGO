@@ -5,6 +5,7 @@ const LIVE_CHAT_STYLE_ID = 'pensionsgo-live-chat-css';
 const LIVE_CHAT_ICON_STYLE_ID = 'pensionsgo-live-chat-icons-css';
 const DEFAULT_PHOTO = new URL('images/default-user.png', APP_ROOT).href;
 let useFallbackIcons = false;
+let liveChatStylesheetReady = null;
 
 const API = {
   bootstrap: new URL('live_chat_bootstrap.php', API_ROOT).href,
@@ -41,13 +42,51 @@ function formatTime(value) {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+function parseChatDate(value) {
+  if (!value) return null;
+  const date = new Date(String(value).replace(' ', 'T'));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function chatDateKey(value) {
+  const date = parseChatDate(value);
+  if (!date) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatChatFullDate(value) {
+  const date = parseChatDate(value);
+  if (!date) return '';
+  return date.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
+
 function ensureStylesheet() {
-  if (document.getElementById(LIVE_CHAT_STYLE_ID)) return;
+  if (liveChatStylesheetReady) return liveChatStylesheetReady;
+  const existing = document.getElementById(LIVE_CHAT_STYLE_ID);
+  if (existing) {
+    liveChatStylesheetReady = existing.sheet
+      ? Promise.resolve()
+      : new Promise((resolve) => {
+          existing.addEventListener('load', resolve, { once: true });
+          existing.addEventListener('error', resolve, { once: true });
+          window.setTimeout(resolve, 1800);
+        });
+    return liveChatStylesheetReady;
+  }
   const link = document.createElement('link');
   link.id = LIVE_CHAT_STYLE_ID;
   link.rel = 'stylesheet';
-  link.href = new URL('css/live_chat.css?v=20260531b', APP_ROOT).href;
+  link.href = new URL('css/live_chat.css?v=20260601a', APP_ROOT).href;
+  liveChatStylesheetReady = new Promise((resolve) => {
+    link.addEventListener('load', resolve, { once: true });
+    link.addEventListener('error', resolve, { once: true });
+    window.setTimeout(resolve, 1800);
+  });
   document.head.appendChild(link);
+  return liveChatStylesheetReady;
 }
 
 function ensureIconStylesheet() {
@@ -160,6 +199,22 @@ class LiveChatApp {
       messageVolume: 70,
       messageRepeatCount: 1
     };
+    this.featureSettings = {
+      groupsEnabled: true,
+      audioCallsEnabled: true,
+      videoCallsEnabled: true,
+      attachmentsEnabled: true,
+      voiceNotesEnabled: true,
+      pollsEnabled: true,
+      typingPresenceEnabled: true,
+      readReceiptsEnabled: true,
+      draftsEnabled: true,
+      typingIdleSeconds: 5,
+      messagePollMs: 350,
+      receiptPollMs: 250,
+      callPollMs: 900,
+      signalPollMs: 350
+    };
     this.unreadTotal = 0;
     this.unreadCountsReady = false;
     this.messageNoticeTimer = null;
@@ -173,6 +228,8 @@ class LiveChatApp {
     this.callSpeakerEnabled = localStorage.getItem('liveCallSpeakerEnabled') !== '0';
     this.callSpeakerVolume = Math.max(0, Math.min(100, Number(localStorage.getItem('liveCallSpeakerVolume') || 100)));
     this.callTimeoutTimer = null;
+    this.callTimerInterval = null;
+    this.callStartedAt = 0;
     this.videoUpgradeConsentOverlay = null;
     this.remoteTrackMuteHandlers = new Map();
     this.bound = false;
@@ -185,12 +242,16 @@ class LiveChatApp {
     this.readReceiptTimer = null;
     this.reactionSheetMessageId = 0;
     this.reactionSheetPointerStartY = 0;
+    this.deleteConfirmResolve = null;
+    this.focusedDateKey = '';
+    this.chatDateBadgeTimer = null;
+    this.lastChatDateLabel = '';
     this.drafts = this.loadDrafts();
     this.timers = { presence: null, messages: null, receipts: null, calls: null, signals: null };
   }
 
   async init() {
-    ensureStylesheet();
+    await ensureStylesheet();
     ensureIconStylesheet();
     this.injectDock();
     this.bindEvents();
@@ -205,6 +266,7 @@ class LiveChatApp {
     const dock = document.createElement('section');
     dock.id = 'liveChatDock';
     dock.className = 'live-chat-dock collapsed';
+    dock.style.visibility = 'hidden';
     if (useFallbackIcons) dock.classList.add('live-fallback-icons');
     dock.innerHTML = `
       <button class="live-chat-launcher" id="liveChatLauncher" type="button" aria-label="Open live chat">
@@ -236,6 +298,7 @@ class LiveChatApp {
                 <button type="button" id="liveVideoCallBtn" title="Video call" disabled><i class="fas fa-video" aria-hidden="true"></i></button>
               </div>
             </div>
+            <div class="live-chat-date-float hidden" id="liveChatDateFloat" aria-live="polite"></div>
             <div class="live-pinned-bar hidden" id="livePinnedBar"></div>
             <div class="live-selection-bar hidden" id="liveSelectionBar"></div>
             <div class="live-chat-messages" id="liveChatMessages">
@@ -276,12 +339,25 @@ class LiveChatApp {
               </div>
               <div class="live-reaction-emoji-grid hidden" id="liveReactionEmojiGrid"></div>
             </div>
+            <div class="live-delete-confirm hidden" id="liveDeleteConfirm" role="dialog" aria-modal="true" aria-labelledby="liveDeleteConfirmTitle">
+              <div class="live-delete-confirm-card">
+                <div class="live-delete-confirm-icon"><i class="fas fa-trash" aria-hidden="true"></i></div>
+                <div class="live-delete-confirm-copy">
+                  <strong id="liveDeleteConfirmTitle">Delete message?</strong>
+                  <p id="liveDeleteConfirmText">This action cannot be undone.</p>
+                </div>
+                <div class="live-delete-confirm-actions">
+                  <button type="button" id="liveDeleteConfirmCancel" class="live-delete-cancel">Cancel</button>
+                  <button type="button" id="liveDeleteConfirmOk" class="live-delete-ok">Delete</button>
+                </div>
+              </div>
+            </div>
           </section>
         </div>
       </div>
       <div class="live-call-modal hidden" id="liveCallModal">
         <div class="live-call-card">
-          <div class="live-call-head"><strong id="liveCallTitle">Call</strong><span id="liveCallStatus">Preparing...</span></div>
+          <div class="live-call-head"><strong id="liveCallTitle">Call</strong><span class="live-call-meta"><span id="liveCallStatus">Preparing...</span><time id="liveCallTimer" class="hidden" datetime="PT0S">00:00</time></span></div>
           <div class="live-call-toolbar">
             <select id="liveCameraSelect" title="Camera"></select>
             <button type="button" id="liveSwitchCameraBtn" title="Switch camera"><i class="fas fa-camera-rotate"></i></button>
@@ -363,6 +439,9 @@ class LiveChatApp {
       </div>
     `;
     document.body.appendChild(dock);
+    requestAnimationFrame(() => {
+      dock.style.visibility = '';
+    });
     document.getElementById('liveEmojiPicker').innerHTML = PICKER_EMOJIS.map((emoji) => `<button type="button" data-emoji="${emoji}">${emoji}</button>`).join('');
     document.getElementById('liveReactionEmojiGrid').innerHTML = REACTION_PICKER_EMOJIS.map((emoji) => `<button type="button" data-reaction-emoji="${emoji}">${emoji}</button>`).join('');
   }
@@ -431,7 +510,10 @@ class LiveChatApp {
     document.getElementById('livePollCreate')?.addEventListener('click', () => this.createPoll());
     document.getElementById('liveChatMessages')?.addEventListener('click', (event) => this.handleMessageClick(event));
     document.getElementById('liveChatMessages')?.addEventListener('keydown', (event) => this.handleMessageKeydown(event));
-    document.getElementById('liveChatMessages')?.addEventListener('scroll', () => this.updateAutoScrollPreference());
+    document.getElementById('liveChatMessages')?.addEventListener('scroll', () => {
+      this.updateAutoScrollPreference();
+      this.updateFloatingChatDate(true, true);
+    });
     document.getElementById('liveAttachmentClose')?.addEventListener('click', () => this.closeAttachmentEditor());
     document.getElementById('liveAttachmentCrop')?.addEventListener('click', () => this.cropAttachmentCenter());
     document.getElementById('liveAttachmentDoodle')?.addEventListener('click', () => this.toggleAttachmentDoodle());
@@ -453,7 +535,17 @@ class LiveChatApp {
     document.getElementById('liveReactionSheet')?.addEventListener('pointerup', (event) => {
       if (event.clientY - this.reactionSheetPointerStartY > 55) this.closeReactionSheet();
     });
+    document.getElementById('liveDeleteConfirmCancel')?.addEventListener('click', () => this.closeDeleteConfirm(false));
+    document.getElementById('liveDeleteConfirmOk')?.addEventListener('click', () => this.closeDeleteConfirm(true));
+    document.getElementById('liveDeleteConfirm')?.addEventListener('click', (event) => {
+      if (event.target?.id === 'liveDeleteConfirm') this.closeDeleteConfirm(false);
+    });
     window.addEventListener('popstate', () => this.closeReactionSheet());
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !document.getElementById('liveDeleteConfirm')?.classList.contains('hidden')) {
+        this.closeDeleteConfirm(false);
+      }
+    });
     document.addEventListener('click', (event) => this.closeTransientPopups(event));
   }
 
@@ -554,7 +646,7 @@ class LiveChatApp {
   }
 
   persistCurrentDraft() {
-    if (!this.selectedThread) return;
+    if (!this.selectedThread || !this.featureSettings.draftsEnabled) return;
     const input = document.getElementById('liveChatInput');
     const key = this.currentDraftKey();
     const value = input?.value || '';
@@ -569,6 +661,10 @@ class LiveChatApp {
   restoreDraftForCurrentThread() {
     const input = document.getElementById('liveChatInput');
     if (!input || !this.selectedThread) return;
+    if (!this.featureSettings.draftsEnabled) {
+      input.value = '';
+      return;
+    }
     const draft = this.drafts[this.currentDraftKey()];
     input.value = draft?.text || '';
     this.syncTypingPulse();
@@ -599,6 +695,8 @@ class LiveChatApp {
       this.unreadTotal = Number(data.unreadTotal || 0);
       this.messageSettings = { ...this.messageSettings, ...(data.messageSettings || {}) };
       this.callSettings = { ...this.callSettings, ...(data.callSettings || {}) };
+      this.featureSettings = { ...this.featureSettings, ...(data.featureSettings || {}) };
+      this.applyFeatureSettings();
       this.unreadCountsReady = true;
       this.renderThreads();
       this.updateStatus();
@@ -654,7 +752,7 @@ class LiveChatApp {
     container.innerHTML = threads.map((thread) => {
       const active = this.threadKey() === `${thread.type}:${thread.id}`;
       const typingActive = this.isThreadTyping(thread);
-      const draft = this.drafts[`${thread.type}:${thread.id}`]?.text || '';
+      const draft = this.featureSettings.draftsEnabled ? (this.drafts[`${thread.type}:${thread.id}`]?.text || '') : '';
       const subtitle = typingActive
         ? '<b class="live-typing-list-label">Typing <span><i></i><i></i><i></i></span></b>'
         : (draft ? '<b class="live-draft-badge">Draft</b>' : escapeHtml(thread.subtitle));
@@ -689,6 +787,24 @@ class LiveChatApp {
     }
   }
 
+  applyFeatureSettings() {
+    const settings = this.featureSettings || {};
+    document.getElementById('liveCreateGroupBtn')?.classList.toggle('hidden', !settings.groupsEnabled);
+    document.getElementById('liveAudioCallBtn')?.classList.toggle('hidden', !settings.audioCallsEnabled);
+    document.getElementById('liveVideoCallBtn')?.classList.toggle('hidden', !settings.videoCallsEnabled);
+    document.getElementById('liveAttachBtn')?.classList.toggle('hidden', !settings.attachmentsEnabled);
+    document.getElementById('liveVoiceBtn')?.classList.toggle('hidden', !settings.voiceNotesEnabled);
+    document.querySelector('#liveAttachmentPicker [data-poll="true"]')?.classList.toggle('hidden', !settings.pollsEnabled);
+  }
+
+  liveChatTypingIdleMs() {
+    return Math.max(2000, Math.min(30000, Number(this.featureSettings?.typingIdleSeconds || 5) * 1000));
+  }
+
+  liveChatPollMs(key, fallback, min, max) {
+    return Math.max(min, Math.min(max, Number(this.featureSettings?.[key] || fallback)));
+  }
+
   async selectThread(type, id) {
     const thread = this.getThreads().find((item) => item.type === type && item.id === id);
     if (!thread) return;
@@ -699,13 +815,15 @@ class LiveChatApp {
     this.editingMessage = null;
     this.renderThreads();
     this.renderReplyPreview();
+    this.focusedDateKey = '';
+    this.hideFloatingChatDate(true);
     document.getElementById('liveChatPeer').innerHTML = `
       <button type="button" class="live-thread-back" id="liveThreadBackBtn" title="Back"><i class="fas fa-arrow-left"></i></button>
       <div><strong>${escapeHtml(thread.name)}</strong><small>${escapeHtml(thread.subtitle)}</small></div>
       <div class="live-peer-actions">
         ${thread.type === 'group' ? '<button type="button" id="liveGroupInfoBtn" title="Group members"><i class="fas fa-users-gear"></i></button>' : ''}
-        <button type="button" id="liveAudioCallBtn" title="Audio call"><i class="fas fa-phone" aria-hidden="true"></i></button>
-        <button type="button" id="liveVideoCallBtn" title="Video call"><i class="fas fa-video" aria-hidden="true"></i></button>
+        ${this.featureSettings.audioCallsEnabled ? '<button type="button" id="liveAudioCallBtn" title="Audio call"><i class="fas fa-phone" aria-hidden="true"></i></button>' : ''}
+        ${this.featureSettings.videoCallsEnabled ? '<button type="button" id="liveVideoCallBtn" title="Video call"><i class="fas fa-video" aria-hidden="true"></i></button>' : ''}
       </div>
     `;
     document.getElementById('liveThreadBackBtn')?.addEventListener('click', () => this.showThreadList());
@@ -716,6 +834,8 @@ class LiveChatApp {
       const element = document.getElementById(elementId);
       if (element) element.disabled = false;
     });
+    if (!this.featureSettings.voiceNotesEnabled) document.getElementById('liveVoiceBtn')?.classList.add('hidden');
+    if (!this.featureSettings.attachmentsEnabled) document.getElementById('liveAttachBtn')?.classList.add('hidden');
     this.restoreDraftForCurrentThread();
     this.lastMessageIdByThread[this.threadKey()] = 0;
     this.renderedMessageIds.clear();
@@ -733,11 +853,15 @@ class LiveChatApp {
   startPolling() {
     this.stop();
     this.timers.presence = setInterval(() => this.refreshPresence(), 5000);
-    this.timers.messages = setInterval(() => this.loadMessages(false), 350);
-    this.timers.receipts = setInterval(() => this.syncReceiptsFast(), 250);
-    this.timers.calls = setInterval(() => this.pollCalls(), 900);
+    this.timers.messages = setInterval(() => this.loadMessages(false), this.liveChatPollMs('messagePollMs', 350, 150, 5000));
+    if (this.featureSettings.readReceiptsEnabled) {
+      this.timers.receipts = setInterval(() => this.syncReceiptsFast(), this.liveChatPollMs('receiptPollMs', 250, 150, 5000));
+    }
+    if (this.featureSettings.audioCallsEnabled || this.featureSettings.videoCallsEnabled) {
+      this.timers.calls = setInterval(() => this.pollCalls(), this.liveChatPollMs('callPollMs', 900, 300, 10000));
+    }
     this.refreshPresence();
-    this.pollCalls();
+    if (this.featureSettings.audioCallsEnabled || this.featureSettings.videoCallsEnabled) this.pollCalls();
   }
 
   stop() {
@@ -748,6 +872,7 @@ class LiveChatApp {
     window.clearTimeout(this.typingHideTimer);
     window.clearTimeout(this.readReceiptTimer);
     window.clearTimeout(this.typingStopTimer);
+    window.clearTimeout(this.chatDateBadgeTimer);
     if (this.typingPulseTimer) window.clearInterval(this.typingPulseTimer);
     this.typingPulseTimer = null;
     this.cleanupCall();
@@ -762,6 +887,8 @@ class LiveChatApp {
       this.unreadTotal = Number(data.unreadTotal || 0);
       this.messageSettings = { ...this.messageSettings, ...(data.messageSettings || {}) };
       this.callSettings = { ...this.callSettings, ...(data.callSettings || {}) };
+      this.featureSettings = { ...this.featureSettings, ...(data.featureSettings || {}) };
+      this.applyFeatureSettings();
       this.unreadCountsReady = true;
       this.renderThreads();
       this.updateStatus();
@@ -777,8 +904,9 @@ class LiveChatApp {
     try {
       const url = `${API.messages}?peer_type=${encodeURIComponent(this.selectedThread.type)}&peer_id=${encodeURIComponent(this.selectedThread.id)}&since_id=${since}`;
       const data = await this.fetchJson(url);
-      const incoming = (data.messages || []).filter((message) => !message.isOwn && !this.renderedMessageIds.has(Number(message.id || 0)));
+      const incoming = (data.messages || []).filter((message) => !message.isDeleted && !message.isOwn && !this.renderedMessageIds.has(Number(message.id || 0)));
       this.syncMessageReceipts(data.receipts || []);
+      this.applyDeletedMessageUpdates(data.deletedUpdates || []);
       this.renderTypingIndicator(data.typing || []);
       this.renderMessages(data.messages || [], force);
       this.reportVisibleMessagesRead();
@@ -802,6 +930,8 @@ class LiveChatApp {
     if (replace) {
       container.innerHTML = '';
       this.renderedMessageIds.clear();
+      this.focusedDateKey = '';
+      this.hideFloatingChatDate(true);
       this.renderPinnedMessages(messages);
     }
     if (!messages.length && replace) {
@@ -811,10 +941,16 @@ class LiveChatApp {
     container.querySelector('.live-chat-empty')?.remove();
     messages.forEach((message) => {
       const id = Number(message.id || 0);
-      if (this.renderedMessageIds.has(id)) return;
+      if (this.renderedMessageIds.has(id)) {
+        if (message.isDeleted) {
+          this.markBubbleDeletedForEveryone(document.querySelector(`.live-chat-bubble[data-message-id="${id}"]`));
+        }
+        return;
+      }
       if (message.clientNonce && this.pendingMessages.has(message.clientNonce) && this.replacePendingMessage(message.clientNonce, message)) return;
       this.renderedMessageIds.add(id);
       this.lastMessageIdByThread[this.threadKey()] = Math.max(this.lastMessageIdByThread[this.threadKey()] || 0, id);
+      this.ensureDateDivider(message.createdAt);
       const bubble = document.createElement('div');
       bubble.className = `live-chat-bubble ${message.isOwn ? 'own' : ''} ${message.isPinned ? 'pinned' : ''} ${message.reactionEmoji ? 'reacted' : ''}`;
       bubble.dataset.messageId = String(id);
@@ -824,6 +960,8 @@ class LiveChatApp {
       bubble.dataset.deliveredAt = message.deliveredAt || '';
       bubble.dataset.receiptStatus = message.receiptStatus || (message.isOwn ? 'sent' : 'received');
       bubble.dataset.createdAt = message.createdAt || '';
+      bubble.dataset.dateKey = chatDateKey(message.createdAt);
+      bubble.dataset.fullDate = formatChatFullDate(message.createdAt);
       bubble.dataset.canEdit = message.canEdit ? '1' : '0';
       bubble.dataset.readAt = message.readAt || '';
       bubble.dataset.text = message.text || '';
@@ -836,12 +974,55 @@ class LiveChatApp {
       bubble.innerHTML = this.messageHtml(message);
       bubble.classList.toggle('selected', this.selectedMessageIds.has(id));
       this.bindMessageGestures(bubble);
-      const typing = document.getElementById('liveTypingIndicator');
-      if (typing && typing.parentElement === container) container.insertBefore(bubble, typing);
-      else container.appendChild(bubble);
+      this.insertBeforeTypingIndicator(bubble);
     });
     if (shouldScroll && this.autoScrollEnabled) {
       container.scrollTop = container.scrollHeight;
+    }
+    this.pruneEmptyDateDividers();
+    this.updateFloatingChatDate(false, false);
+  }
+
+  insertBeforeTypingIndicator(node) {
+    const container = document.getElementById('liveChatMessages');
+    if (!container || !node) return;
+    const typing = document.getElementById('liveTypingIndicator');
+    if (typing && typing.parentElement === container) container.insertBefore(node, typing);
+    else container.appendChild(node);
+  }
+
+  ensureDateDivider(createdAt) {
+    const container = document.getElementById('liveChatMessages');
+    const dateKey = chatDateKey(createdAt);
+    if (!container || !dateKey) return;
+    const lastBubble = Array.from(container.querySelectorAll('.live-chat-bubble')).pop();
+    if (lastBubble?.dataset.dateKey === dateKey) return;
+    const existingLastDivider = Array.from(container.querySelectorAll('.live-chat-date-divider')).pop();
+    if (!lastBubble && existingLastDivider?.dataset.dateKey === dateKey) return;
+    const divider = document.createElement('div');
+    divider.className = 'live-chat-date-divider';
+    divider.dataset.dateKey = dateKey;
+    divider.dataset.fullDate = formatChatFullDate(createdAt);
+    divider.innerHTML = `<span>${escapeHtml(formatChatFullDate(createdAt))}</span>`;
+    this.insertBeforeTypingIndicator(divider);
+  }
+
+  pruneEmptyDateDividers() {
+    const container = document.getElementById('liveChatMessages');
+    if (!container) return;
+    container.querySelectorAll('.live-chat-date-divider').forEach((divider) => {
+      const dateKey = divider.dataset.dateKey || '';
+      if (!dateKey) return;
+      const hasMessageForDate = Array.from(container.querySelectorAll('.live-chat-bubble[data-date-key]'))
+        .some((bubble) => bubble.dataset.dateKey === dateKey && bubble.dataset.deleted !== '1');
+      if (!hasMessageForDate) {
+        divider.remove();
+      }
+    });
+    if (!container.querySelector('.live-chat-bubble')) {
+      this.hideFloatingChatDate(true);
+      this.focusedDateKey = '';
+      this.lastChatDateLabel = '';
     }
   }
 
@@ -853,6 +1034,63 @@ class LiveChatApp {
     const container = document.getElementById('liveChatMessages');
     if (!container) return;
     this.autoScrollEnabled = this.shouldStickToBottom(container);
+  }
+
+  updateFloatingChatDate(force = false, userInitiated = false) {
+    const container = document.getElementById('liveChatMessages');
+    if (!container || !this.selectedThread) return;
+    const containerRect = container.getBoundingClientRect();
+    const focusLine = containerRect.top + 22;
+    const bubbles = Array.from(container.querySelectorAll('.live-chat-bubble[data-date-key]'));
+    if (!bubbles.length) {
+      this.hideFloatingChatDate(true);
+      return;
+    }
+    let focused = bubbles[0];
+    for (const bubble of bubbles) {
+      const rect = bubble.getBoundingClientRect();
+      if (rect.top <= focusLine && rect.bottom >= containerRect.top) {
+        focused = bubble;
+      } else if (rect.top > focusLine) {
+        break;
+      }
+    }
+    const dateKey = focused.dataset.dateKey || '';
+    const fullDate = focused.dataset.fullDate || formatChatFullDate(focused.dataset.createdAt);
+    if (!dateKey || !fullDate) return;
+    if (!force && dateKey === this.focusedDateKey && fullDate === this.lastChatDateLabel) {
+      if (!userInitiated) return;
+      this.showFloatingChatDate(fullDate);
+      return;
+    }
+    this.focusedDateKey = dateKey;
+    this.lastChatDateLabel = fullDate;
+    if (userInitiated) this.showFloatingChatDate(fullDate);
+  }
+
+  showFloatingChatDate(label) {
+    const badge = document.getElementById('liveChatDateFloat');
+    if (!badge) return;
+    badge.textContent = label;
+    badge.classList.remove('hidden');
+    requestAnimationFrame(() => badge.classList.add('visible'));
+    window.clearTimeout(this.chatDateBadgeTimer);
+    this.chatDateBadgeTimer = window.setTimeout(() => this.hideFloatingChatDate(), 3000);
+  }
+
+  hideFloatingChatDate(immediate = false) {
+    const badge = document.getElementById('liveChatDateFloat');
+    if (!badge) return;
+    window.clearTimeout(this.chatDateBadgeTimer);
+    this.chatDateBadgeTimer = null;
+    badge.classList.remove('visible');
+    if (immediate) {
+      badge.classList.add('hidden');
+      return;
+    }
+    window.setTimeout(() => {
+      if (!badge.classList.contains('visible')) badge.classList.add('hidden');
+    }, 240);
   }
 
   renderPinnedMessages(messages = []) {
@@ -906,6 +1144,7 @@ class LiveChatApp {
       isOwn: true,
       receiptStatus: 'sending'
     };
+    this.ensureDateDivider(message.createdAt);
     const bubble = document.createElement('div');
     bubble.className = 'live-chat-bubble own pending';
     bubble.dataset.messageId = tempId;
@@ -917,6 +1156,8 @@ class LiveChatApp {
     bubble.dataset.deliveredAt = '';
     bubble.dataset.receiptStatus = 'sending';
     bubble.dataset.createdAt = message.createdAt;
+    bubble.dataset.dateKey = chatDateKey(message.createdAt);
+    bubble.dataset.fullDate = formatChatFullDate(message.createdAt);
     bubble.dataset.canEdit = '1';
     bubble.dataset.text = text;
     bubble.dataset.sender = 'You';
@@ -925,9 +1166,7 @@ class LiveChatApp {
     bubble.dataset.replyToFileName = message.replyToFileName || '';
     bubble.dataset.replyToSenderName = message.replyToSenderName || '';
     bubble.innerHTML = this.messageHtml(message);
-    const typing = document.getElementById('liveTypingIndicator');
-    if (typing && typing.parentElement === container) container.insertBefore(bubble, typing);
-    else container.appendChild(bubble);
+    this.insertBeforeTypingIndicator(bubble);
     this.pendingMessages.set(clientNonce, bubble);
     this.autoScrollEnabled = true;
     container.scrollTop = container.scrollHeight;
@@ -954,6 +1193,8 @@ class LiveChatApp {
     bubble.dataset.readAt = mergedMessage.readAt || '';
     bubble.dataset.receiptStatus = mergedMessage.receiptStatus || 'sent';
     bubble.dataset.createdAt = mergedMessage.createdAt || '';
+    bubble.dataset.dateKey = chatDateKey(mergedMessage.createdAt || bubble.dataset.createdAt);
+    bubble.dataset.fullDate = formatChatFullDate(mergedMessage.createdAt || bubble.dataset.createdAt);
     bubble.dataset.canEdit = mergedMessage.canEdit ? '1' : '0';
     bubble.dataset.text = mergedMessage.text || '';
     bubble.dataset.sender = mergedMessage.senderName || 'You';
@@ -986,6 +1227,44 @@ class LiveChatApp {
     return numericId > 0 ? numericId : rawId;
   }
 
+  markBubbleDeletedForEveryone(bubble) {
+    if (!bubble) return;
+    if (bubble.dataset.deleted === '1') return;
+    const id = Number(bubble.dataset.messageId || 0);
+    bubble.classList.remove('pending', 'failed', 'reacted', 'selected');
+    bubble.dataset.deleted = '1';
+    bubble.dataset.text = '';
+    bubble.dataset.canEdit = '0';
+    bubble.querySelector('.live-message-menu')?.remove();
+    const message = {
+      id,
+      isDeleted: true,
+      createdAt: bubble.dataset.createdAt || new Date().toISOString()
+    };
+    bubble.innerHTML = this.messageHtml(message);
+    this.bindMessageGestures(bubble);
+    const selectionKey = this.messageSelectionKey(bubble);
+    if (selectionKey) this.selectedMessageIds.delete(selectionKey);
+    this.renderSelectionBar();
+    this.pruneEmptyDateDividers();
+  }
+
+  applyDeletedMessageUpdates(updates = []) {
+    let changed = false;
+    updates.forEach((update) => {
+      const id = Number(update.id || 0);
+      if (!id) return;
+      const bubble = document.querySelector(`.live-chat-bubble[data-message-id="${id}"]`);
+      if (!bubble || bubble.dataset.deleted === '1') return;
+      this.markBubbleDeletedForEveryone(bubble);
+      changed = true;
+    });
+    if (changed) {
+      document.querySelectorAll('.live-message-menu').forEach((menu) => menu.remove());
+      this.pruneEmptyDateDividers();
+    }
+  }
+
   syncMessageReceipts(receipts = []) {
     receipts.forEach((receipt) => {
       const bubble = document.querySelector(`.live-chat-bubble.own[data-message-id="${Number(receipt.id || 0)}"]`);
@@ -1004,7 +1283,7 @@ class LiveChatApp {
   }
 
   async syncReceiptsFast() {
-    if (!this.selectedThread || this.selectedThread.type === 'group' || this.receiptSyncInFlight) return;
+    if (!this.featureSettings.readReceiptsEnabled || !this.selectedThread || this.selectedThread.type === 'group' || this.receiptSyncInFlight) return;
     if (document.getElementById('liveChatDock')?.classList.contains('collapsed')) return;
     if (!this.hasPendingReceiptUpdates()) return;
     this.receiptSyncInFlight = true;
@@ -1025,10 +1304,12 @@ class LiveChatApp {
   }
 
   reportVisibleMessagesRead() {
-    if (!this.selectedThread || document.hidden || document.getElementById('liveChatDock')?.classList.contains('collapsed')) return;
+    if (!this.featureSettings.readReceiptsEnabled) return;
+    if (!this.isCurrentConversationReadable()) return;
     if (this.readReceiptTimer) return;
     this.readReceiptTimer = window.setTimeout(async () => {
       this.readReceiptTimer = null;
+      if (!this.isCurrentConversationReadable()) return;
       const ids = Array.from(document.querySelectorAll('.live-chat-bubble[data-own="0"][data-read="0"]'))
         .map((bubble) => Number(bubble.dataset.messageId || 0))
         .filter((id) => id > 0);
@@ -1050,14 +1331,24 @@ class LiveChatApp {
     }, 10);
   }
 
+  isCurrentConversationReadable() {
+    if (!this.selectedThread || document.hidden) return false;
+    const dock = document.getElementById('liveChatDock');
+    if (!dock || dock.classList.contains('collapsed')) return false;
+    const panel = document.getElementById('liveChatPanel');
+    if (this.isMobileInputMode() && !panel?.classList.contains('thread-open')) return false;
+    const messages = document.getElementById('liveChatMessages');
+    return Boolean(messages && messages.offsetParent !== null);
+  }
+
   async notifyTyping(force = false, touchActivity = true) {
     const input = document.getElementById('liveChatInput');
-    if (!this.selectedThread || document.activeElement !== input) return;
+    if (!this.featureSettings.typingPresenceEnabled || !this.selectedThread || document.activeElement !== input) return;
     const now = Date.now();
     if (touchActivity) {
       this.lastTypingActivityAt = now;
       window.clearTimeout(this.typingStopTimer);
-      this.typingStopTimer = window.setTimeout(() => this.stopTypingSignal(false), TYPING_IDLE_TIMEOUT_MS);
+      this.typingStopTimer = window.setTimeout(() => this.stopTypingSignal(false), this.liveChatTypingIdleMs());
     }
     if (this.typingNotifyTimer && now - this.typingNotifyTimer < 700) return;
     this.typingNotifyTimer = now;
@@ -1071,14 +1362,14 @@ class LiveChatApp {
   }
 
   syncTypingPulse() {
-    if (!this.selectedThread || !this.lastTypingActivityAt || Date.now() - this.lastTypingActivityAt >= TYPING_IDLE_TIMEOUT_MS) {
+    if (!this.featureSettings.typingPresenceEnabled || !this.selectedThread || !this.lastTypingActivityAt || Date.now() - this.lastTypingActivityAt >= this.liveChatTypingIdleMs()) {
       if (this.typingPulseTimer) window.clearInterval(this.typingPulseTimer);
       this.typingPulseTimer = null;
       return;
     }
     if (this.typingPulseTimer) return;
     this.typingPulseTimer = window.setInterval(() => {
-      if (!this.lastTypingActivityAt || Date.now() - this.lastTypingActivityAt >= TYPING_IDLE_TIMEOUT_MS) {
+      if (!this.lastTypingActivityAt || Date.now() - this.lastTypingActivityAt >= this.liveChatTypingIdleMs()) {
         this.syncTypingPulse();
         this.stopTypingSignal(false);
         return;
@@ -1313,12 +1604,12 @@ class LiveChatApp {
     if (isFailed) {
       menu.innerHTML = `
         <button type="button" data-action="retry">Retry</button>
-        <button type="button" data-action="delete">Delete</button>
+        <button type="button" data-action="delete_for_me">Delete for myself</button>
         <button type="button" data-action="select">Select</button>
       `;
     } else if (isDeleted) {
       menu.innerHTML = `
-        <button type="button" data-action="delete">Delete</button>
+        <button type="button" data-action="delete_for_me">Delete</button>
         <button type="button" data-action="select">Select</button>
       `;
     } else {
@@ -1330,12 +1621,46 @@ class LiveChatApp {
         <button type="button" data-action="${isPinned ? 'unpin' : 'pin'}">${isPinned ? 'Unpin' : 'Pin'}</button>
         <button type="button" data-action="select">Select</button>
         ${canEdit ? '<button type="button" data-action="edit">Edit</button>' : ''}
-        <button type="button" data-action="delete">Delete</button>
+        <button type="button" data-action="delete_for_me">${isOwn ? 'Delete for myself' : 'Delete'}</button>
+        ${isOwn ? '<button type="button" data-action="delete_for_everyone">Delete for everyone</button>' : ''}
         <div class="live-reaction-row">${REACTION_EMOJIS.map((emoji) => `<button type="button" data-reaction="${emoji}">${emoji}</button>`).join('')}</div>
       `;
     }
-    bubble.appendChild(menu);
+    this.positionMessageMenu(menu, button);
     menu.addEventListener('click', (menuEvent) => this.handleMessageAction(menuEvent, bubble));
+  }
+
+  positionMessageMenu(menu, trigger) {
+    const host = document.querySelector('.live-chat-thread') || document.getElementById('liveChatPanel');
+    if (!host || !trigger) {
+      trigger?.closest('.live-chat-bubble')?.appendChild(menu);
+      return;
+    }
+    menu.style.visibility = 'hidden';
+    menu.style.top = '0';
+    menu.style.left = '0';
+    menu.style.right = 'auto';
+    host.appendChild(menu);
+
+    const hostRect = host.getBoundingClientRect();
+    const triggerRect = trigger.getBoundingClientRect();
+    const menuRect = menu.getBoundingClientRect();
+    const gap = 6;
+    const inset = 8;
+    const maxLeft = Math.max(inset, hostRect.width - menuRect.width - inset);
+    let left = triggerRect.right - hostRect.left - menuRect.width;
+    let top = triggerRect.bottom - hostRect.top + gap;
+
+    if (top + menuRect.height > hostRect.height - inset) {
+      top = triggerRect.top - hostRect.top - menuRect.height - gap;
+    }
+
+    left = Math.min(Math.max(inset, left), maxLeft);
+    top = Math.min(Math.max(inset, top), Math.max(inset, hostRect.height - menuRect.height - inset));
+
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+    menu.style.visibility = '';
   }
 
   handleMessageKeydown(event) {
@@ -1391,15 +1716,40 @@ class LiveChatApp {
       document.getElementById('liveChatInput').value = text;
       document.getElementById('liveChatInput').focus();
       this.renderReplyPreview('Editing message');
-    } else if (action === 'delete') {
+    } else if (action === 'delete_for_me') {
       if (bubble.dataset.receiptStatus === 'failed' || bubble.classList.contains('failed')) {
         this.removeFailedBubble(bubble);
         return;
       }
-      await this.runMessageAction('delete', messageId);
+      if (bubble.dataset.deleted === '1') {
+        bubble.remove();
+        this.renderedMessageIds.delete(messageId);
+        this.pruneEmptyDateDividers();
+        this.runMessageAction('delete_for_me', messageId).catch(() => this.reloadCurrentThread());
+        document.querySelectorAll('.live-message-menu').forEach((menu) => menu.remove());
+        return;
+      }
+      const confirmed = await this.confirmDelete({
+        title: 'Delete for myself?',
+        message: 'This message will be removed from your chat only. Other participants will still see it.',
+        confirmLabel: 'Delete for myself'
+      });
+      if (!confirmed) return;
       bubble.remove();
       this.renderedMessageIds.delete(messageId);
-      await this.reloadCurrentThread();
+      this.pruneEmptyDateDividers();
+      this.loadUsers().catch(() => {});
+      this.runMessageAction('delete_for_me', messageId).catch(() => this.reloadCurrentThread());
+    } else if (action === 'delete_for_everyone') {
+      if (bubble.dataset.own !== '1') return;
+      const confirmed = await this.confirmDelete({
+        title: 'Delete for everyone?',
+        message: 'This message will be removed for every participant in this conversation.',
+        confirmLabel: 'Delete for everyone'
+      });
+      if (!confirmed) return;
+      this.markBubbleDeletedForEveryone(bubble);
+      this.runMessageAction('delete_for_everyone', messageId).catch(() => this.reloadCurrentThread());
     } else if (action === 'pin' || action === 'unpin') {
       await this.runMessageAction('pin', messageId, { is_pinned: action === 'pin' });
       await this.reloadCurrentThread();
@@ -1426,6 +1776,7 @@ class LiveChatApp {
     if (selectionKey) this.selectedMessageIds.delete(selectionKey);
     bubble?.remove();
     this.renderSelectionBar();
+    this.pruneEmptyDateDividers();
   }
 
   async retryFailedMessage(bubble) {
@@ -1491,6 +1842,36 @@ class LiveChatApp {
       showNotice('Reaction', error.message || 'Unable to update reaction.');
       await this.reloadCurrentThread();
     }
+  }
+
+  confirmDelete({ title = 'Delete message?', message = 'This action cannot be undone.', confirmLabel = 'Delete' } = {}) {
+    const modal = document.getElementById('liveDeleteConfirm');
+    const titleElement = document.getElementById('liveDeleteConfirmTitle');
+    const textElement = document.getElementById('liveDeleteConfirmText');
+    const okButton = document.getElementById('liveDeleteConfirmOk');
+    if (!modal || !titleElement || !textElement || !okButton) {
+      return Promise.resolve(false);
+    }
+    if (this.deleteConfirmResolve) {
+      this.closeDeleteConfirm(false);
+    }
+    document.querySelectorAll('.live-message-menu').forEach((menu) => menu.remove());
+    titleElement.textContent = title;
+    textElement.textContent = message;
+    okButton.textContent = confirmLabel;
+    modal.classList.remove('hidden');
+    okButton.focus({ preventScroll: true });
+    return new Promise((resolve) => {
+      this.deleteConfirmResolve = resolve;
+    });
+  }
+
+  closeDeleteConfirm(confirmed = false) {
+    const modal = document.getElementById('liveDeleteConfirm');
+    modal?.classList.add('hidden');
+    const resolve = this.deleteConfirmResolve;
+    this.deleteConfirmResolve = null;
+    if (resolve) resolve(Boolean(confirmed));
   }
 
   toggleMessageSelection(bubble, forceState = null) {
@@ -1573,6 +1954,16 @@ class LiveChatApp {
     return bubbles.some((bubble) => bubble.dataset.receiptStatus === 'failed' || bubble.classList.contains('failed'));
   }
 
+  selectionCanDeleteForEveryone(bubbles) {
+    return bubbles.length > 0 && bubbles.every((bubble) => (
+      bubble.dataset.own === '1'
+      && bubble.dataset.deleted !== '1'
+      && bubble.dataset.receiptStatus !== 'failed'
+      && !bubble.classList.contains('failed')
+      && Number(bubble.dataset.messageId || 0) > 0
+    ));
+  }
+
   renderSelectionBar() {
     const bar = document.getElementById('liveSelectionBar');
     if (!bar) return;
@@ -1585,6 +1976,7 @@ class LiveChatApp {
     const selectedBubbles = this.getSelectedBubbles();
     const singleSelected = count === 1 ? selectedBubbles[0] : null;
     const hasFailed = this.selectionHasFailedBubbles(selectedBubbles);
+    const canDeleteForEveryone = this.selectionCanDeleteForEveryone(selectedBubbles);
     const canEdit = singleSelected ? this.canEditBubble(singleSelected) : false;
     bar.innerHTML = `
       <strong>${count} selected</strong>
@@ -1592,7 +1984,8 @@ class LiveChatApp {
         ${count === 1 && hasFailed ? '<button type="button" data-selection-action="retry"><i class="fas fa-rotate-right"></i> Retry</button>' : ''}
         ${count === 1 && !hasFailed ? '<button type="button" data-selection-action="reply"><i class="fas fa-reply"></i> Reply</button>' : ''}
         ${canEdit && !hasFailed ? '<button type="button" data-selection-action="edit"><i class="fas fa-pen"></i> Edit</button>' : ''}
-        <button type="button" data-selection-action="delete"><i class="fas fa-trash"></i> Delete</button>
+        <button type="button" data-selection-action="delete_for_me"><i class="fas fa-trash"></i> Delete for myself</button>
+        ${canDeleteForEveryone ? '<button type="button" data-selection-action="delete_for_everyone"><i class="fas fa-trash"></i> Delete for everyone</button>' : ''}
         ${!hasFailed ? '<button type="button" data-selection-action="copy"><i class="fas fa-copy"></i> Copy</button>' : ''}
         ${!hasFailed ? '<button type="button" data-selection-action="forward"><i class="fas fa-share"></i> Forward</button>' : ''}
         <button type="button" data-selection-action="clear"><i class="fas fa-times"></i></button>
@@ -1636,16 +2029,54 @@ class LiveChatApp {
       }
     } else if (action === 'forward') {
       this.prepareForward(texts.join('\n'));
-    } else if (action === 'delete') {
+    } else if (action === 'delete_for_me') {
+      const savedCount = bubbles.filter((bubble) => !(
+        bubble.dataset.receiptStatus === 'failed'
+        || bubble.classList.contains('failed')
+        || bubble.dataset.deleted === '1'
+      )).length;
+      if (savedCount > 0) {
+        const confirmed = await this.confirmDelete({
+          title: savedCount === 1 ? 'Delete for myself?' : `Delete ${savedCount} messages for myself?`,
+          message: savedCount === 1
+            ? 'This message will be removed from your chat only. Other participants will still see it.'
+            : 'These messages will be removed from your chat only. Other participants will still see them.',
+          confirmLabel: 'Delete for myself'
+        });
+        if (!confirmed) return;
+      }
       for (const bubble of bubbles) {
         if (bubble.dataset.receiptStatus === 'failed' || bubble.classList.contains('failed')) {
           this.removeFailedBubble(bubble);
           continue;
         }
         const messageId = Number(bubble.dataset.messageId || 0);
-        if (messageId) await this.runMessageAction('delete', messageId).catch(() => {});
+        bubble.remove();
+        this.renderedMessageIds.delete(messageId);
+        if (messageId) this.runMessageAction('delete_for_me', messageId).catch(() => this.reloadCurrentThread());
       }
-      await this.reloadCurrentThread();
+      this.pruneEmptyDateDividers();
+      this.loadUsers().catch(() => {});
+    } else if (action === 'delete_for_everyone') {
+      const deletable = bubbles.filter((bubble) => (
+        bubble.dataset.own === '1'
+        && bubble.dataset.deleted !== '1'
+        && Number(bubble.dataset.messageId || 0) > 0
+      ));
+      if (!deletable.length) return;
+      const confirmed = await this.confirmDelete({
+        title: deletable.length === 1 ? 'Delete for everyone?' : `Delete ${deletable.length} messages for everyone?`,
+        message: deletable.length === 1
+          ? 'This message will be removed for every participant in this conversation.'
+          : 'These messages will be removed for every participant in this conversation.',
+        confirmLabel: 'Delete for everyone'
+      });
+      if (!confirmed) return;
+      for (const bubble of deletable) {
+        const messageId = Number(bubble.dataset.messageId || 0);
+        this.markBubbleDeletedForEveryone(bubble);
+        this.runMessageAction('delete_for_everyone', messageId).catch(() => this.reloadCurrentThread());
+      }
     }
     this.clearMessageSelection();
   }
@@ -1693,7 +2124,7 @@ class LiveChatApp {
     const text = (input?.value || '').trim();
     if (!this.selectedThread || this.sending) return;
     if (this.editingMessage) {
-      await this.stopTypingSignal(true);
+      this.stopTypingSignal(false);
       if (!text) {
         input.value = '';
         this.editingMessage = null;
@@ -1710,8 +2141,9 @@ class LiveChatApp {
       return;
     }
     if (!text) return;
-    await this.stopTypingSignal(true);
     input.value = '';
+    this.clearCurrentDraft();
+    this.stopTypingSignal(false);
     await this.sendPayload({ message_text: text, message_kind: 'text' });
   }
 
@@ -1979,6 +2411,10 @@ class LiveChatApp {
   }
 
   async createPoll() {
+    if (!this.featureSettings.pollsEnabled) {
+      showNotice('Polls Disabled', 'Polls are currently disabled by the administrator.', 'info');
+      return;
+    }
     if (!this.selectedThread) return;
     const question = document.getElementById('livePollQuestion').value.trim();
     const options = Array.from(document.querySelectorAll('#livePollOptions input'))
@@ -2021,11 +2457,19 @@ class LiveChatApp {
 
   async sendPayload({ message_text = '', message_kind = 'text', file = null, replyContext = this.replyToMessage } = {}) {
     if (!this.selectedThread || this.sending) return;
+    if (message_kind === 'voice' && !this.featureSettings.voiceNotesEnabled) {
+      showNotice('Voice Notes Disabled', 'Voice notes are currently disabled by the administrator.', 'info');
+      return;
+    }
+    if (message_kind === 'attachment' && !this.featureSettings.attachmentsEnabled) {
+      showNotice('Attachments Disabled', 'Attachments are currently disabled by the administrator.', 'info');
+      return;
+    }
     this.sending = true;
-    await this.stopTypingSignal(true);
     const clientNonce = this.makeClientNonce();
     this.failedMessages.set(clientNonce, { message_text, message_kind, file, replyContext });
     this.appendOptimisticMessage({ text: message_text, kind: message_kind, file, clientNonce, replyContext });
+    this.stopTypingSignal(false);
     const form = new FormData();
     form.append('recipient_type', this.selectedThread.type);
     form.append('recipient_id', this.selectedThread.id);
@@ -2058,6 +2502,10 @@ class LiveChatApp {
   }
 
   async toggleVoiceRecording() {
+    if (!this.featureSettings.voiceNotesEnabled) {
+      showNotice('Voice Notes Disabled', 'Voice notes are currently disabled by the administrator.', 'info');
+      return;
+    }
     const button = document.getElementById('liveVoiceBtn');
     if (this.recorder?.state === 'recording') {
       this.recorder.stop();
@@ -2189,7 +2637,44 @@ class LiveChatApp {
     return `${mins}:${secs}`;
   }
 
+  startCallTimer(startedAt = Date.now()) {
+    const parsedStart = startedAt instanceof Date ? startedAt.getTime() : new Date(startedAt).getTime();
+    this.callStartedAt = Number.isFinite(parsedStart) ? parsedStart : Date.now();
+    const timer = document.getElementById('liveCallTimer');
+    if (timer) timer.classList.remove('hidden');
+    this.updateCallTimerDisplay();
+    if (this.callTimerInterval) clearInterval(this.callTimerInterval);
+    this.callTimerInterval = window.setInterval(() => this.updateCallTimerDisplay(), 1000);
+  }
+
+  updateCallTimerDisplay() {
+    const timer = document.getElementById('liveCallTimer');
+    if (!timer || !this.callStartedAt) return;
+    const elapsed = Math.max(0, Math.floor((Date.now() - this.callStartedAt) / 1000));
+    const hours = Math.floor(elapsed / 3600);
+    const minutes = Math.floor((elapsed % 3600) / 60).toString().padStart(2, '0');
+    const seconds = Math.floor(elapsed % 60).toString().padStart(2, '0');
+    timer.textContent = hours > 0 ? `${hours}:${minutes}:${seconds}` : `${minutes}:${seconds}`;
+    timer.dateTime = `PT${elapsed}S`;
+  }
+
+  stopCallTimer() {
+    if (this.callTimerInterval) clearInterval(this.callTimerInterval);
+    this.callTimerInterval = null;
+    this.callStartedAt = 0;
+    const timer = document.getElementById('liveCallTimer');
+    if (timer) {
+      timer.textContent = '00:00';
+      timer.dateTime = 'PT0S';
+      timer.classList.add('hidden');
+    }
+  }
+
   openGroupModal() {
+    if (!this.featureSettings.groupsEnabled) {
+      showNotice('Groups Disabled', 'Group chats are currently disabled by the administrator.', 'info');
+      return;
+    }
     document.getElementById('liveGroupModal')?.classList.remove('hidden');
     document.getElementById('liveGroupMembers').innerHTML = this.users.map((user) => `
       <label><input type="checkbox" value="${escapeHtml(user.userId)}"> <span>${escapeHtml(user.userName)} <small>${escapeHtml(user.userRoleLabel || this.formatRoleLabel(user.userRole))}</small></span></label>
@@ -2299,6 +2784,14 @@ class LiveChatApp {
 
   async startCall(callType = 'audio') {
     if (!this.selectedThread) return;
+    if (callType === 'audio' && !this.featureSettings.audioCallsEnabled) {
+      showNotice('Calls Disabled', 'Audio calls are currently disabled by the administrator.', 'info');
+      return;
+    }
+    if (callType === 'video' && !this.featureSettings.videoCallsEnabled) {
+      showNotice('Calls Disabled', 'Video calls are currently disabled by the administrator.', 'info');
+      return;
+    }
     if (this.selectedThread.type === 'group') {
       await this.startGroupCall(callType);
       return;
@@ -2401,6 +2894,9 @@ class LiveChatApp {
             this.stopIncomingRing();
             this.stopOutgoingRing();
             this.clearCallTimeout();
+            const acceptedAt = currentCall.answeredAt || this.activeCall.answeredAt || new Date().toISOString();
+            this.activeCall.answeredAt = acceptedAt;
+            if (!this.callStartedAt) this.startCallTimer(acceptedAt);
             const status = document.getElementById('liveCallStatus');
             if (status && ['Ringing...', 'audio call', 'video call'].includes(status.textContent || '')) {
               status.textContent = 'Connecting...';
@@ -2431,6 +2927,7 @@ class LiveChatApp {
     if (callType === 'audio') modal?.classList.add('audio-only');
     document.getElementById('liveCallTitle').textContent = title;
     document.getElementById('liveCallStatus').textContent = status;
+    if (incoming || this.activeCall?.status !== 'accepted') this.stopCallTimer();
     document.getElementById('liveAcceptCallBtn')?.classList.toggle('hidden', !incoming);
     document.getElementById('liveRejectCallBtn')?.classList.toggle('hidden', !incoming);
     document.getElementById('liveEndCallBtn')?.classList.toggle('hidden', incoming && this.activeCall?.status === 'ringing');
@@ -2455,7 +2952,10 @@ class LiveChatApp {
       rejectButton && (rejectButton.disabled = true);
       const updatePromise = this.postCall({ action: 'update', call_id: this.activeCall.callId, status: 'accepted' }).catch(() => {});
       this.activeCall.status = 'accepted';
-      const acceptSignalPromise = this.sendSignal('call_accept', { acceptedAt: new Date().toISOString() }).catch(() => {});
+      const acceptedAt = new Date().toISOString();
+      this.activeCall.answeredAt = acceptedAt;
+      this.startCallTimer(acceptedAt);
+      const acceptSignalPromise = this.sendSignal('call_accept', { acceptedAt }).catch(() => {});
       await this.preparePeerConnection(this.activeCall.callType);
       this.startSignalPolling();
       await Promise.allSettled([updatePromise, acceptSignalPromise]);
@@ -2473,6 +2973,7 @@ class LiveChatApp {
     this.stopIncomingRing();
     this.stopOutgoingRing();
     this.clearCallTimeout();
+    this.stopCallTimer();
     const call = this.activeCall;
     const signalPromise = call ? this.sendSignal('hangup', { reason: 'rejected' }).catch(() => {}) : Promise.resolve();
     const updatePromise = call ? this.postCall({ action: 'update', call_id: call.callId, status: 'rejected' }).catch(() => {}) : Promise.resolve();
@@ -2853,6 +3354,7 @@ class LiveChatApp {
     if (connected > 0) {
       this.stopOutgoingRing();
       this.clearCallTimeout();
+      if (!this.callStartedAt) this.startCallTimer(Date.now());
     }
     this.renderGroupRemoteGrid();
   }
@@ -3190,11 +3692,11 @@ class LiveChatApp {
   startSignalPolling() {
     if (this.timers.signals) clearInterval(this.timers.signals);
     if (this.activeCall?.isGroupCall) {
-      this.timers.signals = setInterval(() => this.pollGroupSignals(), 350);
+      this.timers.signals = setInterval(() => this.pollGroupSignals(), this.liveChatPollMs('signalPollMs', 350, 150, 5000));
       this.pollGroupSignals();
       return;
     }
-    this.timers.signals = setInterval(() => this.pollSignals(), 350);
+    this.timers.signals = setInterval(() => this.pollSignals(), this.liveChatPollMs('signalPollMs', 350, 150, 5000));
     this.pollSignals();
   }
 
@@ -3220,7 +3722,9 @@ class LiveChatApp {
     }
     if (signal.signalType === 'call_accept') {
       session.call.status = 'accepted';
+      session.call.answeredAt = signal.payload?.acceptedAt || session.call.answeredAt || new Date().toISOString();
       session.status = 'connecting';
+      if (!this.callStartedAt) this.startCallTimer(session.call.answeredAt);
       this.updateGroupCallStatus();
       return;
     }
@@ -3228,7 +3732,9 @@ class LiveChatApp {
       await session.peerConnection.setRemoteDescription(new RTCSessionDescription(signal.payload));
       await this.flushGroupPendingIceCandidates(session);
       session.call.status = 'accepted';
+      session.call.answeredAt = session.call.answeredAt || new Date().toISOString();
       session.status = 'connected';
+      if (!this.callStartedAt) this.startCallTimer(session.call.answeredAt);
       this.updateGroupCallStatus();
       return;
     }
@@ -3268,9 +3774,11 @@ class LiveChatApp {
     }
     if (signal.signalType === 'call_accept') {
       this.activeCall.status = 'accepted';
+      this.activeCall.answeredAt = signal.payload?.acceptedAt || this.activeCall.answeredAt || new Date().toISOString();
       this.stopIncomingRing();
       this.stopOutgoingRing();
       this.clearCallTimeout();
+      this.startCallTimer(this.activeCall.answeredAt);
       const status = document.getElementById('liveCallStatus');
       if (status && status.textContent !== 'Connected') status.textContent = 'Connecting...';
       return;
@@ -3300,9 +3808,11 @@ class LiveChatApp {
       await this.peerConnection.setLocalDescription(answer);
       await this.sendSignal('answer', answer);
       this.activeCall.status = 'accepted';
+      this.activeCall.answeredAt = this.activeCall.answeredAt || new Date().toISOString();
       this.stopIncomingRing();
       this.stopOutgoingRing();
       this.clearCallTimeout();
+      this.startCallTimer(this.activeCall.answeredAt);
       document.getElementById('liveCallStatus').textContent = 'Connected';
       return;
     }
@@ -3310,9 +3820,11 @@ class LiveChatApp {
       await this.peerConnection.setRemoteDescription(new RTCSessionDescription(signal.payload));
       await this.flushPendingIceCandidates();
       this.activeCall.status = 'accepted';
+      this.activeCall.answeredAt = this.activeCall.answeredAt || new Date().toISOString();
       this.stopIncomingRing();
       this.stopOutgoingRing();
       this.clearCallTimeout();
+      this.startCallTimer(this.activeCall.answeredAt);
       document.getElementById('liveCallStatus').textContent = 'Connected';
       return;
     }
@@ -3416,6 +3928,7 @@ class LiveChatApp {
     this.stopIncomingRing();
     this.stopOutgoingRing();
     this.clearCallTimeout();
+    this.stopCallTimer();
     this.groupCallSessions.forEach((session) => {
       session.peerConnection?.close();
       session.remoteStream?.getTracks().forEach((track) => track.stop());

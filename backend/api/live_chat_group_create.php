@@ -5,6 +5,9 @@ try {
     $userId = liveChatRequireStaff($conn);
     liveChatEnsureTables($conn);
     liveChatTouchPresence($conn, $userId);
+    if (!liveChatFeatureEnabled($conn, 'live_chat_group_chats_enabled', true)) {
+        throw new RuntimeException('Group chats are currently disabled.');
+    }
 
     $data = liveChatJsonInput();
     $name = trim((string)($data['group_name'] ?? ''));

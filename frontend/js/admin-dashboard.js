@@ -821,6 +821,7 @@ class AdminDashboard {
             'access-control': 'Access Control',
             'role-settings': 'Role Governance',
             'notification-settings': 'Notification Settings',
+            'live-chat-settings': 'Live Chat Settings',
             'notification-queue': 'Notification Queue',
             'podcast-settings': 'Podcast Library',
             'title-settings': 'Title Settings',
@@ -837,6 +838,7 @@ class AdminDashboard {
             'data-import': 'Import Data',
             'data-cleanup': 'Data Cleanup',
             'activity-logs': 'Activity Logs',
+            'chat-oversight': 'Chat Oversight',
             'user-logs': 'User Activity Logs',
             'workflow-logs': 'Workflow Reports',
             'task-logs': 'Task Delegation',
@@ -899,6 +901,9 @@ class AdminDashboard {
                 case 'notification-settings':
                     content = await this.loadNotificationSettingsContent();
                     break;
+                case 'live-chat-settings':
+                    content = await this.loadLiveChatSettingsContent();
+                    break;
                 case 'notification-queue':
                     content = await this.loadNotificationQueueContent();
                     break;
@@ -949,6 +954,9 @@ class AdminDashboard {
                     break;
                 case 'document-storage':
                     content = await this.loadDocumentStorageContent();
+                    break;
+                case 'chat-oversight':
+                    content = await this.loadChatOversightContent();
                     break;
                 case 'user-logs':
                     content = await this.loadUserLogsContent();
@@ -5876,6 +5884,8 @@ class AdminDashboard {
             entry('notification-settings', 'Sender Identity', 'Outgoing email sender name and address.', 'sender identity from address from name'),
             entry('notification-settings', 'Delivery Rules', 'Notification timing, escalation, and recipient rules.', 'delivery rules alerts recipients retries'),
             entry('notification-settings', 'Live Chat Call Sounds', 'Incoming call ringtone, outgoing ringback tone, call notification permission, volume, and repeat limits.', 'live chat call sounds incoming outgoing ringtone ringback audio video call alerts'),
+            entry('live-chat-settings', 'Live Chat Settings', 'Enable chat capabilities, calls, groups, attachments, receipts, drafts, polling cadence, and admin oversight behavior.', 'live chat settings groups calls attachments receipts drafts polling oversight archive'),
+            entry('live-chat-settings', 'Live Chat Performance', 'Tune message, receipt, call, and signal polling intervals for the live chat experience.', 'live chat performance polling interval realtime receipts signals'),
             entry('notification-settings', 'Admin Digest', 'Daily digest recipient, schedule, and coverage controls.', 'daily digest recipient time queue'),
             entry('notification-settings', 'Queue Worker', 'Notification queue worker cadence, retries, and processing controls.', 'queue worker process queue retry batch'),
             entry('notification-queue', 'Notification Queue', 'Review, process, clear, and troubleshoot queued notifications.', 'notification queue sent failed clear process'),
@@ -5900,6 +5910,8 @@ class AdminDashboard {
             entry('storage-cleanup', 'Storage Cleanup Tools', 'Retention windows and cleanup previews for operational data.', 'storage cleanup orphan documents exports backups sessions'),
             entry('storage-cleanup', 'Cleanup Candidates', 'Preview removable sessions, exports, and orphan documents.', 'cleanup candidates preview sessions exports orphan'),
 
+            entry('chat-oversight', 'Chat Oversight', 'Read-only review of direct peer conversations and live chat groups for administrative audit.', 'chat oversight messages direct group read only transcript audit'),
+            entry('chat-oversight', 'Chat Transcripts', 'Filter conversations, inspect message history, deleted badges, reactions, attachments, and read receipts.', 'chat transcript message history reactions attachments receipts deleted'),
             entry('workflow-logs', 'Workflow Reports', 'Retention, export, and capture rules for workflow reporting.', 'workflow reports retention comments assignment export verification escalation submitted applications'),
             entry('task-logs', 'Task Delegation', 'Delegation evidence, reason capture, escalation, and export controls.', 'task delegation escalation reason export'),
             entry('task-logs', 'Delegation by Role', 'Role-based delegation distribution insights.', 'delegation by role workload'),
@@ -6328,6 +6340,9 @@ class AdminDashboard {
             case 'notification-settings':
                 this.initializeNotificationSettings();
                 break;
+            case 'live-chat-settings':
+                this.initializeLiveChatSettings();
+                break;
             case 'notification-queue':
                 this.initializeNotificationQueue();
                 break;
@@ -6378,6 +6393,9 @@ class AdminDashboard {
                 break;
             case 'document-storage':
                 this.initializeDocumentStorageSettings();
+                break;
+            case 'chat-oversight':
+                this.initializeChatOversight();
                 break;
             case 'user-logs':
                 this.initializeUserLogs();
@@ -7090,6 +7108,14 @@ class AdminDashboard {
         await this.loadNotificationSettings();
     }
 
+    async initializeLiveChatSettings() {
+        const form = document.getElementById('liveChatSettingsForm');
+        if (!form) return;
+        document.getElementById('saveLiveChatSettingsBtn')?.addEventListener('click', () => this.saveLiveChatSettings());
+        document.getElementById('resetLiveChatSettingsBtn')?.addEventListener('click', () => this.loadLiveChatSettings(true));
+        await this.loadLiveChatSettings();
+    }
+
     // Initialize message storage settings
     async initializeMessageStorageSettings() {
         const form = document.getElementById('messageStorageForm');
@@ -7618,6 +7644,39 @@ class AdminDashboard {
         };
     }
 
+    getLiveChatSettingsPayload() {
+        const form = document.getElementById('liveChatSettingsForm');
+        if (!form) return null;
+
+        const getValue = (name) => form.querySelector(`[name="${name}"]`);
+        const getBool = (name) => Boolean(getValue(name)?.checked);
+        const getNumber = (name) => {
+            const raw = getValue(name)?.value;
+            return raw === '' || raw === null || raw === undefined ? null : Number(raw);
+        };
+
+        return {
+            live_chat_enabled: getBool('live_chat_enabled'),
+            live_chat_group_chats_enabled: getBool('live_chat_group_chats_enabled'),
+            live_chat_audio_calls_enabled: getBool('live_chat_audio_calls_enabled'),
+            live_chat_video_calls_enabled: getBool('live_chat_video_calls_enabled'),
+            live_chat_attachments_enabled: getBool('live_chat_attachments_enabled'),
+            live_chat_voice_notes_enabled: getBool('live_chat_voice_notes_enabled'),
+            live_chat_polls_enabled: getBool('live_chat_polls_enabled'),
+            live_chat_typing_presence_enabled: getBool('live_chat_typing_presence_enabled'),
+            live_chat_read_receipts_enabled: getBool('live_chat_read_receipts_enabled'),
+            live_chat_drafts_enabled: getBool('live_chat_drafts_enabled'),
+            live_chat_admin_archive_enabled: getBool('live_chat_admin_archive_enabled'),
+            live_chat_admin_delete_enabled: getBool('live_chat_admin_delete_enabled'),
+            live_chat_edit_window_minutes: getNumber('live_chat_edit_window_minutes'),
+            live_chat_typing_idle_seconds: getNumber('live_chat_typing_idle_seconds'),
+            live_chat_message_poll_ms: getNumber('live_chat_message_poll_ms'),
+            live_chat_receipt_poll_ms: getNumber('live_chat_receipt_poll_ms'),
+            live_chat_call_poll_ms: getNumber('live_chat_call_poll_ms'),
+            live_chat_signal_poll_ms: getNumber('live_chat_signal_poll_ms')
+        };
+    }
+
     getMessageStoragePayload() {
         const form = document.getElementById('messageStorageForm');
         if (!form) return null;
@@ -7807,6 +7866,42 @@ class AdminDashboard {
         }
     }
 
+    async saveLiveChatSettings() {
+        const payload = this.getLiveChatSettingsPayload();
+        if (!payload) return;
+
+        try {
+            this.updateSettingsStatus('liveChat', 'Saving...', 'info');
+            const response = await fetch('../backend/api/update_app_settings.php', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await this.safeJson(response, { success: false });
+
+            if (!data.success) {
+                this.updateSettingsStatus('liveChat', 'Save failed', 'error');
+                this.showNotification(data.message || 'Unable to save live chat settings.', 'error');
+                return;
+            }
+
+            this.showNotification('Live chat settings saved successfully.', 'success');
+            this.updateSettingsStatus('liveChat', 'Saved', 'success');
+            if (data.settings) {
+                const form = document.getElementById('liveChatSettingsForm');
+                if (form) this.applySettingsToForm(form, data.settings);
+                this.primeAppSettingsCache(data.settings);
+            } else {
+                this.invalidateAppSettingsCache();
+            }
+        } catch (error) {
+            console.error('Save live chat settings error:', error);
+            this.updateSettingsStatus('liveChat', 'Save failed', 'error');
+            this.showNotification('Unable to save live chat settings.', 'error');
+        }
+    }
+
     async saveMessageStorageSettings() {
         const payload = this.getMessageStoragePayload();
         if (!payload) return;
@@ -7891,6 +7986,7 @@ class AdminDashboard {
             permission: 'permissionSettingsStatus',
             role: 'roleSettingsStatus',
             notification: 'notificationSettingsStatus',
+            liveChat: 'liveChatSettingsStatus',
             message: 'messageStorageStatus',
             attachment: 'attachmentStorageStatus'
         };
@@ -10763,6 +10859,22 @@ class AdminDashboard {
                 return true;
             })
             .sort((a, b) => a.role_label.localeCompare(b.role_label));
+    }
+
+    async loadLiveChatSettings(showNotification = false) {
+        const form = document.getElementById('liveChatSettingsForm');
+        if (!form) return;
+        try {
+            this.updateSettingsStatus('liveChat', 'Loading...', 'info');
+            const data = await this.fetchAppSettingsBundle(showNotification);
+            this.applySettingsToForm(form, data.settings || {});
+            this.updateSettingsStatus('liveChat', 'Up to date', 'success');
+            if (showNotification) this.showNotification('Changes reverted to last saved live chat settings.', 'info');
+        } catch (error) {
+            console.error('Load live chat settings error:', error);
+            this.updateSettingsStatus('liveChat', 'Failed to load', 'error');
+            this.showNotification('Unable to load live chat settings.', 'error');
+        }
     }
 
     formatRoleLabel(role) {
@@ -14521,8 +14633,535 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = AdminDashboard;
 }
 
+AdminDashboard.prototype.loadLiveChatSettingsContent = async function () {
+    const toggle = (name, title, subtitle) => `
+        <div class="settings-toggle">
+            <div>
+                <div class="toggle-title">${title}</div>
+                <div class="toggle-subtitle">${subtitle}</div>
+            </div>
+            <label class="switch">
+                <input type="checkbox" name="${name}">
+                <span class="slider"></span>
+            </label>
+        </div>
+    `;
+    const numberField = (name, title, min, max, step, help) => `
+        <label class="settings-field">
+            <span>${title}</span>
+            <input type="number" name="${name}" min="${min}" max="${max}" step="${step}">
+            <small class="field-help">${help}</small>
+        </label>
+    `;
 
+    return `
+        <div class="settings-content live-chat-settings">
+            <div class="settings-header">
+                <div>
+                    <h2 class="section-title">Live Chat Settings</h2>
+                    <p class="section-subtitle">Control staff live chat availability, collaboration tools, real-time cadence, and admin oversight behavior.</p>
+                </div>
+                <div class="settings-actions">
+                    <span class="settings-status" id="liveChatSettingsStatus">Ready</span>
+                    <button class="action-btn secondary" id="resetLiveChatSettingsBtn" type="button">Reset Changes</button>
+                    <button class="action-btn" id="saveLiveChatSettingsBtn" type="button">Save Settings</button>
+                </div>
+            </div>
 
+            <form id="liveChatSettingsForm" class="settings-grid">
+                <section class="settings-card">
+                    <div class="settings-card-header">
+                        <h3>Availability</h3>
+                        <p>Turn core chat surfaces and conversation types on or off.</p>
+                    </div>
+                    <div class="settings-fields">
+                        ${toggle('live_chat_enabled', 'Enable Live Chat', 'Allow authorized staff to open and use the live chat module.')}
+                        ${toggle('live_chat_group_chats_enabled', 'Group Chats', 'Allow group chat creation, membership management, and group conversations.')}
+                        ${toggle('live_chat_drafts_enabled', 'Persistent Drafts', 'Keep unsent text per conversation across page reloads and sign-ins on the same device.')}
+                    </div>
+                </section>
+
+                <section class="settings-card">
+                    <div class="settings-card-header">
+                        <h3>Messaging Tools</h3>
+                        <p>Control the message features available in the composer.</p>
+                    </div>
+                    <div class="settings-fields">
+                        ${toggle('live_chat_attachments_enabled', 'Attachments', 'Allow staff to send documents, photos, videos, and other supported files.')}
+                        ${toggle('live_chat_voice_notes_enabled', 'Voice Notes', 'Allow microphone recording and sending of voice notes.')}
+                        ${toggle('live_chat_polls_enabled', 'Polls', 'Allow quick polls inside direct and group conversations.')}
+                        ${numberField('live_chat_edit_window_minutes', 'Edit Window (minutes)', 1, 60, 1, 'How long after sending a message the sender can edit it.')}
+                    </div>
+                </section>
+
+                <section class="settings-card">
+                    <div class="settings-card-header">
+                        <h3>Calls & Receipts</h3>
+                        <p>Manage real-time call capabilities and feedback signals.</p>
+                    </div>
+                    <div class="settings-fields">
+                        ${toggle('live_chat_audio_calls_enabled', 'Audio Calls', 'Allow staff-to-staff voice calls.')}
+                        ${toggle('live_chat_video_calls_enabled', 'Video Calls', 'Allow staff video calls and audio-to-video upgrade requests.')}
+                        ${toggle('live_chat_typing_presence_enabled', 'Typing Presence', 'Show typing indicators in the conversation and contact list.')}
+                        ${toggle('live_chat_read_receipts_enabled', 'Read Receipts', 'Enable delivered/read receipt syncing and ticks.')}
+                        ${numberField('live_chat_typing_idle_seconds', 'Typing Idle Timeout (seconds)', 2, 30, 1, 'Typing status stops after this many seconds without text changes.')}
+                    </div>
+                </section>
+
+                <section class="settings-card">
+                    <div class="settings-card-header">
+                        <h3>Real-Time Cadence</h3>
+                        <p>Tune polling intervals. Lower values feel faster but create more server traffic.</p>
+                    </div>
+                    <div class="settings-fields">
+                        ${numberField('live_chat_message_poll_ms', 'Message Poll Interval (ms)', 150, 5000, 50, 'How often open conversations check for new messages.')}
+                        ${numberField('live_chat_receipt_poll_ms', 'Receipt Poll Interval (ms)', 150, 5000, 50, 'How often sent messages reconcile delivered/read state.')}
+                        ${numberField('live_chat_call_poll_ms', 'Call Poll Interval (ms)', 300, 10000, 100, 'How often the app checks for incoming or changed calls.')}
+                        ${numberField('live_chat_signal_poll_ms', 'Call Signal Poll Interval (ms)', 150, 5000, 50, 'How often active calls exchange WebRTC signaling updates.')}
+                    </div>
+                </section>
+
+                <section class="settings-card">
+                    <div class="settings-card-header">
+                        <h3>Admin Oversight</h3>
+                        <p>Govern the Chat Oversight archive and administrator delete actions.</p>
+                    </div>
+                    <div class="settings-fields">
+                        ${toggle('live_chat_admin_archive_enabled', 'Preserve Audit Archive', 'Archive message content before user or admin delete actions clear peer-visible content.')}
+                        ${toggle('live_chat_admin_delete_enabled', 'Allow Oversight Delete', 'Allow administrators to remove messages from all peer chat views through Chat Oversight.')}
+                        <div class="settings-note">
+                            <strong>Deletion governance</strong>
+                            <span>Admin deletes hide messages from users without leaving a peer-side deleted badge, while audit logging remains enabled through the system audit log.</span>
+                        </div>
+                    </div>
+                </section>
+            </form>
+        </div>
+    `;
+};
+
+AdminDashboard.prototype.loadChatOversightContent = async function () {
+    return `
+        <div class="chat-oversight-content">
+            <div class="settings-header chat-oversight-header">
+                <div>
+                    <h2 class="section-title">Chat Oversight</h2>
+                    <p class="section-subtitle">Administrative review of direct peer messages and group chat transcripts, including deleted-message audit state.</p>
+                </div>
+                <div class="settings-actions">
+                    <span class="settings-status" id="chatOversightStatus">Ready</span>
+                    <button class="action-btn secondary" id="refreshChatOversightBtn" type="button">Refresh</button>
+                    <button class="action-btn danger" id="clearAllChatOversightBtn" type="button">Clear All</button>
+                </div>
+            </div>
+
+            <div class="chat-oversight-summary" id="chatOversightSummary">
+                <span class="queue-chip">Conversations: <strong>0</strong></span>
+                <span class="queue-chip queued">Direct: <strong>0</strong></span>
+                <span class="queue-chip sent">Groups: <strong>0</strong></span>
+                <span class="queue-chip failed">Messages: <strong>0</strong></span>
+            </div>
+
+            <div class="chat-oversight-toolbar">
+                <input type="search" id="chatOversightSearch" class="filter-input" placeholder="Search participants, groups, or message preview" autocomplete="off">
+                <select id="chatOversightType" class="filter-select">
+                    <option value="all">All chats</option>
+                    <option value="direct">Direct peers</option>
+                    <option value="group">Group chats</option>
+                </select>
+                <button class="filter-btn" id="applyChatOversightFilters" type="button">Apply</button>
+                <button class="filter-btn secondary" id="clearChatOversightFilters" type="button">Clear</button>
+            </div>
+
+            <section class="chat-oversight-shell" aria-label="Read-only chat oversight">
+                <aside class="chat-oversight-list" id="chatOversightList">
+                    <div class="chat-oversight-empty">Loading conversations...</div>
+                </aside>
+                <article class="chat-oversight-thread">
+                    <header class="chat-oversight-thread-header" id="chatOversightThreadHeader">
+                        <div>
+                            <h3>Select a conversation</h3>
+                            <p>Messages open here in read-only mode.</p>
+                        </div>
+                        <span class="chat-oversight-readonly">Admin oversight</span>
+                    </header>
+                    <div class="chat-oversight-messages" id="chatOversightMessages">
+                        <div class="chat-oversight-placeholder">Choose a direct or group chat from the left to inspect its transcript.</div>
+                    </div>
+                    <footer class="chat-oversight-footer">
+                        <button class="filter-btn secondary" id="loadMoreChatOversightMessages" type="button" disabled>Load older messages</button>
+                    </footer>
+                </article>
+            </section>
+        </div>
+    `;
+};
+
+AdminDashboard.prototype.initializeChatOversight = async function () {
+    this.chatOversightState = {
+        conversations: [],
+        selected: null,
+        oldestMessageId: 0,
+        canLoadMore: false,
+        messages: []
+    };
+
+    document.getElementById('refreshChatOversightBtn')?.addEventListener('click', () => this.loadChatOversightConversations(true));
+    document.getElementById('clearAllChatOversightBtn')?.addEventListener('click', () => this.clearAllChatOversightMessages());
+    document.getElementById('applyChatOversightFilters')?.addEventListener('click', () => this.loadChatOversightConversations(true));
+    document.getElementById('clearChatOversightFilters')?.addEventListener('click', () => {
+        const search = document.getElementById('chatOversightSearch');
+        const type = document.getElementById('chatOversightType');
+        if (search) search.value = '';
+        if (type) type.value = 'all';
+        this.loadChatOversightConversations(true);
+    });
+    document.getElementById('chatOversightSearch')?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            this.loadChatOversightConversations(true);
+        }
+    });
+    document.getElementById('loadMoreChatOversightMessages')?.addEventListener('click', () => {
+        this.loadChatOversightMessages(this.chatOversightState?.selected, true);
+    });
+    document.getElementById('chatOversightMessages')?.addEventListener('click', (event) => {
+        const button = event.target instanceof Element ? event.target.closest('[data-chat-oversight-delete]') : null;
+        if (button) {
+            this.deleteChatOversightMessages([Number(button.dataset.chatOversightDelete || 0)]);
+        }
+    });
+
+    await this.loadChatOversightConversations(true);
+};
+
+AdminDashboard.prototype.fetchChatOversight = async function (params = {}) {
+    const query = new URLSearchParams(params);
+    const response = await fetch(`../backend/api/admin_live_chat_audit.php?${query.toString()}`, {
+        credentials: 'include'
+    });
+    const data = await this.safeJson(response, { success: false });
+    if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Unable to load chat oversight data.');
+    }
+    return data;
+};
+
+AdminDashboard.prototype.postChatOversight = async function (payload = {}) {
+    const response = await fetch('../backend/api/admin_live_chat_audit.php', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    const data = await this.safeJson(response, { success: false });
+    if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Unable to update chat oversight data.');
+    }
+    return data;
+};
+
+AdminDashboard.prototype.loadChatOversightConversations = async function (selectFirst = false) {
+    const status = document.getElementById('chatOversightStatus');
+    if (status) {
+        status.textContent = 'Loading';
+        status.dataset.state = 'info';
+    }
+
+    try {
+        const data = await this.fetchChatOversight({
+            action: 'conversations',
+            q: document.getElementById('chatOversightSearch')?.value || '',
+            type: document.getElementById('chatOversightType')?.value || 'all'
+        });
+        this.chatOversightState.conversations = Array.isArray(data.conversations) ? data.conversations : [];
+        this.renderChatOversightSummary(data.summary || {});
+        this.renderChatOversightConversationList();
+        if (status) {
+            status.textContent = 'Ready';
+            status.dataset.state = 'success';
+        }
+        if (selectFirst && this.chatOversightState.conversations.length > 0) {
+            await this.selectChatOversightConversation(this.chatOversightState.conversations[0].conversationKey);
+        } else if (this.chatOversightState.conversations.length === 0) {
+            this.renderChatOversightEmptyThread();
+        }
+    } catch (error) {
+        if (status) {
+            status.textContent = 'Load failed';
+            status.dataset.state = 'error';
+        }
+        this.showNotification(error.message || 'Unable to load chat oversight data.', 'error');
+        const list = document.getElementById('chatOversightList');
+        if (list) {
+            list.innerHTML = `<div class="chat-oversight-empty">${this.escapeHtml(error.message || 'Unable to load conversations.')}</div>`;
+        }
+    }
+};
+
+AdminDashboard.prototype.renderChatOversightSummary = function (summary = {}) {
+    const target = document.getElementById('chatOversightSummary');
+    if (!target) return;
+    target.innerHTML = `
+        <span class="queue-chip">Conversations: <strong>${Number(summary.totalConversations || 0).toLocaleString()}</strong></span>
+        <span class="queue-chip queued">Direct: <strong>${Number(summary.directConversations || 0).toLocaleString()}</strong></span>
+        <span class="queue-chip sent">Groups: <strong>${Number(summary.groupConversations || 0).toLocaleString()}</strong></span>
+        <span class="queue-chip failed">Messages: <strong>${Number(summary.totalMessages || 0).toLocaleString()}</strong></span>
+    `;
+};
+
+AdminDashboard.prototype.renderChatOversightConversationList = function () {
+    const list = document.getElementById('chatOversightList');
+    if (!list) return;
+    const conversations = this.chatOversightState?.conversations || [];
+    if (!conversations.length) {
+        list.innerHTML = '<div class="chat-oversight-empty">No chat conversations match the current filters.</div>';
+        return;
+    }
+    list.innerHTML = conversations.map((conversation) => {
+        const selected = this.chatOversightState?.selected?.conversationKey === conversation.conversationKey;
+        const typeLabel = conversation.type === 'group' ? 'Group' : 'Direct';
+        const time = this.formatChatOversightDate(conversation.lastMessageAt, true);
+        return `
+            <button class="chat-oversight-item ${selected ? 'is-active' : ''}" type="button" data-chat-key="${this.escapeHtml(conversation.conversationKey)}">
+                <span class="chat-oversight-item-top">
+                    <strong>${this.escapeHtml(conversation.title || 'Conversation')}</strong>
+                    <em>${this.escapeHtml(typeLabel)}</em>
+                </span>
+                <span class="chat-oversight-item-preview">${this.escapeHtml(conversation.lastMessagePreview || 'No messages yet')}</span>
+                <span class="chat-oversight-item-meta">
+                    <span>${Number(conversation.messageCount || 0).toLocaleString()} messages</span>
+                    <span>${this.escapeHtml(time || '')}</span>
+                </span>
+            </button>
+        `;
+    }).join('');
+
+    list.querySelectorAll('.chat-oversight-item').forEach((button) => {
+        button.addEventListener('click', () => this.selectChatOversightConversation(button.dataset.chatKey || ''));
+    });
+};
+
+AdminDashboard.prototype.selectChatOversightConversation = async function (conversationKey) {
+    const conversation = (this.chatOversightState?.conversations || []).find((item) => item.conversationKey === conversationKey);
+    if (!conversation) return;
+    this.chatOversightState.selected = conversation;
+    this.chatOversightState.oldestMessageId = 0;
+    this.chatOversightState.canLoadMore = false;
+    this.chatOversightState.messages = [];
+    this.renderChatOversightConversationList();
+    await this.loadChatOversightMessages(conversation, false);
+};
+
+AdminDashboard.prototype.loadChatOversightMessages = async function (conversation, appendOlder = false) {
+    if (!conversation) return;
+    const messagesNode = document.getElementById('chatOversightMessages');
+    const loadMore = document.getElementById('loadMoreChatOversightMessages');
+    if (loadMore) loadMore.disabled = true;
+    if (messagesNode && !appendOlder) {
+        messagesNode.innerHTML = '<div class="chat-oversight-placeholder">Loading transcript...</div>';
+    }
+
+    try {
+        const params = { action: 'messages', type: conversation.type, limit: 100 };
+        if (conversation.type === 'group') {
+            params.group_id = conversation.groupId;
+        } else {
+            params.peer_a = conversation.peerA;
+            params.peer_b = conversation.peerB;
+        }
+        if (appendOlder && this.chatOversightState.oldestMessageId > 0) {
+            params.before_id = this.chatOversightState.oldestMessageId;
+        }
+        const data = await this.fetchChatOversight(params);
+        const incoming = Array.isArray(data.messages) ? data.messages : [];
+        const existing = appendOlder ? (this.chatOversightState.messages || []) : [];
+        this.chatOversightState.messages = appendOlder ? incoming.concat(existing) : incoming;
+        this.chatOversightState.oldestMessageId = this.chatOversightState.messages.length
+            ? Number(this.chatOversightState.messages[0].id || 0)
+            : 0;
+        this.chatOversightState.canLoadMore = incoming.length >= 100;
+        this.renderChatOversightThread(conversation, this.chatOversightState.messages);
+    } catch (error) {
+        if (messagesNode) {
+            messagesNode.innerHTML = `<div class="chat-oversight-placeholder">${this.escapeHtml(error.message || 'Unable to load transcript.')}</div>`;
+        }
+    }
+};
+
+AdminDashboard.prototype.renderChatOversightThread = function (conversation, messages) {
+    const header = document.getElementById('chatOversightThreadHeader');
+    const messagesNode = document.getElementById('chatOversightMessages');
+    const loadMore = document.getElementById('loadMoreChatOversightMessages');
+    if (header) {
+        header.innerHTML = `
+            <div>
+                <h3>${this.escapeHtml(conversation.title || 'Conversation')}</h3>
+                <p>${this.escapeHtml(conversation.subtitle || '')} - ${Number(conversation.messageCount || messages.length || 0).toLocaleString()} messages</p>
+            </div>
+            <div class="chat-oversight-thread-actions">
+                <button class="filter-btn danger" id="clearChatOversightConversationBtn" type="button">Clear conversation</button>
+                <span class="chat-oversight-readonly">Admin oversight</span>
+            </div>
+        `;
+        header.querySelector('#clearChatOversightConversationBtn')?.addEventListener('click', () => this.clearChatOversightConversation(conversation));
+    }
+    if (!messagesNode) return;
+    if (!messages.length) {
+        messagesNode.innerHTML = '<div class="chat-oversight-placeholder">This conversation has no messages yet.</div>';
+    } else {
+        let lastDate = '';
+        messagesNode.innerHTML = messages.map((message) => {
+            const dateLabel = this.formatChatOversightDate(message.createdAt, false);
+            const divider = dateLabel && dateLabel !== lastDate
+                ? `<div class="chat-oversight-date-divider"><span>${this.escapeHtml(dateLabel)}</span></div>`
+                : '';
+            if (dateLabel) lastDate = dateLabel;
+            return divider + this.renderChatOversightMessage(message);
+        }).join('');
+        messagesNode.scrollTop = messagesNode.scrollHeight;
+    }
+    if (loadMore) {
+        loadMore.disabled = !this.chatOversightState.canLoadMore;
+    }
+};
+
+AdminDashboard.prototype.renderChatOversightMessage = function (message) {
+    const isDeleted = Boolean(message.isDeleted);
+    const body = this.renderChatOversightMessageBody(message);
+    const reply = Number(message.replyToMessageId || 0) > 0
+        ? `<div class="chat-oversight-reply"><strong>${this.escapeHtml(message.replyToSenderName || 'Message')}</strong><span>${this.escapeHtml(message.replyToMessageText || message.replyToFileName || 'Original message')}</span></div>`
+        : '';
+    const badges = [
+        message.isAdminDeleted ? `<span>Deleted by ${this.escapeHtml(message.adminDeletedByName || 'Administrator')}</span>` : '',
+        message.deletedByLabel ? `<span>${this.escapeHtml(message.deletedByLabel)}</span>` : '',
+        message.isEdited ? '<span>Edited</span>' : '',
+        message.isPinned ? '<span>Pinned</span>' : '',
+        message.isRead ? '<span>Read</span>' : (message.deliveredAt ? '<span>Delivered</span>' : '')
+    ].filter(Boolean).join('');
+
+    return `
+        <div class="chat-oversight-message ${isDeleted ? 'is-deleted' : ''}">
+            <div class="chat-oversight-message-head">
+                <strong>${this.escapeHtml(message.senderName || 'Unknown User')}</strong>
+                <time>${this.escapeHtml(this.formatChatOversightDate(message.createdAt, true))}</time>
+            </div>
+            ${reply}
+            ${body}
+            <div class="chat-oversight-message-foot">
+                <span class="chat-oversight-kind">${this.escapeHtml(message.kind || 'text')}</span>
+                <span class="chat-oversight-badges">${badges}</span>
+                ${message.reactionEmoji ? `<span class="chat-oversight-reaction">${this.escapeHtml(message.reactionEmoji)}</span>` : ''}
+                <button class="chat-oversight-delete-btn" type="button" data-chat-oversight-delete="${Number(message.id || 0)}">Delete</button>
+            </div>
+        </div>
+    `;
+};
+
+AdminDashboard.prototype.renderChatOversightMessageBody = function (message) {
+    const text = String(message.text || '').trim();
+    const fileName = String(message.fileName || '').trim();
+    const parts = [];
+    if (text) {
+        parts.push(`<div class="chat-oversight-text">${this.escapeHtml(text).replace(/\n/g, '<br>')}</div>`);
+    }
+    if (fileName) {
+        parts.push(`<div class="chat-oversight-attachment"><strong>Attachment:</strong> ${this.escapeHtml(fileName)}${message.fileSize ? ` - ${this.formatBytes(Number(message.fileSize || 0))}` : ''}</div>`);
+    }
+    if (parts.length) return parts.join('');
+    if (message.isAdminDeleted) return '<div class="chat-oversight-deleted">Message content retained only in audit archive if available.</div>';
+    if (message.isDeleted) return '<div class="chat-oversight-deleted">This message was deleted before archive content was available.</div>';
+    return '<div class="chat-oversight-text muted">No text content.</div>';
+};
+
+AdminDashboard.prototype.renderChatOversightEmptyThread = function () {
+    const header = document.getElementById('chatOversightThreadHeader');
+    const messages = document.getElementById('chatOversightMessages');
+    const loadMore = document.getElementById('loadMoreChatOversightMessages');
+    if (header) {
+        header.innerHTML = `
+            <div>
+                <h3>No conversation selected</h3>
+                <p>Adjust filters or refresh to find chats.</p>
+            </div>
+            <span class="chat-oversight-readonly">Admin oversight</span>
+        `;
+    }
+    if (messages) {
+        messages.innerHTML = '<div class="chat-oversight-placeholder">No conversations are available for the current filter.</div>';
+    }
+    if (loadMore) loadMore.disabled = true;
+};
+
+AdminDashboard.prototype.deleteChatOversightMessages = async function (messageIds = []) {
+    const ids = messageIds.map(Number).filter((id) => id > 0);
+    if (!ids.length) return;
+    const confirmed = window.confirm(ids.length === 1
+        ? 'Delete this message from all peer chat views? It will remain logged for oversight.'
+        : `Delete ${ids.length} messages from all peer chat views? They will remain logged for oversight.`);
+    if (!confirmed) return;
+    try {
+        const data = await this.postChatOversight({
+            action: 'delete',
+            mode: 'selected',
+            message_ids: ids,
+            reason: 'Deleted from Chat Oversight'
+        });
+        this.showNotification(`${Number(data.deleted || 0)} message${Number(data.deleted || 0) === 1 ? '' : 's'} deleted from peer chat views.`, 'success');
+        await this.loadChatOversightMessages(this.chatOversightState?.selected, false);
+        await this.loadChatOversightConversations(false);
+    } catch (error) {
+        this.showNotification(error.message || 'Unable to delete chat message.', 'error');
+    }
+};
+
+AdminDashboard.prototype.clearChatOversightConversation = async function (conversation) {
+    if (!conversation) return;
+    const confirmed = window.confirm(`Clear all messages in "${conversation.title || 'this conversation'}" from peer chat views? They will remain logged for oversight.`);
+    if (!confirmed) return;
+    try {
+        const payload = {
+            action: 'delete',
+            mode: 'conversation',
+            type: conversation.type,
+            group_id: conversation.groupId || '',
+            peer_a: conversation.peerA || '',
+            peer_b: conversation.peerB || '',
+            reason: 'Conversation cleared from Chat Oversight'
+        };
+        const data = await this.postChatOversight(payload);
+        this.showNotification(`${Number(data.deleted || 0)} message${Number(data.deleted || 0) === 1 ? '' : 's'} cleared from peer chat views.`, 'success');
+        await this.loadChatOversightMessages(conversation, false);
+        await this.loadChatOversightConversations(false);
+    } catch (error) {
+        this.showNotification(error.message || 'Unable to clear chat conversation.', 'error');
+    }
+};
+
+AdminDashboard.prototype.clearAllChatOversightMessages = async function () {
+    const confirmed = window.confirm('Clear all live chat messages from every peer and group chat view? They will remain logged for admin oversight.');
+    if (!confirmed) return;
+    try {
+        const data = await this.postChatOversight({
+            action: 'delete',
+            mode: 'all',
+            reason: 'All chat messages cleared from Chat Oversight'
+        });
+        this.showNotification(`${Number(data.deleted || 0)} message${Number(data.deleted || 0) === 1 ? '' : 's'} cleared from peer chat views.`, 'success');
+        await this.loadChatOversightConversations(true);
+    } catch (error) {
+        this.showNotification(error.message || 'Unable to clear all chat messages.', 'error');
+    }
+};
+
+AdminDashboard.prototype.formatChatOversightDate = function (value, withTime = true) {
+    if (!value) return '';
+    const date = new Date(String(value).replace(' ', 'T'));
+    if (Number.isNaN(date.getTime())) return String(value);
+    const options = withTime
+        ? { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }
+        : { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    return date.toLocaleString(undefined, options);
+};
 
 AdminDashboard.prototype.loadPodcastSettingsContent = async function () {
     return `

@@ -74,8 +74,11 @@ if ($peerType === 'group') {
     LEFT JOIN tb_users u ON u.userId = m.sender_id
     LEFT JOIN tb_live_chat_messages rm ON rm.chat_message_id = m.reply_to_message_id
     LEFT JOIN tb_users ru ON ru.userId = rm.sender_id
+    LEFT JOIN tb_live_chat_message_deletions md ON md.chat_message_id = m.chat_message_id AND md.user_id = ?
     WHERE m.recipient_id = ?
       AND m.chat_message_id > ?
+      AND m.admin_deleted_at IS NULL
+      AND md.chat_message_id IS NULL
     ORDER BY m.chat_message_id $messageOrderClause
 ");
 } else {
@@ -109,8 +112,11 @@ if ($peerType === 'group') {
     LEFT JOIN tb_users u ON u.userId = m.sender_id
     LEFT JOIN tb_live_chat_messages rm ON rm.chat_message_id = m.reply_to_message_id
     LEFT JOIN tb_users ru ON ru.userId = rm.sender_id
+    LEFT JOIN tb_live_chat_message_deletions md ON md.chat_message_id = m.chat_message_id AND md.user_id = ?
     WHERE ((m.sender_id = ? AND m.recipient_id = ?) OR (m.sender_id = ? AND m.recipient_id = ?))
       AND m.chat_message_id > ?
+      AND m.admin_deleted_at IS NULL
+      AND md.chat_message_id IS NULL
     ORDER BY m.chat_message_id $messageOrderClause
 ");
 }
@@ -118,9 +124,9 @@ if ($peerType === 'group') {
         throw new RuntimeException('Unable to load live chat messages.');
     }
     if ($peerType === 'group') {
-        $stmt->bind_param('si', $peerId, $sinceId);
+        $stmt->bind_param('ssi', $userId, $peerId, $sinceId);
     } else {
-        $stmt->bind_param('ssssi', $userId, $peerId, $peerId, $userId, $sinceId);
+        $stmt->bind_param('sssssi', $userId, $userId, $peerId, $peerId, $userId, $sinceId);
     }
     $stmt->execute();
     $result = $stmt->get_result();
@@ -153,7 +159,7 @@ while ($row = $result->fetch_assoc()) {
         'isEdited' => !empty($row['edited_at']),
         'isDeleted' => !empty($row['deleted_at']),
         'createdAt' => $row['created_at'],
-        'canEdit' => $row['sender_id'] === $userId && empty($row['deleted_at']) && strtotime((string)$row['created_at']) >= (time() - 300),
+        'canEdit' => $row['sender_id'] === $userId && empty($row['deleted_at']) && strtotime((string)$row['created_at']) >= (time() - (liveChatSettingInt($conn, 'live_chat_edit_window_minutes', 5, 1, 60) * 60)),
         'senderName' => $row['sender_name'] ?? 'Unknown User',
         'senderPhoto' => $row['sender_photo'] ?: 'images/default-user.png',
         'isOwn' => $row['sender_id'] === $userId,
@@ -169,26 +175,6 @@ while ($row = $result->fetch_assoc()) {
     }
 
     if (!empty($messageIds)) {
-        $readStmt = $conn->prepare("
-            INSERT IGNORE INTO tb_live_chat_message_reads (chat_message_id, user_id)
-            VALUES (?, ?)
-        ");
-        if ($readStmt) {
-            foreach ($messageIds as $messageId) {
-                $ownedByMe = false;
-                foreach ($messages as $message) {
-                    if ((int)$message['id'] === (int)$messageId && $message['isOwn']) {
-                        $ownedByMe = true;
-                        break;
-                    }
-                }
-                if ($ownedByMe) continue;
-                $readStmt->bind_param('is', $messageId, $userId);
-                $readStmt->execute();
-            }
-            $readStmt->close();
-        }
-
         $placeholders = implode(',', array_fill(0, count($messageIds), '?'));
         $types = str_repeat('i', count($messageIds));
         $pollStmt = $conn->prepare("
@@ -254,9 +240,11 @@ while ($row = $result->fetch_assoc()) {
 
     if ($sinceId > 0) {
         $knownIds = array_fill_keys(array_map(static fn($message) => (int)$message['id'], $messages), true);
+        $hiddenIds = liveChatHiddenMessageIds($conn, $userId, $sinceId);
+        $deletedIds = liveChatDeletedMessageIds($conn, $userId, $peerType, $peerId, $sinceId);
         foreach (liveChatReadCacheMessages($peerType, $userId, $peerId, $sinceId) as $cachedMessage) {
             $cachedId = (int)($cachedMessage['id'] ?? 0);
-            if ($cachedId > 0 && !isset($knownIds[$cachedId])) {
+            if ($cachedId > 0 && !isset($knownIds[$cachedId]) && !isset($hiddenIds[$cachedId]) && !isset($deletedIds[$cachedId])) {
                 $messages[] = $cachedMessage;
                 $knownIds[$cachedId] = true;
             }
@@ -264,11 +252,13 @@ while ($row = $result->fetch_assoc()) {
         usort($messages, static fn($a, $b) => (int)($a['id'] ?? 0) <=> (int)($b['id'] ?? 0));
     }
 
-    $receipts = $peerType !== 'group' ? liveChatDirectReceipts($conn, $userId, $peerId) : [];
+    $receipts = ($peerType !== 'group' && liveChatFeatureEnabled($conn, 'live_chat_read_receipts_enabled', true)) ? liveChatDirectReceipts($conn, $userId, $peerId) : [];
 
     $typing = [];
     $typingStmt = null;
-    if ($peerType === 'group') {
+    if (!liveChatFeatureEnabled($conn, 'live_chat_typing_presence_enabled', true)) {
+        $typing = [];
+    } elseif ($peerType === 'group') {
         $typingStmt = $conn->prepare("
             SELECT t.user_id, u.userName
             FROM tb_live_chat_typing t
@@ -310,7 +300,9 @@ while ($row = $result->fetch_assoc()) {
         $typingStmt->close();
     }
 
-    liveChatRespond(['success' => true, 'messages' => $messages, 'receipts' => $receipts, 'typing' => $typing, 'serverTime' => date('Y-m-d H:i:s')]);
+    $deletedUpdates = liveChatDeletedUpdates($conn, $userId, $peerType, $peerId);
+
+    liveChatRespond(['success' => true, 'messages' => $messages, 'receipts' => $receipts, 'deletedUpdates' => $deletedUpdates, 'typing' => $typing, 'serverTime' => date('Y-m-d H:i:s')]);
 } catch (Throwable $e) {
     http_response_code(400);
     liveChatRespond(['success' => false, 'message' => $e->getMessage(), 'messages' => []]);
@@ -332,6 +324,7 @@ function liveChatDirectReceipts(mysqli $conn, string $userId, string $peerId): a
         SELECT chat_message_id, delivered_at, is_read, read_at
         FROM tb_live_chat_messages
         WHERE sender_id = ? AND recipient_id = ?
+          AND admin_deleted_at IS NULL
         ORDER BY chat_message_id DESC
         LIMIT 150
     ");
@@ -352,4 +345,123 @@ function liveChatDirectReceipts(mysqli $conn, string $userId, string $peerId): a
     }
     $receiptStmt->close();
     return $receipts;
+}
+
+function liveChatHiddenMessageIds(mysqli $conn, string $userId, int $sinceId): array
+{
+    $hidden = [];
+    $stmt = $conn->prepare("
+        SELECT chat_message_id
+        FROM tb_live_chat_message_deletions
+        WHERE user_id = ?
+          AND chat_message_id > ?
+    ");
+    if (!$stmt) {
+        return $hidden;
+    }
+    $stmt->bind_param('si', $userId, $sinceId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $hidden[(int)$row['chat_message_id']] = true;
+    }
+    $stmt->close();
+    return $hidden;
+}
+
+function liveChatDeletedMessageIds(mysqli $conn, string $userId, string $peerType, string $peerId, int $sinceId): array
+{
+    $deleted = [];
+    if ($peerType === 'group') {
+        $stmt = $conn->prepare("
+            SELECT m.chat_message_id
+            FROM tb_live_chat_messages m
+            LEFT JOIN tb_live_chat_message_deletions d
+              ON d.chat_message_id = m.chat_message_id AND d.user_id = ?
+            WHERE m.recipient_id = ?
+              AND m.chat_message_id > ?
+              AND m.deleted_at IS NOT NULL
+              AND m.admin_deleted_at IS NULL
+              AND d.chat_message_id IS NULL
+        ");
+        if ($stmt) {
+            $stmt->bind_param('ssi', $userId, $peerId, $sinceId);
+        }
+    } else {
+        $stmt = $conn->prepare("
+            SELECT m.chat_message_id
+            FROM tb_live_chat_messages m
+            LEFT JOIN tb_live_chat_message_deletions d
+              ON d.chat_message_id = m.chat_message_id AND d.user_id = ?
+            WHERE ((m.sender_id = ? AND m.recipient_id = ?) OR (m.sender_id = ? AND m.recipient_id = ?))
+              AND m.chat_message_id > ?
+              AND m.deleted_at IS NOT NULL
+              AND m.admin_deleted_at IS NULL
+              AND d.chat_message_id IS NULL
+        ");
+        if ($stmt) {
+            $stmt->bind_param('sssssi', $userId, $userId, $peerId, $peerId, $userId, $sinceId);
+        }
+    }
+    if (!$stmt) {
+        return $deleted;
+    }
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $deleted[(int)$row['chat_message_id']] = true;
+    }
+    $stmt->close();
+    return $deleted;
+}
+
+function liveChatDeletedUpdates(mysqli $conn, string $userId, string $peerType, string $peerId): array
+{
+    $updates = [];
+    if ($peerType === 'group') {
+        $stmt = $conn->prepare("
+            SELECT m.chat_message_id, m.deleted_at
+            FROM tb_live_chat_messages m
+            LEFT JOIN tb_live_chat_message_deletions d
+              ON d.chat_message_id = m.chat_message_id AND d.user_id = ?
+            WHERE m.recipient_id = ?
+              AND m.deleted_at IS NOT NULL
+              AND m.admin_deleted_at IS NULL
+              AND d.chat_message_id IS NULL
+            ORDER BY m.deleted_at DESC
+            LIMIT 100
+        ");
+        if ($stmt) {
+            $stmt->bind_param('ss', $userId, $peerId);
+        }
+    } else {
+        $stmt = $conn->prepare("
+            SELECT m.chat_message_id, m.deleted_at
+            FROM tb_live_chat_messages m
+            LEFT JOIN tb_live_chat_message_deletions d
+              ON d.chat_message_id = m.chat_message_id AND d.user_id = ?
+            WHERE ((m.sender_id = ? AND m.recipient_id = ?) OR (m.sender_id = ? AND m.recipient_id = ?))
+              AND m.deleted_at IS NOT NULL
+              AND m.admin_deleted_at IS NULL
+              AND d.chat_message_id IS NULL
+            ORDER BY m.deleted_at DESC
+            LIMIT 100
+        ");
+        if ($stmt) {
+            $stmt->bind_param('sssss', $userId, $userId, $peerId, $peerId, $userId);
+        }
+    }
+    if (!$stmt) {
+        return $updates;
+    }
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $updates[] = [
+            'id' => (int)$row['chat_message_id'],
+            'deletedAt' => $row['deleted_at'] ?? null
+        ];
+    }
+    $stmt->close();
+    return $updates;
 }

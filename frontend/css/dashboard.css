@@ -3960,9 +3960,33 @@ footer{
 }
 
 @media (max-width: 1024px) {
+  .dashboard-main {
+    margin-top: var(--main-header-height, 0px);
+    height: calc(100vh - var(--main-header-height, 0px) - var(--main-footer-height, 0px));
+  }
+
+  .dashboard-wrapper {
+    flex-direction: column;
+    padding-left: 0;
+  }
+
   .sidebar {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: 100%;
+    height: auto;
+    max-height: 300px;
     padding: 0.95rem;
     box-shadow: none;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .dashboard-content {
+    height: auto;
+    min-height: 0;
+    margin-left: 0;
   }
 }
 

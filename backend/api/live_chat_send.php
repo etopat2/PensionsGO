@@ -53,6 +53,10 @@ try {
         $clientNonce = '';
     }
 
+    if ($recipientType === 'group' && !liveChatFeatureEnabled($conn, 'live_chat_group_chats_enabled', true)) {
+        throw new RuntimeException('Group chats are currently disabled.');
+    }
+
     if ($recipientType === 'group') {
         if ($recipientId === '' || !liveChatCanAccessGroup($conn, $recipientId, $userId)) {
             throw new RuntimeException('Select a valid group.');
@@ -63,6 +67,12 @@ try {
 
     if (!in_array($kind, ['text', 'voice', 'attachment'], true)) {
         $kind = 'text';
+    }
+    if ($kind === 'voice' && !liveChatFeatureEnabled($conn, 'live_chat_voice_notes_enabled', true)) {
+        throw new RuntimeException('Voice notes are currently disabled.');
+    }
+    if ($kind === 'attachment' && !liveChatFeatureEnabled($conn, 'live_chat_attachments_enabled', true)) {
+        throw new RuntimeException('Attachments are currently disabled.');
     }
 
     $upload = null;

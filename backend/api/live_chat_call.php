@@ -13,6 +13,12 @@ try {
         $calleeId = trim((string)($data['callee_id'] ?? ''));
         $type = (string)($data['call_type'] ?? 'audio');
         if (!in_array($type, ['audio', 'video'], true)) $type = 'audio';
+        if ($type === 'audio' && !liveChatFeatureEnabled($conn, 'live_chat_audio_calls_enabled', true)) {
+            throw new RuntimeException('Audio calls are currently disabled.');
+        }
+        if ($type === 'video' && !liveChatFeatureEnabled($conn, 'live_chat_video_calls_enabled', true)) {
+            throw new RuntimeException('Video calls are currently disabled.');
+        }
         if ($calleeId === '' || $calleeId === $userId || !liveChatCanReachUser($conn, $calleeId)) {
             throw new RuntimeException('Select a valid staff member to call.');
         }
@@ -60,7 +66,7 @@ try {
         $history = [];
         while ($row = $result->fetch_assoc()) {
             $isOutgoing = $row['caller_id'] === $userId;
-            $started = strtotime((string)$row['created_at']) ?: 0;
+            $started = strtotime((string)($row['answered_at'] ?: $row['created_at'])) ?: 0;
             $ended = strtotime((string)($row['ended_at'] ?: $row['updated_at'])) ?: 0;
             $history[] = [
                 'callId' => $row['call_id'],

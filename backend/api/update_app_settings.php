@@ -127,6 +127,24 @@ try {
         'live_message_sound_path' => 'audio/notification.mp3',
         'live_message_sound_volume' => '70',
         'live_message_sound_repeat_count' => '1',
+        'live_chat_enabled' => '1',
+        'live_chat_group_chats_enabled' => '1',
+        'live_chat_audio_calls_enabled' => '1',
+        'live_chat_video_calls_enabled' => '1',
+        'live_chat_attachments_enabled' => '1',
+        'live_chat_voice_notes_enabled' => '1',
+        'live_chat_polls_enabled' => '1',
+        'live_chat_typing_presence_enabled' => '1',
+        'live_chat_read_receipts_enabled' => '1',
+        'live_chat_drafts_enabled' => '1',
+        'live_chat_admin_archive_enabled' => '1',
+        'live_chat_admin_delete_enabled' => '1',
+        'live_chat_edit_window_minutes' => '5',
+        'live_chat_typing_idle_seconds' => '5',
+        'live_chat_message_poll_ms' => '350',
+        'live_chat_receipt_poll_ms' => '250',
+        'live_chat_call_poll_ms' => '900',
+        'live_chat_signal_poll_ms' => '350',
         'notify_quiet_hours_start' => '22:00',
         'notify_quiet_hours_end' => '06:00',
         'notify_admin_digest_enabled' => '1',
@@ -268,6 +286,18 @@ try {
         'live_call_desktop_alerts_enabled',
         'live_message_sound_enabled',
         'live_message_desktop_alerts_enabled',
+        'live_chat_enabled',
+        'live_chat_group_chats_enabled',
+        'live_chat_audio_calls_enabled',
+        'live_chat_video_calls_enabled',
+        'live_chat_attachments_enabled',
+        'live_chat_voice_notes_enabled',
+        'live_chat_polls_enabled',
+        'live_chat_typing_presence_enabled',
+        'live_chat_read_receipts_enabled',
+        'live_chat_drafts_enabled',
+        'live_chat_admin_archive_enabled',
+        'live_chat_admin_delete_enabled',
         'notify_admin_digest_enabled',
         'notify_queue_worker_enabled',
         'notify_queue_process_on_request',
@@ -347,6 +377,12 @@ try {
         'live_call_ringing_timeout_seconds',
         'live_message_sound_volume',
         'live_message_sound_repeat_count',
+        'live_chat_edit_window_minutes',
+        'live_chat_typing_idle_seconds',
+        'live_chat_message_poll_ms',
+        'live_chat_receipt_poll_ms',
+        'live_chat_call_poll_ms',
+        'live_chat_signal_poll_ms',
         'notify_queue_batch_size',
         'notify_queue_retry_limit',
         'notify_queue_retry_delay_minutes',
@@ -487,6 +523,24 @@ try {
         'live_message_sound_path' => 'Live chat message sound file',
         'live_message_sound_volume' => 'Live chat message sound volume',
         'live_message_sound_repeat_count' => 'Live chat message repeat count',
+        'live_chat_enabled' => 'Live chat enabled',
+        'live_chat_group_chats_enabled' => 'Live chat group chats',
+        'live_chat_audio_calls_enabled' => 'Live chat audio calls',
+        'live_chat_video_calls_enabled' => 'Live chat video calls',
+        'live_chat_attachments_enabled' => 'Live chat attachments',
+        'live_chat_voice_notes_enabled' => 'Live chat voice notes',
+        'live_chat_polls_enabled' => 'Live chat polls',
+        'live_chat_typing_presence_enabled' => 'Live chat typing presence',
+        'live_chat_read_receipts_enabled' => 'Live chat read receipts',
+        'live_chat_drafts_enabled' => 'Live chat drafts',
+        'live_chat_admin_archive_enabled' => 'Live chat admin archive',
+        'live_chat_admin_delete_enabled' => 'Live chat admin delete',
+        'live_chat_edit_window_minutes' => 'Live chat edit window',
+        'live_chat_typing_idle_seconds' => 'Live chat typing idle timeout',
+        'live_chat_message_poll_ms' => 'Live chat message poll interval',
+        'live_chat_receipt_poll_ms' => 'Live chat receipt poll interval',
+        'live_chat_call_poll_ms' => 'Live chat call poll interval',
+        'live_chat_signal_poll_ms' => 'Live chat signal poll interval',
         'notify_quiet_hours_start' => 'Quiet hours start',
         'notify_quiet_hours_end' => 'Quiet hours end',
         'notify_admin_digest_enabled' => 'Admin digest notifications',
@@ -626,6 +680,14 @@ try {
                 $value = max(0, min(10, $value));
             } elseif ($key === 'live_call_ringing_timeout_seconds') {
                 $value = max(10, min(300, $value));
+            } elseif ($key === 'live_chat_edit_window_minutes') {
+                $value = max(1, min(60, $value));
+            } elseif ($key === 'live_chat_typing_idle_seconds') {
+                $value = max(2, min(30, $value));
+            } elseif (in_array($key, ['live_chat_message_poll_ms', 'live_chat_receipt_poll_ms', 'live_chat_signal_poll_ms'], true)) {
+                $value = max(150, min(5000, $value));
+            } elseif ($key === 'live_chat_call_poll_ms') {
+                $value = max(300, min(10000, $value));
             } else {
                 $value = max(0, $value);
             }
