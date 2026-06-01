@@ -79,7 +79,7 @@ function ensureStylesheet() {
   const link = document.createElement('link');
   link.id = LIVE_CHAT_STYLE_ID;
   link.rel = 'stylesheet';
-  link.href = new URL('css/live_chat.css?v=20260601a', APP_ROOT).href;
+  link.href = new URL('css/live_chat.css?v=20260601b', APP_ROOT).href;
   liveChatStylesheetReady = new Promise((resolve) => {
     link.addEventListener('load', resolve, { once: true });
     link.addEventListener('error', resolve, { once: true });
@@ -232,6 +232,9 @@ class LiveChatApp {
     this.callStartedAt = 0;
     this.videoUpgradeConsentOverlay = null;
     this.remoteTrackMuteHandlers = new Map();
+    this.callPeerAudioStates = new Map();
+    this.callSpeechAnalyzers = new Map();
+    this.callConnectionNoticeTimer = null;
     this.bound = false;
     this.typingNotifyTimer = null;
     this.typingHideTimer = null;
@@ -357,6 +360,7 @@ class LiveChatApp {
       </div>
       <div class="live-call-modal hidden" id="liveCallModal">
         <div class="live-call-card">
+          <div class="live-call-connection-toast hidden" id="liveCallConnectionToast" role="status" aria-live="polite"></div>
           <div class="live-call-head"><strong id="liveCallTitle">Call</strong><span class="live-call-meta"><span id="liveCallStatus">Preparing...</span><time id="liveCallTimer" class="hidden" datetime="PT0S">00:00</time></span></div>
           <div class="live-call-toolbar">
             <select id="liveCameraSelect" title="Camera"></select>
@@ -370,8 +374,19 @@ class LiveChatApp {
             <button type="button" id="liveFullscreenCallBtn" title="Fullscreen"><i class="fas fa-expand"></i></button>
           </div>
           <div class="live-video-grid">
-            <video id="liveRemoteVideo" autoplay playsinline></video>
-            <video id="liveLocalVideo" autoplay muted playsinline></video>
+            <div class="live-video-tile live-remote-video-tile">
+              <video id="liveRemoteVideo" autoplay playsinline></video>
+              <div class="live-call-tile-overlay">
+                <span id="liveRemoteMicStatus" class="live-peer-mic-state muted"><i class="fas fa-microphone-slash"></i> Waiting</span>
+                <button type="button" id="liveRemoteMuteBtn" class="live-peer-mute-btn hidden" title="Mute peer"><i class="fas fa-microphone-slash"></i></button>
+              </div>
+            </div>
+            <div class="live-video-tile live-local-video-tile">
+              <video id="liveLocalVideo" autoplay muted playsinline></video>
+              <div class="live-call-tile-overlay">
+                <span id="liveLocalMicStatus" class="live-peer-mic-state"><i class="fas fa-microphone"></i> Mic on</span>
+              </div>
+            </div>
           </div>
           <div class="live-group-remote-grid hidden" id="liveGroupRemoteGrid"></div>
           <div class="live-call-actions">
@@ -495,6 +510,7 @@ class LiveChatApp {
     document.getElementById('liveToggleCameraBtn')?.addEventListener('click', () => this.toggleCamera());
     document.getElementById('liveRequestVideoBtn')?.addEventListener('click', () => this.requestVideoUpgrade());
     document.getElementById('liveToggleMicBtn')?.addEventListener('click', () => this.toggleMicrophone());
+    document.getElementById('liveRemoteMuteBtn')?.addEventListener('click', () => this.toggleRemotePeerMute());
     document.getElementById('liveToggleSpeakerBtn')?.addEventListener('click', () => this.toggleSpeaker());
     document.getElementById('liveCallVolume')?.addEventListener('input', (event) => this.setSpeakerVolume(Number(event.target.value || 0)));
     document.getElementById('liveFullscreenCallBtn')?.addEventListener('click', () => this.toggleCallFullscreen());
@@ -2797,17 +2813,28 @@ class LiveChatApp {
       return;
     }
     try {
-      const response = await this.postCall({ action: 'start', callee_id: this.selectedThread.id, call_type: callType });
+      this.showCallModal(`Calling ${this.selectedThread.name}`, 'Starting call...', callType, false);
+      this.playOutgoingRing();
+      this.startCallTimeout('outgoing');
+      let response;
+      try {
+        response = await this.postCall({ action: 'start', callee_id: this.selectedThread.id, call_type: callType });
+      } catch (startError) {
+        const recoveredCall = await this.recoverOutgoingCall(this.selectedThread.id, callType).catch(() => null);
+        if (!recoveredCall) throw startError;
+        response = { call: recoveredCall };
+        showNotice('Call Recovered', 'The call was started, and the caller view has been reconnected.', 'info');
+      }
       this.activeCall = response.call;
       this.lastSignalId = 0;
       this.pendingIceCandidates = [];
+      this.showCallModal(`Calling ${this.selectedThread.name}`, 'Preparing media...', callType, false);
       await this.preparePeerConnection(callType);
+      await this.broadcastLocalMicState().catch(() => {});
       const offer = await this.peerConnection.createOffer();
       await this.peerConnection.setLocalDescription(offer);
       await this.sendSignal('offer', offer);
-      this.showCallModal(`Calling ${this.selectedThread.name}`, 'Ringing...', callType, false);
-      this.playOutgoingRing();
-      this.startCallTimeout('outgoing');
+      document.getElementById('liveCallStatus').textContent = 'Ringing...';
       this.startSignalPolling();
     } catch (error) {
       showNotice('Call Failed', error.message || 'Unable to start call.');
@@ -2864,6 +2891,7 @@ class LiveChatApp {
     const offer = await session.peerConnection.createOffer();
     await session.peerConnection.setLocalDescription(offer);
     await this.sendSignalForCall(call, 'offer', offer);
+    await this.sendSignalForCall(call, 'mic_state', { muted: !this.localStream?.getAudioTracks?.()[0]?.enabled, updatedAt: new Date().toISOString() }).catch(() => {});
     this.renderGroupRemoteGrid();
   }
 
@@ -2873,6 +2901,7 @@ class LiveChatApp {
     this.lastSignalId = 0;
     this.pendingIceCandidates = [];
     await this.preparePeerConnection(callType);
+    await this.broadcastLocalMicState().catch(() => {});
     const offer = await this.peerConnection.createOffer();
     await this.peerConnection.setLocalDescription(offer);
     await this.sendSignal('offer', offer);
@@ -2932,6 +2961,9 @@ class LiveChatApp {
     document.getElementById('liveRejectCallBtn')?.classList.toggle('hidden', !incoming);
     document.getElementById('liveEndCallBtn')?.classList.toggle('hidden', incoming && this.activeCall?.status === 'ringing');
     document.getElementById('liveRequestVideoBtn')?.classList.toggle('hidden', callType !== 'audio' || incoming);
+    document.getElementById('liveRemoteMuteBtn')?.classList.toggle('hidden', !this.canControlRemotePeer());
+    this.updateLocalMicIndicator();
+    this.updateRemoteMicIndicator();
     this.syncSpeakerControls();
   }
 
@@ -2957,6 +2989,7 @@ class LiveChatApp {
       this.startCallTimer(acceptedAt);
       const acceptSignalPromise = this.sendSignal('call_accept', { acceptedAt }).catch(() => {});
       await this.preparePeerConnection(this.activeCall.callType);
+      await this.broadcastLocalMicState().catch(() => {});
       this.startSignalPolling();
       await Promise.allSettled([updatePromise, acceptSignalPromise]);
     } catch (error) {
@@ -3093,6 +3126,23 @@ class LiveChatApp {
     this.messageNoticeTimer = window.setTimeout(() => {
       notice.classList.add('hidden');
     }, 5600);
+  }
+
+  showCallConnectionNotice(message, type = 'connected') {
+    const notice = document.getElementById('liveCallConnectionToast');
+    if (!notice || !message) return;
+    window.clearTimeout(this.callConnectionNoticeTimer);
+    notice.classList.remove('hidden', 'connected', 'disconnected', 'show');
+    notice.classList.add(type === 'disconnected' ? 'disconnected' : 'connected');
+    notice.innerHTML = `
+      <span><i class="fas ${type === 'disconnected' ? 'fa-phone-slash' : 'fa-circle-check'}"></i></span>
+      <strong>${escapeHtml(message)}</strong>
+    `;
+    requestAnimationFrame(() => notice.classList.add('show'));
+    this.callConnectionNoticeTimer = window.setTimeout(() => {
+      notice.classList.remove('show');
+      window.setTimeout(() => notice.classList.add('hidden'), 260);
+    }, 2600);
   }
 
   async showIncomingCallNotification(call) {
@@ -3284,6 +3334,7 @@ class LiveChatApp {
         }
       });
       this.renderGroupRemoteGrid();
+      this.startSpeechMonitor(remoteStream, peer.userId || call.calleeId, () => document.querySelector(`[data-group-call-id="${CSS.escape(call.callId)}"]`));
     };
     pc.onicecandidate = (event) => {
       if (event.candidate) {
@@ -3294,7 +3345,10 @@ class LiveChatApp {
       session.status = pc.connectionState;
       this.updateGroupCallStatus();
       if (['failed', 'closed'].includes(pc.connectionState)) {
+        this.showCallConnectionNotice(`${peer.userName || 'Participant'} disconnected`, 'disconnected');
         setTimeout(() => this.closeGroupPeerSession(call.callId), 1200);
+      } else if (pc.connectionState === 'disconnected') {
+        this.showCallConnectionNotice(`${peer.userName || 'Participant'} connection interrupted`, 'disconnected');
       }
     };
     return session;
@@ -3320,9 +3374,16 @@ class LiveChatApp {
         tile.dataset.groupCallId = callId;
         tile.innerHTML = `
           <video autoplay playsinline></video>
-          <strong></strong>
-          <small></small>
+          <div class="live-group-remote-meta">
+            <strong></strong>
+            <small></small>
+          </div>
+          <div class="live-call-tile-overlay">
+            <span class="live-peer-mic-state muted"><i class="fas fa-microphone-slash"></i> Waiting</span>
+            <button type="button" class="live-peer-mute-btn" title="Mute participant"><i class="fas fa-microphone-slash"></i></button>
+          </div>
         `;
+        tile.querySelector('.live-peer-mute-btn')?.addEventListener('click', () => this.toggleGroupPeerMute(callId));
         grid.appendChild(tile);
       }
       const video = tile.querySelector('video');
@@ -3333,9 +3394,11 @@ class LiveChatApp {
         video.muted = !this.callSpeakerEnabled;
         video.volume = Math.max(0, Math.min(1, this.callSpeakerVolume / 100));
         video.play?.().catch(() => {});
+        this.startSpeechMonitor(session.remoteStream, session.peer?.userId || session.call?.calleeId, () => tile);
       }
       tile.querySelector('strong').textContent = session.peer?.userName || session.call?.peerName || 'Group member';
       tile.querySelector('small').textContent = session.status || session.call?.status || 'ringing';
+      this.updateGroupPeerMicIndicator(session, tile);
     });
     Array.from(grid.querySelectorAll('[data-group-call-id]')).forEach((tile) => {
       if (!existingTiles.has(tile.dataset.groupCallId)) tile.remove();
@@ -3421,6 +3484,7 @@ class LiveChatApp {
       tracks.forEach((track) => this.attachRemoteTrack(track));
       if (remoteVideo) remoteVideo.srcObject = this.remoteStream;
       remoteVideo?.play?.().catch(() => {});
+      this.startSpeechMonitor(this.remoteStream, this.getActivePeerId(), () => document.querySelector('.live-remote-video-tile'));
     };
     pc.onicecandidate = (event) => {
       if (event.candidate) this.sendSignal('ice', event.candidate.toJSON ? event.candidate.toJSON() : event.candidate).catch(() => {});
@@ -3635,6 +3699,184 @@ class LiveChatApp {
     if (!track) return;
     track.enabled = !track.enabled;
     document.getElementById('liveToggleMicBtn')?.classList.toggle('muted', !track.enabled);
+    this.updateLocalMicIndicator();
+    this.broadcastLocalMicState().catch(() => {});
+  }
+
+  canControlRemotePeer() {
+    if (!this.activeCall || this.activeCall.isGroupCall) return false;
+    return String(this.activeCall.callerId || '') === String(this.currentUserId || '');
+  }
+
+  getActivePeerId() {
+    if (!this.activeCall || this.activeCall.isGroupCall) return '';
+    return String(this.activeCall.callerId) === String(this.currentUserId)
+      ? String(this.activeCall.calleeId || '')
+      : String(this.activeCall.callerId || '');
+  }
+
+  getCallPeerAudioState(peerId) {
+    const key = String(peerId || '');
+    if (!key) return { muted: true, talking: false };
+    return this.callPeerAudioStates.get(key) || { muted: true, talking: false };
+  }
+
+  setCallPeerAudioState(peerId, patch = {}) {
+    const key = String(peerId || '');
+    if (!key) return;
+    const current = this.getCallPeerAudioState(key);
+    this.callPeerAudioStates.set(key, { ...current, ...patch });
+    this.updateRemoteMicIndicator();
+    this.renderGroupRemoteGrid();
+  }
+
+  updateLocalMicIndicator() {
+    const track = this.localStream?.getAudioTracks?.()[0];
+    const muted = !track || !track.enabled;
+    const status = document.getElementById('liveLocalMicStatus');
+    const button = document.getElementById('liveToggleMicBtn');
+    if (status) {
+      status.classList.toggle('muted', muted);
+      status.innerHTML = muted
+        ? '<i class="fas fa-microphone-slash"></i> Muted'
+        : '<i class="fas fa-microphone"></i> Mic on';
+    }
+    button?.classList.toggle('muted', muted);
+  }
+
+  updateRemoteMicIndicator() {
+    const peerId = this.getActivePeerId();
+    const state = this.getCallPeerAudioState(peerId);
+    const status = document.getElementById('liveRemoteMicStatus');
+    if (status) {
+      status.classList.toggle('muted', state.muted);
+      status.classList.toggle('talking', Boolean(state.talking) && !state.muted);
+      status.innerHTML = state.muted
+        ? '<i class="fas fa-microphone-slash"></i> Muted'
+        : '<i class="fas fa-microphone"></i> Mic on';
+    }
+    const button = document.getElementById('liveRemoteMuteBtn');
+    if (button) {
+      button.classList.toggle('hidden', !this.canControlRemotePeer());
+      button.classList.toggle('muted', state.muted);
+      button.innerHTML = state.muted
+        ? '<i class="fas fa-microphone"></i>'
+        : '<i class="fas fa-microphone-slash"></i>';
+      button.title = state.muted ? 'Ask peer to unmute' : 'Mute peer';
+    }
+  }
+
+  async recoverOutgoingCall(calleeId, callType = 'audio') {
+    const data = await this.postCall({ action: 'poll' }, 'GET');
+    return (data.calls || []).find((call) => (
+      String(call.callerId || '') === String(this.currentUserId || '')
+      && String(call.calleeId || '') === String(calleeId || '')
+      && String(call.callType || 'audio') === String(callType || 'audio')
+      && ['ringing', 'accepted'].includes(String(call.status || ''))
+    )) || null;
+  }
+
+  updateGroupPeerMicIndicator(session, tile) {
+    if (!session || !tile) return;
+    const state = this.getCallPeerAudioState(session.peer?.userId || session.call?.calleeId);
+    const indicator = tile.querySelector('.live-peer-mic-state');
+    const button = tile.querySelector('.live-peer-mute-btn');
+    if (indicator) {
+      indicator.classList.toggle('muted', state.muted);
+      indicator.classList.toggle('talking', Boolean(state.talking) && !state.muted);
+      indicator.innerHTML = state.muted
+        ? '<i class="fas fa-microphone-slash"></i> Muted'
+        : '<i class="fas fa-microphone"></i> Mic on';
+    }
+    if (button) {
+      button.classList.toggle('muted', state.muted);
+      button.innerHTML = state.muted
+        ? '<i class="fas fa-microphone"></i>'
+        : '<i class="fas fa-microphone-slash"></i>';
+      button.title = state.muted ? 'Ask participant to unmute' : 'Mute participant';
+    }
+  }
+
+  async toggleRemotePeerMute() {
+    if (!this.activeCall || !this.canControlRemotePeer()) return;
+    const peerId = this.getActivePeerId();
+    const nextMuted = !this.getCallPeerAudioState(peerId).muted;
+    this.setCallPeerAudioState(peerId, { muted: nextMuted });
+    await this.sendSignal('remote_mute_request', { muted: nextMuted, requestedAt: new Date().toISOString() }).catch((error) => {
+      showNotice('Microphone Control', error.message || 'Unable to update peer microphone.', 'error');
+    });
+  }
+
+  async toggleGroupPeerMute(callId) {
+    const session = this.groupCallSessions.get(callId);
+    if (!session) return;
+    const peerId = session.peer?.userId || session.call?.calleeId;
+    const nextMuted = !this.getCallPeerAudioState(peerId).muted;
+    this.setCallPeerAudioState(peerId, { muted: nextMuted });
+    await this.sendSignalForCall(session.call, 'remote_mute_request', { muted: nextMuted, requestedAt: new Date().toISOString() }).catch((error) => {
+      showNotice('Microphone Control', error.message || 'Unable to update participant microphone.', 'error');
+    });
+  }
+
+  async applyRemoteMuteRequest(muted) {
+    const track = this.localStream?.getAudioTracks?.()[0];
+    if (track) track.enabled = !muted;
+    this.updateLocalMicIndicator();
+    await this.broadcastLocalMicState().catch(() => {});
+    showNotice('Microphone Updated', muted ? 'Your microphone was muted by the call host.' : 'The call host asked to unmute your microphone.', 'info');
+  }
+
+  async broadcastLocalMicState() {
+    if (!this.activeCall || !this.localStream) return;
+    const audioTrack = this.localStream.getAudioTracks?.()[0];
+    const muted = !audioTrack || !audioTrack.enabled;
+    const payload = { muted, updatedAt: new Date().toISOString() };
+    if (this.activeCall.isGroupCall) {
+      await Promise.allSettled(Array.from(this.groupCallSessions.values()).map((session) => this.sendSignalForCall(session.call, 'mic_state', payload)));
+      return;
+    }
+    await this.sendSignal('mic_state', payload);
+  }
+
+  startSpeechMonitor(stream, peerId, elementProvider) {
+    const key = String(peerId || '');
+    if (!key || this.callSpeechAnalyzers.has(key)) return;
+    const audioTrack = stream?.getAudioTracks?.()[0];
+    if (!audioTrack || !(window.AudioContext || window.webkitAudioContext)) return;
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      const audioContext = new AudioContextClass();
+      const source = audioContext.createMediaStreamSource(new MediaStream([audioTrack]));
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 512;
+      source.connect(analyser);
+      const data = new Uint8Array(analyser.fftSize);
+      const timer = window.setInterval(() => {
+        analyser.getByteTimeDomainData(data);
+        let sum = 0;
+        for (const value of data) {
+          const delta = value - 128;
+          sum += delta * delta;
+        }
+        const talking = Math.sqrt(sum / data.length) > 8;
+        const state = this.getCallPeerAudioState(key);
+        if (state.talking !== talking) {
+          this.callPeerAudioStates.set(key, { ...state, talking });
+          const element = typeof elementProvider === 'function' ? elementProvider() : null;
+          element?.querySelector?.('.live-peer-mic-state')?.classList.toggle('talking', talking && !state.muted);
+          if (key === this.getActivePeerId()) this.updateRemoteMicIndicator();
+        }
+      }, 180);
+      this.callSpeechAnalyzers.set(key, { audioContext, source, analyser, timer });
+    } catch (_error) {}
+  }
+
+  stopSpeechMonitors() {
+    this.callSpeechAnalyzers.forEach((monitor) => {
+      if (monitor.timer) window.clearInterval(monitor.timer);
+      monitor.audioContext?.close?.().catch(() => {});
+    });
+    this.callSpeechAnalyzers.clear();
   }
 
   syncSpeakerControls() {
@@ -3717,14 +3959,30 @@ class LiveChatApp {
   async handleGroupSignal(session, signal) {
     if (!session?.peerConnection) return;
     if (signal.signalType === 'hangup') {
+      this.showCallConnectionNotice(`${session.peer?.userName || 'Participant'} disconnected`, 'disconnected');
       this.closeGroupPeerSession(session.call.callId);
+      return;
+    }
+    if (signal.signalType === 'mic_state') {
+      this.setCallPeerAudioState(session.peer?.userId || signal.senderId, { muted: Boolean(signal.payload?.muted) });
+      return;
+    }
+    if (signal.signalType === 'peer_connected') {
+      this.showCallConnectionNotice(`${session.peer?.userName || 'Participant'} connected`, 'connected');
+      return;
+    }
+    if (signal.signalType === 'peer_disconnected') {
+      this.showCallConnectionNotice(`${session.peer?.userName || 'Participant'} disconnected`, 'disconnected');
       return;
     }
     if (signal.signalType === 'call_accept') {
       session.call.status = 'accepted';
       session.call.answeredAt = signal.payload?.acceptedAt || session.call.answeredAt || new Date().toISOString();
       session.status = 'connecting';
+      this.stopOutgoingRing();
+      this.clearCallTimeout();
       if (!this.callStartedAt) this.startCallTimer(session.call.answeredAt);
+      this.showCallConnectionNotice(`${session.peer?.userName || 'Participant'} picked up`, 'connected');
       this.updateGroupCallStatus();
       return;
     }
@@ -3735,6 +3993,8 @@ class LiveChatApp {
       session.call.answeredAt = session.call.answeredAt || new Date().toISOString();
       session.status = 'connected';
       if (!this.callStartedAt) this.startCallTimer(session.call.answeredAt);
+      await this.sendSignalForCall(session.call, 'mic_state', { muted: !this.localStream?.getAudioTracks?.()[0]?.enabled, updatedAt: new Date().toISOString() }).catch(() => {});
+      this.showCallConnectionNotice(`${session.peer?.userName || 'Participant'} connected`, 'connected');
       this.updateGroupCallStatus();
       return;
     }
@@ -3769,7 +4029,24 @@ class LiveChatApp {
   async handleSignal(signal) {
     if (!this.activeCall) return;
     if (signal.signalType === 'hangup') {
+      this.showCallConnectionNotice('Call partner disconnected', 'disconnected');
       this.cleanupCall();
+      return;
+    }
+    if (signal.signalType === 'mic_state') {
+      this.setCallPeerAudioState(signal.senderId || this.getActivePeerId(), { muted: Boolean(signal.payload?.muted) });
+      return;
+    }
+    if (signal.signalType === 'remote_mute_request') {
+      await this.applyRemoteMuteRequest(Boolean(signal.payload?.muted));
+      return;
+    }
+    if (signal.signalType === 'peer_connected') {
+      this.showCallConnectionNotice('Call partner connected', 'connected');
+      return;
+    }
+    if (signal.signalType === 'peer_disconnected') {
+      this.showCallConnectionNotice('Call partner disconnected', 'disconnected');
       return;
     }
     if (signal.signalType === 'call_accept') {
@@ -3814,6 +4091,10 @@ class LiveChatApp {
       this.clearCallTimeout();
       this.startCallTimer(this.activeCall.answeredAt);
       document.getElementById('liveCallStatus').textContent = 'Connected';
+      await Promise.allSettled([
+        this.sendSignal('peer_connected', { connectedAt: new Date().toISOString() }),
+        this.broadcastLocalMicState()
+      ]);
       return;
     }
     if (signal.signalType === 'answer' && this.peerConnection) {
@@ -3826,6 +4107,8 @@ class LiveChatApp {
       this.clearCallTimeout();
       this.startCallTimer(this.activeCall.answeredAt);
       document.getElementById('liveCallStatus').textContent = 'Connected';
+      this.showCallConnectionNotice('Call partner connected', 'connected');
+      await this.broadcastLocalMicState().catch(() => {});
       return;
     }
     if (signal.signalType === 'ice' && this.peerConnection && signal.payload) {
@@ -3923,6 +4206,8 @@ class LiveChatApp {
 
   cleanupCall() {
     this.closeVideoUpgradeConsent();
+    window.clearTimeout(this.callConnectionNoticeTimer);
+    this.callConnectionNoticeTimer = null;
     if (this.timers.signals) clearInterval(this.timers.signals);
     this.timers.signals = null;
     this.stopIncomingRing();
@@ -3934,6 +4219,8 @@ class LiveChatApp {
       session.remoteStream?.getTracks().forEach((track) => track.stop());
     });
     this.groupCallSessions.clear();
+    this.stopSpeechMonitors();
+    this.callPeerAudioStates.clear();
     this.peerConnection?.close();
     this.localStream?.getTracks().forEach((track) => track.stop());
     this.remoteStream?.getTracks().forEach((track) => track.stop());
@@ -3960,6 +4247,7 @@ class LiveChatApp {
     remoteVideo?.classList.remove('hidden');
     document.getElementById('liveChatDock')?.classList.remove('call-active');
     document.getElementById('liveCallModal')?.classList.add('hidden');
+    document.getElementById('liveCallConnectionToast')?.classList.add('hidden');
   }
 }
 

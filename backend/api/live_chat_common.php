@@ -53,7 +53,7 @@ function liveChatSettingInt(mysqli $conn, string $key, int $default, int $min, i
 
 function liveChatEnsureTables(mysqli $conn): void
 {
-    $schemaMarker = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'live_chat_schema_ready_v5.json';
+    $schemaMarker = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'live_chat_schema_ready_v6.json';
     if (is_file($schemaMarker)) {
         return;
     }
@@ -272,7 +272,7 @@ function liveChatEnsureTables(mysqli $conn): void
     liveChatAddColumnIfMissing($conn, 'tb_live_chat_calls', 'answered_at', 'TIMESTAMP NULL DEFAULT NULL AFTER created_at');
     $conn->query("
         ALTER TABLE tb_live_chat_signals
-        MODIFY signal_type ENUM('offer','answer','ice','hangup','call_accept','video_request','video_accept','video_decline') NOT NULL
+        MODIFY signal_type ENUM('offer','answer','ice','hangup','call_accept','video_request','video_accept','video_decline','mic_state','remote_mute_request','peer_connected','peer_disconnected') NOT NULL
     ");
 
     foreach (['tb_live_chat_messages', 'tb_live_chat_message_reads', 'tb_live_chat_message_deletions', 'tb_live_chat_message_audit_archive', 'tb_live_chat_presence', 'tb_live_chat_typing', 'tb_live_chat_calls', 'tb_live_chat_signals', 'tb_live_chat_groups', 'tb_live_chat_group_members', 'tb_live_chat_polls', 'tb_live_chat_poll_options', 'tb_live_chat_poll_votes'] as $tableName) {
@@ -289,7 +289,7 @@ function liveChatEnsureTables(mysqli $conn): void
     }
     @file_put_contents($schemaMarker, json_encode([
         'ready' => true,
-        'schema' => 5,
+        'schema' => 6,
         'checked_at' => date('c')
     ], JSON_PRETTY_PRINT), LOCK_EX);
 }

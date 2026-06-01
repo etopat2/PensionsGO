@@ -91,8 +91,19 @@ try {
         $recipientId = trim((string)($data['recipient_id'] ?? ''));
         $signalType = (string)($data['signal_type'] ?? '');
         $payload = $data['payload'] ?? null;
-        if ($callId === '' || $recipientId === '' || !in_array($signalType, ['offer', 'answer', 'ice', 'hangup', 'call_accept', 'video_request', 'video_accept', 'video_decline'], true)) {
+        if ($callId === '' || $recipientId === '' || !in_array($signalType, ['offer', 'answer', 'ice', 'hangup', 'call_accept', 'video_request', 'video_accept', 'video_decline', 'mic_state', 'remote_mute_request', 'peer_connected', 'peer_disconnected'], true)) {
             throw new RuntimeException('Invalid call signal.');
+        }
+        $callStmt = $conn->prepare("SELECT caller_id, callee_id FROM tb_live_chat_calls WHERE call_id = ? LIMIT 1");
+        $callStmt->bind_param('s', $callId);
+        $callStmt->execute();
+        $callRow = $callStmt->get_result()->fetch_assoc();
+        $callStmt->close();
+        if (!$callRow || !in_array($userId, [$callRow['caller_id'], $callRow['callee_id']], true) || !in_array($recipientId, [$callRow['caller_id'], $callRow['callee_id']], true) || $recipientId === $userId) {
+            throw new RuntimeException('Invalid call participant.');
+        }
+        if ($signalType === 'remote_mute_request' && $callRow['caller_id'] !== $userId) {
+            throw new RuntimeException('Only the call host can control a participant microphone.');
         }
         $payloadJson = json_encode($payload, JSON_UNESCAPED_SLASHES);
         $stmt = $conn->prepare("INSERT INTO tb_live_chat_signals (call_id, sender_id, recipient_id, signal_type, payload_json) VALUES (?, ?, ?, ?, ?)");
