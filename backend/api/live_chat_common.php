@@ -27,11 +27,20 @@ function liveChatRequireStaff(mysqli $conn): string
         exit;
     }
 
-    return (string)$_SESSION['userId'];
+    $userId = (string)$_SESSION['userId'];
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
+    }
+    return $userId;
 }
 
 function liveChatEnsureTables(mysqli $conn): void
 {
+    $schemaMarker = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'live_chat_schema_ready_v3.json';
+    if (is_file($schemaMarker)) {
+        return;
+    }
+
     $conn->query("
         CREATE TABLE IF NOT EXISTS tb_live_chat_messages (
             chat_message_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -46,14 +55,17 @@ function liveChatEnsureTables(mysqli $conn): void
             reply_to_message_id BIGINT UNSIGNED DEFAULT NULL,
             reaction_emoji VARCHAR(24) DEFAULT NULL,
             is_pinned TINYINT(1) NOT NULL DEFAULT 0,
+            delivered_at TIMESTAMP NULL DEFAULT NULL,
             is_read TINYINT(1) NOT NULL DEFAULT 0,
             read_at TIMESTAMP NULL DEFAULT NULL,
             edited_at TIMESTAMP NULL DEFAULT NULL,
             deleted_at TIMESTAMP NULL DEFAULT NULL,
+            client_nonce VARCHAR(80) DEFAULT NULL,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (chat_message_id),
             KEY idx_live_chat_pair (sender_id, recipient_id, chat_message_id),
-            KEY idx_live_chat_recipient (recipient_id, is_read, chat_message_id)
+            KEY idx_live_chat_recipient (recipient_id, is_read, chat_message_id),
+            KEY idx_live_chat_nonce (client_nonce)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
 
@@ -86,6 +98,17 @@ function liveChatEnsureTables(mysqli $conn): void
             status VARCHAR(30) NOT NULL DEFAULT 'online',
             current_context VARCHAR(120) DEFAULT NULL,
             PRIMARY KEY (user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS tb_live_chat_typing (
+            user_id VARCHAR(100) NOT NULL,
+            peer_type ENUM('user','group') NOT NULL DEFAULT 'user',
+            peer_id VARCHAR(100) NOT NULL,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (user_id, peer_type, peer_id),
+            KEY idx_live_chat_typing_peer (peer_type, peer_id, updated_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
 
@@ -173,22 +196,109 @@ function liveChatEnsureTables(mysqli $conn): void
     liveChatAddColumnIfMissing($conn, 'tb_live_chat_messages', 'reply_to_message_id', 'BIGINT UNSIGNED DEFAULT NULL AFTER mime_type');
     liveChatAddColumnIfMissing($conn, 'tb_live_chat_messages', 'reaction_emoji', 'VARCHAR(24) DEFAULT NULL AFTER reply_to_message_id');
     liveChatAddColumnIfMissing($conn, 'tb_live_chat_messages', 'is_pinned', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER reaction_emoji');
+    liveChatAddColumnIfMissing($conn, 'tb_live_chat_messages', 'delivered_at', 'TIMESTAMP NULL DEFAULT NULL AFTER is_pinned');
     liveChatAddColumnIfMissing($conn, 'tb_live_chat_messages', 'read_at', 'TIMESTAMP NULL DEFAULT NULL AFTER is_read');
     liveChatAddColumnIfMissing($conn, 'tb_live_chat_messages', 'edited_at', 'TIMESTAMP NULL DEFAULT NULL AFTER is_read');
     liveChatAddColumnIfMissing($conn, 'tb_live_chat_messages', 'deleted_at', 'TIMESTAMP NULL DEFAULT NULL AFTER edited_at');
+    liveChatAddColumnIfMissing($conn, 'tb_live_chat_messages', 'client_nonce', 'VARCHAR(80) DEFAULT NULL AFTER deleted_at');
     liveChatAddColumnIfMissing($conn, 'tb_live_chat_calls', 'answered_at', 'TIMESTAMP NULL DEFAULT NULL AFTER created_at');
     $conn->query("
         ALTER TABLE tb_live_chat_signals
         MODIFY signal_type ENUM('offer','answer','ice','hangup','call_accept','video_request','video_accept','video_decline') NOT NULL
     ");
 
-    foreach (['tb_live_chat_messages', 'tb_live_chat_message_reads', 'tb_live_chat_presence', 'tb_live_chat_calls', 'tb_live_chat_signals', 'tb_live_chat_groups', 'tb_live_chat_group_members', 'tb_live_chat_polls', 'tb_live_chat_poll_options', 'tb_live_chat_poll_votes'] as $tableName) {
+    foreach (['tb_live_chat_messages', 'tb_live_chat_message_reads', 'tb_live_chat_presence', 'tb_live_chat_typing', 'tb_live_chat_calls', 'tb_live_chat_signals', 'tb_live_chat_groups', 'tb_live_chat_group_members', 'tb_live_chat_polls', 'tb_live_chat_poll_options', 'tb_live_chat_poll_votes'] as $tableName) {
         liveChatNormalizeTableCollation($conn, $tableName);
     }
 
     if ($conn->errno) {
         throw new RuntimeException('Unable to prepare live chat storage: ' . $conn->error);
     }
+
+    $markerDir = dirname($schemaMarker);
+    if (!is_dir($markerDir)) {
+        @mkdir($markerDir, 0775, true);
+    }
+    @file_put_contents($schemaMarker, json_encode([
+        'ready' => true,
+        'schema' => 3,
+        'checked_at' => date('c')
+    ], JSON_PRETTY_PRINT), LOCK_EX);
+}
+
+function liveChatCacheDir(): string
+{
+    $dir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'live_chat';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    return $dir;
+}
+
+function liveChatThreadCacheKey(string $peerType, string $a, string $b): string
+{
+    if ($peerType === 'group') {
+        return 'group_' . preg_replace('/[^a-zA-Z0-9_-]+/', '_', $b);
+    }
+    $ids = [$a, $b];
+    sort($ids, SORT_STRING);
+    return 'user_' . sha1($ids[0] . '|' . $ids[1]);
+}
+
+function liveChatAppendCacheMessage(string $peerType, string $senderId, string $recipientId, array $message): void
+{
+    $dir = liveChatCacheDir();
+    if (!is_dir($dir) || !is_writable($dir)) {
+        return;
+    }
+    $key = liveChatThreadCacheKey($peerType, $senderId, $recipientId);
+    $path = $dir . DIRECTORY_SEPARATOR . $key . '.jsonl';
+    $line = json_encode($message, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if ($line === false) {
+        return;
+    }
+    @file_put_contents($path, $line . PHP_EOL, FILE_APPEND | LOCK_EX);
+
+    $maxBytes = 512000;
+    clearstatcache(true, $path);
+    if (@filesize($path) > $maxBytes) {
+        $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+        $lines = array_slice($lines, -400);
+        @file_put_contents($path, implode(PHP_EOL, $lines) . PHP_EOL, LOCK_EX);
+    }
+}
+
+function liveChatReadCacheMessages(string $peerType, string $userId, string $peerId, int $sinceId): array
+{
+    $path = liveChatCacheDir() . DIRECTORY_SEPARATOR . liveChatThreadCacheKey($peerType, $userId, $peerId) . '.jsonl';
+    if (!is_file($path) || !is_readable($path)) {
+        return [];
+    }
+    $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+    $messages = [];
+    foreach (array_slice($lines, -250) as $line) {
+        $message = json_decode($line, true);
+        if (!is_array($message)) {
+            continue;
+        }
+        $id = (int)($message['id'] ?? 0);
+        if ($id <= $sinceId) {
+            continue;
+        }
+        if ($peerType === 'group') {
+            if ((string)($message['recipientId'] ?? '') !== $peerId) {
+                continue;
+            }
+        } elseif (!(
+            ((string)($message['senderId'] ?? '') === $userId && (string)($message['recipientId'] ?? '') === $peerId)
+            || ((string)($message['senderId'] ?? '') === $peerId && (string)($message['recipientId'] ?? '') === $userId)
+        )) {
+            continue;
+        }
+        $message['isOwn'] = (string)($message['senderId'] ?? '') === $userId;
+        $messages[] = $message;
+    }
+    return $messages;
 }
 
 function liveChatAddColumnIfMissing(mysqli $conn, string $tableName, string $columnName, string $definition): void

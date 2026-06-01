@@ -9,6 +9,8 @@ try {
     $peerId = trim((string)($_GET['peer_id'] ?? ''));
     $peerType = trim((string)($_GET['peer_type'] ?? 'user'));
     $sinceId = max(0, (int)($_GET['since_id'] ?? 0));
+    $receiptOnly = !empty($_GET['receipt_only']);
+    $messageOrderClause = $sinceId > 0 ? 'ASC LIMIT 120' : 'DESC LIMIT 80';
 
     if ($peerType === 'group') {
         if ($peerId === '' || !liveChatCanAccessGroup($conn, $peerId, $userId)) {
@@ -18,11 +20,21 @@ try {
         liveChatRespond(['success' => false, 'message' => 'Select a valid staff user.', 'messages' => []]);
     }
 
+    if ($receiptOnly) {
+        liveChatRespond([
+            'success' => true,
+            'messages' => [],
+            'receipts' => $peerType !== 'group' ? liveChatDirectReceipts($conn, $userId, $peerId) : [],
+            'typing' => [],
+            'serverTime' => date('Y-m-d H:i:s')
+        ]);
+    }
+
 if ($peerType !== 'group') {
     $markStmt = $conn->prepare("
         UPDATE tb_live_chat_messages
-        SET is_read = 1, read_at = COALESCE(read_at, NOW())
-        WHERE sender_id = ? AND recipient_id = ? AND is_read = 0
+        SET delivered_at = COALESCE(delivered_at, NOW())
+        WHERE sender_id = ? AND recipient_id = ? AND delivered_at IS NULL
     ");
     if ($markStmt) {
         $markStmt->bind_param('ss', $peerId, $userId);
@@ -46,10 +58,12 @@ if ($peerType === 'group') {
         m.reply_to_message_id,
         m.reaction_emoji,
         m.is_pinned,
+        m.delivered_at,
         m.is_read,
         m.read_at,
         m.edited_at,
         m.deleted_at,
+        m.client_nonce,
         m.created_at,
         u.userName AS sender_name,
         u.userPhoto AS sender_photo,
@@ -62,8 +76,7 @@ if ($peerType === 'group') {
     LEFT JOIN tb_users ru ON ru.userId = rm.sender_id
     WHERE m.recipient_id = ?
       AND m.chat_message_id > ?
-    ORDER BY m.chat_message_id ASC
-    LIMIT 250
+    ORDER BY m.chat_message_id $messageOrderClause
 ");
 } else {
     $stmt = $conn->prepare("
@@ -80,10 +93,12 @@ if ($peerType === 'group') {
         m.reply_to_message_id,
         m.reaction_emoji,
         m.is_pinned,
+        m.delivered_at,
         m.is_read,
         m.read_at,
         m.edited_at,
         m.deleted_at,
+        m.client_nonce,
         m.created_at,
         u.userName AS sender_name,
         u.userPhoto AS sender_photo,
@@ -96,8 +111,7 @@ if ($peerType === 'group') {
     LEFT JOIN tb_users ru ON ru.userId = rm.sender_id
     WHERE ((m.sender_id = ? AND m.recipient_id = ?) OR (m.sender_id = ? AND m.recipient_id = ?))
       AND m.chat_message_id > ?
-    ORDER BY m.chat_message_id ASC
-    LIMIT 250
+    ORDER BY m.chat_message_id $messageOrderClause
 ");
 }
     if (!$stmt) {
@@ -118,6 +132,7 @@ while ($row = $result->fetch_assoc()) {
     $messageIds[] = $messageId;
     $messages[] = [
         'id' => $messageId,
+        'clientNonce' => $row['client_nonce'] ?? '',
         'senderId' => $row['sender_id'],
         'recipientId' => $row['recipient_id'],
         'kind' => $row['message_kind'],
@@ -132,17 +147,26 @@ while ($row = $result->fetch_assoc()) {
         'replyToSenderName' => $row['reply_sender_name'] ?? '',
         'reactionEmoji' => $row['reaction_emoji'] ?? '',
         'isPinned' => (int)($row['is_pinned'] ?? 0) === 1,
+        'deliveredAt' => $row['delivered_at'] ?? null,
         'isRead' => (int)$row['is_read'] === 1,
         'readAt' => $row['read_at'] ?? null,
         'isEdited' => !empty($row['edited_at']),
         'isDeleted' => !empty($row['deleted_at']),
         'createdAt' => $row['created_at'],
+        'canEdit' => $row['sender_id'] === $userId && empty($row['deleted_at']) && strtotime((string)$row['created_at']) >= (time() - 300),
         'senderName' => $row['sender_name'] ?? 'Unknown User',
         'senderPhoto' => $row['sender_photo'] ?: 'images/default-user.png',
-        'isOwn' => $row['sender_id'] === $userId
+        'isOwn' => $row['sender_id'] === $userId,
+        'receiptStatus' => ($row['sender_id'] === $userId)
+            ? (!empty($row['read_at']) ? 'read' : (!empty($row['delivered_at']) ? 'delivered' : 'sent'))
+            : 'received'
     ];
 }
     $stmt->close();
+    if ($sinceId === 0) {
+        $messages = array_reverse($messages);
+        $messageIds = array_reverse($messageIds);
+    }
 
     if (!empty($messageIds)) {
         $readStmt = $conn->prepare("
@@ -228,7 +252,65 @@ while ($row = $result->fetch_assoc()) {
         }
     }
 
-    liveChatRespond(['success' => true, 'messages' => $messages]);
+    if ($sinceId > 0) {
+        $knownIds = array_fill_keys(array_map(static fn($message) => (int)$message['id'], $messages), true);
+        foreach (liveChatReadCacheMessages($peerType, $userId, $peerId, $sinceId) as $cachedMessage) {
+            $cachedId = (int)($cachedMessage['id'] ?? 0);
+            if ($cachedId > 0 && !isset($knownIds[$cachedId])) {
+                $messages[] = $cachedMessage;
+                $knownIds[$cachedId] = true;
+            }
+        }
+        usort($messages, static fn($a, $b) => (int)($a['id'] ?? 0) <=> (int)($b['id'] ?? 0));
+    }
+
+    $receipts = $peerType !== 'group' ? liveChatDirectReceipts($conn, $userId, $peerId) : [];
+
+    $typing = [];
+    $typingStmt = null;
+    if ($peerType === 'group') {
+        $typingStmt = $conn->prepare("
+            SELECT t.user_id, u.userName
+            FROM tb_live_chat_typing t
+            LEFT JOIN tb_users u ON u.userId = t.user_id
+            WHERE t.peer_type = 'group'
+              AND t.peer_id = ?
+              AND t.user_id <> ?
+              AND t.updated_at >= DATE_SUB(NOW(), INTERVAL 4 SECOND)
+            ORDER BY t.updated_at DESC
+            LIMIT 3
+        ");
+        if ($typingStmt) {
+            $typingStmt->bind_param('ss', $peerId, $userId);
+        }
+    } else {
+        $typingStmt = $conn->prepare("
+            SELECT t.user_id, u.userName
+            FROM tb_live_chat_typing t
+            LEFT JOIN tb_users u ON u.userId = t.user_id
+            WHERE t.peer_type = 'user'
+              AND t.peer_id = ?
+              AND t.user_id = ?
+              AND t.updated_at >= DATE_SUB(NOW(), INTERVAL 4 SECOND)
+            LIMIT 1
+        ");
+        if ($typingStmt) {
+            $typingStmt->bind_param('ss', $userId, $peerId);
+        }
+    }
+    if ($typingStmt) {
+        $typingStmt->execute();
+        $typingResult = $typingStmt->get_result();
+        while ($typingRow = $typingResult->fetch_assoc()) {
+            $typing[] = [
+                'userId' => $typingRow['user_id'],
+                'name' => $typingRow['userName'] ?: 'Someone'
+            ];
+        }
+        $typingStmt->close();
+    }
+
+    liveChatRespond(['success' => true, 'messages' => $messages, 'receipts' => $receipts, 'typing' => $typing, 'serverTime' => date('Y-m-d H:i:s')]);
 } catch (Throwable $e) {
     http_response_code(400);
     liveChatRespond(['success' => false, 'message' => $e->getMessage(), 'messages' => []]);
@@ -241,4 +323,33 @@ function liveChatBindParams(mysqli_stmt $stmt, string $types, array &$values): b
         $refs[$key] = &$value;
     }
     return $stmt->bind_param($types, ...$refs);
+}
+
+function liveChatDirectReceipts(mysqli $conn, string $userId, string $peerId): array
+{
+    $receipts = [];
+    $receiptStmt = $conn->prepare("
+        SELECT chat_message_id, delivered_at, is_read, read_at
+        FROM tb_live_chat_messages
+        WHERE sender_id = ? AND recipient_id = ?
+        ORDER BY chat_message_id DESC
+        LIMIT 150
+    ");
+    if (!$receiptStmt) {
+        return $receipts;
+    }
+    $receiptStmt->bind_param('ss', $userId, $peerId);
+    $receiptStmt->execute();
+    $receiptResult = $receiptStmt->get_result();
+    while ($receipt = $receiptResult->fetch_assoc()) {
+        $receipts[] = [
+            'id' => (int)$receipt['chat_message_id'],
+            'deliveredAt' => $receipt['delivered_at'] ?? null,
+            'isRead' => (int)($receipt['is_read'] ?? 0) === 1,
+            'readAt' => $receipt['read_at'] ?? null,
+            'receiptStatus' => !empty($receipt['read_at']) ? 'read' : (!empty($receipt['delivered_at']) ? 'delivered' : 'sent')
+        ];
+    }
+    $receiptStmt->close();
+    return $receipts;
 }

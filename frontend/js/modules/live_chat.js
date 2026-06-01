@@ -20,7 +20,9 @@ const API = {
 
 const REACTION_EMOJIS = ['\u{1F44D}', '\u{2764}\u{FE0F}', '\u{1F602}', '\u{1F622}', '\u{1F64F}', '\u{1F389}'];
 const PICKER_EMOJIS = ['\u{1F600}', '\u{1F602}', '\u{1F60A}', '\u{1F60D}', '\u{1F44D}', '\u{1F64F}', '\u{1F44F}', '\u{2705}', '\u{26A0}\u{FE0F}', '\u{1F4CC}', '\u{1F4CE}', '\u{1F4DE}', '\u{1F3A5}', '\u{2615}', '\u{1F525}', '\u{1F4A1}', '\u{1F389}', '\u{2764}\u{FE0F}'];
+const REACTION_PICKER_EMOJIS = ['\u{1F44D}', '\u{1F44E}', '\u{2764}\u{FE0F}', '\u{1F60D}', '\u{1F602}', '\u{1F62E}', '\u{1F622}', '\u{1F621}', '\u{1F64F}', '\u{1F44F}', '\u{2705}', '\u{1F389}', '\u{1F525}', '\u{1F4AF}', '\u{1F4A1}', '\u{1F4CC}', '\u{1F680}', '\u{23F3}', '\u{26A0}\u{FE0F}', '\u{1F44B}', '\u{1F91D}', '\u{1F4AA}', '\u{1F914}', '\u{1F642}'];
 const INCOMING_RING_URL = new URL('audio/notification.mp3', APP_ROOT).href;
+const TYPING_IDLE_TIMEOUT_MS = 5000;
 
 function escapeHtml(value) {
   const div = document.createElement('div');
@@ -44,7 +46,7 @@ function ensureStylesheet() {
   const link = document.createElement('link');
   link.id = LIVE_CHAT_STYLE_ID;
   link.rel = 'stylesheet';
-  link.href = new URL('css/live_chat.css?v=20260528d', APP_ROOT).href;
+  link.href = new URL('css/live_chat.css?v=20260531b', APP_ROOT).href;
   document.head.appendChild(link);
 }
 
@@ -111,6 +113,10 @@ class LiveChatApp {
     this.selectedThread = null;
     this.lastMessageIdByThread = {};
     this.renderedMessageIds = new Set();
+    this.pendingMessages = new Map();
+    this.failedMessages = new Map();
+    this.messagePollInFlight = false;
+    this.receiptSyncInFlight = false;
     this.selectedMessageIds = new Set();
     this.replyToMessage = null;
     this.editingMessage = null;
@@ -170,7 +176,17 @@ class LiveChatApp {
     this.videoUpgradeConsentOverlay = null;
     this.remoteTrackMuteHandlers = new Map();
     this.bound = false;
-    this.timers = { presence: null, messages: null, calls: null, signals: null };
+    this.typingNotifyTimer = null;
+    this.typingHideTimer = null;
+    this.typingPulseTimer = null;
+    this.typingStopTimer = null;
+    this.lastTypingActivityAt = 0;
+    this.typingByThread = {};
+    this.readReceiptTimer = null;
+    this.reactionSheetMessageId = 0;
+    this.reactionSheetPointerStartY = 0;
+    this.drafts = this.loadDrafts();
+    this.timers = { presence: null, messages: null, receipts: null, calls: null, signals: null };
   }
 
   async init() {
@@ -247,6 +263,18 @@ class LiveChatApp {
               </div>
               <button type="button" id="liveSendBtn" disabled><i class="fas fa-paper-plane" aria-hidden="true"></i></button>
               <input type="file" id="liveChatAttachmentInput" class="hidden">
+            </div>
+            <div class="live-reaction-sheet hidden" id="liveReactionSheet" role="dialog" aria-label="Message reaction options">
+              <div class="live-reaction-sheet-handle"></div>
+              <div class="live-reaction-sheet-head">
+                <strong>Reaction</strong>
+                <button type="button" id="liveReactionClose" title="Close"><i class="fas fa-times"></i></button>
+              </div>
+              <div class="live-reaction-sheet-actions">
+                <button type="button" id="liveReactionRemove"><i class="fas fa-trash"></i> Remove reaction</button>
+                <button type="button" id="liveReactionPickerToggle"><i class="fas fa-face-smile"></i> Change reaction</button>
+              </div>
+              <div class="live-reaction-emoji-grid hidden" id="liveReactionEmojiGrid"></div>
             </div>
           </section>
         </div>
@@ -336,6 +364,7 @@ class LiveChatApp {
     `;
     document.body.appendChild(dock);
     document.getElementById('liveEmojiPicker').innerHTML = PICKER_EMOJIS.map((emoji) => `<button type="button" data-emoji="${emoji}">${emoji}</button>`).join('');
+    document.getElementById('liveReactionEmojiGrid').innerHTML = REACTION_PICKER_EMOJIS.map((emoji) => `<button type="button" data-reaction-emoji="${emoji}">${emoji}</button>`).join('');
   }
 
   bindEvents() {
@@ -344,6 +373,7 @@ class LiveChatApp {
     document.getElementById('liveChatLauncher')?.addEventListener('click', () => {
       document.getElementById('liveChatDock')?.classList.remove('collapsed');
       if (!this.users.length) this.loadUsers().catch(() => {});
+      if (this.selectedThread) this.loadMessages(false).catch(() => {});
       this.requestCallNotificationPermission();
     });
     document.getElementById('liveChatClose')?.addEventListener('click', () => document.getElementById('liveChatDock')?.classList.add('collapsed'));
@@ -356,10 +386,16 @@ class LiveChatApp {
       this.renderThreads();
     });
     document.getElementById('liveChatInput')?.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' && !event.shiftKey) {
+      if (event.key === 'Enter' && !event.shiftKey && !this.isMobileInputMode()) {
         event.preventDefault();
         this.sendText();
       }
+    });
+    document.getElementById('liveChatInput')?.addEventListener('input', () => {
+      this.persistCurrentDraft();
+      this.notifyTyping(true);
+      this.syncTypingPulse();
+      this.renderThreads();
     });
     document.getElementById('liveAttachBtn')?.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -404,6 +440,20 @@ class LiveChatApp {
     document.getElementById('liveAttachmentSend')?.addEventListener('click', () => this.sendAttachmentDraft());
     document.getElementById('liveSelectionBar')?.addEventListener('click', (event) => this.handleSelectionAction(event));
     document.getElementById('livePinnedBar')?.addEventListener('click', (event) => this.handlePinnedBarClick(event));
+    document.getElementById('liveReactionClose')?.addEventListener('click', () => this.closeReactionSheet());
+    document.getElementById('liveReactionRemove')?.addEventListener('click', () => this.applyReactionFromSheet(''));
+    document.getElementById('liveReactionPickerToggle')?.addEventListener('click', () => document.getElementById('liveReactionEmojiGrid')?.classList.toggle('hidden'));
+    document.getElementById('liveReactionEmojiGrid')?.addEventListener('click', (event) => {
+      const button = event.target instanceof Element ? event.target.closest('[data-reaction-emoji]') : null;
+      if (button) this.applyReactionFromSheet(button.dataset.reactionEmoji || '');
+    });
+    document.getElementById('liveReactionSheet')?.addEventListener('pointerdown', (event) => {
+      this.reactionSheetPointerStartY = event.clientY;
+    });
+    document.getElementById('liveReactionSheet')?.addEventListener('pointerup', (event) => {
+      if (event.clientY - this.reactionSheetPointerStartY > 55) this.closeReactionSheet();
+    });
+    window.addEventListener('popstate', () => this.closeReactionSheet());
     document.addEventListener('click', (event) => this.closeTransientPopups(event));
   }
 
@@ -483,19 +533,72 @@ class LiveChatApp {
     return thread ? `${thread.type}:${thread.id}` : '';
   }
 
+  draftStorageKey() {
+    return `pensionsgoLiveChatDrafts:${this.currentUserId || 'guest'}`;
+  }
+
+  loadDrafts() {
+    try {
+      return JSON.parse(localStorage.getItem(this.draftStorageKey()) || '{}') || {};
+    } catch (_error) {
+      return {};
+    }
+  }
+
+  saveDrafts() {
+    localStorage.setItem(this.draftStorageKey(), JSON.stringify(this.drafts || {}));
+  }
+
+  currentDraftKey() {
+    return this.threadKey();
+  }
+
+  persistCurrentDraft() {
+    if (!this.selectedThread) return;
+    const input = document.getElementById('liveChatInput');
+    const key = this.currentDraftKey();
+    const value = input?.value || '';
+    if (value.trim()) {
+      this.drafts[key] = { text: value, updatedAt: Date.now() };
+    } else {
+      delete this.drafts[key];
+    }
+    this.saveDrafts();
+  }
+
+  restoreDraftForCurrentThread() {
+    const input = document.getElementById('liveChatInput');
+    if (!input || !this.selectedThread) return;
+    const draft = this.drafts[this.currentDraftKey()];
+    input.value = draft?.text || '';
+    this.syncTypingPulse();
+  }
+
+  clearCurrentDraft() {
+    if (!this.selectedThread) return;
+    delete this.drafts[this.currentDraftKey()];
+    this.saveDrafts();
+    this.renderThreads();
+  }
+
+  isMobileInputMode() {
+    return window.matchMedia?.('(max-width: 760px), (pointer: coarse)')?.matches || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
+  }
+
   async loadUsers() {
     try {
       const data = await this.fetchJson(API.bootstrap);
+      const previousUserId = this.currentUserId;
       this.currentUserId = String(data.currentUserId || this.currentUserId);
+      if (previousUserId !== this.currentUserId) {
+        this.drafts = this.loadDrafts();
+      }
       this.users = data.users || [];
       this.groups = data.groups || [];
       const previousUnreadTotal = this.unreadTotal;
       this.unreadTotal = Number(data.unreadTotal || 0);
       this.messageSettings = { ...this.messageSettings, ...(data.messageSettings || {}) };
       this.callSettings = { ...this.callSettings, ...(data.callSettings || {}) };
-      if (this.unreadCountsReady && this.unreadTotal > previousUnreadTotal) {
-        this.playMessageNotification({ senderName: 'PensionsGo Live Chat', text: `${this.unreadTotal - previousUnreadTotal} new unread message${this.unreadTotal - previousUnreadTotal === 1 ? '' : 's'}.` });
-      }
       this.unreadCountsReady = true;
       this.renderThreads();
       this.updateStatus();
@@ -550,17 +653,29 @@ class LiveChatApp {
     }
     container.innerHTML = threads.map((thread) => {
       const active = this.threadKey() === `${thread.type}:${thread.id}`;
+      const typingActive = this.isThreadTyping(thread);
+      const draft = this.drafts[`${thread.type}:${thread.id}`]?.text || '';
+      const subtitle = typingActive
+        ? '<b class="live-typing-list-label">Typing <span><i></i><i></i><i></i></span></b>'
+        : (draft ? '<b class="live-draft-badge">Draft</b>' : escapeHtml(thread.subtitle));
       return `
         <button type="button" class="live-chat-user ${active ? 'active' : ''}" data-thread-type="${thread.type}" data-thread-id="${escapeHtml(thread.id)}">
           <span class="presence-dot ${thread.isOnline ? 'online' : ''}"></span>
           ${thread.type === 'group' ? '<span class="live-group-avatar"><i class="fas fa-users"></i></span>' : `<img src="${normalizePhoto(thread.photo)}" alt="${escapeHtml(thread.name)}" onerror="this.onerror=null;this.src='${DEFAULT_PHOTO}'">`}
-          <span><strong>${escapeHtml(thread.name)}${thread.unreadCount > 0 ? `<em class="live-thread-unread">${thread.unreadCount > 99 ? '99+' : thread.unreadCount}</em>` : ''}</strong><small>${escapeHtml(thread.subtitle)}</small></span>
+          <span><strong>${escapeHtml(thread.name)}${thread.unreadCount > 0 ? `<em class="live-thread-unread">${thread.unreadCount > 99 ? '99+' : thread.unreadCount}</em>` : ''}</strong><small>${subtitle}</small></span>
         </button>
       `;
     }).join('');
     container.querySelectorAll('.live-chat-user').forEach((button) => {
       button.addEventListener('click', () => this.selectThread(button.dataset.threadType, button.dataset.threadId));
     });
+  }
+
+  isThreadTyping(thread) {
+    if (!thread) return false;
+    const key = `${thread.type}:${thread.id}`;
+    const entry = this.typingByThread[key];
+    return Boolean(entry && Date.now() - entry.updatedAt < 2500);
   }
 
   updateStatus(text = '') {
@@ -601,8 +716,12 @@ class LiveChatApp {
       const element = document.getElementById(elementId);
       if (element) element.disabled = false;
     });
+    this.restoreDraftForCurrentThread();
     this.lastMessageIdByThread[this.threadKey()] = 0;
     this.renderedMessageIds.clear();
+    this.pendingMessages.clear();
+    delete this.typingByThread[this.threadKey()];
+    this.hideTypingIndicator();
     document.getElementById('liveChatMessages').innerHTML = '<div class="live-chat-empty">Loading conversation...</div>';
     await this.loadMessages(true);
   }
@@ -613,8 +732,9 @@ class LiveChatApp {
 
   startPolling() {
     this.stop();
-    this.timers.presence = setInterval(() => this.refreshPresence(), 10000);
-    this.timers.messages = setInterval(() => this.loadMessages(false), 3000);
+    this.timers.presence = setInterval(() => this.refreshPresence(), 5000);
+    this.timers.messages = setInterval(() => this.loadMessages(false), 350);
+    this.timers.receipts = setInterval(() => this.syncReceiptsFast(), 250);
     this.timers.calls = setInterval(() => this.pollCalls(), 900);
     this.refreshPresence();
     this.pollCalls();
@@ -625,6 +745,11 @@ class LiveChatApp {
       if (this.timers[key]) clearInterval(this.timers[key]);
       this.timers[key] = null;
     });
+    window.clearTimeout(this.typingHideTimer);
+    window.clearTimeout(this.readReceiptTimer);
+    window.clearTimeout(this.typingStopTimer);
+    if (this.typingPulseTimer) window.clearInterval(this.typingPulseTimer);
+    this.typingPulseTimer = null;
     this.cleanupCall();
   }
 
@@ -637,9 +762,6 @@ class LiveChatApp {
       this.unreadTotal = Number(data.unreadTotal || 0);
       this.messageSettings = { ...this.messageSettings, ...(data.messageSettings || {}) };
       this.callSettings = { ...this.callSettings, ...(data.callSettings || {}) };
-      if (this.unreadCountsReady && this.unreadTotal > previousUnreadTotal) {
-        this.playMessageNotification({ senderName: 'PensionsGo Live Chat', text: `${this.unreadTotal - previousUnreadTotal} new unread message${this.unreadTotal - previousUnreadTotal === 1 ? '' : 's'}.` });
-      }
       this.unreadCountsReady = true;
       this.renderThreads();
       this.updateStatus();
@@ -647,14 +769,19 @@ class LiveChatApp {
   }
 
   async loadMessages(force = false) {
-    if (!this.selectedThread) return;
+    if (!this.selectedThread || this.messagePollInFlight) return;
+    if (!force && document.getElementById('liveChatDock')?.classList.contains('collapsed')) return;
     const key = this.threadKey();
     const since = force ? 0 : (this.lastMessageIdByThread[key] || 0);
+    this.messagePollInFlight = true;
     try {
       const url = `${API.messages}?peer_type=${encodeURIComponent(this.selectedThread.type)}&peer_id=${encodeURIComponent(this.selectedThread.id)}&since_id=${since}`;
       const data = await this.fetchJson(url);
       const incoming = (data.messages || []).filter((message) => !message.isOwn && !this.renderedMessageIds.has(Number(message.id || 0)));
+      this.syncMessageReceipts(data.receipts || []);
+      this.renderTypingIndicator(data.typing || []);
       this.renderMessages(data.messages || [], force);
+      this.reportVisibleMessagesRead();
       if (!force && incoming.length > 0) {
         this.playMessageNotification(incoming[incoming.length - 1]);
       }
@@ -663,6 +790,8 @@ class LiveChatApp {
       }
     } catch (error) {
       console.warn('Live chat message poll failed:', error);
+    } finally {
+      this.messagePollInFlight = false;
     }
   }
 
@@ -683,23 +812,33 @@ class LiveChatApp {
     messages.forEach((message) => {
       const id = Number(message.id || 0);
       if (this.renderedMessageIds.has(id)) return;
+      if (message.clientNonce && this.pendingMessages.has(message.clientNonce) && this.replacePendingMessage(message.clientNonce, message)) return;
       this.renderedMessageIds.add(id);
       this.lastMessageIdByThread[this.threadKey()] = Math.max(this.lastMessageIdByThread[this.threadKey()] || 0, id);
       const bubble = document.createElement('div');
-      bubble.className = `live-chat-bubble ${message.isOwn ? 'own' : ''} ${message.isPinned ? 'pinned' : ''}`;
+      bubble.className = `live-chat-bubble ${message.isOwn ? 'own' : ''} ${message.isPinned ? 'pinned' : ''} ${message.reactionEmoji ? 'reacted' : ''}`;
       bubble.dataset.messageId = String(id);
       bubble.dataset.own = message.isOwn ? '1' : '0';
       bubble.dataset.deleted = message.isDeleted ? '1' : '0';
       bubble.dataset.read = message.isRead ? '1' : '0';
+      bubble.dataset.deliveredAt = message.deliveredAt || '';
+      bubble.dataset.receiptStatus = message.receiptStatus || (message.isOwn ? 'sent' : 'received');
       bubble.dataset.createdAt = message.createdAt || '';
+      bubble.dataset.canEdit = message.canEdit ? '1' : '0';
       bubble.dataset.readAt = message.readAt || '';
       bubble.dataset.text = message.text || '';
       bubble.dataset.sender = message.senderName || '';
+      bubble.dataset.replyToMessageId = String(message.replyToMessageId || '');
+      bubble.dataset.replyToMessageText = message.replyToMessageText || '';
+      bubble.dataset.replyToFileName = message.replyToFileName || '';
+      bubble.dataset.replyToSenderName = message.replyToSenderName || '';
       bubble.dataset.pinned = message.isPinned ? '1' : '0';
       bubble.innerHTML = this.messageHtml(message);
       bubble.classList.toggle('selected', this.selectedMessageIds.has(id));
       this.bindMessageGestures(bubble);
-      container.appendChild(bubble);
+      const typing = document.getElementById('liveTypingIndicator');
+      if (typing && typing.parentElement === container) container.insertBefore(bubble, typing);
+      else container.appendChild(bubble);
     });
     if (shouldScroll && this.autoScrollEnabled) {
       container.scrollTop = container.scrollHeight;
@@ -727,6 +866,281 @@ class LiveChatApp {
         <span>${escapeHtml(message.text || message.fileName || 'Pinned message')}</span>
       </button>
     `).join('');
+  }
+
+  makeClientNonce() {
+    return `lc-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  appendOptimisticMessage({ text = '', kind = 'text', file = null, clientNonce, replyContext = this.replyToMessage } = {}) {
+    const container = document.getElementById('liveChatMessages');
+    if (!container || !this.selectedThread) return null;
+    container.querySelector('.live-chat-empty')?.remove();
+    const tempId = `pending-${clientNonce}`;
+    const message = {
+      id: tempId,
+      clientNonce,
+      senderId: this.currentUserId,
+      recipientId: this.selectedThread.id,
+      kind,
+      text,
+      fileName: file?.name || '',
+      filePath: '',
+      fileSize: file?.size || 0,
+      mimeType: file?.type || '',
+      replyToMessageId: replyContext?.id || 0,
+      replyToMessageText: replyContext?.text || '',
+      replyToFileName: '',
+      replyToSenderName: replyContext?.sender || '',
+      reactionEmoji: '',
+      isPinned: false,
+      deliveredAt: null,
+      isRead: false,
+      readAt: null,
+      isEdited: false,
+      isDeleted: false,
+      createdAt: new Date().toISOString(),
+      canEdit: true,
+      senderName: 'You',
+      senderPhoto: '',
+      isOwn: true,
+      receiptStatus: 'sending'
+    };
+    const bubble = document.createElement('div');
+    bubble.className = 'live-chat-bubble own pending';
+    bubble.dataset.messageId = tempId;
+    bubble.dataset.clientNonce = clientNonce;
+    bubble.dataset.messageKind = kind;
+    bubble.dataset.own = '1';
+    bubble.dataset.deleted = '0';
+    bubble.dataset.read = '0';
+    bubble.dataset.deliveredAt = '';
+    bubble.dataset.receiptStatus = 'sending';
+    bubble.dataset.createdAt = message.createdAt;
+    bubble.dataset.canEdit = '1';
+    bubble.dataset.text = text;
+    bubble.dataset.sender = 'You';
+    bubble.dataset.replyToMessageId = String(message.replyToMessageId || '');
+    bubble.dataset.replyToMessageText = message.replyToMessageText || '';
+    bubble.dataset.replyToFileName = message.replyToFileName || '';
+    bubble.dataset.replyToSenderName = message.replyToSenderName || '';
+    bubble.innerHTML = this.messageHtml(message);
+    const typing = document.getElementById('liveTypingIndicator');
+    if (typing && typing.parentElement === container) container.insertBefore(bubble, typing);
+    else container.appendChild(bubble);
+    this.pendingMessages.set(clientNonce, bubble);
+    this.autoScrollEnabled = true;
+    container.scrollTop = container.scrollHeight;
+    return bubble;
+  }
+
+  replacePendingMessage(clientNonce, message) {
+    const bubble = this.pendingMessages.get(clientNonce);
+    if (!bubble) return false;
+    const mergedMessage = { ...message };
+    if (Number(mergedMessage.replyToMessageId || 0)) {
+      mergedMessage.replyToMessageText = mergedMessage.replyToMessageText || bubble.dataset.replyToMessageText || '';
+      mergedMessage.replyToFileName = mergedMessage.replyToFileName || bubble.dataset.replyToFileName || '';
+      mergedMessage.replyToSenderName = mergedMessage.replyToSenderName || bubble.dataset.replyToSenderName || '';
+    }
+    const id = Number(mergedMessage.id || 0);
+    bubble.classList.remove('pending', 'failed');
+    bubble.classList.toggle('reacted', Boolean(mergedMessage.reactionEmoji));
+    bubble.dataset.messageId = String(id);
+    bubble.dataset.own = mergedMessage.isOwn ? '1' : '0';
+    bubble.dataset.deleted = mergedMessage.isDeleted ? '1' : '0';
+    bubble.dataset.read = mergedMessage.isRead ? '1' : '0';
+    bubble.dataset.deliveredAt = mergedMessage.deliveredAt || '';
+    bubble.dataset.readAt = mergedMessage.readAt || '';
+    bubble.dataset.receiptStatus = mergedMessage.receiptStatus || 'sent';
+    bubble.dataset.createdAt = mergedMessage.createdAt || '';
+    bubble.dataset.canEdit = mergedMessage.canEdit ? '1' : '0';
+    bubble.dataset.text = mergedMessage.text || '';
+    bubble.dataset.sender = mergedMessage.senderName || 'You';
+    bubble.dataset.replyToMessageId = String(mergedMessage.replyToMessageId || '');
+    bubble.dataset.replyToMessageText = mergedMessage.replyToMessageText || '';
+    bubble.dataset.replyToFileName = mergedMessage.replyToFileName || '';
+    bubble.dataset.replyToSenderName = mergedMessage.replyToSenderName || '';
+    bubble.innerHTML = this.messageHtml(mergedMessage);
+    this.bindMessageGestures(bubble);
+    this.pendingMessages.delete(clientNonce);
+    this.failedMessages.delete(clientNonce);
+    this.renderedMessageIds.add(id);
+    this.lastMessageIdByThread[this.threadKey()] = Math.max(this.lastMessageIdByThread[this.threadKey()] || 0, id);
+    return true;
+  }
+
+  markPendingFailed(clientNonce, message = 'Failed to send') {
+    const bubble = this.pendingMessages.get(clientNonce);
+    if (!bubble) return;
+    bubble.classList.add('failed');
+    bubble.dataset.failed = '1';
+    bubble.dataset.receiptStatus = 'failed';
+    const status = bubble.querySelector('.live-message-status');
+    if (status) status.outerHTML = this.statusHtml('failed', message);
+  }
+
+  messageSelectionKey(bubble) {
+    const rawId = String(bubble?.dataset?.messageId || '');
+    const numericId = Number(rawId);
+    return numericId > 0 ? numericId : rawId;
+  }
+
+  syncMessageReceipts(receipts = []) {
+    receipts.forEach((receipt) => {
+      const bubble = document.querySelector(`.live-chat-bubble.own[data-message-id="${Number(receipt.id || 0)}"]`);
+      if (!bubble) return;
+      bubble.dataset.deliveredAt = receipt.deliveredAt || '';
+      bubble.dataset.read = receipt.isRead ? '1' : '0';
+      bubble.dataset.readAt = receipt.readAt || '';
+      bubble.dataset.receiptStatus = receipt.receiptStatus || 'sent';
+      const status = bubble.querySelector('.live-message-status');
+      if (status) status.outerHTML = this.statusHtml(bubble.dataset.receiptStatus);
+    });
+  }
+
+  hasPendingReceiptUpdates() {
+    return Boolean(document.querySelector('.live-chat-bubble.own[data-message-id]:not([data-receipt-status="read"]):not(.pending):not(.failed)'));
+  }
+
+  async syncReceiptsFast() {
+    if (!this.selectedThread || this.selectedThread.type === 'group' || this.receiptSyncInFlight) return;
+    if (document.getElementById('liveChatDock')?.classList.contains('collapsed')) return;
+    if (!this.hasPendingReceiptUpdates()) return;
+    this.receiptSyncInFlight = true;
+    try {
+      const url = `${API.messages}?peer_type=${encodeURIComponent(this.selectedThread.type)}&peer_id=${encodeURIComponent(this.selectedThread.id)}&receipt_only=1`;
+      const data = await this.fetchJson(url);
+      this.syncMessageReceipts(data.receipts || []);
+    } catch (_error) {
+    } finally {
+      this.receiptSyncInFlight = false;
+    }
+  }
+
+  scheduleReceiptBurst() {
+    [120, 300, 650, 1100, 1800, 2800].forEach((delay) => {
+      window.setTimeout(() => this.syncReceiptsFast(), delay);
+    });
+  }
+
+  reportVisibleMessagesRead() {
+    if (!this.selectedThread || document.hidden || document.getElementById('liveChatDock')?.classList.contains('collapsed')) return;
+    if (this.readReceiptTimer) return;
+    this.readReceiptTimer = window.setTimeout(async () => {
+      this.readReceiptTimer = null;
+      const ids = Array.from(document.querySelectorAll('.live-chat-bubble[data-own="0"][data-read="0"]'))
+        .map((bubble) => Number(bubble.dataset.messageId || 0))
+        .filter((id) => id > 0);
+      if (!ids.length) return;
+      try {
+        await this.fetchJson(API.action, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'read', message_ids: ids })
+        });
+        ids.forEach((id) => {
+          const bubble = document.querySelector(`.live-chat-bubble[data-message-id="${id}"]`);
+          if (bubble) {
+            bubble.dataset.read = '1';
+            bubble.dataset.readAt = new Date().toISOString();
+          }
+        });
+      } catch (_error) {}
+    }, 10);
+  }
+
+  async notifyTyping(force = false, touchActivity = true) {
+    const input = document.getElementById('liveChatInput');
+    if (!this.selectedThread || document.activeElement !== input) return;
+    const now = Date.now();
+    if (touchActivity) {
+      this.lastTypingActivityAt = now;
+      window.clearTimeout(this.typingStopTimer);
+      this.typingStopTimer = window.setTimeout(() => this.stopTypingSignal(false), TYPING_IDLE_TIMEOUT_MS);
+    }
+    if (this.typingNotifyTimer && now - this.typingNotifyTimer < 700) return;
+    this.typingNotifyTimer = now;
+    try {
+      await this.fetchJson(API.action, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'typing', peer_type: this.selectedThread.type, peer_id: this.selectedThread.id })
+      });
+    } catch (_error) {}
+  }
+
+  syncTypingPulse() {
+    if (!this.selectedThread || !this.lastTypingActivityAt || Date.now() - this.lastTypingActivityAt >= TYPING_IDLE_TIMEOUT_MS) {
+      if (this.typingPulseTimer) window.clearInterval(this.typingPulseTimer);
+      this.typingPulseTimer = null;
+      return;
+    }
+    if (this.typingPulseTimer) return;
+    this.typingPulseTimer = window.setInterval(() => {
+      if (!this.lastTypingActivityAt || Date.now() - this.lastTypingActivityAt >= TYPING_IDLE_TIMEOUT_MS) {
+        this.syncTypingPulse();
+        this.stopTypingSignal(false);
+        return;
+      }
+      this.notifyTyping(false, false);
+    }, 1800);
+  }
+
+  async stopTypingSignal(wait = false) {
+    if (this.typingPulseTimer) window.clearInterval(this.typingPulseTimer);
+    this.typingPulseTimer = null;
+    window.clearTimeout(this.typingStopTimer);
+    this.typingStopTimer = null;
+    this.lastTypingActivityAt = 0;
+    if (!this.selectedThread) return;
+    const payload = {
+      action: 'typing_stop',
+      peer_type: this.selectedThread.type,
+      peer_id: this.selectedThread.id
+    };
+    const request = this.fetchJson(API.action, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(() => {});
+    if (wait) await request;
+  }
+
+  renderTypingIndicator(typing = []) {
+    const messages = document.getElementById('liveChatMessages');
+    if (!messages) return;
+    let indicator = document.getElementById('liveTypingIndicator');
+    if (!typing.length) {
+      if (this.selectedThread) {
+        delete this.typingByThread[this.threadKey()];
+        this.renderThreads();
+      }
+      this.hideTypingIndicator();
+      return;
+    }
+    if (this.selectedThread) {
+      this.typingByThread[this.threadKey()] = { updatedAt: Date.now(), typing };
+      this.renderThreads();
+    }
+    const names = typing.map((item) => item.name || 'Someone').slice(0, 2).join(', ');
+    if (!indicator) {
+      indicator = document.createElement('div');
+      indicator.id = 'liveTypingIndicator';
+      indicator.className = 'live-typing-indicator';
+      messages.appendChild(indicator);
+    }
+    indicator.innerHTML = `<span></span><span></span><span></span><strong>${escapeHtml(names)} ${typing.length === 1 ? 'is' : 'are'} typing</strong>`;
+    indicator.classList.remove('hidden');
+    window.clearTimeout(this.typingHideTimer);
+    this.typingHideTimer = window.setTimeout(() => this.hideTypingIndicator(), 1800);
+    if (this.autoScrollEnabled) {
+      messages.scrollTop = messages.scrollHeight;
+    }
+  }
+
+  hideTypingIndicator() {
+    document.getElementById('liveTypingIndicator')?.classList.add('hidden');
   }
 
   handlePinnedBarClick(event) {
@@ -759,7 +1173,7 @@ class LiveChatApp {
     const content = message.replyToMessageText || message.replyToFileName || 'Original message';
     return `
       <div class="live-reply-ref" role="button" tabindex="0" data-reply-message-id="${replyId}" title="Open replied message">
-        <strong>Replying to ${escapeHtml(sender)}:</strong>
+        <strong>${escapeHtml(sender)}</strong>
         <span>${escapeHtml(content)}</span>
       </div>
     `;
@@ -793,9 +1207,36 @@ class LiveChatApp {
       ${message.text && !message.poll ? `<p>${formatText(message.text)}</p>` : ''}
       ${filePart}
       ${pollPart}
-      <small>${formatTime(message.createdAt)}${message.isEdited ? ' edited' : ''}${message.isPinned ? ' pinned' : ''}</small>
+      <small class="live-message-meta">${formatTime(message.createdAt)}${message.isEdited ? ' edited' : ''}${message.isPinned ? ' pinned' : ''}${message.isOwn ? this.statusHtml(message.receiptStatus || (message.isRead ? 'read' : (message.deliveredAt ? 'delivered' : 'sent'))) : ''}</small>
       ${message.reactionEmoji ? `<span class="live-message-reaction">${escapeHtml(message.reactionEmoji)}</span>` : ''}
     `;
+  }
+
+  statusHtml(status, title = '') {
+    const normalized = String(status || 'sent');
+    const labels = {
+      sending: 'Sending',
+      sent: 'Sent',
+      delivered: 'Delivered',
+      read: 'Read',
+      failed: 'Failed to send'
+    };
+    const icons = {
+      sending: '<span class="live-status-spinner"></span>',
+      sent: '<i class="live-status-tick single" aria-hidden="true">&#10003;</i>',
+      delivered: '<i class="live-status-tick double" aria-hidden="true">&#10003;&#10003;</i>',
+      read: '<i class="live-status-tick double read" aria-hidden="true">&#10003;&#10003;</i>',
+      failed: '<i class="live-status-failed" aria-hidden="true">!</i>'
+    };
+    return `<span class="live-message-status ${escapeHtml(normalized)}" title="${escapeHtml(title || labels[normalized] || labels.sent)}">${icons[normalized] || icons.sent}</span>`;
+  }
+
+  canEditBubble(bubble) {
+    if (!bubble || bubble.dataset.own !== '1' || bubble.dataset.deleted === '1') return false;
+    if (bubble.dataset.canEdit === '1') return true;
+    if (bubble.dataset.canEdit === '0') return false;
+    const createdAt = new Date(String(bubble.dataset.createdAt || '').replace(' ', 'T')).getTime();
+    return Number.isFinite(createdAt) && Date.now() - createdAt <= 5 * 60 * 1000;
   }
 
   pollHtml(poll) {
@@ -826,6 +1267,13 @@ class LiveChatApp {
   }
 
   handleMessageClick(event) {
+    const reaction = event.target instanceof Element ? event.target.closest('.live-message-reaction') : null;
+    if (reaction) {
+      event.stopPropagation();
+      const bubble = reaction.closest('.live-chat-bubble');
+      this.openReactionSheet(Number(bubble?.dataset.messageId || 0), reaction.textContent || '');
+      return;
+    }
     const replyRef = event.target instanceof Element ? event.target.closest('.live-reply-ref[data-reply-message-id]') : null;
     if (replyRef) {
       event.stopPropagation();
@@ -858,9 +1306,17 @@ class LiveChatApp {
     const isDeleted = bubble.dataset.deleted === '1';
     const isOwn = bubble.dataset.own === '1';
     const isPinned = bubble.dataset.pinned === '1';
+    const isFailed = bubble.dataset.receiptStatus === 'failed' || bubble.classList.contains('failed');
+    const canEdit = this.canEditBubble(bubble);
     const menu = document.createElement('div');
     menu.className = 'live-message-menu';
-    if (isDeleted) {
+    if (isFailed) {
+      menu.innerHTML = `
+        <button type="button" data-action="retry">Retry</button>
+        <button type="button" data-action="delete">Delete</button>
+        <button type="button" data-action="select">Select</button>
+      `;
+    } else if (isDeleted) {
       menu.innerHTML = `
         <button type="button" data-action="delete">Delete</button>
         <button type="button" data-action="select">Select</button>
@@ -873,7 +1329,7 @@ class LiveChatApp {
         <button type="button" data-action="forward">Forward</button>
         <button type="button" data-action="${isPinned ? 'unpin' : 'pin'}">${isPinned ? 'Unpin' : 'Pin'}</button>
         <button type="button" data-action="select">Select</button>
-        ${isOwn ? '<button type="button" data-action="edit">Edit</button>' : ''}
+        ${canEdit ? '<button type="button" data-action="edit">Edit</button>' : ''}
         <button type="button" data-action="delete">Delete</button>
         <div class="live-reaction-row">${REACTION_EMOJIS.map((emoji) => `<button type="button" data-reaction="${emoji}">${emoji}</button>`).join('')}</div>
       `;
@@ -913,8 +1369,7 @@ class LiveChatApp {
     const messageId = Number(bubble.dataset.messageId || 0);
     const text = bubble.dataset.text || '';
     if (reactionButton) {
-      await this.runMessageAction('react', messageId, { emoji: reactionButton.dataset.reaction || '' });
-      await this.reloadCurrentThread();
+      await this.applyReactionToBubble(messageId, reactionButton.dataset.reaction || '');
       return;
     }
     if (!actionButton) return;
@@ -922,15 +1377,25 @@ class LiveChatApp {
     if (action === 'copy') {
       await navigator.clipboard?.writeText(text).catch(() => {});
       showNotice('Copied', 'Message copied to clipboard.', 'success');
+    } else if (action === 'retry') {
+      await this.retryFailedMessage(bubble);
     } else if (action === 'reply') {
       this.replyToMessage = { id: messageId, text, sender: bubble.dataset.sender || 'Message' };
       this.renderReplyPreview();
     } else if (action === 'edit') {
-      this.editingMessage = { id: messageId };
+      if (!this.canEditBubble(bubble)) {
+        showNotice('Edit Unavailable', 'Messages can only be edited within five minutes of sending.', 'info');
+        return;
+      }
+      this.editingMessage = { id: messageId, originalText: text };
       document.getElementById('liveChatInput').value = text;
       document.getElementById('liveChatInput').focus();
       this.renderReplyPreview('Editing message');
     } else if (action === 'delete') {
+      if (bubble.dataset.receiptStatus === 'failed' || bubble.classList.contains('failed')) {
+        this.removeFailedBubble(bubble);
+        return;
+      }
       await this.runMessageAction('delete', messageId);
       bubble.remove();
       this.renderedMessageIds.delete(messageId);
@@ -944,15 +1409,92 @@ class LiveChatApp {
       this.toggleMessageSelection(bubble);
     } else if (action === 'info') {
       if (bubble.dataset.own !== '1') return;
-      const delivered = bubble.dataset.createdAt ? new Date(String(bubble.dataset.createdAt).replace(' ', 'T')).toLocaleString() : 'Not available';
+      const delivered = bubble.dataset.deliveredAt ? new Date(String(bubble.dataset.deliveredAt).replace(' ', 'T')).toLocaleString() : 'Not delivered yet';
       const read = bubble.dataset.readAt ? new Date(String(bubble.dataset.readAt).replace(' ', 'T')).toLocaleString() : 'Not read yet';
       showNotice('Message Info', `Delivered: ${delivered}\nRead: ${read}`, 'info');
     }
     document.querySelectorAll('.live-message-menu').forEach((menu) => menu.remove());
   }
 
+  removeFailedBubble(bubble) {
+    const clientNonce = bubble?.dataset?.clientNonce || '';
+    const selectionKey = this.messageSelectionKey(bubble);
+    if (clientNonce) {
+      this.pendingMessages.delete(clientNonce);
+      this.failedMessages.delete(clientNonce);
+    }
+    if (selectionKey) this.selectedMessageIds.delete(selectionKey);
+    bubble?.remove();
+    this.renderSelectionBar();
+  }
+
+  async retryFailedMessage(bubble) {
+    const clientNonce = bubble?.dataset?.clientNonce || '';
+    const fallbackReplyId = Number(bubble?.dataset?.replyToMessageId || 0);
+    const payload = this.failedMessages.get(clientNonce) || {
+      message_text: bubble?.dataset?.text || '',
+      message_kind: bubble?.dataset?.messageKind || 'text',
+      file: null,
+      replyContext: fallbackReplyId ? {
+        id: fallbackReplyId,
+        text: bubble?.dataset?.replyToMessageText || '',
+        sender: bubble?.dataset?.replyToSenderName || ''
+      } : null
+    };
+    this.removeFailedBubble(bubble);
+    await this.sendPayload(payload);
+  }
+
+  openReactionSheet(messageId, currentEmoji = '') {
+    if (!messageId) return;
+    this.reactionSheetMessageId = messageId;
+    const sheet = document.getElementById('liveReactionSheet');
+    if (!sheet) return;
+    document.getElementById('liveReactionEmojiGrid')?.classList.add('hidden');
+    sheet.querySelectorAll('[data-reaction-emoji]').forEach((button) => {
+      button.classList.toggle('active', button.dataset.reactionEmoji === currentEmoji);
+    });
+    sheet.classList.remove('hidden');
+    if (!history.state?.liveReactionSheet) {
+      history.pushState({ ...(history.state || {}), liveReactionSheet: true }, '');
+    }
+  }
+
+  closeReactionSheet() {
+    const sheet = document.getElementById('liveReactionSheet');
+    sheet?.classList.add('hidden');
+    this.reactionSheetMessageId = 0;
+  }
+
+  async applyReactionFromSheet(emoji) {
+    if (!this.reactionSheetMessageId) return;
+    const messageId = this.reactionSheetMessageId;
+    this.closeReactionSheet();
+    await this.applyReactionToBubble(messageId, emoji);
+  }
+
+  async applyReactionToBubble(messageId, emoji) {
+    const bubble = document.querySelector(`.live-chat-bubble[data-message-id="${Number(messageId || 0)}"]`);
+    if (bubble) {
+      bubble.querySelector('.live-message-reaction')?.remove();
+      bubble.classList.toggle('reacted', Boolean(emoji));
+      if (emoji) {
+        const reaction = document.createElement('span');
+        reaction.className = 'live-message-reaction';
+        reaction.textContent = emoji;
+        bubble.appendChild(reaction);
+      }
+    }
+    try {
+      await this.runMessageAction('react', messageId, { emoji });
+    } catch (error) {
+      showNotice('Reaction', error.message || 'Unable to update reaction.');
+      await this.reloadCurrentThread();
+    }
+  }
+
   toggleMessageSelection(bubble, forceState = null) {
-    const messageId = Number(bubble?.dataset?.messageId || 0);
+    const messageId = this.messageSelectionKey(bubble);
     if (!messageId) return;
     const shouldSelect = forceState === null ? !this.selectedMessageIds.has(messageId) : Boolean(forceState);
     if (shouldSelect) this.selectedMessageIds.add(messageId);
@@ -1027,6 +1569,10 @@ class LiveChatApp {
     return Array.from(document.querySelectorAll('.live-chat-bubble.selected'));
   }
 
+  selectionHasFailedBubbles(bubbles) {
+    return bubbles.some((bubble) => bubble.dataset.receiptStatus === 'failed' || bubble.classList.contains('failed'));
+  }
+
   renderSelectionBar() {
     const bar = document.getElementById('liveSelectionBar');
     if (!bar) return;
@@ -1036,12 +1582,19 @@ class LiveChatApp {
       bar.innerHTML = '';
       return;
     }
+    const selectedBubbles = this.getSelectedBubbles();
+    const singleSelected = count === 1 ? selectedBubbles[0] : null;
+    const hasFailed = this.selectionHasFailedBubbles(selectedBubbles);
+    const canEdit = singleSelected ? this.canEditBubble(singleSelected) : false;
     bar.innerHTML = `
       <strong>${count} selected</strong>
       <div class="live-selection-actions">
+        ${count === 1 && hasFailed ? '<button type="button" data-selection-action="retry"><i class="fas fa-rotate-right"></i> Retry</button>' : ''}
+        ${count === 1 && !hasFailed ? '<button type="button" data-selection-action="reply"><i class="fas fa-reply"></i> Reply</button>' : ''}
+        ${canEdit && !hasFailed ? '<button type="button" data-selection-action="edit"><i class="fas fa-pen"></i> Edit</button>' : ''}
         <button type="button" data-selection-action="delete"><i class="fas fa-trash"></i> Delete</button>
-        <button type="button" data-selection-action="copy"><i class="fas fa-copy"></i> Copy</button>
-        <button type="button" data-selection-action="forward"><i class="fas fa-share"></i> Forward</button>
+        ${!hasFailed ? '<button type="button" data-selection-action="copy"><i class="fas fa-copy"></i> Copy</button>' : ''}
+        ${!hasFailed ? '<button type="button" data-selection-action="forward"><i class="fas fa-share"></i> Forward</button>' : ''}
         <button type="button" data-selection-action="clear"><i class="fas fa-times"></i></button>
       </div>
     `;
@@ -1060,10 +1613,35 @@ class LiveChatApp {
     if (action === 'copy') {
       await navigator.clipboard?.writeText(texts.join('\n')).catch(() => {});
       showNotice('Copied', 'Selected messages copied to clipboard.', 'success');
+    } else if (action === 'retry') {
+      const bubble = bubbles[0];
+      if (bubble) await this.retryFailedMessage(bubble);
+    } else if (action === 'reply') {
+      const bubble = bubbles[0];
+      if (bubble) {
+        this.replyToMessage = {
+          id: Number(bubble.dataset.messageId || 0),
+          text: bubble.dataset.text || '',
+          sender: bubble.dataset.sender || 'Message'
+        };
+        this.renderReplyPreview();
+      }
+    } else if (action === 'edit') {
+      const bubble = bubbles[0];
+      if (bubble && this.canEditBubble(bubble)) {
+        this.editingMessage = { id: Number(bubble.dataset.messageId || 0), originalText: bubble.dataset.text || '' };
+        document.getElementById('liveChatInput').value = bubble.dataset.text || '';
+        document.getElementById('liveChatInput').focus();
+        this.renderReplyPreview('Editing message');
+      }
     } else if (action === 'forward') {
       this.prepareForward(texts.join('\n'));
     } else if (action === 'delete') {
       for (const bubble of bubbles) {
+        if (bubble.dataset.receiptStatus === 'failed' || bubble.classList.contains('failed')) {
+          this.removeFailedBubble(bubble);
+          continue;
+        }
         const messageId = Number(bubble.dataset.messageId || 0);
         if (messageId) await this.runMessageAction('delete', messageId).catch(() => {});
       }
@@ -1113,17 +1691,28 @@ class LiveChatApp {
   async sendText() {
     const input = document.getElementById('liveChatInput');
     const text = (input?.value || '').trim();
-    if (!text || !this.selectedThread || this.sending) return;
+    if (!this.selectedThread || this.sending) return;
     if (this.editingMessage) {
+      await this.stopTypingSignal(true);
+      if (!text) {
+        input.value = '';
+        this.editingMessage = null;
+        this.renderReplyPreview();
+        this.clearCurrentDraft();
+        return;
+      }
       await this.runMessageAction('edit', this.editingMessage.id, { message_text: text });
       this.editingMessage = null;
       input.value = '';
       this.renderReplyPreview();
+      this.clearCurrentDraft();
       await this.reloadCurrentThread();
       return;
     }
-    await this.sendPayload({ message_text: text, message_kind: 'text' });
+    if (!text) return;
+    await this.stopTypingSignal(true);
     input.value = '';
+    await this.sendPayload({ message_text: text, message_kind: 'text' });
   }
 
   handleAttachmentMenu(event) {
@@ -1430,22 +2019,38 @@ class LiveChatApp {
     if (input) input.value = '';
   }
 
-  async sendPayload({ message_text = '', message_kind = 'text', file = null } = {}) {
+  async sendPayload({ message_text = '', message_kind = 'text', file = null, replyContext = this.replyToMessage } = {}) {
     if (!this.selectedThread || this.sending) return;
     this.sending = true;
+    await this.stopTypingSignal(true);
+    const clientNonce = this.makeClientNonce();
+    this.failedMessages.set(clientNonce, { message_text, message_kind, file, replyContext });
+    this.appendOptimisticMessage({ text: message_text, kind: message_kind, file, clientNonce, replyContext });
     const form = new FormData();
     form.append('recipient_type', this.selectedThread.type);
     form.append('recipient_id', this.selectedThread.id);
     form.append('message_text', message_text);
     form.append('message_kind', message_kind);
-    if (this.replyToMessage?.id) form.append('reply_to_message_id', String(this.replyToMessage.id));
+    form.append('client_nonce', clientNonce);
+    if (replyContext?.id) form.append('reply_to_message_id', String(replyContext.id));
     if (file) form.append('file', file, file.name || `${message_kind}.webm`);
     try {
-      await this.fetchJson(API.send, { method: 'POST', body: form });
+      const data = await this.fetchJson(API.send, { method: 'POST', body: form });
       this.replyToMessage = null;
       this.renderReplyPreview();
-      await this.loadMessages(false);
+      if (data.chatMessage) {
+        this.replacePendingMessage(clientNonce, data.chatMessage);
+      }
+      this.clearCurrentDraft();
+      this.scheduleReceiptBurst();
+      this.loadMessages(false).catch(() => {});
     } catch (error) {
+      if (message_text.trim()) {
+        this.drafts[this.currentDraftKey()] = { text: message_text, updatedAt: Date.now() };
+        this.saveDrafts();
+        this.renderThreads();
+      }
+      this.markPendingFailed(clientNonce, error.message || 'Unable to send chat message.');
       showNotice('Live Chat', error.message || 'Unable to send chat message.');
     } finally {
       this.sending = false;

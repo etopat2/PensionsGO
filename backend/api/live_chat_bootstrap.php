@@ -80,6 +80,20 @@ try {
     }
     $groupStmt->close();
 
+    $deliveredStmt = $conn->prepare("
+        UPDATE tb_live_chat_messages
+        SET delivered_at = COALESCE(delivered_at, NOW())
+        WHERE recipient_id = ?
+          AND sender_id <> ?
+          AND delivered_at IS NULL
+          AND deleted_at IS NULL
+    ");
+    if ($deliveredStmt) {
+        $deliveredStmt->bind_param('ss', $userId, $userId);
+        $deliveredStmt->execute();
+        $deliveredStmt->close();
+    }
+
     $unreadByUser = [];
     $directUnreadStmt = $conn->prepare("
         SELECT m.sender_id, COUNT(*) AS unread_count
