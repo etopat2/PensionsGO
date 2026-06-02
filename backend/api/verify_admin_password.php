@@ -40,9 +40,10 @@ if (empty($password)) {
 try {
     // Get current user's password hash from database
     $stmt = $conn->prepare("
-        SELECT userPassword 
-        FROM tb_users 
+        SELECT userPassword
+        FROM tb_users
         WHERE userId = ?
+        LIMIT 1
     ");
     $stmt->bind_param("s", $_SESSION['userId']);
     $stmt->execute();

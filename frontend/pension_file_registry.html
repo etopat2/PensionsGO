@@ -9,17 +9,17 @@
   <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
   <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
   <title>Pension File Registry - PensionsGo</title>
-  <link rel="stylesheet" href="css/color-variables.css?v=20260504b">
-  <link rel="stylesheet" href="css/styles.css?v=20260507c">
+  <link rel="stylesheet" href="css/color-variables.css?v=20260602a">
+  <link rel="stylesheet" href="css/styles.css?v=20260602b">
   <link rel="stylesheet" href="css/profile.css?v=20260504a">
   <link rel="stylesheet" href="css/menu.css?v=20260504d">
   <link rel="stylesheet" href="css/overlay.css?v=20260504a">
-  <link rel="stylesheet" href="css/pension_file_registry.css?v=20260528c">
-  <script type="module" src="js/main.js?v=20260528b"></script>
+  <link rel="stylesheet" href="css/pension_file_registry.css?v=20260602a">
+  <script type="module" src="js/main.js?v=20260602x"></script>
   <script defer src="js/modules/filterable_select.js?v=20260429a"></script>
   <script defer src="js/modules/district_selector.js?v=20260429a"></script>
   <script defer src="js/modules/retirement-types.js"></script>
-  <script defer src="js/pension_file_registry.js?v=20260430a"></script>
+  <script defer src="js/pension_file_registry.js?v=20260602a"></script>
 </head>
 <body>
   <main class="registry-wrapper">
@@ -550,7 +550,9 @@
               </label>
               <label class="edit-field">
                 <span>Bank Name</span>
-                <input type="text" id="registryLifeCertBankName" readonly>
+                <select id="registryLifeCertBankName" disabled>
+                  <option value="">Select bank</option>
+                </select>
               </label>
               <label class="edit-field">
                 <span>Bank Account</span>

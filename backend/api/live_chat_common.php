@@ -53,7 +53,7 @@ function liveChatSettingInt(mysqli $conn, string $key, int $default, int $min, i
 
 function liveChatEnsureTables(mysqli $conn): void
 {
-    $schemaMarker = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'live_chat_schema_ready_v6.json';
+    $schemaMarker = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'live_chat_schema_ready_v9.json';
     if (is_file($schemaMarker)) {
         return;
     }
@@ -63,7 +63,7 @@ function liveChatEnsureTables(mysqli $conn): void
             chat_message_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             sender_id VARCHAR(100) NOT NULL,
             recipient_id VARCHAR(100) NOT NULL,
-            message_kind ENUM('text','voice','attachment') NOT NULL DEFAULT 'text',
+            message_kind ENUM('text','voice','attachment','call') NOT NULL DEFAULT 'text',
             message_text TEXT DEFAULT NULL,
             file_name VARCHAR(255) DEFAULT NULL,
             file_path VARCHAR(500) DEFAULT NULL,
@@ -270,6 +270,11 @@ function liveChatEnsureTables(mysqli $conn): void
     liveChatAddColumnIfMissing($conn, 'tb_live_chat_messages', 'admin_delete_reason', 'VARCHAR(255) DEFAULT NULL AFTER admin_deleted_by');
     liveChatAddColumnIfMissing($conn, 'tb_live_chat_messages', 'client_nonce', 'VARCHAR(80) DEFAULT NULL AFTER admin_delete_reason');
     liveChatAddColumnIfMissing($conn, 'tb_live_chat_calls', 'answered_at', 'TIMESTAMP NULL DEFAULT NULL AFTER created_at');
+    liveChatAddColumnIfMissing($conn, 'tb_live_chat_calls', 'call_message_id', 'BIGINT UNSIGNED DEFAULT NULL AFTER ended_at');
+    $conn->query("ALTER TABLE tb_live_chat_messages MODIFY message_kind ENUM('text','voice','attachment','call') NOT NULL DEFAULT 'text'");
+    liveChatAddIndexIfMissing($conn, 'tb_live_chat_messages', 'idx_live_chat_delivery_fast', 'sender_id, recipient_id, delivered_at, chat_message_id');
+    liveChatAddIndexIfMissing($conn, 'tb_live_chat_messages', 'idx_live_chat_group_fast', 'recipient_id, admin_deleted_at, chat_message_id');
+    liveChatAddIndexIfMissing($conn, 'tb_live_chat_signals', 'idx_live_chat_signals_fast', 'call_id, recipient_id, signal_id');
     $conn->query("
         ALTER TABLE tb_live_chat_signals
         MODIFY signal_type ENUM('offer','answer','ice','hangup','call_accept','video_request','video_accept','video_decline','mic_state','remote_mute_request','peer_connected','peer_disconnected') NOT NULL
@@ -289,7 +294,7 @@ function liveChatEnsureTables(mysqli $conn): void
     }
     @file_put_contents($schemaMarker, json_encode([
         'ready' => true,
-        'schema' => 6,
+        'schema' => 9,
         'checked_at' => date('c')
     ], JSON_PRETTY_PRINT), LOCK_EX);
 }
@@ -448,6 +453,29 @@ function liveChatAddColumnIfMissing(mysqli $conn, string $tableName, string $col
     }
 }
 
+function liveChatAddIndexIfMissing(mysqli $conn, string $tableName, string $indexName, string $columns): void
+{
+    $stmt = $conn->prepare("
+        SELECT COUNT(*) AS total
+        FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+          AND INDEX_NAME = ?
+    ");
+    if (!$stmt) {
+        return;
+    }
+
+    $stmt->bind_param('ss', $tableName, $indexName);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if ((int)($row['total'] ?? 0) === 0) {
+        $conn->query("ALTER TABLE `$tableName` ADD INDEX `$indexName` ($columns)");
+    }
+}
+
 function liveChatNormalizeTableCollation(mysqli $conn, string $tableName): void
 {
     $stmt = $conn->prepare("
@@ -494,6 +522,27 @@ function liveChatCanReachUser(mysqli $conn, string $userId): bool
     return function_exists('canRoleAccessMessagingModule')
         ? canRoleAccessMessagingModule((string)$row['userRole'])
         : !in_array((string)$row['userRole'], ['pensioner', 'user'], true);
+}
+
+function liveChatIsUserOnline(mysqli $conn, string $userId, int $freshSeconds = 45): bool
+{
+    $seconds = max(10, min(300, $freshSeconds));
+    $stmt = $conn->prepare("
+        SELECT 1
+        FROM tb_live_chat_presence
+        WHERE user_id = ?
+          AND status = 'online'
+          AND last_seen >= DATE_SUB(NOW(), INTERVAL {$seconds} SECOND)
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param('s', $userId);
+    $stmt->execute();
+    $online = (bool)$stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $online;
 }
 
 function liveChatCanAccessGroup(mysqli $conn, string $groupId, string $userId): bool

@@ -43,7 +43,7 @@ try {
     }
 
     $sm = SessionManager::getInstance($conn);
-    $sm->cleanupExpiredSessions();
+    $sm->cleanupExpiredSessionsThrottled(60);
     $state = $sm->validateSession($_SESSION['session_id'], $_SESSION['userId']);
 
     // Update session activity only if still active

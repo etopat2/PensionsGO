@@ -35,7 +35,7 @@ try {
     }
 
     $sm = SessionManager::getInstance($conn);
-    $sm->cleanupExpiredSessions();
+    $sm->cleanupExpiredSessionsThrottled(60);
     $touched = $sm->touchSession($_SESSION['session_id'], $requestDeviceId);
     if (!$touched) {
         http_response_code(403);

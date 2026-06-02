@@ -12,6 +12,121 @@
     flex-direction: column;
 }
 
+[data-theme="dark"] .admin-modal-overlay,
+[data-theme="dark"] .reauth-overlay {
+    background: rgba(4, 8, 12, 0.74);
+    backdrop-filter: blur(10px);
+}
+
+[data-theme="dark"] .admin-modal,
+[data-theme="dark"] .admin-confirm-modal,
+[data-theme="dark"] .security-modal,
+[data-theme="dark"] .reauth-modal,
+[data-theme="dark"] .notification-sound-modal,
+[data-theme="dark"] .notification-sound-library-modal,
+[data-theme="dark"] .notification-sound-confirm-modal,
+[data-theme="dark"] .settings-card,
+[data-theme="dark"] .settings-table-container,
+[data-theme="dark"] .settings-toolbar,
+[data-theme="dark"] .runtime-settings-card {
+    border-color: rgba(143, 179, 207, 0.22);
+    background: linear-gradient(180deg, rgba(27, 39, 50, 0.98), rgba(16, 24, 33, 0.98));
+    color: var(--text-color);
+    box-shadow: 0 24px 58px rgba(0, 0, 0, 0.46);
+}
+
+[data-theme="dark"] .admin-dashboard,
+[data-theme="dark"] .admin-main,
+[data-theme="dark"] .admin-content {
+    background:
+        radial-gradient(circle at top right, rgba(143, 179, 207, 0.08), transparent 30%),
+        linear-gradient(180deg, #101822 0%, #0e141b 62%, #0a1017 100%);
+    color: var(--text-color);
+}
+
+[data-theme="dark"] .admin-sidebar,
+[data-theme="dark"] .admin-panel,
+[data-theme="dark"] .admin-card,
+[data-theme="dark"] .admin-section,
+[data-theme="dark"] .management-card,
+[data-theme="dark"] .chat-oversight-shell,
+[data-theme="dark"] .chat-oversight-thread,
+[data-theme="dark"] .chat-oversight-message {
+    border-color: rgba(143, 179, 207, 0.2);
+    background:
+        linear-gradient(180deg, rgba(27, 39, 50, 0.94), rgba(18, 28, 38, 0.96));
+    color: var(--text-color);
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
+}
+
+[data-theme="dark"] .chat-oversight-list,
+[data-theme="dark"] .chat-oversight-thread-header,
+[data-theme="dark"] .chat-oversight-messages,
+[data-theme="dark"] .chat-oversight-toolbar,
+[data-theme="dark"] .chat-oversight-summary {
+    border-color: rgba(143, 179, 207, 0.18);
+    background: rgba(15, 23, 32, 0.72);
+}
+
+[data-theme="dark"] .chat-oversight-item {
+    border-bottom-color: rgba(143, 179, 207, 0.16);
+    color: var(--text-color);
+}
+
+[data-theme="dark"] .chat-oversight-item:hover,
+[data-theme="dark"] .chat-oversight-item.is-active {
+    background: rgba(143, 179, 207, 0.13);
+}
+
+[data-theme="dark"] .chat-oversight-item.is-active {
+    border-left-color: var(--primary-gold);
+}
+
+[data-theme="dark"] .chat-oversight-item-top em,
+[data-theme="dark"] .chat-oversight-readonly,
+[data-theme="dark"] .chat-oversight-kind,
+[data-theme="dark"] .chat-oversight-badges span {
+    border-color: rgba(143, 179, 207, 0.2);
+    background: rgba(12, 20, 28, 0.78);
+    color: var(--muted-dark);
+}
+
+[data-theme="dark"] .admin-modal-overlay,
+[data-theme="dark"] .reauth-overlay {
+    background: rgba(4, 8, 12, 0.74);
+    backdrop-filter: blur(10px);
+}
+
+[data-theme="dark"] .admin-modal,
+[data-theme="dark"] .admin-confirm-modal,
+[data-theme="dark"] .security-modal,
+[data-theme="dark"] .reauth-modal,
+[data-theme="dark"] .notification-sound-modal,
+[data-theme="dark"] .notification-sound-library-modal,
+[data-theme="dark"] .notification-sound-confirm-modal {
+    border: 1px solid rgba(143, 179, 207, 0.22);
+    background:
+        linear-gradient(180deg, rgba(27, 39, 50, 0.98), rgba(16, 24, 33, 0.98));
+    color: var(--text-color);
+    box-shadow: 0 30px 74px rgba(0, 0, 0, 0.56);
+}
+
+[data-theme="dark"] .admin-modal-header,
+[data-theme="dark"] .content-header,
+[data-theme="dark"] .settings-header {
+    border-color: rgba(220, 178, 80, 0.24);
+}
+
+[data-theme="dark"] .settings-card,
+[data-theme="dark"] .settings-table-container,
+[data-theme="dark"] .settings-toolbar,
+[data-theme="dark"] .runtime-settings-card {
+    border-color: rgba(143, 179, 207, 0.2);
+    background:
+        linear-gradient(180deg, rgba(27, 39, 50, 0.94), rgba(18, 28, 38, 0.96));
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
+}
+
 /* Chat Oversight */
 .chat-oversight-content {
     display: flex;
@@ -4482,6 +4597,32 @@
 @media (max-width: 1180px) { .settings-split-grid { grid-template-columns: 1fr; } .admin-form-grid.three-column { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 768px) { .section-card-header, .admin-insight-bar-head, .cleanup-quick-actions, .settings-actions.stacked-mobile { flex-direction: column; align-items: stretch; } .admin-form-grid.three-column, .settings-toggle-grid { grid-template-columns: 1fr; } .admin-insight-summary { grid-template-columns: 1fr; } }
 
+[data-theme="dark"] .admin-modal-overlay,
+[data-theme="dark"] .reauth-overlay {
+    background: rgba(4, 8, 12, 0.74);
+    backdrop-filter: blur(10px);
+}
+
+[data-theme="dark"] .admin-modal,
+[data-theme="dark"] .admin-confirm-modal,
+[data-theme="dark"] .security-modal,
+[data-theme="dark"] .reauth-modal,
+[data-theme="dark"] .settings-card,
+[data-theme="dark"] .settings-table-container,
+[data-theme="dark"] .settings-toolbar,
+[data-theme="dark"] .runtime-settings-card {
+    border-color: rgba(143, 179, 207, 0.22);
+    background: linear-gradient(180deg, rgba(27, 39, 50, 0.98), rgba(16, 24, 33, 0.98));
+    color: var(--text-color);
+    box-shadow: 0 24px 58px rgba(0, 0, 0, 0.46);
+}
+
+[data-theme="dark"] .admin-modal-header,
+[data-theme="dark"] .content-header,
+[data-theme="dark"] .settings-header {
+    border-color: rgba(220, 178, 80, 0.24);
+}
+
 .settings-pill.active {
     display: inline-flex;
     align-items: center;
@@ -5219,4 +5360,27 @@
         height: 2.7rem;
         flex-basis: 2.7rem;
     }
+}
+
+[data-theme="dark"] .admin-modal-overlay,
+[data-theme="dark"] .reauth-overlay {
+    background: rgba(4, 8, 12, 0.74);
+    backdrop-filter: blur(10px);
+}
+
+[data-theme="dark"] .admin-modal,
+[data-theme="dark"] .admin-confirm-modal,
+[data-theme="dark"] .security-modal,
+[data-theme="dark"] .reauth-modal,
+[data-theme="dark"] .notification-sound-modal,
+[data-theme="dark"] .notification-sound-library-modal,
+[data-theme="dark"] .notification-sound-confirm-modal,
+[data-theme="dark"] .settings-card,
+[data-theme="dark"] .settings-table-container,
+[data-theme="dark"] .settings-toolbar,
+[data-theme="dark"] .runtime-settings-card {
+    border-color: rgba(143, 179, 207, 0.22);
+    background: linear-gradient(180deg, rgba(27, 39, 50, 0.98), rgba(16, 24, 33, 0.98));
+    color: var(--text-color);
+    box-shadow: 0 24px 58px rgba(0, 0, 0, 0.46);
 }

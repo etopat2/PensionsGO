@@ -79,7 +79,7 @@ function ensureStylesheet() {
   const link = document.createElement('link');
   link.id = LIVE_CHAT_STYLE_ID;
   link.rel = 'stylesheet';
-  link.href = new URL('css/live_chat.css?v=20260601b', APP_ROOT).href;
+  link.href = new URL('css/live_chat.css?v=20260602x', APP_ROOT).href;
   liveChatStylesheetReady = new Promise((resolve) => {
     link.addEventListener('load', resolve, { once: true });
     link.addEventListener('error', resolve, { once: true });
@@ -146,6 +146,7 @@ function normalizePhoto(path) {
 class LiveChatApp {
   constructor(options = {}) {
     this.currentUserId = String(options.userId || localStorage.getItem('loggedInUser') || '');
+    this.currentUserName = String(options.userName || localStorage.getItem('loggedInUserName') || 'You');
     this.users = [];
     this.groups = [];
     this.filteredQuery = '';
@@ -155,6 +156,8 @@ class LiveChatApp {
     this.pendingMessages = new Map();
     this.failedMessages = new Map();
     this.messagePollInFlight = false;
+    this.messageAbortController = null;
+    this.messageCacheByThread = new Map();
     this.receiptSyncInFlight = false;
     this.selectedMessageIds = new Set();
     this.replyToMessage = null;
@@ -203,6 +206,7 @@ class LiveChatApp {
       groupsEnabled: true,
       audioCallsEnabled: true,
       videoCallsEnabled: true,
+      addParticipantsEnabled: true,
       attachmentsEnabled: true,
       voiceNotesEnabled: true,
       pollsEnabled: true,
@@ -212,7 +216,7 @@ class LiveChatApp {
       typingIdleSeconds: 5,
       messagePollMs: 350,
       receiptPollMs: 250,
-      callPollMs: 900,
+      callPollMs: 300,
       signalPollMs: 350
     };
     this.unreadTotal = 0;
@@ -221,10 +225,16 @@ class LiveChatApp {
     this.autoScrollEnabled = true;
     this.availableVideoDevices = [];
     this.selectedVideoDeviceId = '';
-    this.cameraFacingMode = 'environment';
+    this.attachmentCaptureMode = 'photo';
+    this.attachmentCameraFilter = 'none';
+    this.attachmentMediaRecorder = null;
+    this.attachmentRecordedChunks = [];
+    this.attachmentRecordingStartedAt = 0;
+    this.attachmentRecordingTimer = null;
+    this.cameraFacingMode = 'user';
     this.cameraZoom = 1;
     this.cameraSwitching = false;
-    this.mirrorFrontCamera = true;
+    this.mirrorFrontCamera = localStorage.getItem('liveCallMirrorLocalVideo') === '1';
     this.callSpeakerEnabled = localStorage.getItem('liveCallSpeakerEnabled') !== '0';
     this.callSpeakerVolume = Math.max(0, Math.min(100, Number(localStorage.getItem('liveCallSpeakerVolume') || 100)));
     this.callTimeoutTimer = null;
@@ -235,6 +245,13 @@ class LiveChatApp {
     this.callPeerAudioStates = new Map();
     this.callSpeechAnalyzers = new Map();
     this.callConnectionNoticeTimer = null;
+    this.callConnectionRecoveryTimer = null;
+    this.callRestartInFlight = false;
+    this.signalPollInFlight = false;
+    this.callAddParticipantModalOpen = false;
+    this.callFastSignalUntil = 0;
+    this.deferIncomingVideoCapture = false;
+    this.localVideoPrimary = false;
     this.bound = false;
     this.typingNotifyTimer = null;
     this.typingHideTimer = null;
@@ -261,6 +278,7 @@ class LiveChatApp {
     this.syncIncomingSoundButton();
     await this.loadUsers();
     this.startPolling();
+    document.addEventListener('fullscreenchange', () => this.syncCallFullscreenButtons());
     window.addEventListener('beforeunload', () => this.stop());
   }
 
@@ -368,14 +386,17 @@ class LiveChatApp {
             <label class="live-call-zoom" title="Camera zoom"><i class="fas fa-magnifying-glass-plus"></i><input id="liveCallZoom" type="range" min="1" max="3" step="0.1" value="1"></label>
             <button type="button" id="liveToggleCameraBtn" title="Camera on/off"><i class="fas fa-video"></i></button>
             <button type="button" id="liveRequestVideoBtn" title="Switch audio call to video"><i class="fas fa-video"></i> Video</button>
+            <button type="button" id="liveAddCallParticipantBtn" title="Add participant"><i class="fas fa-user-plus"></i></button>
             <button type="button" id="liveToggleMicBtn" title="Mute/unmute"><i class="fas fa-microphone"></i></button>
             <button type="button" id="liveToggleSpeakerBtn" title="Speaker on/off"><i class="fas fa-volume-high"></i></button>
             <label class="live-call-volume" title="Call volume"><i class="fas fa-volume-low"></i><input id="liveCallVolume" type="range" min="0" max="100" step="1" value="100"></label>
             <button type="button" id="liveFullscreenCallBtn" title="Fullscreen"><i class="fas fa-expand"></i></button>
+            <button type="button" id="liveRestoreCallBtn" class="hidden" title="Restore call window"><i class="fas fa-compress"></i></button>
           </div>
           <div class="live-video-grid">
             <div class="live-video-tile live-remote-video-tile">
               <video id="liveRemoteVideo" autoplay playsinline></video>
+              <span id="liveRemoteParticipantLabel" class="live-video-name-label hidden" title=""></span>
               <div class="live-call-tile-overlay">
                 <span id="liveRemoteMicStatus" class="live-peer-mic-state muted"><i class="fas fa-microphone-slash"></i> Waiting</span>
                 <button type="button" id="liveRemoteMuteBtn" class="live-peer-mute-btn hidden" title="Mute peer"><i class="fas fa-microphone-slash"></i></button>
@@ -383,8 +404,10 @@ class LiveChatApp {
             </div>
             <div class="live-video-tile live-local-video-tile">
               <video id="liveLocalVideo" autoplay muted playsinline></video>
+              <span id="liveLocalParticipantLabel" class="live-video-name-label hidden" title=""></span>
               <div class="live-call-tile-overlay">
                 <span id="liveLocalMicStatus" class="live-peer-mic-state"><i class="fas fa-microphone"></i> Mic on</span>
+                <button type="button" id="liveCallMirrorBtn" class="live-peer-mute-btn" title="Mirror/unmirror my video"><i class="fas fa-arrows-left-right"></i></button>
               </div>
             </div>
           </div>
@@ -394,6 +417,13 @@ class LiveChatApp {
             <button type="button" id="liveRejectCallBtn" class="hidden"><i class="fas fa-phone-slash" aria-hidden="true"></i> Reject</button>
             <button type="button" id="liveEndCallBtn"><i class="fas fa-phone-slash" aria-hidden="true"></i> End</button>
           </div>
+        </div>
+      </div>
+      <div class="live-add-call-modal hidden" id="liveAddCallModal">
+        <div class="live-add-call-card">
+          <div class="live-group-head"><strong>Add to Call</strong><button type="button" id="liveAddCallClose"><i class="fas fa-times"></i></button></div>
+          <div class="live-add-call-list" id="liveAddCallList"></div>
+          <button type="button" id="liveAddCallInvite" class="live-secondary-btn"><i class="fas fa-user-plus"></i> Invite Selected</button>
         </div>
       </div>
       <div class="live-group-modal hidden" id="liveGroupModal">
@@ -450,6 +480,25 @@ class LiveChatApp {
             <button type="button" id="liveAttachmentDelete"><i class="fas fa-trash"></i> Delete</button>
             <button type="button" id="liveAttachmentSend"><i class="fas fa-paper-plane"></i> Send</button>
           </div>
+        </div>
+      </div>
+      <div class="live-media-viewer-modal hidden" id="liveMediaViewerModal" aria-hidden="true">
+        <div class="live-media-viewer-card" role="dialog" aria-modal="true" aria-labelledby="liveMediaViewerTitle">
+          <div class="live-media-viewer-head">
+            <div>
+              <strong id="liveMediaViewerTitle">Media Preview</strong>
+              <span id="liveMediaViewerMeta"></span>
+            </div>
+            <div class="live-media-viewer-actions">
+              <button type="button" id="liveMediaZoomOut" title="Zoom out"><i class="fas fa-minus"></i></button>
+              <button type="button" id="liveMediaZoomIn" title="Zoom in"><i class="fas fa-magnifying-glass-plus"></i></button>
+              <button type="button" id="liveMediaMinimize" title="Minimize"><i class="fas fa-minus"></i></button>
+              <button type="button" id="liveMediaExpand" title="Expand"><i class="fas fa-expand"></i></button>
+              <a id="liveMediaDownload" href="#" download title="Download"><i class="fas fa-download"></i></a>
+              <button type="button" id="liveMediaClose" title="Close"><i class="fas fa-times"></i></button>
+            </div>
+          </div>
+          <div class="live-media-viewer-stage" id="liveMediaViewerStage"></div>
         </div>
       </div>
     `;
@@ -509,11 +558,18 @@ class LiveChatApp {
     document.getElementById('liveCallZoom')?.addEventListener('input', (event) => this.applyCameraZoom(Number(event.target.value || 1)));
     document.getElementById('liveToggleCameraBtn')?.addEventListener('click', () => this.toggleCamera());
     document.getElementById('liveRequestVideoBtn')?.addEventListener('click', () => this.requestVideoUpgrade());
+    document.getElementById('liveAddCallParticipantBtn')?.addEventListener('click', () => this.openAddCallParticipantModal());
     document.getElementById('liveToggleMicBtn')?.addEventListener('click', () => this.toggleMicrophone());
     document.getElementById('liveRemoteMuteBtn')?.addEventListener('click', () => this.toggleRemotePeerMute());
     document.getElementById('liveToggleSpeakerBtn')?.addEventListener('click', () => this.toggleSpeaker());
     document.getElementById('liveCallVolume')?.addEventListener('input', (event) => this.setSpeakerVolume(Number(event.target.value || 0)));
     document.getElementById('liveFullscreenCallBtn')?.addEventListener('click', () => this.toggleCallFullscreen());
+    document.getElementById('liveRestoreCallBtn')?.addEventListener('click', () => this.restoreCallWindow());
+    document.getElementById('liveCallMirrorBtn')?.addEventListener('click', () => this.toggleCameraMirror());
+    document.querySelector('.live-local-video-tile')?.addEventListener('click', (event) => this.handleVideoTileSwap(event, 'local'));
+    document.querySelector('.live-remote-video-tile')?.addEventListener('click', (event) => this.handleVideoTileSwap(event, 'remote'));
+    document.getElementById('liveAddCallClose')?.addEventListener('click', () => this.closeAddCallParticipantModal());
+    document.getElementById('liveAddCallInvite')?.addEventListener('click', () => this.inviteSelectedCallParticipants());
     document.getElementById('liveCreateGroupBtn')?.addEventListener('click', () => this.openGroupModal());
     document.getElementById('liveGroupClose')?.addEventListener('click', () => this.closeGroupModal());
     document.getElementById('liveGroupSave')?.addEventListener('click', () => this.createGroup());
@@ -536,6 +592,19 @@ class LiveChatApp {
     document.getElementById('liveAttachmentRetake')?.addEventListener('click', () => this.retakeAttachment());
     document.getElementById('liveAttachmentDelete')?.addEventListener('click', () => this.clearAttachmentDraft());
     document.getElementById('liveAttachmentSend')?.addEventListener('click', () => this.sendAttachmentDraft());
+    document.getElementById('liveMediaClose')?.addEventListener('click', () => this.closeMediaViewer());
+    document.getElementById('liveMediaExpand')?.addEventListener('click', () => this.toggleMediaViewerExpanded());
+    document.getElementById('liveMediaMinimize')?.addEventListener('click', () => this.toggleMediaViewerMinimized());
+    document.getElementById('liveMediaZoomIn')?.addEventListener('click', () => this.zoomMediaViewer(0.25));
+    document.getElementById('liveMediaZoomOut')?.addEventListener('click', () => this.zoomMediaViewer(-0.25));
+    document.getElementById('liveMediaViewerModal')?.addEventListener('click', (event) => {
+      if (event.target === event.currentTarget) this.closeMediaViewer();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !document.getElementById('liveMediaViewerModal')?.classList.contains('hidden')) {
+        this.closeMediaViewer();
+      }
+    });
     document.getElementById('liveSelectionBar')?.addEventListener('click', (event) => this.handleSelectionAction(event));
     document.getElementById('livePinnedBar')?.addEventListener('click', (event) => this.handlePinnedBarClick(event));
     document.getElementById('liveReactionClose')?.addEventListener('click', () => this.closeReactionSheet());
@@ -702,6 +771,8 @@ class LiveChatApp {
       const data = await this.fetchJson(API.bootstrap);
       const previousUserId = this.currentUserId;
       this.currentUserId = String(data.currentUserId || this.currentUserId);
+      this.currentUserName = String(data.currentUserName || this.currentUserName || 'You');
+      localStorage.setItem('loggedInUserName', this.currentUserName);
       if (previousUserId !== this.currentUserId) {
         this.drafts = this.loadDrafts();
       }
@@ -853,13 +924,19 @@ class LiveChatApp {
     if (!this.featureSettings.voiceNotesEnabled) document.getElementById('liveVoiceBtn')?.classList.add('hidden');
     if (!this.featureSettings.attachmentsEnabled) document.getElementById('liveAttachBtn')?.classList.add('hidden');
     this.restoreDraftForCurrentThread();
-    this.lastMessageIdByThread[this.threadKey()] = 0;
+    const key = this.threadKey();
+    this.lastMessageIdByThread[key] = 0;
     this.renderedMessageIds.clear();
     this.pendingMessages.clear();
-    delete this.typingByThread[this.threadKey()];
+    delete this.typingByThread[key];
     this.hideTypingIndicator();
-    document.getElementById('liveChatMessages').innerHTML = '<div class="live-chat-empty">Loading conversation...</div>';
-    await this.loadMessages(true);
+    const cachedMessages = this.messageCacheByThread.get(key);
+    if (cachedMessages?.length) {
+      this.renderMessages(cachedMessages, true);
+    } else {
+      document.getElementById('liveChatMessages').innerHTML = '<div class="live-chat-empty">Loading conversation...</div>';
+    }
+    this.loadMessages(true).catch(() => {});
   }
 
   showThreadList() {
@@ -880,6 +957,13 @@ class LiveChatApp {
     if (this.featureSettings.audioCallsEnabled || this.featureSettings.videoCallsEnabled) this.pollCalls();
   }
 
+  accelerateSignalPolling(durationMs = 8000) {
+    this.callFastSignalUntil = Math.max(this.callFastSignalUntil || 0, Date.now() + durationMs);
+    if (this.activeCall && (!this.timers.signals || this.liveChatPollMs('signalPollMs', 350, 150, 5000) > 120)) {
+      this.startSignalPolling();
+    }
+  }
+
   stop() {
     Object.keys(this.timers).forEach((key) => {
       if (this.timers[key]) clearInterval(this.timers[key]);
@@ -891,6 +975,9 @@ class LiveChatApp {
     window.clearTimeout(this.chatDateBadgeTimer);
     if (this.typingPulseTimer) window.clearInterval(this.typingPulseTimer);
     this.typingPulseTimer = null;
+    this.messageAbortController?.abort();
+    this.messageAbortController = null;
+    this.messagePollInFlight = false;
     this.cleanupCall();
   }
 
@@ -912,19 +999,36 @@ class LiveChatApp {
   }
 
   async loadMessages(force = false) {
-    if (!this.selectedThread || this.messagePollInFlight) return;
+    if (!this.selectedThread) return;
+    if (this.messagePollInFlight && !force) return;
     if (!force && document.getElementById('liveChatDock')?.classList.contains('collapsed')) return;
+    if (force && this.messageAbortController) {
+      this.messageAbortController.abort();
+      this.messagePollInFlight = false;
+    }
     const key = this.threadKey();
+    const thread = { ...this.selectedThread };
     const since = force ? 0 : (this.lastMessageIdByThread[key] || 0);
     this.messagePollInFlight = true;
+    const controller = new AbortController();
+    this.messageAbortController = controller;
     try {
-      const url = `${API.messages}?peer_type=${encodeURIComponent(this.selectedThread.type)}&peer_id=${encodeURIComponent(this.selectedThread.id)}&since_id=${since}`;
-      const data = await this.fetchJson(url);
+      const url = `${API.messages}?peer_type=${encodeURIComponent(thread.type)}&peer_id=${encodeURIComponent(thread.id)}&since_id=${since}`;
+      const data = await this.fetchJson(url, { signal: controller.signal });
+      if (!this.selectedThread || this.threadKey() !== key) return;
       const incoming = (data.messages || []).filter((message) => !message.isDeleted && !message.isOwn && !this.renderedMessageIds.has(Number(message.id || 0)));
       this.syncMessageReceipts(data.receipts || []);
       this.applyDeletedMessageUpdates(data.deletedUpdates || []);
       this.renderTypingIndicator(data.typing || []);
       this.renderMessages(data.messages || [], force);
+      if (force) {
+        this.messageCacheByThread.set(key, data.messages || []);
+      } else if ((data.messages || []).length) {
+        const existing = this.messageCacheByThread.get(key) || [];
+        const byId = new Map(existing.map((message) => [Number(message.id || 0), message]));
+        (data.messages || []).forEach((message) => byId.set(Number(message.id || 0), message));
+        this.messageCacheByThread.set(key, Array.from(byId.values()).sort((a, b) => Number(a.id || 0) - Number(b.id || 0)).slice(-120));
+      }
       this.reportVisibleMessagesRead();
       if (!force && incoming.length > 0) {
         this.playMessageNotification(incoming[incoming.length - 1]);
@@ -933,9 +1037,12 @@ class LiveChatApp {
         this.loadUsers().catch(() => {});
       }
     } catch (error) {
-      console.warn('Live chat message poll failed:', error);
+      if (error?.name !== 'AbortError') console.warn('Live chat message poll failed:', error);
     } finally {
-      this.messagePollInFlight = false;
+      if (this.messageAbortController === controller) {
+        this.messageAbortController = null;
+        this.messagePollInFlight = false;
+      }
     }
   }
 
@@ -1490,6 +1597,9 @@ class LiveChatApp {
     if (message.isDeleted) {
       return `<button type="button" class="live-message-actions-btn" title="Message actions"><i class="fas fa-chevron-down"></i></button><em class="live-deleted-message">This message was deleted</em><small>${formatTime(message.createdAt)}</small>`;
     }
+    if (message.kind === 'call') {
+      return this.callRecordHtml(message);
+    }
     const fileUrl = message.filePath ? new URL(message.filePath, BACKEND_ROOT).href : '';
     const fileName = escapeHtml(message.fileName || 'Attachment');
     const mimeType = String(message.mimeType || '').toLowerCase();
@@ -1497,11 +1607,17 @@ class LiveChatApp {
     if (fileUrl) {
       const downloadLink = `<a class="live-file-download" href="${fileUrl}" download="${fileName}"><i class="fas fa-download"></i> Download</a>`;
       if (message.kind === 'voice' || mimeType.startsWith('audio/')) {
-        filePart = `<div class="live-file-preview-message"><audio controls src="${fileUrl}"></audio>${downloadLink}</div>`;
+        filePart = `
+          <div class="live-thread-voice-note">
+            <span class="live-thread-voice-icon"><i class="fas fa-microphone-lines" aria-hidden="true"></i></span>
+            <audio controls preload="metadata" src="${fileUrl}"></audio>
+            <a class="live-thread-voice-download" href="${fileUrl}" download="${fileName}" title="Download voice note"><i class="fas fa-download" aria-hidden="true"></i></a>
+          </div>
+        `;
       } else if (mimeType.startsWith('image/')) {
-        filePart = `<figure class="live-file-preview-message"><a href="${fileUrl}" target="_blank" rel="noopener"><img src="${fileUrl}" alt="${fileName}" loading="lazy"></a><figcaption>${fileName}</figcaption>${downloadLink}</figure>`;
+        filePart = `<figure class="live-file-preview-message"><button type="button" class="live-media-open" data-media-type="image" data-media-url="${escapeHtml(fileUrl)}" data-media-name="${fileName}" title="Open photo"><img src="${fileUrl}" alt="${fileName}" loading="lazy" decoding="async"></button><figcaption>${fileName}</figcaption>${downloadLink}</figure>`;
       } else if (mimeType.startsWith('video/')) {
-        filePart = `<div class="live-file-preview-message"><video controls preload="metadata" src="${fileUrl}"></video><span>${fileName}</span>${downloadLink}</div>`;
+        filePart = `<div class="live-file-preview-message"><button type="button" class="live-media-open video" data-media-type="video" data-media-url="${escapeHtml(fileUrl)}" data-media-name="${fileName}" title="Open video"><video preload="metadata" muted playsinline src="${fileUrl}"></video><i class="fas fa-video"></i></button><span>${fileName}</span>${downloadLink}</div>`;
       } else {
         filePart = `<div class="live-file-preview-message compact"><a href="${fileUrl}" target="_blank" rel="noopener"><i class="fas fa-paperclip" aria-hidden="true"></i> ${fileName}</a>${downloadLink}</div>`;
       }
@@ -1573,7 +1689,51 @@ class LiveChatApp {
     `;
   }
 
+  callRecordHtml(message) {
+    let call = {};
+    try {
+      call = JSON.parse(message.text || '{}') || {};
+    } catch (_error) {
+      call = {};
+    }
+    const callType = String(call.callType || 'audio').toLowerCase() === 'video' ? 'video' : 'audio';
+    const status = String(call.status || 'ended').toLowerCase();
+    const icon = callType === 'video' ? 'fa-video' : 'fa-phone';
+    const isCaller = String(call.callerId || '') === String(this.currentUserId || '');
+    const peerName = isCaller ? (call.calleeName || 'Recipient') : (call.callerName || 'Caller');
+    const statusLabels = {
+      ended: 'Call ended',
+      missed: isCaller ? 'Unanswered call' : 'Missed call',
+      rejected: isCaller ? 'Call declined' : 'Call rejected',
+      accepted: 'Call connected'
+    };
+    const duration = Number(call.durationSeconds || 0);
+    const durationText = duration > 0 ? this.formatDuration(duration) : '';
+    return `
+      <button type="button" class="live-message-actions-btn" title="Message actions"><i class="fas fa-chevron-down"></i></button>
+      <div class="live-call-thread-record ${escapeHtml(status)}">
+        <span class="live-call-thread-icon"><i class="fas ${icon}"></i></span>
+        <div>
+          <strong>${escapeHtml(statusLabels[status] || 'Call record')}</strong>
+          <small>${escapeHtml(callType)} call with ${escapeHtml(peerName)}${durationText ? ` - ${escapeHtml(durationText)}` : ''}</small>
+        </div>
+      </div>
+      <small class="live-message-meta">${formatTime(call.endedAt || call.createdAt || message.createdAt)}</small>
+    `;
+  }
+
   handleMessageClick(event) {
+    const mediaButton = event.target instanceof Element ? event.target.closest('.live-media-open[data-media-url]') : null;
+    if (mediaButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.openMediaViewer({
+        type: mediaButton.dataset.mediaType || 'image',
+        url: mediaButton.dataset.mediaUrl || '',
+        name: mediaButton.dataset.mediaName || 'Media'
+      });
+      return;
+    }
     const reaction = event.target instanceof Element ? event.target.closest('.live-message-reaction') : null;
     if (reaction) {
       event.stopPropagation();
@@ -1677,6 +1837,194 @@ class LiveChatApp {
     menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
     menu.style.visibility = '';
+  }
+
+  openMediaViewer({ type = 'image', url = '', name = 'Media' } = {}) {
+    const modal = document.getElementById('liveMediaViewerModal');
+    const stage = document.getElementById('liveMediaViewerStage');
+    const title = document.getElementById('liveMediaViewerTitle');
+    const meta = document.getElementById('liveMediaViewerMeta');
+    const download = document.getElementById('liveMediaDownload');
+    if (!modal || !stage || !url) return;
+
+    this.mediaViewerZoom = 1;
+    document.getElementById('liveChatDock')?.classList.add('media-viewer-active');
+    modal.classList.remove('hidden', 'expanded', 'minimized', 'video-mode', 'image-mode');
+    this.syncMediaViewerMinimizeButton();
+    modal.classList.add(type === 'video' ? 'video-mode' : 'image-mode');
+    modal.setAttribute('aria-hidden', 'false');
+    if (title) title.textContent = type === 'video' ? 'Video Preview' : 'Photo Preview';
+    if (meta) meta.textContent = name || 'Media';
+    if (download) {
+      download.href = url;
+      download.download = name || '';
+    }
+
+    if (type === 'video') {
+      stage.innerHTML = `<video id="liveMediaViewerVideo" controls autoplay playsinline preload="metadata" src="${escapeHtml(url)}"></video>`;
+      document.getElementById('liveMediaZoomIn')?.classList.add('hidden');
+      document.getElementById('liveMediaZoomOut')?.classList.add('hidden');
+      const video = document.getElementById('liveMediaViewerVideo');
+      video?.focus?.();
+      video?.play?.().catch(() => {});
+      return;
+    }
+
+    stage.innerHTML = `<img id="liveMediaViewerImage" src="${escapeHtml(url)}" alt="${escapeHtml(name || 'Photo')}" decoding="async">`;
+    document.getElementById('liveMediaZoomIn')?.classList.remove('hidden');
+    document.getElementById('liveMediaZoomOut')?.classList.remove('hidden');
+    this.applyMediaViewerZoom();
+    this.bindMediaViewerPinch();
+  }
+
+  closeMediaViewer() {
+    const modal = document.getElementById('liveMediaViewerModal');
+    const stage = document.getElementById('liveMediaViewerStage');
+    stage?.querySelectorAll('video').forEach((video) => {
+      video.pause();
+      video.removeAttribute('src');
+      video.load?.();
+    });
+    if (stage) stage.innerHTML = '';
+    modal?.classList.add('hidden');
+    modal?.classList.remove('expanded', 'minimized', 'video-mode', 'image-mode');
+    modal?.setAttribute('aria-hidden', 'true');
+    this.syncMediaViewerMinimizeButton();
+    document.getElementById('liveChatDock')?.classList.remove('media-viewer-active');
+    this.mediaViewerZoom = 1;
+    this.mediaViewerPinch = null;
+  }
+
+  toggleMediaViewerExpanded() {
+    const modal = document.getElementById('liveMediaViewerModal');
+    if (!modal) return;
+    modal.classList.remove('minimized');
+    modal.classList.toggle('expanded');
+    const button = document.getElementById('liveMediaExpand');
+    if (button) button.title = modal.classList.contains('expanded') ? 'Restore' : 'Expand';
+    this.syncMediaViewerMinimizeButton();
+  }
+
+  toggleMediaViewerMinimized() {
+    const modal = document.getElementById('liveMediaViewerModal');
+    if (!modal) return;
+    modal.classList.remove('expanded');
+    modal.classList.toggle('minimized');
+    this.syncMediaViewerMinimizeButton();
+  }
+
+  syncMediaViewerMinimizeButton() {
+    const modal = document.getElementById('liveMediaViewerModal');
+    const button = document.getElementById('liveMediaMinimize');
+    if (!modal || !button) return;
+    const minimized = modal.classList.contains('minimized');
+    button.title = minimized ? 'Restore' : 'Minimize';
+    button.innerHTML = minimized
+      ? '<i class="fas fa-arrow-up-right-from-square"></i>'
+      : '<i class="fas fa-minus"></i>';
+  }
+
+  zoomMediaViewer(delta = 0) {
+    this.mediaViewerZoom = Math.max(0.5, Math.min(4, Number(this.mediaViewerZoom || 1) + delta));
+    this.applyMediaViewerZoom();
+  }
+
+  applyMediaViewerZoom() {
+    const image = document.getElementById('liveMediaViewerImage');
+    if (!image) return;
+    const zoom = Number(this.mediaViewerZoom || 1);
+    image.style.transform = `scale(${zoom})`;
+    image.style.cursor = zoom > 1 ? 'zoom-out' : 'zoom-in';
+  }
+
+  toggleMediaViewerTapZoom() {
+    if (!document.getElementById('liveMediaViewerImage')) return;
+    this.mediaViewerZoom = Number(this.mediaViewerZoom || 1) > 1 ? 1 : 1.75;
+    this.applyMediaViewerZoom();
+  }
+
+  bindMediaViewerPinch() {
+    const stage = document.getElementById('liveMediaViewerStage');
+    if (!stage || stage.dataset.pinchBound === '1') return;
+    stage.dataset.pinchBound = '1';
+    const points = new Map();
+    let tapCandidate = null;
+    let pinchHappened = false;
+    let lastMobileTapAt = 0;
+    const distance = () => {
+      const values = Array.from(points.values());
+      if (values.length < 2) return 0;
+      const [a, b] = values;
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    };
+
+    stage.addEventListener('pointerdown', (event) => {
+      if (!document.getElementById('liveMediaViewerImage')) return;
+      points.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      stage.setPointerCapture?.(event.pointerId);
+      if (points.size === 1) {
+        tapCandidate = {
+          pointerId: event.pointerId,
+          x: event.clientX,
+          y: event.clientY,
+          startedAt: Date.now(),
+          moved: false
+        };
+        pinchHappened = false;
+      }
+      if (points.size === 2) {
+        pinchHappened = true;
+        if (tapCandidate) tapCandidate.moved = true;
+        this.mediaViewerPinch = {
+          distance: distance(),
+          zoom: Number(this.mediaViewerZoom || 1)
+        };
+      }
+    });
+
+    stage.addEventListener('pointermove', (event) => {
+      if (!points.has(event.pointerId)) return;
+      points.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (tapCandidate?.pointerId === event.pointerId) {
+        const movedBy = Math.hypot(event.clientX - tapCandidate.x, event.clientY - tapCandidate.y);
+        if (movedBy > 8) tapCandidate.moved = true;
+      }
+      if (points.size !== 2 || !this.mediaViewerPinch?.distance) return;
+      event.preventDefault();
+      const nextDistance = distance();
+      if (!nextDistance) return;
+      const scale = nextDistance / this.mediaViewerPinch.distance;
+      this.mediaViewerZoom = Math.max(0.5, Math.min(4, this.mediaViewerPinch.zoom * scale));
+      this.applyMediaViewerZoom();
+    }, { passive: false });
+
+    const endPointer = (event) => {
+      const wasTap = tapCandidate?.pointerId === event.pointerId
+        && !tapCandidate.moved
+        && !pinchHappened
+        && Date.now() - tapCandidate.startedAt < 450;
+      points.delete(event.pointerId);
+      if (points.size < 2) this.mediaViewerPinch = null;
+      if (points.size === 0) pinchHappened = false;
+      if (wasTap) {
+        event.preventDefault();
+        if (this.isMobileInputMode()) {
+          const now = Date.now();
+          if (now - lastMobileTapAt <= 320) {
+            lastMobileTapAt = 0;
+            this.toggleMediaViewerTapZoom();
+          } else {
+            lastMobileTapAt = now;
+          }
+        } else {
+          this.toggleMediaViewerTapZoom();
+        }
+      }
+      if (tapCandidate?.pointerId === event.pointerId) tapCandidate = null;
+    };
+    stage.addEventListener('pointerup', endPointer);
+    stage.addEventListener('pointercancel', endPointer);
+    stage.addEventListener('pointerleave', endPointer);
   }
 
   handleMessageKeydown(event) {
@@ -2184,40 +2532,147 @@ class LiveChatApp {
     document.getElementById('liveAttachmentPicker')?.classList.add('hidden');
   }
 
-  async openCameraCapture() {
+  async openCameraCapture(options = {}) {
+    const requestedDeviceId = String(options.deviceId || this.selectedVideoDeviceId || '').trim();
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: this.cameraFacingMode }, audio: false });
+      this.stopCameraStream();
+      await this.populateAttachmentCameraDevices();
+      const videoConstraint = this.buildAttachmentCameraConstraint(requestedDeviceId);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: this.getCallVideoConstraints(videoConstraint),
+        audio: this.attachmentCaptureMode === 'video'
+      });
+      const activeSettings = stream.getVideoTracks?.()[0]?.getSettings?.() || {};
+      if (requestedDeviceId && activeSettings.deviceId && activeSettings.deviceId !== requestedDeviceId) {
+        stream.getTracks().forEach((track) => track.stop());
+        throw new Error('The browser returned a different camera than the one selected.');
+      }
       this.cameraStream = stream;
+      if (activeSettings.deviceId) this.selectedVideoDeviceId = activeSettings.deviceId;
+      await this.populateAttachmentCameraDevices();
       document.getElementById('liveAttachmentModal')?.classList.remove('hidden', 'image-preview-mode');
       document.getElementById('liveAttachmentModal')?.classList.add('camera-capture-mode');
-      document.getElementById('liveAttachmentTitle').textContent = 'Camera';
+      document.getElementById('liveAttachmentTitle').textContent = 'Camera Capture';
       const stage = document.getElementById('liveAttachmentStage');
       stage.innerHTML = `
+        <div class="live-camera-controlbar">
+          <div class="live-camera-mode-tabs" role="tablist" aria-label="Capture mode">
+            <button type="button" id="livePhotoMode" class="${this.attachmentCaptureMode === 'photo' ? 'active' : ''}" data-mode="photo"><i class="fas fa-camera"></i> Photo</button>
+            <button type="button" id="liveVideoMode" class="${this.attachmentCaptureMode === 'video' ? 'active' : ''}" data-mode="video"><i class="fas fa-video"></i> Video</button>
+          </div>
+          <label class="live-camera-select-wrap">
+            <span>Camera</span>
+            <select id="liveAttachmentCameraSelect"></select>
+          </label>
+        </div>
         <div class="live-camera-frame">
           <video id="liveCameraPreview" autoplay playsinline></video>
+          <span id="liveAttachmentRecordingBadge" class="live-recording-badge hidden"><i class="fas fa-circle"></i> 00:00</span>
           <button type="button" id="liveMirrorCameraBtn" class="live-camera-mirror-btn" title="Mirror front camera"><i class="fas fa-arrows-left-right"></i></button>
         </div>
         <div class="live-camera-actions">
           <button type="button" id="liveCameraFlip"><i class="fas fa-camera-rotate"></i> Front/Back</button>
           <label class="live-camera-zoom"><i class="fas fa-magnifying-glass-plus"></i><input id="liveCameraZoom" type="range" min="1" max="3" step="0.1" value="${this.cameraZoom}"></label>
-          <button type="button" id="liveCapturePhoto"><i class="fas fa-camera"></i> Capture</button>
+          <label class="live-camera-filter"><i class="fas fa-sliders"></i><select id="liveCameraFilter">
+            <option value="none">Normal</option>
+            <option value="warm">Warm</option>
+            <option value="cool">Cool</option>
+            <option value="mono">Mono</option>
+            <option value="vivid">Vivid</option>
+            <option value="soft">Soft</option>
+          </select></label>
+          <button type="button" id="liveCapturePhoto" class="${this.attachmentCaptureMode === 'photo' ? '' : 'hidden'}"><i class="fas fa-camera"></i> Shoot Photo</button>
+          <button type="button" id="liveStartVideoCapture" class="${this.attachmentCaptureMode === 'video' ? '' : 'hidden'}"><i class="fas fa-video"></i> Record Video</button>
+          <button type="button" id="liveStopVideoCapture" class="hidden recording"><i class="fas fa-stop"></i> Stop</button>
           <button type="button" id="liveCancelCamera">Cancel</button>
         </div>
       `;
-      document.getElementById('liveCameraPreview').srcObject = stream;
+      this.renderAttachmentCameraOptions();
+      const preview = document.getElementById('liveCameraPreview');
+      preview.srcObject = stream;
+      preview.muted = true;
       this.syncCameraMirrorPreview();
+      this.applyAttachmentCameraFilter();
       this.applyCameraZoom(this.cameraZoom);
+      document.getElementById('liveAttachmentCameraSelect')?.addEventListener('change', (event) => this.switchAttachmentCameraDevice(event.target.value));
+      document.querySelectorAll('.live-camera-mode-tabs button').forEach((button) => {
+        button.addEventListener('click', () => this.setAttachmentCaptureMode(button.dataset.mode || 'photo'));
+      });
       document.getElementById('liveCameraFlip')?.addEventListener('click', () => this.switchAttachmentCamera());
       document.getElementById('liveMirrorCameraBtn')?.addEventListener('click', () => this.toggleCameraMirror());
       document.getElementById('liveCameraZoom')?.addEventListener('input', (event) => this.applyCameraZoom(Number(event.target.value || 1)));
-      document.getElementById('liveCapturePhoto')?.addEventListener('click', () => this.captureCameraPhoto(), { once: true });
+      document.getElementById('liveCameraFilter')?.addEventListener('change', (event) => {
+        this.attachmentCameraFilter = event.target.value || 'none';
+        this.applyAttachmentCameraFilter();
+      });
+      document.getElementById('liveCapturePhoto')?.addEventListener('click', () => this.captureCameraPhoto());
+      document.getElementById('liveStartVideoCapture')?.addEventListener('click', () => this.startAttachmentVideoRecording());
+      document.getElementById('liveStopVideoCapture')?.addEventListener('click', () => this.stopAttachmentVideoRecording());
       document.getElementById('liveCancelCamera')?.addEventListener('click', () => this.closeAttachmentEditor(), { once: true });
-    } catch (_error) {
+    } catch (error) {
+      if (requestedDeviceId || options.suppressFileFallback) {
+        showNotice('Camera Switch Failed', error.message || 'Unable to open the selected camera.');
+        if (options.previousDeviceId && options.previousDeviceId !== this.selectedVideoDeviceId && !options.recovering) {
+          this.selectedVideoDeviceId = options.previousDeviceId;
+          await this.openCameraCapture({ deviceId: options.previousDeviceId, suppressFileFallback: true, recovering: true });
+        }
+        return;
+      }
       const input = document.getElementById('liveChatAttachmentInput');
-      input.accept = 'image/*';
+      input.accept = 'image/*,video/*';
       input.setAttribute('capture', 'environment');
       input.click();
     }
+  }
+
+  async populateAttachmentCameraDevices() {
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      this.availableVideoDevices = [];
+      return;
+    }
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    this.availableVideoDevices = devices.filter((device) => device.kind === 'videoinput');
+    if (!this.selectedVideoDeviceId && this.availableVideoDevices.length) {
+      const integrated = this.availableVideoDevices.find((device) => /integrated|built.?in|front/i.test(device.label || ''));
+      this.selectedVideoDeviceId = (integrated || this.availableVideoDevices[0]).deviceId;
+    }
+  }
+
+  renderAttachmentCameraOptions() {
+    const select = document.getElementById('liveAttachmentCameraSelect');
+    if (!select) return;
+    select.innerHTML = this.availableVideoDevices.length
+      ? this.availableVideoDevices.map((device, index) => {
+          const selected = device.deviceId === this.selectedVideoDeviceId ? 'selected' : '';
+          return `<option value="${escapeHtml(device.deviceId)}" ${selected}>${escapeHtml(device.label || `Camera ${index + 1}`)}</option>`;
+        }).join('')
+      : '<option value="">Default camera</option>';
+    select.disabled = this.availableVideoDevices.length === 0;
+    const filter = document.getElementById('liveCameraFilter');
+    if (filter) filter.value = this.attachmentCameraFilter || 'none';
+  }
+
+  buildAttachmentCameraConstraint(deviceId = this.selectedVideoDeviceId) {
+    const requestedDeviceId = String(deviceId || '').trim();
+    if (requestedDeviceId) {
+      return { deviceId: { exact: requestedDeviceId } };
+    }
+    return { facingMode: { ideal: this.cameraFacingMode } };
+  }
+
+  async setAttachmentCaptureMode(mode) {
+    const nextMode = mode === 'video' ? 'video' : 'photo';
+    if (this.attachmentCaptureMode === nextMode) return;
+    this.attachmentCaptureMode = nextMode;
+    await this.openCameraCapture();
+  }
+
+  async switchAttachmentCameraDevice(deviceId) {
+    const nextDeviceId = String(deviceId || '').trim();
+    if (!nextDeviceId || nextDeviceId === this.selectedVideoDeviceId) return;
+    const previousDeviceId = this.selectedVideoDeviceId;
+    this.selectedVideoDeviceId = nextDeviceId;
+    await this.openCameraCapture({ deviceId: nextDeviceId, previousDeviceId, suppressFileFallback: true });
   }
 
   captureCameraPhoto() {
@@ -2231,6 +2686,7 @@ class LiveChatApp {
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
     }
+    ctx.filter = this.getAttachmentCanvasFilter();
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     canvas.toBlob((blob) => {
       if (!blob) return;
@@ -2239,12 +2695,116 @@ class LiveChatApp {
     }, 'image/jpeg', 0.92);
   }
 
+  getAttachmentCanvasFilter() {
+    const filters = {
+      none: 'none',
+      warm: 'sepia(0.18) saturate(1.18) brightness(1.04)',
+      cool: 'saturate(1.08) hue-rotate(185deg) brightness(1.02)',
+      mono: 'grayscale(1) contrast(1.05)',
+      vivid: 'saturate(1.38) contrast(1.08)',
+      soft: 'brightness(1.05) contrast(0.94) saturate(0.96)'
+    };
+    return filters[this.attachmentCameraFilter] || filters.none;
+  }
+
+  applyAttachmentCameraFilter() {
+    const video = document.getElementById('liveCameraPreview');
+    if (!video) return;
+    video.classList.remove('filter-warm', 'filter-cool', 'filter-mono', 'filter-vivid', 'filter-soft');
+    const filter = this.attachmentCameraFilter || 'none';
+    if (filter !== 'none') {
+      video.classList.add(`filter-${filter}`);
+    }
+  }
+
+  getSupportedAttachmentVideoMimeType() {
+    const candidates = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm'
+    ];
+    return candidates.find((type) => window.MediaRecorder?.isTypeSupported?.(type)) || '';
+  }
+
+  startAttachmentVideoRecording() {
+    if (!this.cameraStream || !window.MediaRecorder) {
+      showNotice('Video Capture', 'Video recording is not supported by this browser.', 'info');
+      return;
+    }
+    if (this.attachmentMediaRecorder?.state === 'recording') return;
+
+    const mimeType = this.getSupportedAttachmentVideoMimeType();
+    this.attachmentRecordedChunks = [];
+    this.attachmentRecordingStartedAt = Date.now();
+    this.attachmentMediaRecorder = new MediaRecorder(this.cameraStream, mimeType ? { mimeType } : undefined);
+    this.attachmentMediaRecorder.ondataavailable = (event) => {
+      if (event.data?.size) this.attachmentRecordedChunks.push(event.data);
+    };
+    this.attachmentMediaRecorder.onstop = () => this.finishAttachmentVideoRecording(mimeType || 'video/webm');
+    this.attachmentMediaRecorder.start(250);
+    this.syncAttachmentRecordingState(true);
+  }
+
+  stopAttachmentVideoRecording() {
+    if (this.attachmentMediaRecorder?.state === 'recording') {
+      this.attachmentMediaRecorder.stop();
+    }
+    this.syncAttachmentRecordingState(false);
+  }
+
+  finishAttachmentVideoRecording(mimeType = 'video/webm') {
+    this.clearAttachmentRecordingTimer();
+    const chunks = this.attachmentRecordedChunks.slice();
+    this.attachmentRecordedChunks = [];
+    this.attachmentMediaRecorder = null;
+    if (!chunks.length) return;
+    const blob = new Blob(chunks, { type: mimeType });
+    const extension = mimeType.includes('mp4') ? 'mp4' : 'webm';
+    const file = new File([blob], `camera-video-${Date.now()}.${extension}`, { type: mimeType });
+    this.prepareAttachmentDraft(file, '', true);
+  }
+
+  syncAttachmentRecordingState(isRecording) {
+    document.getElementById('liveStartVideoCapture')?.classList.toggle('hidden', isRecording || this.attachmentCaptureMode !== 'video');
+    document.getElementById('liveStopVideoCapture')?.classList.toggle('hidden', !isRecording);
+    document.getElementById('liveCapturePhoto')?.classList.toggle('hidden', isRecording || this.attachmentCaptureMode !== 'photo');
+    document.getElementById('liveAttachmentCameraSelect') && (document.getElementById('liveAttachmentCameraSelect').disabled = isRecording || this.availableVideoDevices.length === 0);
+    document.querySelectorAll('.live-camera-mode-tabs button, #liveCameraFlip').forEach((button) => {
+      button.disabled = isRecording;
+    });
+    const badge = document.getElementById('liveAttachmentRecordingBadge');
+    if (badge) badge.classList.toggle('hidden', !isRecording);
+    if (isRecording) {
+      this.startAttachmentRecordingTimer();
+    } else {
+      this.clearAttachmentRecordingTimer();
+    }
+  }
+
+  startAttachmentRecordingTimer() {
+    this.clearAttachmentRecordingTimer();
+    const render = () => {
+      const elapsed = Math.max(0, Math.floor((Date.now() - this.attachmentRecordingStartedAt) / 1000));
+      const badge = document.getElementById('liveAttachmentRecordingBadge');
+      if (badge) badge.innerHTML = `<i class="fas fa-circle"></i> ${this.formatDuration(elapsed)}`;
+    };
+    render();
+    this.attachmentRecordingTimer = setInterval(render, 500);
+  }
+
+  clearAttachmentRecordingTimer() {
+    if (this.attachmentRecordingTimer) clearInterval(this.attachmentRecordingTimer);
+    this.attachmentRecordingTimer = null;
+  }
+
   async prepareAttachmentDraft(file, caption = '', fromCamera = false) {
     this.stopCameraStream();
     this.attachmentDraft = { file, caption, url: URL.createObjectURL(file), fromCamera, editedBlob: null };
     document.getElementById('liveAttachmentModal')?.classList.remove('hidden', 'camera-capture-mode');
     document.getElementById('liveAttachmentModal')?.classList.add('image-preview-mode');
-    document.getElementById('liveAttachmentTitle').textContent = fromCamera ? 'Review Photo' : 'Attachment Preview';
+    document.getElementById('liveAttachmentTitle').textContent = fromCamera
+      ? (file.type.startsWith('video/') ? 'Review Video' : 'Review Photo')
+      : 'Attachment Preview';
     document.getElementById('liveAttachmentComposerPreview')?.classList.remove('hidden');
     document.getElementById('liveAttachmentComposeName').textContent = file.name || 'Attachment ready';
     document.getElementById('liveAttachmentCaption').value = caption || '';
@@ -2356,12 +2916,29 @@ class LiveChatApp {
   }
 
   stopCameraStream() {
+    if (this.attachmentMediaRecorder?.state === 'recording') {
+      this.attachmentMediaRecorder.onstop = null;
+      this.attachmentMediaRecorder.stop();
+    }
+    this.attachmentMediaRecorder = null;
+    this.attachmentRecordedChunks = [];
+    this.clearAttachmentRecordingTimer();
     this.cameraStream?.getTracks().forEach((track) => track.stop());
     this.cameraStream = null;
   }
 
   async switchAttachmentCamera() {
+    await this.populateAttachmentCameraDevices();
+    if (this.availableVideoDevices.length > 1) {
+      const currentIndex = Math.max(0, this.availableVideoDevices.findIndex((device) => device.deviceId === this.selectedVideoDeviceId));
+      const nextDevice = this.availableVideoDevices[(currentIndex + 1) % this.availableVideoDevices.length];
+      const previousDeviceId = this.selectedVideoDeviceId;
+      this.selectedVideoDeviceId = nextDevice.deviceId;
+      await this.openCameraCapture({ deviceId: nextDevice.deviceId, previousDeviceId, suppressFileFallback: true });
+      return;
+    }
     this.cameraFacingMode = this.cameraFacingMode === 'environment' ? 'user' : 'environment';
+    this.selectedVideoDeviceId = '';
     this.stopCameraStream();
     await this.openCameraCapture();
     this.syncCameraMirrorPreview();
@@ -2385,10 +2962,86 @@ class LiveChatApp {
   syncCallCameraPreview() {
     const localVideo = document.getElementById('liveLocalVideo');
     if (localVideo) localVideo.classList.toggle('mirrored', this.shouldMirrorCamera());
+    const button = document.getElementById('liveCallMirrorBtn');
+    if (button) {
+      button.classList.toggle('active', this.shouldMirrorCamera());
+      button.title = this.shouldMirrorCamera() ? 'Show my video unmirrored' : 'Mirror my video';
+    }
+    this.syncVideoParticipantLabels();
+  }
+
+  getLocalParticipantName() {
+    if (!this.activeCall) return this.currentUserName || 'You';
+    if (String(this.activeCall.callerId || '') === String(this.currentUserId || '')) {
+      return this.activeCall.callerName || this.currentUserName || 'You';
+    }
+    return this.activeCall.calleeName || this.currentUserName || 'You';
+  }
+
+  getRemoteParticipantName() {
+    if (!this.activeCall) return this.selectedThread?.name || 'Peer';
+    if (String(this.activeCall.callerId || '') === String(this.currentUserId || '')) {
+      return this.activeCall.calleeName || this.activeCall.peerName || this.selectedThread?.name || 'Peer';
+    }
+    return this.activeCall.callerName || this.activeCall.peerName || this.selectedThread?.name || 'Peer';
+  }
+
+  syncParticipantLabel(elementId, name, visible, inactive = false) {
+    const label = document.getElementById(elementId);
+    if (!label) return;
+    const cleanName = String(name || '').replace(/\s+/g, ' ').trim();
+    label.classList.toggle('hidden', !visible || !cleanName);
+    if (!visible || !cleanName) {
+      label.textContent = '';
+      label.title = '';
+      return;
+    }
+    label.classList.toggle('off', inactive);
+    label.textContent = cleanName;
+    label.title = cleanName;
+  }
+
+  syncVideoParticipantLabels() {
+    const isVideoCall = this.activeCall?.callType === 'video';
+    const localTrack = this.localStream?.getVideoTracks?.()[0];
+    const remoteTrack = this.remoteStream?.getVideoTracks?.()[0];
+    this.syncParticipantLabel(
+      'liveLocalParticipantLabel',
+      this.getLocalParticipantName(),
+      Boolean(isVideoCall && localTrack),
+      Boolean(localTrack && (!localTrack.enabled || localTrack.readyState === 'ended'))
+    );
+    this.syncParticipantLabel(
+      'liveRemoteParticipantLabel',
+      this.getRemoteParticipantName(),
+      Boolean(isVideoCall),
+      Boolean(remoteTrack && remoteTrack.readyState === 'ended')
+    );
+  }
+
+  handleVideoTileSwap(event, tile = 'local') {
+    if (event.target instanceof Element && event.target.closest('button,select,input,label')) return;
+    if (!this.activeCall || this.activeCall.callType !== 'video') return;
+    const clickedLocalPreview = tile === 'local' && !this.localVideoPrimary;
+    const clickedRemotePreview = tile === 'remote' && this.localVideoPrimary;
+    if (!clickedLocalPreview && !clickedRemotePreview) return;
+    this.localVideoPrimary = !this.localVideoPrimary;
+    this.syncVideoStageLayout();
+  }
+
+  syncVideoStageLayout() {
+    const grid = document.querySelector('.live-video-grid');
+    if (!grid) return;
+    grid.classList.toggle('local-primary', this.localVideoPrimary);
+    grid.classList.toggle('remote-primary', !this.localVideoPrimary);
+    document.querySelector('.live-local-video-tile')?.setAttribute('title', this.localVideoPrimary ? 'Showing your video large' : 'Tap to show your video large');
+    document.querySelector('.live-remote-video-tile')?.setAttribute('title', this.localVideoPrimary ? 'Tap to show peer video large' : 'Showing peer video large');
+    this.syncVideoParticipantLabels();
   }
 
   toggleCameraMirror() {
     this.mirrorFrontCamera = !this.mirrorFrontCamera;
+    localStorage.setItem('liveCallMirrorLocalVideo', this.mirrorFrontCamera ? '1' : '0');
     this.syncCameraMirrorPreview();
     this.syncCallCameraPreview();
   }
@@ -2500,6 +3153,9 @@ class LiveChatApp {
       this.renderReplyPreview();
       if (data.chatMessage) {
         this.replacePendingMessage(clientNonce, data.chatMessage);
+        const key = this.threadKey();
+        const existing = this.messageCacheByThread.get(key) || [];
+        this.messageCacheByThread.set(key, [...existing.filter((message) => Number(message.id || 0) !== Number(data.chatMessage.id || 0)), data.chatMessage].slice(-120));
       }
       this.clearCurrentDraft();
       this.scheduleReceiptBurst();
@@ -2570,9 +3226,13 @@ class LiveChatApp {
       const elapsed = Math.max(0, Math.floor((Date.now() - this.recordingStartTime) / 1000));
       if (draft) {
         draft.innerHTML = `
-          <div class="live-recording-status"><span></span><strong>Recording ${this.formatDuration(elapsed)}</strong></div>
-          <button type="button" id="liveStopRecording">Stop</button>
-          <button type="button" id="liveCancelRecording">Cancel</button>
+          <div class="live-voice-preview live-recording-preview">
+            <div class="live-recording-status"><span></span><strong>Recording ${this.formatDuration(elapsed)}</strong></div>
+          </div>
+          <div class="live-voice-actions">
+            <button type="button" id="liveStopRecording"><i class="fas fa-stop"></i> Stop</button>
+            <button type="button" id="liveCancelRecording"><i class="fas fa-trash"></i> Cancel</button>
+          </div>
         `;
         document.getElementById('liveStopRecording')?.addEventListener('click', () => this.toggleVoiceRecording(), { once: true });
         document.getElementById('liveCancelRecording')?.addEventListener('click', () => this.cancelRecording(), { once: true });
@@ -2611,12 +3271,12 @@ class LiveChatApp {
     draft.classList.remove('hidden');
     draft.innerHTML = `
       <div class="live-voice-preview">
-        <strong>Voice note ${this.formatDuration(this.voiceDraft.duration)}</strong>
+        <strong><i class="fas fa-microphone-lines"></i> Voice note ${this.formatDuration(this.voiceDraft.duration)}</strong>
         <audio controls src="${this.voiceDraft.url}"></audio>
       </div>
       <div class="live-voice-actions">
         <button type="button" id="liveSendVoiceDraft"><i class="fas fa-paper-plane"></i> Send</button>
-        <button type="button" id="liveRedoVoiceDraft"><i class="fas fa-redo"></i> Re-record</button>
+        <button type="button" id="liveRedoVoiceDraft"><i class="fas fa-rotate-right"></i> Re-record</button>
         <button type="button" id="liveDeleteVoiceDraft"><i class="fas fa-trash"></i> Delete</button>
       </div>
     `;
@@ -2813,9 +3473,7 @@ class LiveChatApp {
       return;
     }
     try {
-      this.showCallModal(`Calling ${this.selectedThread.name}`, 'Starting call...', callType, false);
-      this.playOutgoingRing();
-      this.startCallTimeout('outgoing');
+      this.showCallModal(`Calling ${this.selectedThread.name}`, 'Checking availability...', callType, false);
       let response;
       try {
         response = await this.postCall({ action: 'start', callee_id: this.selectedThread.id, call_type: callType });
@@ -2825,9 +3483,20 @@ class LiveChatApp {
         response = { call: recoveredCall };
         showNotice('Call Recovered', 'The call was started, and the caller view has been reconnected.', 'info');
       }
+      if (response.offline) {
+        this.activeCall = response.call || null;
+        this.showCallModal(`Calling ${this.selectedThread.name}`, 'Recipient offline', callType, false);
+        showNotice('Recipient Offline', response.message || `${this.selectedThread.name} is offline. A missed call record has been added.`, 'info');
+        await this.loadMessages(true).catch(() => {});
+        window.setTimeout(() => this.cleanupCall(), 1200);
+        return;
+      }
       this.activeCall = response.call;
       this.lastSignalId = 0;
       this.pendingIceCandidates = [];
+      this.callFastSignalUntil = Date.now() + 15000;
+      this.playOutgoingRing();
+      this.startCallTimeout('outgoing');
       this.showCallModal(`Calling ${this.selectedThread.name}`, 'Preparing media...', callType, false);
       await this.preparePeerConnection(callType);
       await this.broadcastLocalMicState().catch(() => {});
@@ -2860,11 +3529,12 @@ class LiveChatApp {
         groupId: this.selectedThread.id,
         groupName: this.selectedThread.name
       };
+      this.callFastSignalUntil = Date.now() + 15000;
       this.lastSignalId = 0;
       this.pendingIceCandidates = [];
       this.configureCallMediaElements();
       const videoConstraint = callType === 'video'
-        ? (this.selectedVideoDeviceId ? { deviceId: { exact: this.selectedVideoDeviceId } } : { facingMode: { ideal: this.cameraFacingMode } })
+        ? (this.selectedVideoDeviceId ? { deviceId: { ideal: this.selectedVideoDeviceId } } : true)
         : false;
       this.localStream = await this.getCallMediaStream(callType, videoConstraint);
       await this.tuneCallAudioTrack(this.localStream);
@@ -2872,9 +3542,15 @@ class LiveChatApp {
       if (localVideo) localVideo.srcObject = this.localStream;
       this.showCallModal(`Calling ${this.selectedThread.name}`, `Ringing ${peers.length} members...`, callType, false);
       this.renderGroupRemoteGrid();
+      await Promise.all(peers.map((peer) => this.startGroupCallToPeer(peer, callType)));
+      if (!this.groupCallSessions.size) {
+        showNotice('Group Call', 'No group member is currently online. Missed call records were added.', 'info');
+        await this.loadMessages(true).catch(() => {});
+        window.setTimeout(() => this.cleanupCall(), 1200);
+        return;
+      }
       this.playOutgoingRing();
       this.startCallTimeout('outgoing');
-      await Promise.all(peers.map((peer) => this.startGroupCallToPeer(peer, callType)));
       this.startSignalPolling();
       showNotice('Group Call', `Calling ${peers.length} group member${peers.length === 1 ? '' : 's'}.`, 'info');
     } catch (error) {
@@ -2885,6 +3561,10 @@ class LiveChatApp {
 
   async startGroupCallToPeer(peer, callType) {
     const response = await this.postCall({ action: 'start', callee_id: peer.userId, call_type: callType });
+    if (response.offline) {
+      showNotice('Group Call', `${peer.userName || 'A group member'} is offline. A missed call record was added.`, 'info');
+      return null;
+    }
     const call = response.call;
     const session = await this.createGroupPeerSession(call, peer);
     this.groupCallSessions.set(call.callId, session);
@@ -2897,6 +3577,13 @@ class LiveChatApp {
 
   async startCallToPeer(peer, callType, title) {
     const response = await this.postCall({ action: 'start', callee_id: peer.userId, call_type: callType });
+    if (response.offline) {
+      this.showCallModal(`Calling ${title || peer.userName}`, 'Recipient offline', callType, false);
+      showNotice('Recipient Offline', response.message || `${peer.userName || 'The recipient'} is offline. A missed call record has been added.`, 'info');
+      await this.loadMessages(true).catch(() => {});
+      window.setTimeout(() => this.cleanupCall(), 1200);
+      return;
+    }
     this.activeCall = response.call;
     this.lastSignalId = 0;
     this.pendingIceCandidates = [];
@@ -2919,6 +3606,7 @@ class LiveChatApp {
         const currentCall = (data.calls || []).find((call) => call.callId === this.activeCall.callId);
         if (currentCall) {
           this.activeCall = { ...this.activeCall, ...currentCall };
+          this.syncVideoParticipantLabels();
           if (currentCall.status === 'accepted') {
             this.stopIncomingRing();
             this.stopOutgoingRing();
@@ -2931,8 +3619,8 @@ class LiveChatApp {
               status.textContent = 'Connecting...';
             }
           }
-        } else if (this.activeCall.status === 'ringing') {
-          showNotice('Call Ended', 'The call was not answered in time or was declined.', 'info');
+        } else {
+          showNotice('Call Ended', this.activeCall.status === 'ringing' ? 'The call was not answered in time or was declined.' : 'The call partner ended the call.', 'info');
           this.cleanupCall();
         }
         return;
@@ -2961,9 +3649,13 @@ class LiveChatApp {
     document.getElementById('liveRejectCallBtn')?.classList.toggle('hidden', !incoming);
     document.getElementById('liveEndCallBtn')?.classList.toggle('hidden', incoming && this.activeCall?.status === 'ringing');
     document.getElementById('liveRequestVideoBtn')?.classList.toggle('hidden', callType !== 'audio' || incoming);
+    document.getElementById('liveAddCallParticipantBtn')?.classList.toggle('hidden', !this.canAddCallParticipants());
     document.getElementById('liveRemoteMuteBtn')?.classList.toggle('hidden', !this.canControlRemotePeer());
     this.updateLocalMicIndicator();
     this.updateRemoteMicIndicator();
+    this.syncVideoStageLayout();
+    this.syncVideoParticipantLabels();
+    this.syncCallFullscreenButtons();
     this.syncSpeakerControls();
   }
 
@@ -2984,11 +3676,13 @@ class LiveChatApp {
       rejectButton && (rejectButton.disabled = true);
       const updatePromise = this.postCall({ action: 'update', call_id: this.activeCall.callId, status: 'accepted' }).catch(() => {});
       this.activeCall.status = 'accepted';
+      this.callFastSignalUntil = Date.now() + 15000;
       const acceptedAt = new Date().toISOString();
       this.activeCall.answeredAt = acceptedAt;
       this.startCallTimer(acceptedAt);
       const acceptSignalPromise = this.sendSignal('call_accept', { acceptedAt }).catch(() => {});
-      await this.preparePeerConnection(this.activeCall.callType);
+      this.deferIncomingVideoCapture = false;
+      await this.preparePeerConnection(this.activeCall.callType, { captureLocalVideo: !this.deferIncomingVideoCapture });
       await this.broadcastLocalMicState().catch(() => {});
       this.startSignalPolling();
       await Promise.allSettled([updatePromise, acceptSignalPromise]);
@@ -3008,6 +3702,7 @@ class LiveChatApp {
     this.clearCallTimeout();
     this.stopCallTimer();
     const call = this.activeCall;
+    this.accelerateSignalPolling(5000);
     const signalPromise = call ? this.sendSignal('hangup', { reason: 'rejected' }).catch(() => {}) : Promise.resolve();
     const updatePromise = call ? this.postCall({ action: 'update', call_id: call.callId, status: 'rejected' }).catch(() => {}) : Promise.resolve();
     this.cleanupCall();
@@ -3020,6 +3715,7 @@ class LiveChatApp {
     this.clearCallTimeout();
     if (this.activeCall?.isGroupCall) {
       const sessions = Array.from(this.groupCallSessions.values());
+      this.accelerateSignalPolling(5000);
       const signalPromises = sessions.map((session) => this.sendSignalForCall(session.call, 'hangup', { reason: 'ended' }).catch(() => {}));
       const updatePromises = sessions.map((session) => this.postCall({ action: 'update', call_id: session.call.callId, status: 'ended' }).catch(() => {}));
       this.cleanupCall();
@@ -3027,10 +3723,14 @@ class LiveChatApp {
       return;
     }
     const call = this.activeCall;
+    const sessions = Array.from(this.groupCallSessions.values());
+    this.accelerateSignalPolling(5000);
     const signalPromise = call ? this.sendSignal('hangup', { reason: 'ended' }).catch(() => {}) : Promise.resolve();
     const updatePromise = call ? this.postCall({ action: 'update', call_id: call.callId, status: 'ended' }).catch(() => {}) : Promise.resolve();
+    const extraSignals = sessions.map((session) => this.sendSignalForCall(session.call, 'hangup', { reason: 'ended' }).catch(() => {}));
+    const extraUpdates = sessions.map((session) => this.postCall({ action: 'update', call_id: session.call.callId, status: 'ended' }).catch(() => {}));
     this.cleanupCall();
-    await Promise.allSettled([signalPromise, updatePromise]);
+    await Promise.allSettled([signalPromise, updatePromise, ...extraSignals, ...extraUpdates]);
   }
 
   playIncomingRing() {
@@ -3241,7 +3941,7 @@ class LiveChatApp {
       noiseSuppression: { ideal: true },
       autoGainControl: { ideal: true },
       channelCount: { ideal: 1 },
-      latency: { ideal: 0.02 },
+      latency: { ideal: 0.005, max: 0.02 },
       sampleRate: { ideal: 48000 },
       sampleSize: { ideal: 16 }
     };
@@ -3249,11 +3949,13 @@ class LiveChatApp {
 
   getCallVideoConstraints(videoConstraint = true) {
     const base = videoConstraint && typeof videoConstraint === 'object' ? { ...videoConstraint } : {};
+    const handheld = this.isHandheldCallDevice();
     return {
       ...base,
-      width: base.width || { ideal: 960, max: 1280 },
-      height: base.height || { ideal: 540, max: 720 },
-      frameRate: base.frameRate || { ideal: 24, max: 30 }
+      width: base.width || { ideal: handheld ? 720 : 1280, max: handheld ? 960 : 1280 },
+      height: base.height || { ideal: handheld ? 480 : 720, max: handheld ? 540 : 720 },
+      frameRate: base.frameRate || { ideal: 30, max: 30 },
+      latency: { ideal: 0.02, max: 0.08 }
     };
   }
 
@@ -3262,9 +3964,12 @@ class LiveChatApp {
   }
 
   async getCallMediaStream(callType, videoConstraint = false) {
+    const resolvedVideoConstraint = callType === 'video'
+      ? await this.resolveDefaultCallVideoConstraint(videoConstraint)
+      : false;
     const constraints = {
       audio: this.getCallAudioConstraints(),
-      video: callType === 'video' ? this.getCallVideoConstraints(videoConstraint) : false
+      video: callType === 'video' ? this.getCallVideoConstraints(resolvedVideoConstraint) : false
     };
     try {
       return await navigator.mediaDevices.getUserMedia(constraints);
@@ -3274,9 +3979,56 @@ class LiveChatApp {
       }
       return navigator.mediaDevices.getUserMedia({
         audio: this.getCallAudioConstraints(),
-        video: this.getCallVideoConstraints(true)
+        video: this.getCallVideoConstraints(await this.resolveDefaultCallVideoConstraint(true))
       });
     }
+  }
+
+  async getSafeCallVideoStream(videoConstraint = true) {
+    const resolvedVideoConstraint = await this.resolveDefaultCallVideoConstraint(videoConstraint);
+    const attempts = [
+      this.getCallVideoConstraints(resolvedVideoConstraint),
+      this.getCallVideoConstraints(true),
+      { ...((resolvedVideoConstraint && typeof resolvedVideoConstraint === 'object') ? resolvedVideoConstraint : {}), width: { ideal: 960, max: 1280 }, height: { ideal: 540, max: 720 }, frameRate: { ideal: 30, max: 30 } },
+      { ...((resolvedVideoConstraint && typeof resolvedVideoConstraint === 'object') ? resolvedVideoConstraint : {}), width: { ideal: 640, max: 960 }, height: { ideal: 360, max: 540 }, frameRate: { ideal: 24, max: 30 } },
+      { width: { ideal: 480, max: 640 }, height: { ideal: 270, max: 360 }, frameRate: { ideal: 20, max: 24 } },
+      true
+    ];
+    let lastError = null;
+    for (const video of attempts) {
+      try {
+        return await navigator.mediaDevices.getUserMedia({ audio: false, video });
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError || new Error('Unable to open camera safely.');
+  }
+
+  async resolveDefaultCallVideoConstraint(videoConstraint = true) {
+    if (videoConstraint && typeof videoConstraint === 'object' && (videoConstraint.deviceId || videoConstraint.facingMode)) {
+      return videoConstraint;
+    }
+    if (this.isHandheldCallDevice()) {
+      this.cameraFacingMode = 'user';
+      return { facingMode: { ideal: 'user' } };
+    }
+    if (this.selectedVideoDeviceId) {
+      return { deviceId: { ideal: this.selectedVideoDeviceId } };
+    }
+    if (!navigator.mediaDevices?.enumerateDevices) return true;
+    try {
+      const devices = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === 'videoinput');
+      const integrated = devices.find((device) => /integrated\s+webcam/i.test(device.label || ''))
+        || devices.find((device) => /integrated/i.test(device.label || ''))
+        || devices.find((device) => /built.?in|internal|webcam/i.test(device.label || ''));
+      const selected = integrated || devices[0];
+      if (selected?.deviceId) {
+        this.selectedVideoDeviceId = selected.deviceId;
+        return { deviceId: { ideal: selected.deviceId } };
+      }
+    } catch (_error) {}
+    return true;
   }
 
   async tuneCallAudioTrack(stream) {
@@ -3300,17 +4052,28 @@ class LiveChatApp {
         parameters.encodings[0].maxBitrate = 32000;
       }
       if (sender.track.kind === 'video') {
-        parameters.encodings[0].priority = 'medium';
-        parameters.encodings[0].networkPriority = 'medium';
-        parameters.encodings[0].maxBitrate = this.isHandheldCallDevice() ? 450000 : 800000;
+        parameters.degradationPreference = 'maintain-framerate';
+        parameters.encodings[0].priority = 'high';
+        parameters.encodings[0].networkPriority = 'high';
+        parameters.encodings[0].maxBitrate = this.isHandheldCallDevice() ? 900000 : 1800000;
+        parameters.encodings[0].maxFramerate = 30;
       }
       await sender.setParameters(parameters).catch(() => {});
     }
   }
 
+  createPeerConnection() {
+    return new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require',
+      iceCandidatePoolSize: 4
+    });
+  }
+
   async createGroupPeerSession(call, peer) {
     const remoteStream = new MediaStream();
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    const pc = this.createPeerConnection();
     const session = {
       call,
       peer,
@@ -3332,6 +4095,7 @@ class LiveChatApp {
         if (!remoteStream.getTracks().some((existing) => existing.id === track.id)) {
           remoteStream.addTrack(track);
         }
+        track.addEventListener?.('unmute', () => this.renderGroupRemoteGrid(), { once: true });
       });
       this.renderGroupRemoteGrid();
       this.startSpeechMonitor(remoteStream, peer.userId || call.calleeId, () => document.querySelector(`[data-group-call-id="${CSS.escape(call.callId)}"]`));
@@ -3342,14 +4106,10 @@ class LiveChatApp {
       }
     };
     pc.onconnectionstatechange = () => {
-      session.status = pc.connectionState;
-      this.updateGroupCallStatus();
-      if (['failed', 'closed'].includes(pc.connectionState)) {
-        this.showCallConnectionNotice(`${peer.userName || 'Participant'} disconnected`, 'disconnected');
-        setTimeout(() => this.closeGroupPeerSession(call.callId), 1200);
-      } else if (pc.connectionState === 'disconnected') {
-        this.showCallConnectionNotice(`${peer.userName || 'Participant'} connection interrupted`, 'disconnected');
-      }
+      this.handleGroupPeerConnectionState(session);
+    };
+    pc.oniceconnectionstatechange = () => {
+      this.handleGroupPeerConnectionState(session);
     };
     return session;
   }
@@ -3357,7 +4117,7 @@ class LiveChatApp {
   renderGroupRemoteGrid() {
     const grid = document.getElementById('liveGroupRemoteGrid');
     const singleRemote = document.getElementById('liveRemoteVideo');
-    if (!grid || !this.activeCall?.isGroupCall) {
+    if (!grid || (!this.activeCall?.isGroupCall && this.groupCallSessions.size === 0)) {
       grid?.classList.add('hidden');
       singleRemote?.classList.remove('hidden');
       return;
@@ -3374,6 +4134,7 @@ class LiveChatApp {
         tile.dataset.groupCallId = callId;
         tile.innerHTML = `
           <video autoplay playsinline></video>
+          <span class="live-video-name-label"></span>
           <div class="live-group-remote-meta">
             <strong></strong>
             <small></small>
@@ -3382,6 +4143,7 @@ class LiveChatApp {
             <span class="live-peer-mic-state muted"><i class="fas fa-microphone-slash"></i> Waiting</span>
             <button type="button" class="live-peer-mute-btn" title="Mute participant"><i class="fas fa-microphone-slash"></i></button>
           </div>
+          <audio autoplay playsinline></audio>
         `;
         tile.querySelector('.live-peer-mute-btn')?.addEventListener('click', () => this.toggleGroupPeerMute(callId));
         grid.appendChild(tile);
@@ -3391,12 +4153,27 @@ class LiveChatApp {
         video.srcObject = session.remoteStream;
         video.autoplay = true;
         video.playsInline = true;
-        video.muted = !this.callSpeakerEnabled;
-        video.volume = Math.max(0, Math.min(1, this.callSpeakerVolume / 100));
-        video.play?.().catch(() => {});
+        video.setAttribute('playsinline', '');
+        video.muted = true;
+        video.volume = 0;
+        this.playMediaElement(video);
         this.startSpeechMonitor(session.remoteStream, session.peer?.userId || session.call?.calleeId, () => tile);
       }
-      tile.querySelector('strong').textContent = session.peer?.userName || session.call?.peerName || 'Group member';
+      const audio = tile.querySelector('audio');
+      if (audio && audio.srcObject !== session.remoteStream) {
+        audio.srcObject = session.remoteStream;
+        audio.autoplay = true;
+        audio.muted = !this.callSpeakerEnabled;
+        audio.volume = Math.max(0, Math.min(1, this.callSpeakerVolume / 100));
+        this.playMediaElement(audio);
+      }
+      const participantName = session.peer?.userName || session.call?.peerName || 'Group member';
+      tile.querySelector('strong').textContent = participantName;
+      const nameLabel = tile.querySelector('.live-video-name-label');
+      if (nameLabel) {
+        nameLabel.textContent = participantName;
+        nameLabel.title = participantName;
+      }
       tile.querySelector('small').textContent = session.status || session.call?.status || 'ringing';
       this.updateGroupPeerMicIndicator(session, tile);
     });
@@ -3437,8 +4214,57 @@ class LiveChatApp {
     };
     if (!this.remoteTrackMuteHandlers.has(track.id)) {
       track.addEventListener?.('ended', removeEndedTrack, { once: true });
+      track.addEventListener?.('unmute', () => this.renderRemoteVideoNow(), { once: true });
       this.remoteTrackMuteHandlers.set(track.id, removeEndedTrack);
     }
+    this.renderRemoteVideoNow();
+  }
+
+  playMediaElement(element) {
+    if (!element) return;
+    const play = () => element.play?.().catch(() => {});
+    play();
+    element.addEventListener?.('loadedmetadata', play, { once: true });
+    window.requestAnimationFrame?.(play);
+  }
+
+  renderRemoteVideoNow() {
+    const remoteVideo = document.getElementById('liveRemoteVideo');
+    if (!remoteVideo || !this.remoteStream) return;
+    if (remoteVideo.srcObject !== this.remoteStream) remoteVideo.srcObject = this.remoteStream;
+    remoteVideo.autoplay = true;
+    remoteVideo.playsInline = true;
+    remoteVideo.setAttribute('playsinline', '');
+    remoteVideo.controls = false;
+    remoteVideo.muted = true;
+    remoteVideo.volume = 0;
+    remoteVideo.classList.toggle('has-video', this.remoteStream.getVideoTracks().some((track) => track.readyState !== 'ended'));
+    this.playMediaElement(remoteVideo);
+    this.renderRemoteAudioNow();
+    this.syncVideoParticipantLabels();
+  }
+
+  getRemoteAudioElement() {
+    let audio = document.getElementById('liveRemoteAudio');
+    if (!audio) {
+      audio = document.createElement('audio');
+      audio.id = 'liveRemoteAudio';
+      audio.autoplay = true;
+      audio.setAttribute('playsinline', '');
+      audio.className = 'hidden';
+      document.getElementById('liveCallModal')?.appendChild(audio);
+    }
+    return audio;
+  }
+
+  renderRemoteAudioNow() {
+    if (!this.remoteStream) return;
+    const audio = this.getRemoteAudioElement();
+    if (audio.srcObject !== this.remoteStream) audio.srcObject = this.remoteStream;
+    audio.autoplay = true;
+    audio.muted = !this.callSpeakerEnabled;
+    audio.volume = Math.max(0, Math.min(1, this.callSpeakerVolume / 100));
+    this.playMediaElement(audio);
   }
 
   configureCallMediaElements() {
@@ -3452,54 +4278,171 @@ class LiveChatApp {
       localVideo.setAttribute('playsinline', '');
     }
     if (remoteVideo) {
-      remoteVideo.muted = !this.callSpeakerEnabled;
+      remoteVideo.muted = true;
       remoteVideo.autoplay = true;
       remoteVideo.playsInline = true;
       remoteVideo.setAttribute('playsinline', '');
       remoteVideo.controls = false;
-      remoteVideo.volume = Math.max(0, Math.min(1, this.callSpeakerVolume / 100));
+      remoteVideo.volume = 0;
     }
     this.syncSpeakerControls();
   }
 
-  async preparePeerConnection(callType) {
-    const videoConstraint = callType === 'video'
-      ? (this.selectedVideoDeviceId ? { deviceId: { exact: this.selectedVideoDeviceId } } : { facingMode: { ideal: this.cameraFacingMode } })
+  clearCallConnectionRecoveryTimer() {
+    window.clearTimeout(this.callConnectionRecoveryTimer);
+    this.callConnectionRecoveryTimer = null;
+  }
+
+  markCallConnected(startedAt = null) {
+    const status = document.getElementById('liveCallStatus');
+    if (status) status.textContent = 'Connected';
+    if (this.activeCall) this.activeCall.status = 'accepted';
+    this.stopIncomingRing();
+    this.stopOutgoingRing();
+    this.clearCallTimeout();
+    this.clearCallConnectionRecoveryTimer();
+    if (!this.callStartedAt) this.startCallTimer(startedAt || this.activeCall?.answeredAt || Date.now());
+  }
+
+  scheduleCallConnectionRecovery(pc, message = 'Connection interrupted. Reconnecting...', timeoutMs = 45000) {
+    if (!this.activeCall || this.peerConnection !== pc) return;
+    const status = document.getElementById('liveCallStatus');
+    if (status) status.textContent = message;
+    if (this.callConnectionRecoveryTimer) return;
+    this.callConnectionRecoveryTimer = window.setTimeout(() => {
+      this.callConnectionRecoveryTimer = null;
+      if (!this.activeCall || this.peerConnection !== pc) return;
+      if (['failed', 'disconnected'].includes(pc.connectionState)) {
+        this.showCallConnectionNotice('Call connection could not be restored', 'disconnected');
+        this.cleanupCall();
+      }
+    }, timeoutMs);
+  }
+
+  async restartPeerConnectionIce(pc) {
+    if (!this.activeCall || this.peerConnection !== pc || this.callRestartInFlight || pc.signalingState !== 'stable') return;
+    this.callRestartInFlight = true;
+    try {
+      pc.restartIce?.();
+      const offer = await pc.createOffer({ iceRestart: true });
+      if (!this.activeCall || this.peerConnection !== pc) return;
+      await pc.setLocalDescription(offer);
+      await this.sendSignal('offer', offer);
+      this.callFastSignalUntil = Date.now() + 10000;
+    } catch (_error) {
+      this.scheduleCallConnectionRecovery(pc, 'Trying to reconnect...', 45000);
+    } finally {
+      this.callRestartInFlight = false;
+    }
+  }
+
+  handlePeerConnectionState(pc) {
+    if (!pc || this.peerConnection !== pc || !this.activeCall) return;
+    const state = pc.connectionState || pc.iceConnectionState || 'connecting';
+    if (['connected', 'completed'].includes(state)) {
+      this.markCallConnected();
+      return;
+    }
+    if (state === 'connecting') {
+      const status = document.getElementById('liveCallStatus');
+      if (status && status.textContent !== 'Connected') status.textContent = 'Connecting...';
+      return;
+    }
+    if (state === 'disconnected') {
+      this.showCallConnectionNotice('Connection interrupted. Reconnecting...', 'disconnected');
+      this.scheduleCallConnectionRecovery(pc, 'Connection interrupted. Reconnecting...', 45000);
+      return;
+    }
+    if (state === 'failed') {
+      this.showCallConnectionNotice('Connection interrupted. Repairing call...', 'disconnected');
+      this.scheduleCallConnectionRecovery(pc, 'Repairing call connection...', 45000);
+      this.restartPeerConnectionIce(pc);
+    }
+  }
+
+  handleGroupPeerConnectionState(session) {
+    if (!session?.peerConnection) return;
+    const pc = session.peerConnection;
+    const state = pc.connectionState || pc.iceConnectionState || 'connecting';
+    session.status = state;
+    const name = session.peer?.userName || 'Participant';
+    if (['connected', 'completed'].includes(state)) {
+      session.status = 'connected';
+      window.clearTimeout(session.recoveryTimer);
+      session.recoveryTimer = null;
+      this.showCallConnectionNotice(`${name} connected`, 'connected');
+      this.clearCallTimeout();
+      if (!this.callStartedAt) this.startCallTimer(session.call?.answeredAt || Date.now());
+    } else if (state === 'disconnected') {
+      this.showCallConnectionNotice(`${name} connection interrupted`, 'disconnected');
+      window.clearTimeout(session.recoveryTimer);
+      session.recoveryTimer = window.setTimeout(() => {
+        if (this.groupCallSessions.get(session.call.callId) !== session) return;
+        if (['disconnected', 'failed'].includes(pc.connectionState)) this.closeGroupPeerSession(session.call.callId);
+      }, 45000);
+    } else if (state === 'failed') {
+      this.showCallConnectionNotice(`${name} connection interrupted`, 'disconnected');
+      this.restartGroupPeerConnectionIce(session);
+    }
+    this.updateGroupCallStatus();
+  }
+
+  async restartGroupPeerConnectionIce(session) {
+    const pc = session?.peerConnection;
+    if (!pc || session.restartInFlight || pc.signalingState !== 'stable') return;
+    session.restartInFlight = true;
+    try {
+      pc.restartIce?.();
+      const offer = await pc.createOffer({ iceRestart: true });
+      if (this.groupCallSessions.get(session.call.callId) !== session) return;
+      await pc.setLocalDescription(offer);
+      await this.sendSignalForCall(session.call, 'offer', offer);
+      this.callFastSignalUntil = Date.now() + 10000;
+    } catch (_error) {
+      window.clearTimeout(session.recoveryTimer);
+      session.recoveryTimer = window.setTimeout(() => {
+        if (this.groupCallSessions.get(session.call.callId) === session && ['disconnected', 'failed'].includes(pc.connectionState)) {
+          this.closeGroupPeerSession(session.call.callId);
+        }
+      }, 45000);
+    } finally {
+      session.restartInFlight = false;
+    }
+  }
+
+  async preparePeerConnection(callType, { captureLocalVideo = callType === 'video' } = {}) {
+    const videoConstraint = callType === 'video' && captureLocalVideo
+      ? (this.selectedVideoDeviceId ? { deviceId: { ideal: this.selectedVideoDeviceId } } : true)
       : false;
     this.configureCallMediaElements();
     this.localStream = await this.getCallMediaStream(callType, videoConstraint);
     await this.tuneCallAudioTrack(this.localStream);
+    this.updateLocalMicIndicator();
     this.remoteStream = new MediaStream();
     const localVideo = document.getElementById('liveLocalVideo');
     const remoteVideo = document.getElementById('liveRemoteVideo');
     if (localVideo) localVideo.srcObject = this.localStream;
-    if (remoteVideo) remoteVideo.srcObject = this.remoteStream;
+    if (remoteVideo) this.renderRemoteVideoNow();
     this.syncCallCameraPreview();
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    document.getElementById('liveToggleCameraBtn')?.classList.toggle('active', Boolean(this.localStream.getVideoTracks()[0]?.enabled));
+    const pc = this.createPeerConnection();
     this.peerConnection = pc;
     this.localStream.getTracks().forEach((track) => pc.addTrack(track, this.localStream));
     await this.tunePeerConnectionSenders(pc);
     pc.ontrack = (event) => {
       const tracks = event.streams[0]?.getTracks?.()?.length ? event.streams[0].getTracks() : [event.track];
       tracks.forEach((track) => this.attachRemoteTrack(track));
-      if (remoteVideo) remoteVideo.srcObject = this.remoteStream;
-      remoteVideo?.play?.().catch(() => {});
+      this.renderRemoteVideoNow();
       this.startSpeechMonitor(this.remoteStream, this.getActivePeerId(), () => document.querySelector('.live-remote-video-tile'));
     };
     pc.onicecandidate = (event) => {
       if (event.candidate) this.sendSignal('ice', event.candidate.toJSON ? event.candidate.toJSON() : event.candidate).catch(() => {});
     };
     pc.onconnectionstatechange = () => {
-      document.getElementById('liveCallStatus').textContent = pc.connectionState;
-      if (['failed', 'closed'].includes(pc.connectionState)) {
-        setTimeout(() => this.cleanupCall(), 1200);
-      } else if (pc.connectionState === 'disconnected') {
-        setTimeout(() => {
-          if (this.peerConnection === pc && ['disconnected', 'failed', 'closed'].includes(pc.connectionState)) {
-            this.cleanupCall();
-          }
-        }, 10000);
-      }
+      this.handlePeerConnectionState(pc);
+    };
+    pc.oniceconnectionstatechange = () => {
+      this.handlePeerConnectionState(pc);
     };
     await this.populateCameraDevices();
     this.applyCameraZoom(this.cameraZoom);
@@ -3529,8 +4472,8 @@ class LiveChatApp {
     if (!this.peerConnection || !this.localStream) return;
     const existing = this.localStream.getVideoTracks()[0];
     if (!existing) {
-      const videoConstraint = this.selectedVideoDeviceId ? { deviceId: { exact: this.selectedVideoDeviceId } } : { facingMode: { ideal: this.cameraFacingMode } };
-      const stream = await navigator.mediaDevices.getUserMedia({ video: this.getCallVideoConstraints(videoConstraint), audio: false });
+      const videoConstraint = this.selectedVideoDeviceId ? { deviceId: { ideal: this.selectedVideoDeviceId } } : { facingMode: { ideal: this.cameraFacingMode } };
+      const stream = await this.getSafeCallVideoStream(videoConstraint);
       const track = stream.getVideoTracks()[0];
       if (track) {
         this.localStream.addTrack(track);
@@ -3561,6 +4504,7 @@ class LiveChatApp {
       return `<option value="${escapeHtml(device.deviceId)}" ${selected}>${escapeHtml(device.label || `Camera ${index + 1}`)}</option>`;
     }).join('');
     select.disabled = this.availableVideoDevices.length === 0;
+    this.syncVideoParticipantLabels();
   }
 
   async switchCamera(deviceId) {
@@ -3572,9 +4516,13 @@ class LiveChatApp {
       if (button) button.disabled = true;
       if (select) select.disabled = true;
       this.selectedVideoDeviceId = deviceId;
-      await this.replaceCallVideoTrack({ deviceId: { exact: deviceId } }, { stopOldFirst: this.isHandheldCallDevice() });
+      await this.replaceCallVideoTrack(
+        [{ deviceId: { exact: deviceId } }, { deviceId: { ideal: deviceId } }],
+        { stopOldFirst: true, requiredDeviceId: deviceId }
+      );
       await this.populateCameraDevices();
     } catch (error) {
+      await this.populateCameraDevices();
       showNotice('Camera Switch Failed', error.message || 'Unable to switch to the selected camera.');
     } finally {
       this.cameraSwitching = false;
@@ -3612,7 +4560,10 @@ class LiveChatApp {
         const currentIndex = Math.max(0, this.availableVideoDevices.findIndex((device) => device.deviceId === currentDeviceId));
         const nextDevice = this.availableVideoDevices[(currentIndex + 1) % this.availableVideoDevices.length];
         this.selectedVideoDeviceId = nextDevice.deviceId;
-        await this.replaceCallVideoTrack({ deviceId: { exact: nextDevice.deviceId } });
+        await this.replaceCallVideoTrack(
+          [{ deviceId: { exact: nextDevice.deviceId } }, { deviceId: { ideal: nextDevice.deviceId } }],
+          { stopOldFirst: true, requiredDeviceId: nextDevice.deviceId }
+        );
       } else {
         this.cameraFacingMode = nextFacing;
         this.selectedVideoDeviceId = '';
@@ -3628,7 +4579,7 @@ class LiveChatApp {
     }
   }
 
-  async replaceCallVideoTrack(videoConstraint, { stopOldFirst = false } = {}) {
+  async replaceCallVideoTrack(videoConstraint, { stopOldFirst = false, requiredDeviceId = '' } = {}) {
     if (!this.localStream || !this.peerConnection) return;
     const constraints = Array.isArray(videoConstraint) ? videoConstraint : [videoConstraint];
     const oldTrack = this.localStream.getVideoTracks()[0];
@@ -3643,6 +4594,13 @@ class LiveChatApp {
     for (const constraint of constraints) {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: this.getCallVideoConstraints(constraint), audio: false });
+        const returnedDeviceId = stream.getVideoTracks?.()[0]?.getSettings?.().deviceId || '';
+        if (requiredDeviceId && returnedDeviceId && returnedDeviceId !== requiredDeviceId) {
+          stream.getTracks().forEach((track) => track.stop());
+          stream = null;
+          lastError = new Error('The browser returned a different camera than the one selected.');
+          continue;
+        }
         break;
       } catch (error) {
         lastError = error;
@@ -3666,9 +4624,7 @@ class LiveChatApp {
     if (settings.facingMode === 'user' || settings.facingMode === 'environment') {
       this.cameraFacingMode = settings.facingMode;
     }
-    if (settings.deviceId) {
-      this.selectedVideoDeviceId = settings.deviceId;
-    }
+    if (settings.deviceId) this.selectedVideoDeviceId = settings.deviceId;
     const localVideo = document.getElementById('liveLocalVideo');
     if (localVideo) localVideo.srcObject = this.localStream;
     this.syncCallCameraPreview();
@@ -3689,23 +4645,128 @@ class LiveChatApp {
 
   toggleCamera() {
     const track = this.localStream?.getVideoTracks?.()[0];
-    if (!track) return;
+    if (!track) {
+      if (this.activeCall?.callType === 'video' && this.peerConnection && this.localStream) {
+        this.deferIncomingVideoCapture = false;
+        document.getElementById('liveCallStatus').textContent = 'Starting camera...';
+        this.addVideoToCurrentCall(true)
+          .then(() => {
+            document.getElementById('liveToggleCameraBtn')?.classList.add('active');
+            document.getElementById('liveCallStatus').textContent = 'Connected';
+          })
+          .catch((error) => {
+            document.getElementById('liveCallStatus').textContent = 'Camera off';
+            showNotice('Camera Blocked', error.message || 'Unable to start your camera on this device.', 'info');
+          });
+      }
+      return;
+    }
     track.enabled = !track.enabled;
     document.getElementById('liveToggleCameraBtn')?.classList.toggle('active', track.enabled);
+    this.syncVideoParticipantLabels();
   }
 
   toggleMicrophone() {
-    const track = this.localStream?.getAudioTracks?.()[0];
-    if (!track) return;
-    track.enabled = !track.enabled;
-    document.getElementById('liveToggleMicBtn')?.classList.toggle('muted', !track.enabled);
+    const muted = this.isLocalMicrophoneMuted();
+    this.setLocalMicrophoneMuted(!muted, { broadcast: true });
+  }
+
+  isLocalMicrophoneMuted() {
+    const tracks = this.localStream?.getAudioTracks?.() || [];
+    return !tracks.length || tracks.every((track) => !track.enabled);
+  }
+
+  setLocalMicrophoneMuted(muted, { broadcast = true } = {}) {
+    const tracks = this.localStream?.getAudioTracks?.() || [];
+    if (!tracks.length) return false;
+    tracks.forEach((track) => {
+      track.enabled = !muted;
+    });
     this.updateLocalMicIndicator();
-    this.broadcastLocalMicState().catch(() => {});
+    if (broadcast) {
+      this.accelerateSignalPolling(6000);
+      this.broadcastLocalMicState().catch(() => {});
+    }
+    return true;
   }
 
   canControlRemotePeer() {
     if (!this.activeCall || this.activeCall.isGroupCall) return false;
     return String(this.activeCall.callerId || '') === String(this.currentUserId || '');
+  }
+
+  canControlGroupPeer(session) {
+    return Boolean(session?.call) && String(session.call.callerId || '') === String(this.currentUserId || '');
+  }
+
+  canAddCallParticipants() {
+    if (!this.activeCall || !this.featureSettings.addParticipantsEnabled) return false;
+    if (this.activeCall.isGroupCall) return true;
+    return String(this.activeCall.callerId || '') === String(this.currentUserId || '');
+  }
+
+  getCallParticipantIds() {
+    const ids = new Set([String(this.currentUserId || '')]);
+    if (this.activeCall) {
+      if (this.activeCall.callerId) ids.add(String(this.activeCall.callerId));
+      if (this.activeCall.calleeId) ids.add(String(this.activeCall.calleeId));
+    }
+    this.groupCallSessions.forEach((session) => {
+      if (session.peer?.userId) ids.add(String(session.peer.userId));
+      if (session.call?.calleeId) ids.add(String(session.call.calleeId));
+    });
+    ids.delete('');
+    return ids;
+  }
+
+  openAddCallParticipantModal() {
+    if (!this.canAddCallParticipants()) {
+      showNotice('Add Participant', 'Adding participants to active calls is currently unavailable.', 'info');
+      return;
+    }
+    const modal = document.getElementById('liveAddCallModal');
+    const list = document.getElementById('liveAddCallList');
+    if (!modal || !list) return;
+    const existing = this.getCallParticipantIds();
+    const candidates = this.users.filter((user) => !existing.has(String(user.userId)));
+    list.innerHTML = candidates.length ? candidates.map((user) => `
+      <label>
+        <input type="checkbox" value="${escapeHtml(user.userId)}">
+        <span>${escapeHtml(user.userName)} <small>${escapeHtml(user.userRoleLabel || this.formatRoleLabel(user.userRole))}</small></span>
+      </label>
+    `).join('') : '<div class="live-chat-empty">No available staff members to add.</div>';
+    this.callAddParticipantModalOpen = true;
+    modal.classList.remove('hidden');
+  }
+
+  closeAddCallParticipantModal() {
+    this.callAddParticipantModalOpen = false;
+    document.getElementById('liveAddCallModal')?.classList.add('hidden');
+  }
+
+  async inviteSelectedCallParticipants() {
+    if (!this.activeCall || !this.canAddCallParticipants()) return;
+    const selected = Array.from(document.querySelectorAll('#liveAddCallList input:checked')).map((input) => input.value);
+    if (!selected.length) {
+      showNotice('Add Participant', 'Select at least one staff member to invite.', 'info');
+      return;
+    }
+    const button = document.getElementById('liveAddCallInvite');
+    if (button) button.disabled = true;
+    try {
+      const peers = selected
+        .map((userId) => this.users.find((user) => String(user.userId) === String(userId)))
+        .filter(Boolean);
+      await Promise.all(peers.map((peer) => this.startGroupCallToPeer(peer, this.activeCall.callType || 'audio')));
+      this.closeAddCallParticipantModal();
+      this.renderGroupRemoteGrid();
+      this.startSignalPolling();
+      this.showCallConnectionNotice(`${peers.length} participant${peers.length === 1 ? '' : 's'} invited`, 'connected');
+    } catch (error) {
+      showNotice('Add Participant', error.message || 'Unable to add participant to the call.');
+    } finally {
+      if (button) button.disabled = false;
+    }
   }
 
   getActivePeerId() {
@@ -3717,15 +4778,15 @@ class LiveChatApp {
 
   getCallPeerAudioState(peerId) {
     const key = String(peerId || '');
-    if (!key) return { muted: true, talking: false };
-    return this.callPeerAudioStates.get(key) || { muted: true, talking: false };
+    if (!key) return { muted: false, talking: false, unknown: true };
+    return this.callPeerAudioStates.get(key) || { muted: false, talking: false, unknown: true };
   }
 
   setCallPeerAudioState(peerId, patch = {}) {
     const key = String(peerId || '');
     if (!key) return;
     const current = this.getCallPeerAudioState(key);
-    this.callPeerAudioStates.set(key, { ...current, ...patch });
+    this.callPeerAudioStates.set(key, { ...current, ...patch, unknown: false });
     this.updateRemoteMicIndicator();
     this.renderGroupRemoteGrid();
   }
@@ -3749,20 +4810,23 @@ class LiveChatApp {
     const state = this.getCallPeerAudioState(peerId);
     const status = document.getElementById('liveRemoteMicStatus');
     if (status) {
-      status.classList.toggle('muted', state.muted);
-      status.classList.toggle('talking', Boolean(state.talking) && !state.muted);
-      status.innerHTML = state.muted
+      status.classList.toggle('muted', !state.unknown && state.muted);
+      status.classList.toggle('talking', Boolean(state.talking) && !state.muted && !state.unknown);
+      status.innerHTML = state.unknown
+        ? '<i class="fas fa-microphone"></i> Mic status'
+        : state.muted
         ? '<i class="fas fa-microphone-slash"></i> Muted'
         : '<i class="fas fa-microphone"></i> Mic on';
     }
     const button = document.getElementById('liveRemoteMuteBtn');
     if (button) {
       button.classList.toggle('hidden', !this.canControlRemotePeer());
-      button.classList.toggle('muted', state.muted);
-      button.innerHTML = state.muted
+      button.disabled = !this.canControlRemotePeer() || Boolean(state.pending);
+      button.classList.toggle('muted', !state.unknown && state.muted);
+      button.innerHTML = !state.unknown && state.muted
         ? '<i class="fas fa-microphone"></i>'
         : '<i class="fas fa-microphone-slash"></i>';
-      button.title = state.muted ? 'Ask peer to unmute' : 'Mute peer';
+      button.title = !state.unknown && state.muted ? 'Ask peer to unmute' : 'Mute peer';
     }
   }
 
@@ -3782,46 +4846,63 @@ class LiveChatApp {
     const indicator = tile.querySelector('.live-peer-mic-state');
     const button = tile.querySelector('.live-peer-mute-btn');
     if (indicator) {
-      indicator.classList.toggle('muted', state.muted);
-      indicator.classList.toggle('talking', Boolean(state.talking) && !state.muted);
-      indicator.innerHTML = state.muted
+      indicator.classList.toggle('muted', !state.unknown && state.muted);
+      indicator.classList.toggle('talking', Boolean(state.talking) && !state.muted && !state.unknown);
+      indicator.innerHTML = state.unknown
+        ? '<i class="fas fa-microphone"></i> Mic status'
+        : state.muted
         ? '<i class="fas fa-microphone-slash"></i> Muted'
         : '<i class="fas fa-microphone"></i> Mic on';
     }
     if (button) {
-      button.classList.toggle('muted', state.muted);
-      button.innerHTML = state.muted
+      const canControl = this.canControlGroupPeer(session);
+      button.classList.toggle('hidden', !canControl);
+      button.disabled = !canControl || Boolean(state.pending);
+      button.classList.toggle('muted', !state.unknown && state.muted);
+      button.innerHTML = !state.unknown && state.muted
         ? '<i class="fas fa-microphone"></i>'
         : '<i class="fas fa-microphone-slash"></i>';
-      button.title = state.muted ? 'Ask participant to unmute' : 'Mute participant';
+      button.title = !state.unknown && state.muted ? 'Ask participant to unmute' : 'Mute participant';
     }
   }
 
   async toggleRemotePeerMute() {
     if (!this.activeCall || !this.canControlRemotePeer()) return;
     const peerId = this.getActivePeerId();
-    const nextMuted = !this.getCallPeerAudioState(peerId).muted;
-    this.setCallPeerAudioState(peerId, { muted: nextMuted });
+    const previous = this.getCallPeerAudioState(peerId);
+    const nextMuted = previous.unknown ? true : !previous.muted;
+    this.setCallPeerAudioState(peerId, { muted: nextMuted, pending: true });
     await this.sendSignal('remote_mute_request', { muted: nextMuted, requestedAt: new Date().toISOString() }).catch((error) => {
+      this.callPeerAudioStates.set(String(peerId), previous);
+      this.updateRemoteMicIndicator();
       showNotice('Microphone Control', error.message || 'Unable to update peer microphone.', 'error');
+    }).finally(() => {
+      const current = this.getCallPeerAudioState(peerId);
+      this.callPeerAudioStates.set(String(peerId), { ...current, pending: false });
+      this.updateRemoteMicIndicator();
     });
   }
 
   async toggleGroupPeerMute(callId) {
     const session = this.groupCallSessions.get(callId);
-    if (!session) return;
+    if (!session || !this.canControlGroupPeer(session)) return;
     const peerId = session.peer?.userId || session.call?.calleeId;
-    const nextMuted = !this.getCallPeerAudioState(peerId).muted;
-    this.setCallPeerAudioState(peerId, { muted: nextMuted });
+    const previous = this.getCallPeerAudioState(peerId);
+    const nextMuted = previous.unknown ? true : !previous.muted;
+    this.setCallPeerAudioState(peerId, { muted: nextMuted, pending: true });
     await this.sendSignalForCall(session.call, 'remote_mute_request', { muted: nextMuted, requestedAt: new Date().toISOString() }).catch((error) => {
+      this.callPeerAudioStates.set(String(peerId), previous);
+      this.renderGroupRemoteGrid();
       showNotice('Microphone Control', error.message || 'Unable to update participant microphone.', 'error');
+    }).finally(() => {
+      const current = this.getCallPeerAudioState(peerId);
+      this.callPeerAudioStates.set(String(peerId), { ...current, pending: false });
+      this.renderGroupRemoteGrid();
     });
   }
 
   async applyRemoteMuteRequest(muted) {
-    const track = this.localStream?.getAudioTracks?.()[0];
-    if (track) track.enabled = !muted;
-    this.updateLocalMicIndicator();
+    this.setLocalMicrophoneMuted(muted, { broadcast: false });
     await this.broadcastLocalMicState().catch(() => {});
     showNotice('Microphone Updated', muted ? 'Your microphone was muted by the call host.' : 'The call host asked to unmute your microphone.', 'info');
   }
@@ -3831,6 +4912,7 @@ class LiveChatApp {
     const audioTrack = this.localStream.getAudioTracks?.()[0];
     const muted = !audioTrack || !audioTrack.enabled;
     const payload = { muted, updatedAt: new Date().toISOString() };
+    this.accelerateSignalPolling(6000);
     if (this.activeCall.isGroupCall) {
       await Promise.allSettled(Array.from(this.groupCallSessions.values()).map((session) => this.sendSignalForCall(session.call, 'mic_state', payload)));
       return;
@@ -3882,12 +4964,23 @@ class LiveChatApp {
   syncSpeakerControls() {
     const remoteVideo = document.getElementById('liveRemoteVideo');
     if (remoteVideo) {
-      remoteVideo.muted = !this.callSpeakerEnabled;
-      remoteVideo.volume = Math.max(0, Math.min(1, this.callSpeakerVolume / 100));
+      remoteVideo.muted = true;
+      remoteVideo.volume = 0;
+    }
+    const remoteAudio = document.getElementById('liveRemoteAudio');
+    if (remoteAudio) {
+      remoteAudio.muted = !this.callSpeakerEnabled;
+      remoteAudio.volume = Math.max(0, Math.min(1, this.callSpeakerVolume / 100));
+      this.playMediaElement(remoteAudio);
     }
     document.querySelectorAll('#liveGroupRemoteGrid video').forEach((media) => {
+      media.muted = true;
+      media.volume = 0;
+    });
+    document.querySelectorAll('#liveGroupRemoteGrid audio').forEach((media) => {
       media.muted = !this.callSpeakerEnabled;
       media.volume = Math.max(0, Math.min(1, this.callSpeakerVolume / 100));
+      this.playMediaElement(media);
     });
     const button = document.getElementById('liveToggleSpeakerBtn');
     if (button) {
@@ -3921,25 +5014,47 @@ class LiveChatApp {
 
   async toggleCallFullscreen() {
     const card = document.querySelector('.live-call-card');
+    const modal = document.getElementById('liveCallModal');
     if (!card) return;
     if (!document.fullscreenElement) {
       await card.requestFullscreen?.();
       card.classList.add('fullscreen');
+      modal?.classList.add('fullscreen');
     } else {
-      await document.exitFullscreen?.();
-      card.classList.remove('fullscreen');
+      await this.restoreCallWindow();
     }
+    this.syncCallFullscreenButtons();
+  }
+
+  async restoreCallWindow() {
+    const card = document.querySelector('.live-call-card');
+    const modal = document.getElementById('liveCallModal');
+    if (document.fullscreenElement) await document.exitFullscreen?.().catch(() => {});
+    card?.classList.remove('fullscreen');
+    modal?.classList.remove('fullscreen');
+    this.syncCallFullscreenButtons();
+  }
+
+  syncCallFullscreenButtons() {
+    const isExpanded = Boolean(document.fullscreenElement) || document.querySelector('.live-call-card')?.classList.contains('fullscreen');
+    document.getElementById('liveFullscreenCallBtn')?.classList.toggle('hidden', isExpanded);
+    document.getElementById('liveRestoreCallBtn')?.classList.toggle('hidden', !isExpanded);
   }
 
   startSignalPolling() {
     if (this.timers.signals) clearInterval(this.timers.signals);
-    if (this.activeCall?.isGroupCall) {
-      this.timers.signals = setInterval(() => this.pollGroupSignals(), this.liveChatPollMs('signalPollMs', 350, 150, 5000));
-      this.pollGroupSignals();
-      return;
-    }
-    this.timers.signals = setInterval(() => this.pollSignals(), this.liveChatPollMs('signalPollMs', 350, 150, 5000));
-    this.pollSignals();
+    const interval = Date.now() < this.callFastSignalUntil
+      ? 90
+      : Math.min(this.liveChatPollMs('signalPollMs', 350, 150, 5000), 250);
+    const poll = () => {
+      if (this.activeCall && !this.activeCall.isGroupCall) this.pollSignals();
+      if (this.activeCall?.isGroupCall || this.groupCallSessions.size > 0) this.pollGroupSignals();
+      if (Date.now() >= this.callFastSignalUntil && this.timers.signals && interval < 150) {
+        this.startSignalPolling();
+      }
+    };
+    this.timers.signals = setInterval(poll, interval);
+    poll();
   }
 
   async pollGroupSignals() {
@@ -3964,7 +5079,11 @@ class LiveChatApp {
       return;
     }
     if (signal.signalType === 'mic_state') {
-      this.setCallPeerAudioState(session.peer?.userId || signal.senderId, { muted: Boolean(signal.payload?.muted) });
+      this.setCallPeerAudioState(session.peer?.userId || signal.senderId, { muted: Boolean(signal.payload?.muted), pending: false });
+      return;
+    }
+    if (signal.signalType === 'remote_mute_request') {
+      await this.applyRemoteMuteRequest(Boolean(signal.payload?.muted));
       return;
     }
     if (signal.signalType === 'peer_connected') {
@@ -3989,12 +5108,28 @@ class LiveChatApp {
     if (signal.signalType === 'answer') {
       await session.peerConnection.setRemoteDescription(new RTCSessionDescription(signal.payload));
       await this.flushGroupPendingIceCandidates(session);
+      this.callFastSignalUntil = Date.now() + 6000;
       session.call.status = 'accepted';
       session.call.answeredAt = session.call.answeredAt || new Date().toISOString();
       session.status = 'connected';
       if (!this.callStartedAt) this.startCallTimer(session.call.answeredAt);
       await this.sendSignalForCall(session.call, 'mic_state', { muted: !this.localStream?.getAudioTracks?.()[0]?.enabled, updatedAt: new Date().toISOString() }).catch(() => {});
       this.showCallConnectionNotice(`${session.peer?.userName || 'Participant'} connected`, 'connected');
+      this.updateGroupCallStatus();
+      return;
+    }
+    if (signal.signalType === 'offer') {
+      this.callFastSignalUntil = Date.now() + 10000;
+      await session.peerConnection.setRemoteDescription(new RTCSessionDescription(signal.payload));
+      await this.flushGroupPendingIceCandidates(session);
+      const answer = await session.peerConnection.createAnswer();
+      await session.peerConnection.setLocalDescription(answer);
+      await this.sendSignalForCall(session.call, 'answer', answer);
+      session.call.status = 'accepted';
+      session.call.answeredAt = session.call.answeredAt || new Date().toISOString();
+      session.status = 'connected';
+      if (!this.callStartedAt) this.startCallTimer(session.call.answeredAt);
+      await this.sendSignalForCall(session.call, 'mic_state', { muted: this.isLocalMicrophoneMuted(), updatedAt: new Date().toISOString() }).catch(() => {});
       this.updateGroupCallStatus();
       return;
     }
@@ -4016,14 +5151,18 @@ class LiveChatApp {
   }
 
   async pollSignals() {
-    if (!this.activeCall) return;
+    if (!this.activeCall || this.signalPollInFlight) return;
+    this.signalPollInFlight = true;
     try {
       const data = await this.postCall({ action: 'signals', call_id: this.activeCall.callId, after_id: this.lastSignalId }, 'GET');
       for (const signal of data.signals || []) {
         this.lastSignalId = Math.max(this.lastSignalId, Number(signal.signalId || 0));
         await this.handleSignal(signal);
       }
-    } catch (_error) {}
+    } catch (_error) {
+    } finally {
+      this.signalPollInFlight = false;
+    }
   }
 
   async handleSignal(signal) {
@@ -4034,7 +5173,7 @@ class LiveChatApp {
       return;
     }
     if (signal.signalType === 'mic_state') {
-      this.setCallPeerAudioState(signal.senderId || this.getActivePeerId(), { muted: Boolean(signal.payload?.muted) });
+      this.setCallPeerAudioState(signal.senderId || this.getActivePeerId(), { muted: Boolean(signal.payload?.muted), pending: false });
       return;
     }
     if (signal.signalType === 'remote_mute_request') {
@@ -4077,8 +5216,9 @@ class LiveChatApp {
       return;
     }
     if (signal.signalType === 'offer') {
-      if (this.activeCall.callType === 'video') await this.addVideoToCurrentCall(false);
-      if (!this.peerConnection) await this.preparePeerConnection(this.activeCall.callType);
+      this.callFastSignalUntil = Date.now() + 10000;
+      if (this.activeCall.callType === 'video' && !this.deferIncomingVideoCapture) await this.addVideoToCurrentCall(false);
+      if (!this.peerConnection) await this.preparePeerConnection(this.activeCall.callType, { captureLocalVideo: !this.deferIncomingVideoCapture });
       await this.peerConnection.setRemoteDescription(new RTCSessionDescription(signal.payload));
       await this.flushPendingIceCandidates();
       const answer = await this.peerConnection.createAnswer();
@@ -4100,6 +5240,7 @@ class LiveChatApp {
     if (signal.signalType === 'answer' && this.peerConnection) {
       await this.peerConnection.setRemoteDescription(new RTCSessionDescription(signal.payload));
       await this.flushPendingIceCandidates();
+      this.callFastSignalUntil = Date.now() + 6000;
       this.activeCall.status = 'accepted';
       this.activeCall.answeredAt = this.activeCall.answeredAt || new Date().toISOString();
       this.stopIncomingRing();
@@ -4135,19 +5276,20 @@ class LiveChatApp {
 
   async sendSignal(signalType, payload) {
     if (!this.activeCall) return null;
-    const recipientId = this.activeCall.callerId === this.currentUserId ? this.activeCall.calleeId : this.activeCall.callerId;
+    const recipientId = String(this.activeCall.callerId || '') === String(this.currentUserId || '') ? this.activeCall.calleeId : this.activeCall.callerId;
     return this.postCall({ action: 'signal', call_id: this.activeCall.callId, recipient_id: recipientId, signal_type: signalType, payload });
   }
 
   async sendSignalForCall(call, signalType, payload) {
     if (!call) return null;
-    const recipientId = call.callerId === this.currentUserId ? call.calleeId : call.callerId;
+    const recipientId = String(call.callerId || '') === String(this.currentUserId || '') ? call.calleeId : call.callerId;
     return this.postCall({ action: 'signal', call_id: call.callId, recipient_id: recipientId, signal_type: signalType, payload });
   }
 
   closeGroupPeerSession(callId) {
     const session = this.groupCallSessions.get(callId);
     if (!session) return;
+    window.clearTimeout(session.recoveryTimer);
     session.peerConnection?.close();
     session.remoteStream?.getTracks().forEach((track) => track.stop());
     this.groupCallSessions.delete(callId);
@@ -4206,8 +5348,11 @@ class LiveChatApp {
 
   cleanupCall() {
     this.closeVideoUpgradeConsent();
+    this.closeAddCallParticipantModal();
     window.clearTimeout(this.callConnectionNoticeTimer);
     this.callConnectionNoticeTimer = null;
+    this.clearCallConnectionRecoveryTimer();
+    this.callRestartInFlight = false;
     if (this.timers.signals) clearInterval(this.timers.signals);
     this.timers.signals = null;
     this.stopIncomingRing();
@@ -4215,6 +5360,7 @@ class LiveChatApp {
     this.clearCallTimeout();
     this.stopCallTimer();
     this.groupCallSessions.forEach((session) => {
+      window.clearTimeout(session.recoveryTimer);
       session.peerConnection?.close();
       session.remoteStream?.getTracks().forEach((track) => track.stop());
     });
@@ -4235,10 +5381,17 @@ class LiveChatApp {
     this.pendingIceCandidates = [];
     this.activeCall = null;
     this.lastSignalId = 0;
+    this.deferIncomingVideoCapture = false;
+    this.localVideoPrimary = false;
     const localVideo = document.getElementById('liveLocalVideo');
     const remoteVideo = document.getElementById('liveRemoteVideo');
     if (localVideo) localVideo.srcObject = null;
     if (remoteVideo) remoteVideo.srcObject = null;
+    const remoteAudio = document.getElementById('liveRemoteAudio');
+    if (remoteAudio) {
+      remoteAudio.srcObject = null;
+      remoteAudio.remove();
+    }
     const groupGrid = document.getElementById('liveGroupRemoteGrid');
     if (groupGrid) {
       groupGrid.innerHTML = '';
@@ -4247,7 +5400,10 @@ class LiveChatApp {
     remoteVideo?.classList.remove('hidden');
     document.getElementById('liveChatDock')?.classList.remove('call-active');
     document.getElementById('liveCallModal')?.classList.add('hidden');
+    document.getElementById('liveCallModal')?.classList.remove('fullscreen');
+    document.querySelector('.live-call-card')?.classList.remove('fullscreen');
     document.getElementById('liveCallConnectionToast')?.classList.add('hidden');
+    this.syncVideoStageLayout();
   }
 }
 

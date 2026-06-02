@@ -246,6 +246,14 @@ try {
         }
     }
 
+    if ($bankName !== '') {
+        $normalizedBankName = normalizeBankCatalogName($conn, $bankName, false);
+        if ($normalizedBankName === null) {
+            throw new RuntimeException('Select a valid bank from Bank Settings.');
+        }
+        $bankName = $normalizedBankName;
+    }
+
     $addAuditChange('Phone number', (string)($existing['telNo'] ?? ''), $telNo, 'phone');
     $addAuditChange('Email address', (string)($existing['applicant_email'] ?? ''), $email);
     $addAuditChange('District of residence', $existingAddress, $address);

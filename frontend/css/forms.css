@@ -192,6 +192,40 @@ html {
   letter-spacing: 1px;
   pointer-events: none;
 }
+
+[data-theme="dark"] .form-section,
+[data-theme="dark"] #loginForm,
+[data-theme="dark"] #registerForm {
+  border: 1px solid rgba(143, 179, 207, 0.2);
+  background:
+    linear-gradient(180deg, rgba(27, 39, 50, 0.94), rgba(18, 28, 38, 0.96));
+  color: var(--text-color);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.38);
+}
+
+[data-theme="dark"] .form-section h2,
+[data-theme="dark"] .form-group label {
+  color: var(--heading-color);
+}
+
+[data-theme="dark"] .form-group input,
+[data-theme="dark"] .form-group select,
+[data-theme="dark"] .form-group textarea {
+  border-color: rgba(143, 179, 207, 0.28);
+  background: rgba(12, 20, 28, 0.92);
+  color: var(--input-text);
+}
+
+[data-theme="dark"] .form-group input:focus,
+[data-theme="dark"] .form-group select:focus,
+[data-theme="dark"] .form-group textarea:focus {
+  border-color: rgba(244, 216, 135, 0.72);
+  box-shadow: 0 0 0 3px rgba(244, 216, 135, 0.14);
+}
+
+[data-theme="dark"] .salary-prefix {
+  color: var(--muted-color);
+}
 /* MESSAGE BOX STYLES FOR USER REGISTRATION FEEDBACK
    ------------------------------------------------------------
    Automatically fades out after 10 seconds.

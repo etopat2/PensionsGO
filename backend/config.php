@@ -287,6 +287,13 @@ $database = appEnv('PENSIONAPP_DB_NAME', defined('PENSIONAPP_DB_NAME') ? PENSION
 $conn = @new mysqli($host, $user, $password, $database);
 
 if ($conn->connect_error) {
+    error_log(sprintf(
+        'DATABASE CONNECTION ERROR: host=%s database=%s errno=%s error=%s',
+        (string)$host,
+        (string)$database,
+        (string)$conn->connect_errno,
+        (string)$conn->connect_error
+    ));
     http_response_code(500);
     header("Content-Type: application/json");
     echo json_encode([

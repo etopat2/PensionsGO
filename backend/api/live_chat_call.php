@@ -23,6 +23,29 @@ try {
             throw new RuntimeException('Select a valid staff member to call.');
         }
         $callId = 'call_' . bin2hex(random_bytes(16));
+        if (!liveChatIsUserOnline($conn, $calleeId, 45)) {
+            $status = 'missed';
+            $stmt = $conn->prepare("
+                INSERT INTO tb_live_chat_calls (call_id, caller_id, callee_id, call_type, status, ended_at)
+                VALUES (?, ?, ?, ?, ?, NOW())
+            ");
+            $stmt->bind_param('sssss', $callId, $userId, $calleeId, $type, $status);
+            $stmt->execute();
+            $stmt->close();
+            liveChatCreateCallThreadRecord($conn, $callId);
+            liveChatRespond([
+                'success' => true,
+                'offline' => true,
+                'message' => 'The recipient is offline. A missed call record has been added.',
+                'call' => [
+                    'callId' => $callId,
+                    'callerId' => $userId,
+                    'calleeId' => $calleeId,
+                    'callType' => $type,
+                    'status' => 'missed'
+                ]
+            ]);
+        }
         $stmt = $conn->prepare("INSERT INTO tb_live_chat_calls (call_id, caller_id, callee_id, call_type) VALUES (?, ?, ?, ?)");
         $stmt->bind_param('ssss', $callId, $userId, $calleeId, $type);
         $stmt->execute();
@@ -46,6 +69,9 @@ try {
         $stmt->bind_param('ssssss', $status, $status, $status, $callId, $userId, $userId);
         $stmt->execute();
         $stmt->close();
+        if (in_array($status, ['rejected', 'ended', 'missed'], true)) {
+            liveChatCreateCallThreadRecord($conn, $callId);
+        }
         liveChatRespond(['success' => true]);
     }
 
@@ -99,10 +125,12 @@ try {
         $callStmt->execute();
         $callRow = $callStmt->get_result()->fetch_assoc();
         $callStmt->close();
-        if (!$callRow || !in_array($userId, [$callRow['caller_id'], $callRow['callee_id']], true) || !in_array($recipientId, [$callRow['caller_id'], $callRow['callee_id']], true) || $recipientId === $userId) {
+        $callerId = (string)($callRow['caller_id'] ?? '');
+        $calleeId = (string)($callRow['callee_id'] ?? '');
+        if (!$callRow || !in_array((string)$userId, [$callerId, $calleeId], true) || !in_array((string)$recipientId, [$callerId, $calleeId], true) || (string)$recipientId === (string)$userId) {
             throw new RuntimeException('Invalid call participant.');
         }
-        if ($signalType === 'remote_mute_request' && $callRow['caller_id'] !== $userId) {
+        if ($signalType === 'remote_mute_request' && $callerId !== (string)$userId) {
             throw new RuntimeException('Only the call host can control a participant microphone.');
         }
         $payloadJson = json_encode($payload, JSON_UNESCAPED_SLASHES);
@@ -151,7 +179,7 @@ try {
         LEFT JOIN tb_users callee ON callee.userId = c.callee_id
         WHERE (c.caller_id = ? OR c.callee_id = ?)
           AND c.status IN ('ringing','accepted')
-          AND c.updated_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+          AND (c.status = 'accepted' OR c.updated_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE))
         ORDER BY c.updated_at DESC
         LIMIT 10
     ");
@@ -178,4 +206,81 @@ try {
 } catch (Throwable $e) {
     http_response_code(400);
     liveChatRespond(['success' => false, 'message' => $e->getMessage()]);
+}
+
+function liveChatCreateCallThreadRecord(mysqli $conn, string $callId): void
+{
+    try {
+        $conn->begin_transaction();
+        $select = $conn->prepare("
+            SELECT c.call_id, c.caller_id, c.callee_id, c.call_type, c.status, c.created_at, c.answered_at, c.ended_at, c.updated_at, c.call_message_id,
+                   caller.userName AS caller_name, callee.userName AS callee_name
+            FROM tb_live_chat_calls c
+            LEFT JOIN tb_users caller ON caller.userId = c.caller_id
+            LEFT JOIN tb_users callee ON callee.userId = c.callee_id
+            WHERE c.call_id = ?
+            LIMIT 1
+            FOR UPDATE
+        ");
+        if (!$select) {
+            $conn->rollback();
+            return;
+        }
+        $select->bind_param('s', $callId);
+        $select->execute();
+        $call = $select->get_result()->fetch_assoc();
+        $select->close();
+        if (!$call || !empty($call['call_message_id']) || !in_array((string)$call['status'], ['rejected', 'ended', 'missed'], true)) {
+            $conn->rollback();
+            return;
+        }
+
+        $started = strtotime((string)($call['answered_at'] ?: $call['created_at'])) ?: 0;
+        $ended = strtotime((string)($call['ended_at'] ?: $call['updated_at'])) ?: 0;
+        $durationSeconds = ($started > 0 && $ended > $started && in_array((string)$call['status'], ['ended'], true)) ? ($ended - $started) : 0;
+        $payload = [
+            'callId' => (string)$call['call_id'],
+            'callType' => (string)$call['call_type'],
+            'status' => (string)$call['status'],
+            'callerId' => (string)$call['caller_id'],
+            'calleeId' => (string)$call['callee_id'],
+            'callerName' => (string)($call['caller_name'] ?: 'Caller'),
+            'calleeName' => (string)($call['callee_name'] ?: 'Recipient'),
+            'createdAt' => $call['created_at'],
+            'answeredAt' => $call['answered_at'],
+            'endedAt' => $call['ended_at'] ?: $call['updated_at'],
+            'durationSeconds' => $durationSeconds
+        ];
+        $messageText = json_encode($payload, JSON_UNESCAPED_SLASHES);
+        $kind = 'call';
+
+        $insert = $conn->prepare("
+            INSERT INTO tb_live_chat_messages (sender_id, recipient_id, message_kind, message_text, delivered_at)
+            VALUES (?, ?, ?, ?, NOW())
+        ");
+        if (!$insert) {
+            $conn->rollback();
+            return;
+        }
+        $insert->bind_param('ssss', $call['caller_id'], $call['callee_id'], $kind, $messageText);
+        $insert->execute();
+        $messageId = (int)$conn->insert_id;
+        $insert->close();
+        if ($messageId <= 0) {
+            $conn->rollback();
+            return;
+        }
+
+        $update = $conn->prepare("UPDATE tb_live_chat_calls SET call_message_id = ? WHERE call_id = ? AND call_message_id IS NULL");
+        if (!$update) {
+            $conn->rollback();
+            return;
+        }
+        $update->bind_param('is', $messageId, $callId);
+        $update->execute();
+        $update->close();
+        $conn->commit();
+    } catch (Throwable $e) {
+        $conn->rollback();
+    }
 }

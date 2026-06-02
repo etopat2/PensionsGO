@@ -703,6 +703,52 @@ class SessionManager
         
         return $affectedRows;
     }
+
+    public function cleanupExpiredSessionsThrottled(int $intervalSeconds = 60): int
+    {
+        $safeInterval = max(15, min(3600, $intervalSeconds));
+        $markerPath = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'pensionsgo_session_cleanup_at.txt';
+        $now = time();
+
+        $lastRun = 0;
+        $rawLastRun = @file_get_contents($markerPath);
+        if ($rawLastRun !== false && is_numeric(trim($rawLastRun))) {
+            $lastRun = (int)trim($rawLastRun);
+        }
+
+        if ($lastRun > 0 && ($now - $lastRun) < $safeInterval) {
+            return 0;
+        }
+
+        $lockPath = $markerPath . '.lock';
+        $lockHandle = @fopen($lockPath, 'c');
+        if (!$lockHandle) {
+            return $this->cleanupExpiredSessions();
+        }
+
+        try {
+            if (!flock($lockHandle, LOCK_EX | LOCK_NB)) {
+                return 0;
+            }
+
+            $rawLastRun = @file_get_contents($markerPath);
+            if ($rawLastRun !== false && is_numeric(trim($rawLastRun))) {
+                $lastRun = (int)trim($rawLastRun);
+            }
+
+            if ($lastRun > 0 && ($now - $lastRun) < $safeInterval) {
+                flock($lockHandle, LOCK_UN);
+                return 0;
+            }
+
+            @file_put_contents($markerPath, (string)$now, LOCK_EX);
+            $affectedRows = $this->cleanupExpiredSessions();
+            flock($lockHandle, LOCK_UN);
+            return $affectedRows;
+        } finally {
+            fclose($lockHandle);
+        }
+    }
 }
 ?>
 

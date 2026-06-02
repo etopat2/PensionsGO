@@ -195,6 +195,34 @@ class AdminDashboard {
         } catch (_error) {}
     }
 
+    isSensitiveSettingsSection(section) {
+        return new Set([
+            'system-settings',
+            'app-settings',
+            'security-settings',
+            'access-control',
+            'role-settings',
+            'notification-settings',
+            'live-chat-settings',
+            'podcast-settings',
+            'title-settings',
+            'bank-settings',
+            'unit-settings',
+            'prison-district-settings',
+            'prison-region-settings',
+            'political-district-settings',
+            'faq-settings',
+            'terms-settings'
+        ]).has(String(section || '').trim().toLowerCase());
+    }
+
+    async requireSettingsSectionReauth(section, actionVerb = 'open') {
+        if (!this.isSensitiveSettingsSection(section)) {
+            return true;
+        }
+        return await this.promptForAdminReauth(`${actionVerb} ${this.getSectionTitle(section)}`, { force: true });
+    }
+
     async requireAdminDashboardEntryVerification() {
         if (this.hasFreshAdminStepUp()) {
             return true;
@@ -775,6 +803,11 @@ class AdminDashboard {
         section = String(section || '').trim().toLowerCase();
         if (!section) {
             section = 'dashboard';
+        }
+
+        const settingsVerified = await this.requireSettingsSectionReauth(section, 'open');
+        if (!settingsVerified) {
+            return;
         }
 
         // Close mobile sidebar when navigating (only on mobile)
@@ -5693,8 +5726,13 @@ class AdminDashboard {
     }
 
     // Refresh current section
-    refreshCurrentSection() {
-        this.loadSectionContent(this.currentSection);
+    async refreshCurrentSection() {
+        const section = String(this.currentSection || '').trim().toLowerCase();
+        const settingsVerified = await this.requireSettingsSectionReauth(section, 'refresh');
+        if (!settingsVerified) {
+            return;
+        }
+        await this.loadSectionContent(section);
     }
 
     // Export current data
@@ -7178,11 +7216,11 @@ class AdminDashboard {
         }
 
         this.appSettingsRequest = (async () => {
-            const response = await fetch('../backend/api/get_app_settings.php', {
+            const response = await this.performSensitiveAdminRequest('../backend/api/get_app_settings.php', {
                 credentials: 'include',
                 cache: 'no-store'
-            });
-            const data = await this.safeJson(response, { success: false });
+            }, 'load application settings');
+            const data = response.__adminPayloadAttached || await this.safeJson(response, { success: false });
             if (!data.success) {
                 throw new Error(data.message || 'Unable to load app settings.');
             }
@@ -7660,6 +7698,7 @@ class AdminDashboard {
             live_chat_group_chats_enabled: getBool('live_chat_group_chats_enabled'),
             live_chat_audio_calls_enabled: getBool('live_chat_audio_calls_enabled'),
             live_chat_video_calls_enabled: getBool('live_chat_video_calls_enabled'),
+            live_chat_add_participants_enabled: getBool('live_chat_add_participants_enabled'),
             live_chat_attachments_enabled: getBool('live_chat_attachments_enabled'),
             live_chat_voice_notes_enabled: getBool('live_chat_voice_notes_enabled'),
             live_chat_polls_enabled: getBool('live_chat_polls_enabled'),
@@ -7726,13 +7765,13 @@ class AdminDashboard {
 
         try {
             this.updateSettingsStatus('app', 'Saving...', 'info');
-            const response = await fetch('../backend/api/update_app_settings.php', {
+            const response = await this.performSensitiveAdminRequest('../backend/api/update_app_settings.php', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
-            });
-            const data = await this.safeJson(response, { success: false });
+            }, 'save application settings');
+            const data = response.__adminPayloadAttached || await this.safeJson(response, { success: false });
 
             if (!data.success) {
                 this.updateSettingsStatus('app', 'Save failed', 'error');
@@ -7796,13 +7835,13 @@ class AdminDashboard {
 
         try {
             this.updateSettingsStatus('security', 'Saving...', 'info');
-            const response = await fetch('../backend/api/update_app_settings.php', {
+            const response = await this.performSensitiveAdminRequest('../backend/api/update_app_settings.php', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
-            });
-            const data = await this.safeJson(response, { success: false });
+            }, 'save security settings');
+            const data = response.__adminPayloadAttached || await this.safeJson(response, { success: false });
 
             if (!data.success) {
                 this.updateSettingsStatus('security', 'Save failed', 'error');
@@ -7834,13 +7873,13 @@ class AdminDashboard {
 
         try {
             this.updateSettingsStatus('notification', 'Saving...', 'info');
-            const response = await fetch('../backend/api/update_app_settings.php', {
+            const response = await this.performSensitiveAdminRequest('../backend/api/update_app_settings.php', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
-            });
-            const data = await this.safeJson(response, { success: false });
+            }, 'save notification settings');
+            const data = response.__adminPayloadAttached || await this.safeJson(response, { success: false });
 
             if (!data.success) {
                 this.updateSettingsStatus('notification', 'Save failed', 'error');
@@ -7872,13 +7911,13 @@ class AdminDashboard {
 
         try {
             this.updateSettingsStatus('liveChat', 'Saving...', 'info');
-            const response = await fetch('../backend/api/update_app_settings.php', {
+            const response = await this.performSensitiveAdminRequest('../backend/api/update_app_settings.php', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
-            });
-            const data = await this.safeJson(response, { success: false });
+            }, 'save application settings');
+            const data = response.__adminPayloadAttached || await this.safeJson(response, { success: false });
 
             if (!data.success) {
                 this.updateSettingsStatus('liveChat', 'Save failed', 'error');
@@ -7908,13 +7947,13 @@ class AdminDashboard {
 
         try {
             this.updateSettingsStatus('message', 'Saving...', 'info');
-            const response = await fetch('../backend/api/update_app_settings.php', {
+            const response = await this.performSensitiveAdminRequest('../backend/api/update_app_settings.php', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
-            });
-            const data = await this.safeJson(response, { success: false });
+            }, 'save security settings');
+            const data = response.__adminPayloadAttached || await this.safeJson(response, { success: false });
 
             if (!data.success) {
                 this.updateSettingsStatus('message', 'Save failed', 'error');
@@ -7946,13 +7985,13 @@ class AdminDashboard {
 
         try {
             this.updateSettingsStatus('attachment', 'Saving...', 'info');
-            const response = await fetch('../backend/api/update_app_settings.php', {
+            const response = await this.performSensitiveAdminRequest('../backend/api/update_app_settings.php', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
-            });
-            const data = await this.safeJson(response, { success: false });
+            }, 'save attachment settings');
+            const data = response.__adminPayloadAttached || await this.safeJson(response, { success: false });
 
             if (!data.success) {
                 this.updateSettingsStatus('attachment', 'Save failed', 'error');
@@ -14492,8 +14531,9 @@ AdminDashboard.prototype.openRegistryBoxRebuildModal = async function (allowExec
     });
 };
 
-AdminDashboard.prototype.promptForAdminReauth = function (actionLabel = 'continue') {
-    if (this.hasFreshAdminStepUp && this.hasFreshAdminStepUp()) {
+AdminDashboard.prototype.promptForAdminReauth = function (actionLabel = 'continue', options = {}) {
+    const forcePrompt = Boolean(options?.force);
+    if (!forcePrompt && this.hasFreshAdminStepUp && this.hasFreshAdminStepUp()) {
         return Promise.resolve(true);
     }
     return new Promise((resolve) => {
@@ -14547,24 +14587,30 @@ AdminDashboard.prototype.promptForAdminReauth = function (actionLabel = 'continu
             if (event.target === overlay) close(false);
         });
 
+        let submitting = false;
         const submit = async () => {
+            if (submitting) return;
             const password = passwordInput?.value?.trim() || '';
             if (!password) {
                 showError('Enter your admin password.');
                 return;
             }
 
+            submitting = true;
             if (confirmBtn) {
                 confirmBtn.disabled = true;
                 confirmBtn.textContent = 'Verifying...';
             }
 
+            const controller = new AbortController();
+            const timeoutId = window.setTimeout(() => controller.abort(), 9000);
             try {
                 const response = await fetch('../backend/api/verify_admin_password.php', {
                     method: 'POST',
                     credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password })
+                    body: JSON.stringify({ password }),
+                    signal: controller.signal
                 });
                 const data = await this.safeJson(response, { success: false, valid: false });
                 if (!response.ok || !data.success || !data.valid) {
@@ -14575,11 +14621,14 @@ AdminDashboard.prototype.promptForAdminReauth = function (actionLabel = 'continu
                 }
                 close(true);
             } catch (error) {
-                showError(error.message || 'Password verification failed.');
+                showError(error.name === 'AbortError' ? 'Verification is taking too long. Please try again.' : (error.message || 'Password verification failed.'));
                 if (confirmBtn) {
                     confirmBtn.disabled = false;
                     confirmBtn.textContent = 'Verify';
                 }
+                submitting = false;
+            } finally {
+                window.clearTimeout(timeoutId);
             }
         };
 
@@ -14702,6 +14751,7 @@ AdminDashboard.prototype.loadLiveChatSettingsContent = async function () {
                     <div class="settings-fields">
                         ${toggle('live_chat_audio_calls_enabled', 'Audio Calls', 'Allow staff-to-staff voice calls.')}
                         ${toggle('live_chat_video_calls_enabled', 'Video Calls', 'Allow staff video calls and audio-to-video upgrade requests.')}
+                        ${toggle('live_chat_add_participants_enabled', 'Add Participants During Calls', 'Allow the call host to invite more staff into an active voice or video call.')}
                         ${toggle('live_chat_typing_presence_enabled', 'Typing Presence', 'Show typing indicators in the conversation and contact list.')}
                         ${toggle('live_chat_read_receipts_enabled', 'Read Receipts', 'Enable delivered/read receipt syncing and ticks.')}
                         ${numberField('live_chat_typing_idle_seconds', 'Typing Idle Timeout (seconds)', 2, 30, 1, 'Typing status stops after this many seconds without text changes.')}
@@ -15364,13 +15414,13 @@ AdminDashboard.prototype.savePodcastSettings = async function () {
     if (!payload) return;
     try {
         this.updateSettingsStatus('podcast', 'Saving...', 'info');
-        const response = await fetch('../backend/api/update_app_settings.php', {
+        const response = await this.performSensitiveAdminRequest('../backend/api/update_app_settings.php', {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
-        });
-        const data = await this.safeJson(response, { success: false });
+        }, 'save podcast settings');
+        const data = response.__adminPayloadAttached || await this.safeJson(response, { success: false });
         if (!data.success) {
             throw new Error(data.message || 'Unable to save podcast settings.');
         }
@@ -16179,8 +16229,8 @@ AdminDashboard.prototype.wireSettingsForm = async function ({ formId, refreshBtn
             form.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
                 payload[checkbox.name] = checkbox.checked;
             });
-            const response = await fetch('../backend/api/update_app_settings.php', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            const data = await this.safeJson(response, { success: false });
+            const response = await this.performSensitiveAdminRequest('../backend/api/update_app_settings.php', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }, 'save settings');
+            const data = response.__adminPayloadAttached || await this.safeJson(response, { success: false });
             if (!data.success) throw new Error(data.message || 'Unable to save settings.');
             this.applySettingsToForm(form, data.settings || {});
             this.primeAppSettingsCache(data.settings || null);

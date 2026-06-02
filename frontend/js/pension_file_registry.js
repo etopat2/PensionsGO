@@ -387,11 +387,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     return { valid: true, normalized, message: "" };
   }
 
-  function ensureRegistryBankOption(value) {
-    if (!editBankName) return;
+  function ensureBankOption(selectElement, value) {
+    if (!selectElement) return;
     const normalized = String(value || "").trim();
     if (!normalized) return;
-    const exists = Array.from(editBankName.options).some((option) => {
+    const exists = Array.from(selectElement.options).some((option) => {
       return String(option.value || "").trim().toLowerCase() === normalized.toLowerCase();
     });
     if (exists) return;
@@ -400,7 +400,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     option.value = normalized;
     option.textContent = `${normalized} (inactive)`;
     option.dataset.dynamicBank = "true";
-    editBankName.appendChild(option);
+    selectElement.appendChild(option);
+  }
+
+  function ensureRegistryBankOption(value) {
+    ensureBankOption(editBankName, value);
   }
 
   function setRegistryBankValue(value) {
@@ -409,6 +413,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     ensureRegistryBankOption(value);
     editBankName.value = String(value || "").trim();
     syncFilterableSelect(editBankName);
+  }
+
+  function populateBankSelect(selectElement, currentValue = "") {
+    if (!selectElement) return;
+    const selectedValue = String(currentValue || selectElement.value || "").trim();
+    selectElement.innerHTML = '<option value="">Select bank</option>';
+    bankOptions.forEach((bank) => {
+      const bankName = String(bank.bank_name || "").trim();
+      if (!bankName) return;
+      const option = document.createElement("option");
+      option.value = bankName;
+      option.textContent = bankName;
+      selectElement.appendChild(option);
+    });
+    ensureBankOption(selectElement, selectedValue);
+    selectElement.value = selectedValue;
+  }
+
+  function setLifeCertBankValue(value) {
+    if (!lifeCertBankName) return;
+    Array.from(lifeCertBankName.querySelectorAll('option[data-dynamic-bank="true"]')).forEach((option) => option.remove());
+    ensureBankOption(lifeCertBankName, value);
+    lifeCertBankName.value = String(value || "").trim();
   }
 
   function setMoneyInputValue(field, value) {
@@ -1089,15 +1116,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       bankOptions = [];
     }
 
-    if (!editBankName) return;
-    const currentValue = String(editBankName.value || "").trim();
-    editBankName.innerHTML = '<option value="">Select bank</option>';
-    bankOptions.forEach((bank) => {
-      const option = document.createElement("option");
-      option.value = String(bank.bank_name || "").trim();
-      option.textContent = String(bank.bank_name || "").trim();
-      editBankName.appendChild(option);
-    });
+    const currentValue = String(editBankName?.value || "").trim();
+    populateBankSelect(editBankName, currentValue);
+    populateBankSelect(lifeCertBankName, lifeCertBankName?.value || "");
     setRegistryBankValue(currentValue);
   }
 
@@ -2040,7 +2061,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     ];
     fields.forEach((field) => {
       if (!field) return;
-      field.readOnly = !isEditable;
+      if (field === lifeCertBankName) {
+        field.disabled = !isEditable;
+      } else {
+        field.readOnly = !isEditable;
+      }
       if (field === lifeCertAddress) {
         syncDistrictState(field, !isEditable);
       }
@@ -2070,6 +2095,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         setDistrictValue(field, "");
         return;
       }
+      if (field === lifeCertBankName) {
+        setLifeCertBankValue("");
+        return;
+      }
       field.value = "";
     });
     lifeCertProfileRecordId = 0;
@@ -2089,7 +2118,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     setDistrictValue(lifeCertAddress, String(safe.address || "").trim());
     if (lifeCertNok) lifeCertNok.value = String(safe.next_of_kin || "").trim();
     if (lifeCertNokContact) lifeCertNokContact.value = String(safe.next_of_kin_contact || "").trim();
-    if (lifeCertBankName) lifeCertBankName.value = String(safe.bank_name || "").trim();
+    setLifeCertBankValue(String(safe.bank_name || "").trim());
     if (lifeCertBankAccount) lifeCertBankAccount.value = String(safe.bank_account || "").trim();
     if (lifeCertBankBranch) lifeCertBankBranch.value = String(safe.bank_branch || "").trim();
     if (!preserveEditable) {

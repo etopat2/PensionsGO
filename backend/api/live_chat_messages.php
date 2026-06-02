@@ -35,6 +35,8 @@ if ($peerType !== 'group') {
         UPDATE tb_live_chat_messages
         SET delivered_at = COALESCE(delivered_at, NOW())
         WHERE sender_id = ? AND recipient_id = ? AND delivered_at IS NULL
+        ORDER BY chat_message_id DESC
+        LIMIT 150
     ");
     if ($markStmt) {
         $markStmt->bind_param('ss', $peerId, $userId);
@@ -159,7 +161,7 @@ while ($row = $result->fetch_assoc()) {
         'isEdited' => !empty($row['edited_at']),
         'isDeleted' => !empty($row['deleted_at']),
         'createdAt' => $row['created_at'],
-        'canEdit' => $row['sender_id'] === $userId && empty($row['deleted_at']) && strtotime((string)$row['created_at']) >= (time() - (liveChatSettingInt($conn, 'live_chat_edit_window_minutes', 5, 1, 60) * 60)),
+        'canEdit' => $row['message_kind'] !== 'call' && $row['sender_id'] === $userId && empty($row['deleted_at']) && strtotime((string)$row['created_at']) >= (time() - (liveChatSettingInt($conn, 'live_chat_edit_window_minutes', 5, 1, 60) * 60)),
         'senderName' => $row['sender_name'] ?? 'Unknown User',
         'senderPhoto' => $row['sender_photo'] ?: 'images/default-user.png',
         'isOwn' => $row['sender_id'] === $userId,
@@ -300,7 +302,7 @@ while ($row = $result->fetch_assoc()) {
         $typingStmt->close();
     }
 
-    $deletedUpdates = liveChatDeletedUpdates($conn, $userId, $peerType, $peerId);
+    $deletedUpdates = $sinceId > 0 ? liveChatDeletedUpdates($conn, $userId, $peerType, $peerId) : [];
 
     liveChatRespond(['success' => true, 'messages' => $messages, 'receipts' => $receipts, 'deletedUpdates' => $deletedUpdates, 'typing' => $typing, 'serverTime' => date('Y-m-d H:i:s')]);
 } catch (Throwable $e) {

@@ -11,14 +11,15 @@
 import { loadFooter } from './modules/footer.js?v=20260507c';
 import { initAppUI } from './modules/ui_feedback.js';
 import { initPwaShell } from './modules/pwa.js?v=20260528b';
-import { initLiveChat } from './modules/live_chat.js?v=20260528g';
 
 const DEVICE_TOKEN_STORAGE_KEY = 'pensionsgo_device_token';
 const TAB_AUTH_MARKER_KEY = 'pensionsgo_tab_auth_verified';
+const SESSION_VALIDATION_CACHE_KEY = 'pensionsgo_session_validation_state';
 const LAST_SECURE_PAGE_KEY = 'pensionsgo_last_secure_page';
 const PUBLIC_SESSION_ALLOWANCE_KEY = 'pensionsgo_public_session_allowance';
 const DOCUMENT_VIEWER_RETURN_PREFIX = 'pensionsgo_document_viewer_return_';
 const PUBLIC_SESSION_ALLOWANCE_TTL_MS = 20 * 60 * 1000;
+const SESSION_VALIDATION_CACHE_TTL_MS = 25 * 1000;
 const PUBLIC_REAUTH_PAGES = new Set(['login.html', 'index.html', 'about.html', 'feedback.html', 'terms.html']);
 const PUBLIC_DROPDOWN_EXCEPTION_PAGES = new Set(['feedback.html', 'terms.html']);
 
@@ -903,8 +904,49 @@ function hasTabAuthenticationVerified() {
   return sessionStorage.getItem(TAB_AUTH_MARKER_KEY) === 'true';
 }
 
+function rememberSessionValidationState(sessionData = {}) {
+  if (!sessionData?.active) {
+    sessionStorage.removeItem(SESSION_VALIDATION_CACHE_KEY);
+    return;
+  }
+
+  const cachePayload = {
+    ...sessionData,
+    active: true,
+    cachedAt: Date.now()
+  };
+  try {
+    sessionStorage.setItem(SESSION_VALIDATION_CACHE_KEY, JSON.stringify(cachePayload));
+  } catch (_error) {
+    // Ignore storage quota issues; the live session check remains authoritative.
+  }
+}
+
+function getFreshSessionValidationState() {
+  if (!hasTabAuthenticationVerified()) {
+    return null;
+  }
+
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(SESSION_VALIDATION_CACHE_KEY) || 'null');
+    const cachedAt = Number(cached?.cachedAt || 0);
+    if (!cached?.active || cachedAt <= 0 || Date.now() - cachedAt > SESSION_VALIDATION_CACHE_TTL_MS) {
+      return null;
+    }
+
+    return {
+      ...cached,
+      validationCacheHit: true
+    };
+  } catch (_error) {
+    sessionStorage.removeItem(SESSION_VALIDATION_CACHE_KEY);
+    return null;
+  }
+}
+
 function clearTabAuthenticationState() {
   sessionStorage.removeItem(TAB_AUTH_MARKER_KEY);
+  sessionStorage.removeItem(SESSION_VALIDATION_CACHE_KEY);
   sessionStorage.removeItem(PUBLIC_SESSION_ALLOWANCE_KEY);
 }
 
@@ -2656,6 +2698,18 @@ class SessionManager {
       
       // Reset failure counter on success
       this.consecutiveFailures = 0;
+      if (data?.active) {
+        rememberSessionValidationState({
+          active: true,
+          userId: data.userId || '',
+          userName: data.userName || 'User',
+          userRole: String(data.userRole || '').toLowerCase(),
+          userRoleEffective: String(data.userRoleEffective || data.userRole || '').toLowerCase(),
+          userPhoto: data.userPhoto || ''
+        });
+      } else {
+        sessionStorage.removeItem(SESSION_VALIDATION_CACHE_KEY);
+      }
       
       return this.handleSessionCheckResult({
         data: data,
@@ -4044,6 +4098,7 @@ function clearClientAuthState() {
   sessionStorage.removeItem('phoneNo');
   sessionStorage.removeItem('sessionTimeout');
   sessionStorage.removeItem('gracePeriod');
+  sessionStorage.removeItem(SESSION_VALIDATION_CACHE_KEY);
   clearTabAuthenticationState();
   localStorage.removeItem('loggedInUser');
     localStorage.removeItem('userRole');
@@ -4086,10 +4141,23 @@ function syncClientAuthState(sessionData) {
       photo: userPhoto,
       userPhoto: userPhoto
     }));
+    rememberSessionValidationState({
+      active: true,
+      userId,
+      userName,
+      userRole,
+      userRoleEffective,
+      userEmail,
+      userPhoto
+    });
 }
 
 async function validateActiveSession() {
   const cachedSession = getCachedOfflineSessionState();
+  const freshValidation = getFreshSessionValidationState();
+  if (freshValidation?.active) {
+    return freshValidation;
+  }
   let timeoutId = null;
 
   try {
@@ -4130,7 +4198,7 @@ async function validateActiveSession() {
     ).toLowerCase();
 
     if (data && data.active && resolvedRole) {
-      return {
+      const activeState = {
         active: true,
         userId: data.userId || cachedSession.userId || '',
         userName: data.userName || cachedSession.userName || 'User',
@@ -4139,8 +4207,11 @@ async function validateActiveSession() {
         userEmail: data.userEmail || cachedSession.userEmail || '',
         userPhoto: data.userPhoto || cachedSession.userPhoto || ''
       };
+      rememberSessionValidationState(activeState);
+      return activeState;
     }
 
+    sessionStorage.removeItem(SESSION_VALIDATION_CACHE_KEY);
     return { active: false };
   } catch (error) {
     if (!isAbortLikeError(error)) {
@@ -4607,6 +4678,31 @@ async function loadFooterWithCoordination(isAuthenticated = false) {
   }
 }
 
+function scheduleLiveChatInitialization(sessionState = {}) {
+  if (window.__pensionsgoLiveChatInitScheduled) {
+    return;
+  }
+  window.__pensionsgoLiveChatInitScheduled = true;
+
+  const startLiveChat = async () => {
+    try {
+      const { initLiveChat } = await import('./modules/live_chat.js?v=20260602x');
+      await initLiveChat({ userId: sessionState.userId || '' });
+    } catch (error) {
+      console.warn('Live chat initialization failed:', error.message || error);
+      window.__pensionsgoLiveChatInitScheduled = false;
+    }
+  };
+
+  const schedule = window.requestIdleCallback
+    ? (callback) => window.requestIdleCallback(callback, { timeout: 1200 })
+    : (callback) => window.setTimeout(callback, 150);
+
+  schedule(() => {
+    startLiveChat();
+  });
+}
+
 /* 18. APP INITIALIZATION ENTRY POINT */
 async function initializeApplication() {
   disableLegacyDevtoolsDetectors();
@@ -4713,9 +4809,7 @@ async function initializeApplication() {
     window.__broadcastCheckerRunning = true;
     // Initialize session manager
     sessionManager.initialize();
-    initLiveChat({ userId: sessionState.userId || '' }).catch((error) => {
-      console.warn('Live chat initialization failed:', error.message || error);
-    });
+    scheduleLiveChatInitialization(sessionState);
 
     // Additional check after 3 seconds to catch any immediate conflicts
     setTimeout(() => {

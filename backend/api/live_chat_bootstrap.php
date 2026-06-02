@@ -6,6 +6,16 @@ try {
     liveChatEnsureTables($conn);
     liveChatTouchPresence($conn, $userId);
 
+    $currentUserName = 'You';
+    $currentStmt = $conn->prepare("SELECT userName FROM tb_users WHERE userId = ? LIMIT 1");
+    if ($currentStmt) {
+        $currentStmt->bind_param('s', $userId);
+        $currentStmt->execute();
+        $currentRow = $currentStmt->get_result()->fetch_assoc();
+        $currentUserName = trim((string)($currentRow['userName'] ?? '')) ?: 'You';
+        $currentStmt->close();
+    }
+
     $stmt = $conn->prepare("
         SELECT
             u.userId,
@@ -163,6 +173,7 @@ try {
     liveChatRespond([
         'success' => true,
         'currentUserId' => $userId,
+        'currentUserName' => $currentUserName,
         'users' => $users,
         'groups' => liveChatFeatureEnabled($conn, 'live_chat_group_chats_enabled', true) ? $groups : [],
         'unreadTotal' => $totalUnread,
@@ -171,6 +182,7 @@ try {
             'groupsEnabled' => liveChatFeatureEnabled($conn, 'live_chat_group_chats_enabled', true),
             'audioCallsEnabled' => liveChatFeatureEnabled($conn, 'live_chat_audio_calls_enabled', true),
             'videoCallsEnabled' => liveChatFeatureEnabled($conn, 'live_chat_video_calls_enabled', true),
+            'addParticipantsEnabled' => liveChatFeatureEnabled($conn, 'live_chat_add_participants_enabled', true),
             'attachmentsEnabled' => liveChatFeatureEnabled($conn, 'live_chat_attachments_enabled', true),
             'voiceNotesEnabled' => liveChatFeatureEnabled($conn, 'live_chat_voice_notes_enabled', true),
             'pollsEnabled' => liveChatFeatureEnabled($conn, 'live_chat_polls_enabled', true),
