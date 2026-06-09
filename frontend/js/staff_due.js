@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", async () => {
+async function initStaffDueController() {
   const staffContainer = document.getElementById("staffContainer");
   const searchInput = document.getElementById("searchInput");
   const searchButton = document.getElementById("searchButton");
@@ -38,6 +38,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const searchDebounceMs = 220;
   const pageSize = 12;
   let searchDebounceTimer = null;
+  let refreshDebounceTimer = null;
+  let currentFetchController = null;
   let currentPage = 1;
   let currentRecords = [];
   let verificationEscalationWindowDays = 60;
@@ -213,6 +215,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function fetchStaffData() {
+    if (currentFetchController) {
+      currentFetchController.abort();
+    }
+    const fetchController = new AbortController();
+    currentFetchController = fetchController;
+
     try {
       const params = new URLSearchParams({
         search: searchInput.value.trim(),
@@ -222,7 +230,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
       const res = await fetch(`../backend/api/fetch_staffdue.php?${params.toString()}`, {
         cache: "no-store",
-        credentials: "include"
+        credentials: "include",
+        signal: fetchController.signal
       });
       const data = await res.json();
 
@@ -239,12 +248,27 @@ document.addEventListener("DOMContentLoaded", async () => {
       currentPage = 1;
       renderStaffCards();
     } catch (err) {
+      if (err?.name === "AbortError") return;
       console.error("Error fetching staff data:", err);
       currentRecords = [];
       currentPage = 1;
       renderPagination();
       staffContainer.innerHTML = "<div class=\"app-state-message app-state-error\">Error loading data.</div>";
+    } finally {
+      if (currentFetchController === fetchController) {
+        currentFetchController = null;
+      }
     }
+  }
+
+  function scheduleStaffRefresh(delay = 120) {
+    if (refreshDebounceTimer) {
+      clearTimeout(refreshDebounceTimer);
+    }
+    refreshDebounceTimer = setTimeout(() => {
+      refreshDebounceTimer = null;
+      fetchStaffData();
+    }, delay);
   }
 
   searchButton.addEventListener("click", fetchStaffData);
@@ -740,14 +764,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     localStorage.setItem("staffDueUpdated", Date.now().toString());
   }
 
-  window.addEventListener("focus", () => fetchStaffData());
+  window.addEventListener("focus", () => scheduleStaffRefresh());
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) fetchStaffData();
+    if (!document.hidden) scheduleStaffRefresh();
   });
-  window.addEventListener("pageshow", () => fetchStaffData());
+  window.addEventListener("pageshow", () => scheduleStaffRefresh());
   window.addEventListener("storage", (event) => {
     if (event.key === "staffDueUpdated") {
-      fetchStaffData();
+      scheduleStaffRefresh(40);
     }
   });
 
@@ -1173,4 +1197,20 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (evt.target === modal) close();
     });
   }
-});
+}
+
+function startStaffDueController() {
+  initStaffDueController().catch((error) => {
+    console.error("Staff due controller initialization failed:", error);
+    const staffContainer = document.getElementById("staffContainer");
+    if (staffContainer) {
+      staffContainer.innerHTML = "<div class=\"app-state-message app-state-error\">Unable to initialize staff due records.</div>";
+    }
+  });
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", startStaffDueController, { once: true });
+} else {
+  startStaffDueController();
+}

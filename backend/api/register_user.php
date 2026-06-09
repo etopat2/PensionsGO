@@ -19,8 +19,8 @@ $logFile = __DIR__ . '/../logs/register_errors.log';
 $uploadDir = __DIR__ . '/../uploads/profiles/';
 
 // Ensure upload & logs dirs exist
-if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
-if (!is_dir(dirname($logFile))) mkdir(dirname($logFile), 0777, true);
+ensureUploadDirectoryGuard($uploadDir);
+if (!is_dir(dirname($logFile))) mkdir(dirname($logFile), 0775, true);
 
 function respond($success, $message, $extra = []) {
     echo json_encode(array_merge(['success' => $success, 'message' => $message], $extra));
@@ -268,15 +268,14 @@ if (isset($_FILES['userPhoto']) && $_FILES['userPhoto']['error'] !== UPLOAD_ERR_
         respond(false, 'Error uploading file.');
     }
 
-    enforceUploadedFileSizeLimit($conn, $_FILES['userPhoto'], 'Profile photo');
-    $tmpPath = $_FILES['userPhoto']['tmp_name'];
-    $origName = $_FILES['userPhoto']['name'];
-    $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
     $allowed = ['jpg','jpeg','png','webp'];
-
-    if (!in_array($ext, $allowed)) {
-        respond(false, 'Invalid image format. Only jpg, jpeg, png, webp are allowed.');
+    try {
+        $validatedPhoto = assertUploadedFileIsSafe($conn, $_FILES['userPhoto'], $allowed, ['image/'], 'Profile photo');
+    } catch (Throwable $e) {
+        respond(false, $e->getMessage() ?: 'Invalid image format. Only jpg, jpeg, png, webp are allowed.');
     }
+    $tmpPath = (string)$validatedPhoto['tmp_name'];
+    $ext = (string)$validatedPhoto['extension'];
 
     // Build new filename using the short code
     $baseFilename = $shortCode;

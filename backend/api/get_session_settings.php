@@ -8,15 +8,19 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 error_reporting(E_ALL);
 
+require_once __DIR__ . '/../config.php';
+applyApiCorsPolicy($conn, ['GET', 'OPTIONS']);
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
+
 header('Content-Type: application/json; charset=UTF-8');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Credentials: true');
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-
-require_once __DIR__ . '/../config.php';
 
 $timeoutMinutesRaw = function_exists('getAppSetting') ? getAppSetting($conn, 'session_timeout_minutes') : null;
 $graceMinutesRaw = function_exists('getAppSetting') ? getAppSetting($conn, 'grace_period_minutes') : null;

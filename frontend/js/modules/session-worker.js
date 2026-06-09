@@ -10,6 +10,8 @@
 
 let BASE_API = null;
 let DEVICE_TOKEN = '';
+let HOSTED_SESSION_ID = '';
+let HOSTED_SESSION_USER = '';
 let sessionExpiredBroadcasted = false;
 
 const state = {
@@ -21,6 +23,8 @@ self.onmessage = (e) => {
   if (e.data.type === "CONFIG") {
     BASE_API = e.data.BASE_API;
     DEVICE_TOKEN = e.data.deviceToken || '';
+    HOSTED_SESSION_ID = e.data.hostedSessionId || '';
+    HOSTED_SESSION_USER = e.data.hostedSessionUser || '';
   }
   if (e.data.type === "START_MONITORING") poll();
 };
@@ -29,10 +33,17 @@ async function poll() {
   if (!BASE_API) return;
 
   try {
+    const headers = {};
+    if (DEVICE_TOKEN) headers["X-Device-Token"] = DEVICE_TOKEN;
+    if (/^[a-f0-9]{64}$/i.test(HOSTED_SESSION_ID) && HOSTED_SESSION_USER) {
+      headers["X-PensionsGo-Session-Id"] = HOSTED_SESSION_ID;
+      headers["X-PensionsGo-User-Id"] = HOSTED_SESSION_USER;
+    }
+
     const res = await fetch(BASE_API + "check_session.php", {
       credentials: "include",
       cache: "no-store",
-      headers: DEVICE_TOKEN ? { "X-Device-Token": DEVICE_TOKEN } : {}
+      headers
     });
 
     if (!res.ok) return;

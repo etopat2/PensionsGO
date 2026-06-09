@@ -8,8 +8,14 @@ define('PENSIONAPP_DB_HOST', 'localhost');
 define('PENSIONAPP_DB_USER', 'pension_app_user');
 define('PENSIONAPP_DB_PASSWORD', 'change-me');
 define('PENSIONAPP_DB_NAME', 'pension_db');
+// App timezone used by PHP and the MySQL connection. Keep this as Africa/Kampala for Uganda deployments.
+define('PENSIONAPP_TIMEZONE', 'Africa/Kampala');
 // Optional override when the app is behind a tunnel / reverse proxy and auto-detection is unreliable.
 // Example: define('PENSIONAPP_PUBLIC_URL', 'https://example.ngrok-free.dev');
+// Optional override for shared hosts where the default PHP session folder is not writable.
+// Example: define('PENSIONAPP_SESSION_SAVE_PATH', __DIR__ . '/cache/php_sessions');
+// Recommended on hosted deployments: set a long random value used to sign fallback auth cookies.
+// Example: define('PENSIONAPP_COOKIE_AUTH_SECRET', 'replace-with-at-least-32-random-characters');
 
 // Optional override. Keep this aligned with app_version.json unless a deployment needs a temporary override.
 define('PENSIONAPP_APP_VERSION', '1.0.0');

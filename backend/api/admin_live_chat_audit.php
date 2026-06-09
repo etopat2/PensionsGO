@@ -55,6 +55,23 @@ function adminChatAuditMessagePreview(array $row): string
 {
     $kind = (string)($row['message_kind'] ?? 'text');
     $text = trim((string)($row['archive_message_text'] ?? $row['message_text'] ?? ''));
+    if ($kind === 'call' && $text !== '') {
+        $call = json_decode($text, true);
+        if (is_array($call)) {
+            $callType = ucfirst((string)($call['callType'] ?? 'audio'));
+            $status = strtolower((string)($call['status'] ?? 'logged'));
+            $statusLabel = match ($status) {
+                'missed' => 'Missed',
+                'rejected' => 'Rejected',
+                'ended' => 'Ended',
+                'accepted' => 'Answered',
+                default => ucfirst($status ?: 'Logged')
+            };
+            $caller = trim((string)($call['callerName'] ?? 'Caller'));
+            $callee = trim((string)($call['calleeName'] ?? 'Recipient'));
+            return trim($statusLabel . ' ' . strtolower($callType) . ' call: ' . $caller . ' to ' . $callee);
+        }
+    }
     if ($text !== '') {
         return substr($text, 0, 160);
     }

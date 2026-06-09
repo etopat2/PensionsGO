@@ -7,15 +7,15 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 error_reporting(E_ALL);
 
-header('Content-Type: application/json; charset=UTF-8');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, X-Requested-With, X-Device-Token, X-CSRF-Token');
+require_once __DIR__ . '/../config.php';
+applyApiCorsPolicy($conn, ['POST', 'OPTIONS']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
+
+header('Content-Type: application/json; charset=UTF-8');
 
 ob_start();
 
@@ -26,7 +26,6 @@ $userName = 'Unknown';
 $userRole = 'guest';
 
 try {
-    require_once __DIR__ . '/../config.php';
     if (session_status() === PHP_SESSION_NONE) {
         session_start();
     }
@@ -108,6 +107,9 @@ try {
 // Always clear the PHP session locally so logout cannot leave a valid browser session behind.
 try {
     $_SESSION = [];
+    if (function_exists('clearSignedSessionCookies')) {
+        clearSignedSessionCookies();
+    }
     if (ini_get('session.use_cookies')) {
         $params = session_get_cookie_params();
         if (PHP_VERSION_ID >= 70300) {

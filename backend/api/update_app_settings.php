@@ -144,7 +144,7 @@ try {
         'live_chat_typing_idle_seconds' => '5',
         'live_chat_message_poll_ms' => '350',
         'live_chat_receipt_poll_ms' => '250',
-        'live_chat_call_poll_ms' => '900',
+        'live_chat_call_poll_ms' => '500',
         'live_chat_signal_poll_ms' => '350',
         'notify_quiet_hours_start' => '22:00',
         'notify_quiet_hours_end' => '06:00',

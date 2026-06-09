@@ -229,18 +229,16 @@ if (!empty($newPassword)) {
 // 
 if (!empty($_FILES['profilePicture']['name'])) {
     $uploadDir = __DIR__ . '/../uploads/profiles/';
-    if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+    ensureUploadDirectoryGuard($uploadDir);
 
-    enforceUploadedFileSizeLimit($conn, $_FILES['profilePicture'], 'Profile photo');
-    $ext = strtolower(pathinfo($_FILES['profilePicture']['name'], PATHINFO_EXTENSION));
     $allowed = ['jpg', 'jpeg', 'png'];
-    if (!in_array($ext, $allowed)) throw new Exception('Invalid image format');
+    $validatedPhoto = assertUploadedFileIsSafe($conn, $_FILES['profilePicture'], $allowed, ['image/'], 'Profile photo');
 
     $filename = uniqid('profile_', true) . '.jpg';
     $targetPath = $uploadDir . $filename;
 
     deleteOldPhoto($current['userPhoto']);
-    optimizeImage($_FILES['profilePicture']['tmp_name'], $targetPath);
+    optimizeImage((string)$validatedPhoto['tmp_name'], $targetPath);
 
     $photoPath = '../uploads/profiles/' . $filename;
     $fields[] = "userPhoto = ?";

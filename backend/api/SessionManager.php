@@ -38,7 +38,7 @@ class SessionManager
     {
         // Check if sessions table exists
         $result = $this->conn->query("SHOW TABLES LIKE 'tb_user_sessions'");
-        if ($result->num_rows === 0) {
+        if ($result && $result->num_rows === 0) {
             // Create table
             $this->conn->query("
                 CREATE TABLE IF NOT EXISTS `tb_user_sessions` (
@@ -59,6 +59,106 @@ class SessionManager
                     KEY `idx_user_id` (`user_id`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
             ");
+        }
+        if ($result) {
+            $result->free();
+        }
+
+        $this->ensureSessionTableSchema();
+    }
+
+    private function sessionColumnExists(string $column): bool
+    {
+        $stmt = $this->conn->prepare("
+            SELECT 1
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'tb_user_sessions'
+              AND COLUMN_NAME = ?
+            LIMIT 1
+        ");
+        if (!$stmt) {
+            return false;
+        }
+        $stmt->bind_param('s', $column);
+        $stmt->execute();
+        $exists = (bool)$stmt->get_result()->fetch_row();
+        $stmt->close();
+        return $exists;
+    }
+
+    private function sessionKeyExists(string $keyName): bool
+    {
+        $stmt = $this->conn->prepare("
+            SELECT 1
+            FROM INFORMATION_SCHEMA.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'tb_user_sessions'
+              AND INDEX_NAME = ?
+            LIMIT 1
+        ");
+        if (!$stmt) {
+            return false;
+        }
+        $stmt->bind_param('s', $keyName);
+        $stmt->execute();
+        $exists = (bool)$stmt->get_result()->fetch_row();
+        $stmt->close();
+        return $exists;
+    }
+
+    private function applySessionSchemaStatement(string $sql): void
+    {
+        if (!$this->conn->query($sql)) {
+            error_log('Session schema repair skipped: ' . $this->conn->error . ' SQL: ' . $sql);
+        }
+    }
+
+    private function ensureSessionTableSchema(): void
+    {
+        $columns = [
+            'id' => "`id` int(11) NOT NULL AUTO_INCREMENT",
+            'session_id' => "`session_id` varchar(128) NOT NULL",
+            'user_id' => "`user_id` varchar(100) NOT NULL",
+            'device_id' => "`device_id` varchar(64) NOT NULL",
+            'session_type' => "`session_type` enum('web','mobile','api') DEFAULT 'web'",
+            'login_time' => "`login_time` timestamp NOT NULL DEFAULT current_timestamp()",
+            'last_activity' => "`last_activity` timestamp NOT NULL DEFAULT current_timestamp()",
+            'grace_period_until' => "`grace_period_until` timestamp NULL DEFAULT NULL",
+            'is_active' => "`is_active` tinyint(1) DEFAULT 1",
+            'termination_reason' => "`termination_reason` varchar(50) DEFAULT NULL",
+            'user_agent' => "`user_agent` text DEFAULT NULL",
+            'ip_address' => "`ip_address` varchar(45) DEFAULT NULL"
+        ];
+
+        foreach ($columns as $column => $definition) {
+            if (!$this->sessionColumnExists($column)) {
+                $this->applySessionSchemaStatement("ALTER TABLE `tb_user_sessions` ADD COLUMN {$definition}");
+            }
+        }
+
+        $this->applySessionSchemaStatement("ALTER TABLE `tb_user_sessions` MODIFY `session_id` varchar(128) NOT NULL");
+        $this->applySessionSchemaStatement("ALTER TABLE `tb_user_sessions` MODIFY `user_id` varchar(100) NOT NULL");
+        $this->applySessionSchemaStatement("ALTER TABLE `tb_user_sessions` MODIFY `device_id` varchar(64) NOT NULL");
+        $this->applySessionSchemaStatement("ALTER TABLE `tb_user_sessions` MODIFY `session_type` enum('web','mobile','api') DEFAULT 'web'");
+        $this->applySessionSchemaStatement("ALTER TABLE `tb_user_sessions` MODIFY `last_activity` timestamp NOT NULL DEFAULT current_timestamp()");
+        $this->applySessionSchemaStatement("ALTER TABLE `tb_user_sessions` MODIFY `is_active` tinyint(1) DEFAULT 1");
+
+        if (!$this->sessionKeyExists('PRIMARY')) {
+            $this->applySessionSchemaStatement("ALTER TABLE `tb_user_sessions` ADD PRIMARY KEY (`id`)");
+        }
+        $this->applySessionSchemaStatement("ALTER TABLE `tb_user_sessions` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT");
+        if (!$this->sessionKeyExists('unique_session_id')) {
+            $this->applySessionSchemaStatement("ALTER TABLE `tb_user_sessions` ADD UNIQUE KEY `unique_session_id` (`session_id`)");
+        }
+        if (!$this->sessionKeyExists('idx_user_active')) {
+            $this->applySessionSchemaStatement("ALTER TABLE `tb_user_sessions` ADD KEY `idx_user_active` (`user_id`, `is_active`)");
+        }
+        if (!$this->sessionKeyExists('idx_session_device')) {
+            $this->applySessionSchemaStatement("ALTER TABLE `tb_user_sessions` ADD KEY `idx_session_device` (`session_id`, `device_id`)");
+        }
+        if (!$this->sessionKeyExists('idx_last_activity')) {
+            $this->applySessionSchemaStatement("ALTER TABLE `tb_user_sessions` ADD KEY `idx_last_activity` (`last_activity`)");
         }
     }
 
@@ -93,8 +193,8 @@ class SessionManager
             $gracePeriod = $this->defaultGrace;
         }
         
-        // Calculate grace period end time
-        $graceUntil = date('Y-m-d H:i:s', time() + $gracePeriod);
+        $nowString = $this->currentAppDateTimeString();
+        $graceUntil = $this->currentAppDateTimeString(time() + $gracePeriod);
         
         // Terminate existing sessions if multiple devices not allowed
         if (!$allowMultipleDevices) {
@@ -103,9 +203,9 @@ class SessionManager
         
         // Insert new session - SIMPLE VERSION
         $stmt = $this->conn->prepare("
-            INSERT INTO tb_user_sessions 
-            (session_id, user_id, device_id, user_agent, ip_address, session_type, grace_period_until)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO tb_user_sessions
+            (session_id, user_id, device_id, user_agent, ip_address, session_type, login_time, last_activity, grace_period_until, is_active, termination_reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL)
         ");
         
         if (!$stmt) {
@@ -116,13 +216,15 @@ class SessionManager
         $sessionType = in_array($platform, ['web', 'mobile', 'api'], true) ? $platform : 'web';
         
         $stmt->bind_param(
-            "sssssss",
+            "sssssssss",
             $sessionId,
             $userId,
             $deviceId,
             $userAgent,
             $ipAddress,
             $sessionType,
+            $nowString,
+            $nowString,
             $graceUntil
         );
         
@@ -134,6 +236,11 @@ class SessionManager
         }
         
         $stmt->close();
+
+        if (!$this->confirmSessionStored($sessionId, $userId, $deviceId)) {
+            error_log("SessionManager insert verification failed for session {$sessionId} and user {$userId}");
+            throw new RuntimeException("Session was not persisted after login.");
+        }
         
         // Log session start - USE SIMPLIFIED LOGGING
         $this->logSessionStartSimple($userId, $userName, $userRole, $sessionId);
@@ -143,8 +250,55 @@ class SessionManager
             'timeout' => $timeout,
             'grace_period' => $gracePeriod,
             'allow_multiple_devices' => $allowMultipleDevices,
-            'login_time' => date('Y-m-d H:i:s')
+            'login_time' => $nowString
         ];
+    }
+
+    private function currentAppDateTimeString(?int $timestamp = null): string
+    {
+        $timezoneName = function_exists('getConfiguredAppTimezone') ? getConfiguredAppTimezone() : date_default_timezone_get();
+        try {
+            $timezone = new DateTimeZone($timezoneName ?: 'Africa/Kampala');
+        } catch (Throwable $error) {
+            $timezone = new DateTimeZone('Africa/Kampala');
+        }
+
+        $dateTime = $timestamp === null
+            ? new DateTimeImmutable('now', $timezone)
+            : (new DateTimeImmutable('@' . $timestamp))->setTimezone($timezone);
+        return $dateTime->format('Y-m-d H:i:s');
+    }
+
+    public function confirmSessionStored(string $sessionId, string $userId, ?string $deviceId = null): bool
+    {
+        $hasDeviceId = $deviceId !== null && $deviceId !== '';
+        $sql = "
+            SELECT session_id
+            FROM tb_user_sessions
+            WHERE session_id = ?
+              AND user_id = ?
+              AND is_active = 1
+        ";
+        if ($hasDeviceId) {
+            $sql .= " AND device_id = ?";
+        }
+        $sql .= " LIMIT 1";
+
+        $stmt = $this->conn->prepare($sql);
+        if (!$stmt) {
+            error_log("SessionManager verification prepare failed: " . $this->conn->error);
+            return false;
+        }
+
+        if ($hasDeviceId) {
+            $stmt->bind_param('sss', $sessionId, $userId, $deviceId);
+        } else {
+            $stmt->bind_param('ss', $sessionId, $userId);
+        }
+        $stmt->execute();
+        $exists = (bool)$stmt->get_result()->fetch_row();
+        $stmt->close();
+        return $exists;
     }
 
     /**
@@ -269,9 +423,10 @@ class SessionManager
             ];
         }
 
-        $lastActivity = strtotime($row['last_activity']);
+        $lastActivity = $this->parseAppTimestamp((string)$row['last_activity']);
         $now = time();
-        $expired = ($now - $lastActivity) > $this->defaultTimeout;
+        $timeoutSeconds = $this->getConfiguredTimeoutSeconds();
+        $expired = ($now - $lastActivity) > $timeoutSeconds;
 
         if ($expired && (int)$row['is_active'] === 1) {
             $updateStmt = $this->conn->prepare("
@@ -309,10 +464,40 @@ class SessionManager
             'expired'         => $expired,
             'in_grace'        => false,
             'last_activity'   => $lastActivity,
-            'seconds_left'    => max(0, ($lastActivity + $this->defaultTimeout) - $now),
+            'seconds_left'    => max(0, ($lastActivity + $timeoutSeconds) - $now),
             'reason'          => $expired ? 'timeout' : null,
             'message'         => $expired ? 'Session expired due to inactivity.' : null
         ];
+    }
+
+    private function getConfiguredTimeoutSeconds(): int
+    {
+        $timeoutMinutesRaw = function_exists('getAppSetting') ? getAppSetting($this->conn, 'session_timeout_minutes') : null;
+        $timeoutSeconds = is_numeric($timeoutMinutesRaw) ? (int)$timeoutMinutesRaw * 60 : $this->defaultTimeout;
+        return $timeoutSeconds > 0 ? $timeoutSeconds : $this->defaultTimeout;
+    }
+
+    private function parseAppTimestamp(string $value): int
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return 0;
+        }
+
+        $timezoneName = function_exists('getConfiguredAppTimezone') ? getConfiguredAppTimezone() : date_default_timezone_get();
+        try {
+            $timezone = new DateTimeZone($timezoneName ?: 'Africa/Kampala');
+        } catch (Throwable $error) {
+            $timezone = new DateTimeZone('Africa/Kampala');
+        }
+
+        $parsed = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $value, $timezone);
+        if ($parsed instanceof DateTimeImmutable) {
+            return $parsed->getTimestamp();
+        }
+
+        $fallback = strtotime($value);
+        return $fallback === false ? 0 : $fallback;
     }
 
     /**
@@ -379,13 +564,13 @@ class SessionManager
         if ($hasDeviceId) {
             $stmt = $this->conn->prepare("
                 UPDATE tb_user_sessions
-                SET last_activity = NOW()
+                SET last_activity = ?
                 WHERE session_id = ? AND is_active = 1 AND device_id = ?
             ");
         } else {
             $stmt = $this->conn->prepare("
                 UPDATE tb_user_sessions
-                SET last_activity = NOW()
+                SET last_activity = ?
                 WHERE session_id = ? AND is_active = 1
             ");
         }
@@ -394,10 +579,11 @@ class SessionManager
             throw new RuntimeException($this->conn->error);
         }
 
+        $nowString = $this->currentAppDateTimeString();
         if ($hasDeviceId) {
-            $stmt->bind_param("ss", $sessionId, $deviceId);
+            $stmt->bind_param("sss", $nowString, $sessionId, $deviceId);
         } else {
-            $stmt->bind_param("s", $sessionId);
+            $stmt->bind_param("ss", $nowString, $sessionId);
         }
         $stmt->execute();
         $updated = $stmt->affected_rows > 0;

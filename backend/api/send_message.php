@@ -123,23 +123,9 @@ function handleFileUpload($file, $messageId, $conn, $customName = null) {
     }
     
     $uploadDir = __DIR__ . '/../uploads/messages/';
-    
-    // Create uploads directory if it doesn't exist
-    if (!is_dir($uploadDir)) {
-        if (!mkdir($uploadDir, 0755, true)) {
-            throw new Exception("Failed to create upload directory");
-        }
-    }
+    ensureUploadDirectoryGuard($uploadDir);
 
     // Security: sanitize filename
-    $originalName = basename($file['name']);
-    $safeName = preg_replace('/[^a-zA-Z0-9\._-]/', '_', $originalName);
-    $fileName = time() . '_' . $safeName;
-    $filePath = $uploadDir . $fileName;
-    
-    // Use custom name if provided, otherwise use original name
-    $displayName = $customName ?: $originalName;
-    
     $settings = getAttachmentSettings($conn);
     $allowedExtensions = $settings['allowed_extensions'];
     $mimeMap = $settings['mime_map'];
@@ -147,17 +133,21 @@ function handleFileUpload($file, $messageId, $conn, $customName = null) {
     $dedupeEnabled = $settings['dedupe_enabled'];
     $compressEnabled = $settings['compress_enabled'];
     ensureAttachmentMetadataColumns($conn);
+    $validated = assertUploadedFileIsSafe($conn, $file, $allowedExtensions, [], 'Message attachment');
+    $originalName = (string)$validated['original_name'];
+    $safeName = sanitizeUploadedFileName($originalName, 'attachment.' . (string)$validated['extension']);
+    $fileName = time() . '_' . bin2hex(random_bytes(4)) . '_' . $safeName;
+    $filePath = $uploadDir . $fileName;
+
+    // Use custom name if provided, otherwise use original name
+    $displayName = $customName ?: $originalName;
     
-    $fileExtension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+    $fileExtension = (string)$validated['extension'];
     if (!empty($allowedExtensions) && !in_array($fileExtension, $allowedExtensions, true)) {
         throw new Exception("File type not allowed. Allowed: " . implode(', ', $allowedExtensions));
     }
 
-    enforceUploadedFileSizeLimit($conn, $file, 'Message attachment');
-
-    $finfo = finfo_open(FILEINFO_MIME_TYPE);
-    $mimeType = finfo_file($finfo, $file['tmp_name']);
-    finfo_close($finfo);
+    $mimeType = (string)$validated['mime_type'];
 
     if (isset($mimeMap[$fileExtension]) && !in_array($mimeType, $mimeMap[$fileExtension], true)) {
         throw new Exception("File type not allowed: " . $mimeType);
@@ -169,8 +159,8 @@ function handleFileUpload($file, $messageId, $conn, $customName = null) {
         throw new Exception("File size too large. Maximum {$maxMb}MB allowed.");
     }
 
-    $fileHash = hash_file('sha256', $file['tmp_name']);
-    $scanResult = runVirusScanOnFile($conn, $file['tmp_name'], [
+    $fileHash = (string)$validated['file_hash'];
+    $scanResult = runVirusScanOnFile($conn, (string)$validated['tmp_name'], [
         'storage_context' => 'message_attachment',
         'file_name' => $originalName,
         'file_path' => null,
@@ -231,7 +221,7 @@ function handleFileUpload($file, $messageId, $conn, $customName = null) {
     }
 
     // Move uploaded file
-    if (!move_uploaded_file($file['tmp_name'], $filePath)) {
+    if (!move_uploaded_file((string)$validated['tmp_name'], $filePath)) {
         throw new Exception("Failed to move uploaded file");
     }
 

@@ -15108,6 +15108,10 @@ AdminDashboard.prototype.renderChatOversightMessage = function (message) {
 };
 
 AdminDashboard.prototype.renderChatOversightMessageBody = function (message) {
+    if (String(message.kind || '').toLowerCase() === 'call') {
+        return this.renderChatOversightCallRecord(message);
+    }
+
     const text = String(message.text || '').trim();
     const fileName = String(message.fileName || '').trim();
     const parts = [];
@@ -15121,6 +15125,68 @@ AdminDashboard.prototype.renderChatOversightMessageBody = function (message) {
     if (message.isAdminDeleted) return '<div class="chat-oversight-deleted">Message content retained only in audit archive if available.</div>';
     if (message.isDeleted) return '<div class="chat-oversight-deleted">This message was deleted before archive content was available.</div>';
     return '<div class="chat-oversight-text muted">No text content.</div>';
+};
+
+AdminDashboard.prototype.parseChatOversightCallPayload = function (message) {
+    const raw = String(message?.text || '').trim();
+    if (!raw) return null;
+    try {
+        const payload = JSON.parse(raw);
+        return payload && typeof payload === 'object' ? payload : null;
+    } catch (_error) {
+        return null;
+    }
+};
+
+AdminDashboard.prototype.formatChatOversightCallDuration = function (seconds) {
+    const total = Math.max(0, Number(seconds || 0));
+    if (!Number.isFinite(total) || total <= 0) return 'No duration';
+    const minutes = Math.floor(total / 60);
+    const remaining = Math.floor(total % 60);
+    if (minutes <= 0) return `${remaining}s`;
+    return `${minutes}m ${String(remaining).padStart(2, '0')}s`;
+};
+
+AdminDashboard.prototype.renderChatOversightCallRecord = function (message) {
+    const call = this.parseChatOversightCallPayload(message);
+    if (!call) {
+        const fallback = String(message.text || '').trim();
+        return fallback
+            ? `<div class="chat-oversight-text">${this.escapeHtml(fallback).replace(/\n/g, '<br>')}</div>`
+            : '<div class="chat-oversight-text muted">Call record unavailable.</div>';
+    }
+
+    const callType = String(call.callType || 'audio').toLowerCase();
+    const status = String(call.status || 'logged').toLowerCase();
+    const statusLabels = {
+        missed: 'Missed call',
+        rejected: 'Rejected call',
+        ended: 'Ended call',
+        accepted: 'Answered call',
+        ringing: 'Ringing call',
+        failed: 'Failed call',
+        logged: 'Call record'
+    };
+    const caller = String(call.callerName || 'Caller');
+    const callee = String(call.calleeName || 'Recipient');
+    const startedAt = call.createdAt || message.createdAt || '';
+    const endedAt = call.endedAt || '';
+    const duration = this.formatChatOversightCallDuration(call.durationSeconds);
+
+    return `
+        <div class="chat-oversight-call-record ${this.escapeHtml(status)}">
+            <div class="chat-oversight-call-icon">${callType === 'video' ? '<i class="fas fa-video"></i>' : '<i class="fas fa-phone"></i>'}</div>
+            <div class="chat-oversight-call-main">
+                <strong>${this.escapeHtml(statusLabels[status] || 'Call record')}</strong>
+                <span>${this.escapeHtml(caller)} to ${this.escapeHtml(callee)}</span>
+                <small>${this.escapeHtml(callType.charAt(0).toUpperCase() + callType.slice(1))} call${startedAt ? ` - ${this.escapeHtml(this.formatChatOversightDate(startedAt, true))}` : ''}</small>
+            </div>
+            <div class="chat-oversight-call-meta">
+                <span>${this.escapeHtml(duration)}</span>
+                ${endedAt ? `<small>Ended ${this.escapeHtml(this.formatChatOversightDate(endedAt, true))}</small>` : ''}
+            </div>
+        </div>
+    `;
 };
 
 AdminDashboard.prototype.renderChatOversightEmptyThread = function () {

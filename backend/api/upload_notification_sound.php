@@ -4,6 +4,7 @@ header('Content-Type: application/json; charset=UTF-8');
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../notification_sound_library.php';
+require_once __DIR__ . '/../runtime_admin_tools.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -27,31 +28,22 @@ if (!isset($_FILES['sound']) || !is_array($_FILES['sound'])) {
     exit;
 }
 
-$file = $_FILES['sound'];
-$uploadError = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
-if ($uploadError !== UPLOAD_ERR_OK) {
+try {
+    $file = $_FILES['sound'];
+    $upload = assertUploadedFileIsSafe($conn, $file, notificationAllowedSoundExtensions(), notificationAllowedSoundMimeTypes(), 'Notification sound');
+} catch (Throwable $e) {
     http_response_code(422);
     echo json_encode([
         'success' => false,
-        'message' => 'The sound upload could not be completed.'
+        'message' => $e->getMessage() ?: 'The sound upload could not be completed.'
     ]);
     exit;
 }
 
-$originalName = (string)($file['name'] ?? 'notification-sound');
-$tmpPath = (string)($file['tmp_name'] ?? '');
-$sizeBytes = (int)($file['size'] ?? 0);
+$originalName = (string)$upload['original_name'];
+$tmpPath = (string)$upload['tmp_name'];
+$sizeBytes = (int)$upload['file_size'];
 $maxUploadBytes = 5 * 1024 * 1024;
-
-if ($sizeBytes <= 0 || !is_uploaded_file($tmpPath)) {
-    http_response_code(422);
-    echo json_encode([
-        'success' => false,
-        'message' => 'The uploaded sound file is invalid.'
-    ]);
-    exit;
-}
-
 if ($sizeBytes > $maxUploadBytes) {
     http_response_code(422);
     echo json_encode([
@@ -61,27 +53,21 @@ if ($sizeBytes > $maxUploadBytes) {
     exit;
 }
 
-$extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
-if (!in_array($extension, notificationAllowedSoundExtensions(), true)) {
+$scanResult = runVirusScanOnFile($conn, $tmpPath, [
+    'storage_context' => 'notification_sound',
+    'file_name' => $originalName,
+    'file_path' => null,
+    'mime_type' => (string)$upload['mime_type'],
+    'scanned_by' => $_SESSION['userId'] ?? null,
+    'scanned_by_name' => $_SESSION['userName'] ?? null,
+    'scanned_by_role' => $_SESSION['userRole'] ?? null
+]);
+if (($scanResult['enabled'] ?? true) && in_array(($scanResult['status'] ?? ''), ['infected', 'suspicious', 'error'], true)) {
     http_response_code(422);
+    $reason = trim((string)($scanResult['findings'] ?? 'Sound upload failed the configured virus scan.'));
     echo json_encode([
         'success' => false,
-        'message' => 'Supported sound formats are MP3, WAV, OGG, and M4A.'
-    ]);
-    exit;
-}
-
-$detectedMime = '';
-if (class_exists('finfo')) {
-    $finfo = new finfo(FILEINFO_MIME_TYPE);
-    $detectedMime = (string)$finfo->file($tmpPath);
-}
-
-if ($detectedMime !== '' && !in_array($detectedMime, notificationAllowedSoundMimeTypes(), true)) {
-    http_response_code(422);
-    echo json_encode([
-        'success' => false,
-        'message' => 'That file does not appear to be a supported audio format.'
+        'message' => $reason !== '' ? $reason : 'Sound upload failed the configured virus scan.'
     ]);
     exit;
 }
@@ -129,4 +115,3 @@ echo json_encode([
 if (isset($conn)) {
     $conn->close();
 }
-

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../runtime_admin_tools.php';
 
 function registryDocumentRequireEditAccess(mysqli $conn): array
 {
@@ -143,9 +144,7 @@ function registryDocumentBuildPath(array $registry, string $docType, string $ext
     $staffdueId = (int)($registry['staffdue_id'] ?? 0);
     $folderLabel = $regNo !== '' ? preg_replace('/[^a-zA-Z0-9_-]/', '_', $regNo) : 'staff_' . $staffdueId;
     $targetDir = __DIR__ . '/../uploads/documents/' . $folderLabel;
-    if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
-        throw new RuntimeException('Unable to prepare document storage folder.');
-    }
+    ensureUploadDirectoryGuard($targetDir);
 
     $timestampLabel = (new DateTimeImmutable('now'))->format('Ymd_His');
     $docTypeLabel = registryDocumentLabel($docType, 'Document');
@@ -182,18 +181,8 @@ function registryDocumentBuildPath(array $registry, string $docType, string $ext
 
 function registryDocumentValidateUpload(mysqli $conn, array $file, array $docSettings, string $contextLabel = 'Registry document'): array
 {
-    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-        throw new RuntimeException('File upload failed.');
-    }
-
-    enforceUploadedFileSizeLimit($conn, $file, $contextLabel);
-
     $allowedExt = $docSettings['allowed_types'] ?? ['pdf', 'jpg', 'jpeg', 'png'];
-    $originalName = (string)($file['name'] ?? 'document');
-    $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
-    if ($extension === '' || !in_array($extension, $allowedExt, true)) {
-        throw new RuntimeException('Unsupported file type.');
-    }
+    $upload = assertUploadedFileIsSafe($conn, $file, $allowedExt, ['image/', 'application/pdf', 'application/msword', 'application/vnd.'], $contextLabel);
 
     if (!empty($docSettings['max_size_mb'])) {
         $maxDocBytes = max(1, (int)$docSettings['max_size_mb']) * 1024 * 1024;
@@ -202,11 +191,11 @@ function registryDocumentValidateUpload(mysqli $conn, array $file, array $docSet
         }
     }
 
-    $scanResult = runVirusScanOnFile($conn, (string)$file['tmp_name'], [
+    $scanResult = runVirusScanOnFile($conn, (string)$upload['tmp_name'], [
         'storage_context' => 'registry_document',
-        'file_name' => $originalName,
+        'file_name' => (string)$upload['original_name'],
         'file_path' => null,
-        'mime_type' => $file['type'] ?? null,
+        'mime_type' => (string)$upload['mime_type'],
         'scanned_by' => $_SESSION['userId'] ?? null,
         'scanned_by_name' => $_SESSION['userName'] ?? null,
         'scanned_by_role' => $_SESSION['userRole'] ?? null
@@ -217,12 +206,12 @@ function registryDocumentValidateUpload(mysqli $conn, array $file, array $docSet
     }
 
     return [
-        'original_name' => $originalName,
-        'extension' => $extension,
-        'tmp_name' => (string)($file['tmp_name'] ?? ''),
-        'mime_type' => (string)($file['type'] ?? ''),
-        'file_size' => isset($file['size']) ? (int)$file['size'] : 0,
-        'file_hash' => hash_file('sha256', (string)$file['tmp_name'])
+        'original_name' => (string)$upload['original_name'],
+        'extension' => (string)$upload['extension'],
+        'tmp_name' => (string)$upload['tmp_name'],
+        'mime_type' => (string)$upload['mime_type'],
+        'file_size' => (int)$upload['file_size'],
+        'file_hash' => (string)$upload['file_hash']
     ];
 }
 

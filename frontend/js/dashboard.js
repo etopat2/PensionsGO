@@ -14,7 +14,7 @@
  * ============================================================
  */
 
-document.addEventListener("DOMContentLoaded", () => {
+function initDashboardController() {
   let currentSessionRole = "";
   let dashboardRoleLabelMap = {};
   let analyticsSettings = {
@@ -734,6 +734,92 @@ document.addEventListener("DOMContentLoaded", () => {
     refreshDashboardLiveStampLabel();
   }
 
+  const dashboardSectionLoadState = new Map();
+
+  function dashboardIdle(callback, timeout = 1200) {
+    if ("requestIdleCallback" in window) {
+      return window.requestIdleCallback(callback, { timeout });
+    }
+    return window.setTimeout(callback, 80);
+  }
+
+  function renderDashboardSection(sectionId, { force = false, reason = "navigation" } = {}) {
+    if (!sectionId) return Promise.resolve();
+    if (!force && dashboardSectionLoadState.get(sectionId) === "loaded") {
+      return Promise.resolve();
+    }
+    if (dashboardSectionLoadState.get(sectionId) === "loading") {
+      return Promise.resolve();
+    }
+
+    const role = currentSessionRole || getCurrentRole();
+    const renderers = {
+      claimsSection: renderClaimsSummary,
+      pensionersSection: renderPensionersSummary,
+      demographicsSection: renderDemographicsSection,
+      categoriesSection: renderModeOfRetirement,
+      lifeCertSection: renderLifeCertificates,
+      payrollSection: renderPayrollMovements,
+      staffDueSection: renderStaffDue,
+      filesSection: renderFilesSummary,
+      fileMovementSection: renderFileMovementAnalytics,
+      usersSection: renderUsersSummary,
+      workflowSection: () => canViewWorkflow(role) ? renderWorkflowPerformance() : Promise.resolve(),
+      feedbackSection: () => canViewFeedbackSection() ? renderFeedbackManagement() : Promise.resolve(setFeedbackAccessNotice(false)),
+      generalSection: renderGeneralStatistics,
+      dataSection: () => canViewDataManagement(role) ? renderActiveDataManagementTab() : Promise.resolve()
+    };
+
+    const renderer = renderers[sectionId];
+    if (typeof renderer !== "function") return Promise.resolve();
+
+    dashboardSectionLoadState.set(sectionId, "loading");
+    return Promise.resolve()
+      .then(renderer)
+      .then(() => {
+        dashboardSectionLoadState.set(sectionId, "loaded");
+      })
+      .catch((error) => {
+        dashboardSectionLoadState.delete(sectionId);
+        console.error(`Unable to render ${sectionId} during ${reason}:`, error);
+      });
+  }
+
+  function scheduleDashboardSection(sectionId, options = {}) {
+    dashboardIdle(() => {
+      renderDashboardSection(sectionId, options);
+    }, options.timeout || 1600);
+  }
+
+  function scheduleSecondaryDashboardHydration(accessRole) {
+    const queue = [
+      "pensionersSection",
+      "demographicsSection",
+      "categoriesSection",
+      "lifeCertSection",
+      "payrollSection",
+      "staffDueSection",
+      "filesSection",
+      "fileMovementSection",
+      canViewFeedbackSection() ? "feedbackSection" : "",
+      "generalSection",
+      canViewDataManagement(accessRole) ? "dataSection" : "",
+      "usersSection",
+      canViewWorkflow(accessRole) ? "workflowSection" : ""
+    ].filter(Boolean);
+
+    const runNext = () => {
+      const sectionId = queue.shift();
+      if (!sectionId) return;
+      renderDashboardSection(sectionId, { reason: "background-hydration" })
+        .finally(() => {
+          window.setTimeout(() => dashboardIdle(runNext, 1800), 120);
+        });
+    };
+
+    dashboardIdle(runNext, 2200);
+  }
+
   /* Section Navigation Logic*/
   function switchSection(targetSectionId) {
     if (targetSectionId === "workflowSection" && !canViewWorkflow(currentSessionRole || getCurrentRole())) {
@@ -769,48 +855,7 @@ document.addEventListener("DOMContentLoaded", () => {
       targetSection.classList.add("active");
       // Scroll to top of the content area when switching sections
       document.querySelector('.dashboard-content').scrollTop = 0;
-      if (targetSectionId === "workflowSection") {
-        renderWorkflowPerformance();
-      }
-      if (targetSectionId === "fileMovementSection") {
-        renderFileMovementAnalytics();
-      }
-      if (targetSectionId === "lifeCertSection") {
-        renderLifeCertificates();
-      }
-      if (targetSectionId === "payrollSection") {
-        renderPayrollMovements();
-      }
-      if (targetSectionId === "claimsSection") {
-        renderClaimsSummary();
-      }
-      if (targetSectionId === "pensionersSection") {
-        renderPensionersSummary();
-      }
-      if (targetSectionId === "demographicsSection") {
-        renderDemographicsSection();
-      }
-      if (targetSectionId === "categoriesSection") {
-        renderModeOfRetirement();
-      }
-      if (targetSectionId === "staffDueSection") {
-        renderStaffDue();
-      }
-      if (targetSectionId === "filesSection") {
-        renderFilesSummary();
-      }
-      if (targetSectionId === "usersSection") {
-        renderUsersSummary();
-      }
-      if (targetSectionId === "generalSection") {
-        renderGeneralStatistics();
-      }
-      if (targetSectionId === "feedbackSection") {
-        renderFeedbackManagement();
-      }
-      if (targetSectionId === "dataSection") {
-        renderActiveDataManagementTab();
-      }
+      scheduleDashboardSection(targetSectionId, { timeout: 400, reason: "navigation" });
     }
   }
 
@@ -1162,10 +1207,20 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const res = await fetch('../backend/api/check_session.php', {
         credentials: 'include',
-        cache: 'no-store'
+        cache: 'no-store',
+        headers: window.withDeploymentSessionHeaders
+          ? window.withDeploymentSessionHeaders({ 'X-Requested-With': 'XMLHttpRequest' })
+          : (window.withDeviceTokenHeaders ? window.withDeviceTokenHeaders({ 'X-Requested-With': 'XMLHttpRequest' }) : { 'X-Requested-With': 'XMLHttpRequest' })
       });
       const data = await res.json();
       if (!data.active) {
+        const hostedSessionId = (localStorage.getItem('pensionsgo_hosted_session_id') || '').trim();
+        const hostedSessionUser = (localStorage.getItem('pensionsgo_hosted_session_user') || '').trim();
+        const cachedRole = (sessionStorage.getItem('userRoleEffective') || sessionStorage.getItem('userRole') || localStorage.getItem('userRoleEffective') || localStorage.getItem('userRole') || '').toLowerCase().trim();
+        if (/^[a-f0-9]{64}$/i.test(hostedSessionId) && hostedSessionUser && cachedRole && ['not_authenticated', 'not_found', 'invalid', null, undefined, ''].includes(data.reason)) {
+          currentSessionRole = cachedRole;
+          return true;
+        }
         window.location.replace('login.html');
         return false;
       }
@@ -8350,35 +8405,18 @@ document.addEventListener("DOMContentLoaded", () => {
       applyFeedbackMenuVisibility();
       applyDataManagementVisibility(accessRole);
       
-      // Load all sections
-      await renderClaimsSummary();
-      await renderPensionersSummary();
-      await renderDemographicsSection();
-      await renderModeOfRetirement();
-      renderLifeCertificates();
-      renderPayrollMovements();
-      await renderStaffDue();
-      await renderFilesSummary();
-      await renderFileMovementAnalytics();
-      if (canViewFeedbackSection()) {
-        await renderFeedbackManagement();
-      } else {
+      // Render the visible first section before hydrating the rest of the dashboard.
+      await renderDashboardSection("claimsSection", { force: true, reason: "initial-visible-section" });
+      if (!canViewFeedbackSection()) {
         setFeedbackAccessNotice(false);
       }
-      await renderGeneralStatistics();
       if (canViewDataManagement(accessRole)) {
         applyDataManagementTabSelection();
-        await renderActiveDataManagementTab();
       }
-      
-      // Load real users data and workflow metrics
-      await renderUsersSummary();
-      const role = getCurrentRole();
-      if (canViewWorkflow(role)) {
-        await renderWorkflowPerformance();
-      }
+      scheduleSecondaryDashboardHydration(accessRole);
 
       const analyticsRefreshMs = Math.max(60000, Number(analyticsSettings.refreshIntervalMs || 0));
+      const role = getCurrentRole();
 
       if (role === 'admin' || role === 'oc_pen') {
         setInterval(() => {
@@ -8436,7 +8474,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   initializeDashboard();
-});
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initDashboardController, { once: true });
+} else {
+  initDashboardController();
+}
 
 
 

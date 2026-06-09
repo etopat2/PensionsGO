@@ -22,6 +22,37 @@ function appEnv(string $key, ?string $default = null): ?string {
     return (string)$value;
 }
 
+function getConfiguredAppTimezone(): string {
+    $configured = trim((string)appEnv(
+        'PENSIONAPP_TIMEZONE',
+        defined('PENSIONAPP_TIMEZONE') ? PENSIONAPP_TIMEZONE : 'Africa/Kampala'
+    ));
+
+    if ($configured === '') {
+        return 'Africa/Kampala';
+    }
+
+    try {
+        new DateTimeZone($configured);
+        return $configured;
+    } catch (Throwable $error) {
+        error_log('Invalid app timezone configured: ' . $configured);
+        return 'Africa/Kampala';
+    }
+}
+
+function getConfiguredAppTimezoneOffset(): string {
+    $timezone = new DateTimeZone(getConfiguredAppTimezone());
+    $offsetSeconds = $timezone->getOffset(new DateTimeImmutable('now', $timezone));
+    $sign = $offsetSeconds >= 0 ? '+' : '-';
+    $offsetSeconds = abs($offsetSeconds);
+    $hours = intdiv($offsetSeconds, 3600);
+    $minutes = intdiv($offsetSeconds % 3600, 60);
+    return sprintf('%s%02d:%02d', $sign, $hours, $minutes);
+}
+
+date_default_timezone_set(getConfiguredAppTimezone());
+
 function getFirstHeaderListValue(?string $raw): string {
     $raw = trim((string)$raw);
     if ($raw === '') {
@@ -303,6 +334,17 @@ if ($conn->connect_error) {
     exit;
 }
 
+$conn->set_charset('utf8mb4');
+$mysqlTimezoneOffset = getConfiguredAppTimezoneOffset();
+$tzStmt = $conn->prepare("SET time_zone = ?");
+if ($tzStmt) {
+    $tzStmt->bind_param('s', $mysqlTimezoneOffset);
+    $tzStmt->execute();
+    $tzStmt->close();
+} else {
+    error_log('Unable to prepare MySQL timezone statement: ' . $conn->error);
+}
+
 /* 2Ã¯Â¸ÂÃ¢Æ’Â£ SESSION MANAGER INITIALIZATION */
 require_once __DIR__ . '/api/SessionManager.php';
 require_once __DIR__ . '/api/TimeoutManager.php';
@@ -321,10 +363,153 @@ ensureUserPermissionsTable($conn);
 // Ensure the governed demo super administrator exists for controlled deployments.
 ensureDemoSuperAdminAccount($conn);
 
+function getSignedSessionCookieSecret(): string
+{
+    $configured = appEnv(
+        'PENSIONAPP_COOKIE_AUTH_SECRET',
+        defined('PENSIONAPP_COOKIE_AUTH_SECRET') ? PENSIONAPP_COOKIE_AUTH_SECRET : ''
+    );
+    if ($configured !== '') {
+        return hash('sha256', $configured);
+    }
+
+    $dbHost = appEnv('PENSIONAPP_DB_HOST', defined('PENSIONAPP_DB_HOST') ? PENSIONAPP_DB_HOST : 'localhost');
+    $dbUser = appEnv('PENSIONAPP_DB_USER', defined('PENSIONAPP_DB_USER') ? PENSIONAPP_DB_USER : 'root');
+    $dbPassword = appEnv('PENSIONAPP_DB_PASSWORD', defined('PENSIONAPP_DB_PASSWORD') ? PENSIONAPP_DB_PASSWORD : '');
+    $dbName = appEnv('PENSIONAPP_DB_NAME', defined('PENSIONAPP_DB_NAME') ? PENSIONAPP_DB_NAME : 'pension_db');
+    return hash('sha256', $dbHost . '|' . $dbUser . '|' . $dbPassword . '|' . $dbName . '|' . __DIR__);
+}
+
+function getSignedSessionCookieSignature(string $sessionId, string $userId): string
+{
+    return hash_hmac('sha256', $sessionId . '|' . $userId, getSignedSessionCookieSecret());
+}
+
+function setSignedSessionCookies(string $sessionId, string $userId): void
+{
+    if (headers_sent()) {
+        return;
+    }
+
+    $options = [
+        'expires' => 0,
+        'path' => '/',
+        'secure' => requestUsesSecureTransport(),
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ];
+    setcookie('PENSION_APP_AUTH_SID', $sessionId, $options);
+    setcookie('PENSION_APP_AUTH_UID', $userId, $options);
+    setcookie('PENSION_APP_AUTH_SIG', getSignedSessionCookieSignature($sessionId, $userId), $options);
+}
+
+function clearSignedSessionCookies(): void
+{
+    if (headers_sent()) {
+        return;
+    }
+
+    $options = [
+        'expires' => time() - 42000,
+        'path' => '/',
+        'secure' => requestUsesSecureTransport(),
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ];
+    setcookie('PENSION_APP_AUTH_SID', '', $options);
+    setcookie('PENSION_APP_AUTH_UID', '', $options);
+    setcookie('PENSION_APP_AUTH_SIG', '', $options);
+    setcookie('PENSION_APP_CLIENT_SID', '', $options);
+    setcookie('PENSION_APP_CLIENT_UID', '', $options);
+}
+
+function restoreSessionFromSignedAuthCookies(mysqli $conn): bool
+{
+    if (isset($_SESSION['session_id'], $_SESSION['userId'])) {
+        return true;
+    }
+
+    $sessionId = trim((string)($_SERVER['HTTP_X_PENSIONSGO_SESSION_ID'] ?? $_COOKIE['PENSION_APP_AUTH_SID'] ?? $_COOKIE['PENSION_APP_CLIENT_SID'] ?? ''));
+    $userId = trim((string)($_SERVER['HTTP_X_PENSIONSGO_USER_ID'] ?? $_COOKIE['PENSION_APP_AUTH_UID'] ?? $_COOKIE['PENSION_APP_CLIENT_UID'] ?? ''));
+    $signature = trim((string)($_COOKIE['PENSION_APP_AUTH_SIG'] ?? ''));
+    $usingHeaderFallback = isset($_SERVER['HTTP_X_PENSIONSGO_SESSION_ID'], $_SERVER['HTTP_X_PENSIONSGO_USER_ID']);
+    $usingClientCookieFallback = !$usingHeaderFallback && isset($_COOKIE['PENSION_APP_CLIENT_SID'], $_COOKIE['PENSION_APP_CLIENT_UID']);
+    if ($sessionId === '' || $userId === '') {
+        return false;
+    }
+    if (!preg_match('/^[a-f0-9]{64}$/i', $sessionId)) {
+        clearSignedSessionCookies();
+        return false;
+    }
+    if (!$usingHeaderFallback && !$usingClientCookieFallback) {
+        if ($signature === '' || !hash_equals(getSignedSessionCookieSignature($sessionId, $userId), $signature)) {
+            clearSignedSessionCookies();
+            return false;
+        }
+    }
+
+    $stmt = $conn->prepare("
+        SELECT s.session_id, s.user_id, s.device_id, u.userName, u.userRole, u.userPhoto, u.phoneNo, u.userEmail
+        FROM tb_user_sessions s
+        INNER JOIN tb_users u ON u.userId = s.user_id
+        WHERE s.session_id = ?
+          AND s.user_id = ?
+          AND s.is_active = 1
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return false;
+    }
+
+    $stmt->bind_param('ss', $sessionId, $userId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$row) {
+        clearSignedSessionCookies();
+        return false;
+    }
+    if ($usingHeaderFallback || $usingClientCookieFallback) {
+        $requestDeviceId = resolveClientDeviceIdentifierHash(getRequestDeviceToken());
+        $storedDeviceId = (string)($row['device_id'] ?? '');
+        if ($storedDeviceId !== '' && !hash_equals($storedDeviceId, $requestDeviceId)) {
+            return false;
+        }
+    }
+
+    $_SESSION['userId'] = (string)$row['user_id'];
+    $_SESSION['userName'] = (string)($row['userName'] ?? '');
+    $_SESSION['userRole'] = (string)($row['userRole'] ?? '');
+    $_SESSION['userRoleEffective'] = function_exists('resolveRoleAccessKey')
+        ? resolveRoleAccessKey($conn, (string)($row['userRole'] ?? ''))
+        : (string)($row['userRole'] ?? '');
+    $_SESSION['userPhoto'] = $row['userPhoto'] ?? null;
+    $_SESSION['phoneNo'] = $row['phoneNo'] ?? null;
+    $_SESSION['userEmail'] = $row['userEmail'] ?? null;
+    $_SESSION['session_id'] = $sessionId;
+    $_SESSION['last_activity'] = time();
+    $_SESSION['device_id'] = (string)($row['device_id'] ?? '');
+    return true;
+}
+
 /* 3Ã¯Â¸ÂÃ¢Æ’Â£ SECURE SESSION INITIALIZATION */
 if (session_status() === PHP_SESSION_NONE) {
     // Determine if using HTTPS, including reverse-proxy / tunnel deployments.
     $isSecure = requestUsesSecureTransport();
+
+    $sessionSavePath = appEnv(
+        'PENSIONAPP_SESSION_SAVE_PATH',
+        defined('PENSIONAPP_SESSION_SAVE_PATH') ? PENSIONAPP_SESSION_SAVE_PATH : ''
+    );
+    if ($sessionSavePath === '') {
+        $sessionSavePath = __DIR__ . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'php_sessions';
+    }
+    if (!is_dir($sessionSavePath)) {
+        @mkdir($sessionSavePath, 0775, true);
+    }
+    if (is_dir($sessionSavePath) && is_writable($sessionSavePath)) {
+        ini_set('session.save_path', $sessionSavePath);
+    }
     
     // Get a cookie-safe host. Localhost, IP literals, and host:port values should not
     // force a Domain attribute because browsers may reject those cookies entirely.
@@ -367,26 +552,28 @@ if (session_status() === PHP_SESSION_NONE) {
         'samesite' => 'Lax'
     ]);
 
-    if ($domain !== '') {
-        session_set_cookie_params([
-            'lifetime' => 0,
-            'path' => '/',
-            'domain' => $domain,
-            'secure' => $isSecure,
-            'httponly' => true,
-            'samesite' => 'Lax'
-        ]);
-    }
+    // if ($domain !== '') {
+    //     session_set_cookie_params([
+    //         'lifetime' => 0,
+    //         'path' => '/',
+    //         'domain' => $domain,
+    //         'secure' => $isSecure,
+    //         'httponly' => true,
+    //         'samesite' => 'Lax'
+    //     ]);
+    // }
     
     // Start session
     session_name('PENSION_APP_SESS');
     session_start();
+    restoreSessionFromSignedAuthCookies($conn);
 }
 
 if (isAppApiRequest()) {
     applyApiCorsPolicy($conn, ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
 }
 
+applyAppSecurityHeaders();
 enforceRequestSecurityControls($conn);
 
 /* Support Functions*/
@@ -868,6 +1055,133 @@ function getSecurityMaxZipEntries(mysqli $conn): int {
     return max(10, getAppSettingInt($conn, 'security_max_zip_entries', 2000));
 }
 
+function applyAppSecurityHeaders(): void {
+    if (headers_sent() || isAppCliRuntime()) {
+        return;
+    }
+
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: SAMEORIGIN');
+    header('X-Permitted-Cross-Domain-Policies: none');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    header('Permissions-Policy: camera=(self), microphone=(self), geolocation=(self), fullscreen=(self)');
+
+    if (isAppApiRequest()) {
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+    }
+}
+
+function getDangerousUploadExtensions(): array {
+    return [
+        'php', 'php3', 'php4', 'php5', 'php7', 'phtml', 'phar',
+        'cgi', 'pl', 'py', 'rb', 'sh', 'bash', 'zsh', 'cmd', 'bat',
+        'com', 'exe', 'dll', 'msi', 'jsp', 'asp', 'aspx', 'cer',
+        'js', 'mjs', 'html', 'htm', 'shtml', 'svg'
+    ];
+}
+
+function sanitizeUploadedFileName(string $fileName, string $fallback = 'upload.bin'): string {
+    $base = basename(str_replace('\\', '/', $fileName));
+    $base = preg_replace('/[\x00-\x1F\x7F]+/', '', $base);
+    $base = preg_replace('/[^a-zA-Z0-9._ -]+/', '_', (string)$base);
+    $base = preg_replace('/\s+/', ' ', (string)$base);
+    $base = trim((string)$base, " .-_\t\n\r\0\x0B");
+    return $base !== '' ? $base : $fallback;
+}
+
+function assertUploadedFileIsSafe(mysqli $conn, array $file, array $allowedExtensions = [], array $allowedMimePrefixes = [], string $label = 'Uploaded file'): array {
+    enforceUploadedFileSizeLimit($conn, $file, $label);
+
+    $tmpPath = (string)($file['tmp_name'] ?? '');
+    if ($tmpPath === '' || !is_uploaded_file($tmpPath)) {
+        throw new RuntimeException($label . ' is not a valid uploaded file.');
+    }
+
+    $originalName = sanitizeUploadedFileName((string)($file['name'] ?? ''), 'upload.bin');
+    $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+    if ($extension === '') {
+        throw new RuntimeException($label . ' must have a file extension.');
+    }
+
+    $parts = array_map('strtolower', array_filter(explode('.', $originalName)));
+    foreach ($parts as $part) {
+        if (in_array($part, getDangerousUploadExtensions(), true)) {
+            throw new RuntimeException($label . ' uses an unsafe file type.');
+        }
+    }
+
+    $allowedExtensions = array_values(array_unique(array_map('strtolower', $allowedExtensions)));
+    if (!empty($allowedExtensions) && !in_array($extension, $allowedExtensions, true)) {
+        throw new RuntimeException($label . ' uses an unsupported file type.');
+    }
+
+    $mimeType = 'application/octet-stream';
+    if (class_exists('finfo')) {
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $detected = (string)$finfo->file($tmpPath);
+        if ($detected !== '') {
+            $mimeType = $detected;
+        }
+    } elseif (function_exists('mime_content_type')) {
+        $detected = (string)@mime_content_type($tmpPath);
+        if ($detected !== '') {
+            $mimeType = $detected;
+        }
+    }
+
+    if (!empty($allowedMimePrefixes)) {
+        $matchesMime = false;
+        foreach ($allowedMimePrefixes as $prefix) {
+            $prefix = strtolower(trim((string)$prefix));
+            if ($prefix !== '' && str_starts_with(strtolower($mimeType), rtrim($prefix, '*'))) {
+                $matchesMime = true;
+                break;
+            }
+        }
+        if (!$matchesMime) {
+            throw new RuntimeException($label . ' content does not match an allowed file type.');
+        }
+    }
+
+    if (in_array($extension, ['zip', 'xlsx', 'docx'], true)) {
+        enforceZipArchiveSafety($conn, $tmpPath, $label);
+    }
+
+    return [
+        'original_name' => $originalName,
+        'extension' => $extension,
+        'tmp_name' => $tmpPath,
+        'mime_type' => $mimeType,
+        'file_size' => (int)($file['size'] ?? 0),
+        'file_hash' => @hash_file('sha256', $tmpPath) ?: ''
+    ];
+}
+
+function ensureUploadDirectoryGuard(string $directory): void {
+    if (!is_dir($directory) && !@mkdir($directory, 0775, true) && !is_dir($directory)) {
+        throw new RuntimeException('Unable to prepare upload storage.');
+    }
+
+    $htaccess = rtrim($directory, "/\\") . DIRECTORY_SEPARATOR . '.htaccess';
+    if (!is_file($htaccess)) {
+        @file_put_contents($htaccess, implode("\n", [
+            'Options -Indexes',
+            '<FilesMatch "\\.(php|php[0-9]?|phtml|phar|cgi|pl|py|rb|sh|asp|aspx|jsp|js|mjs|html?|shtml|svg)$">',
+            '  Require all denied',
+            '</FilesMatch>',
+            'AddType text/plain .php .php3 .php4 .php5 .php7 .phtml .phar .cgi .pl .py .rb .sh .asp .aspx .jsp',
+            ''
+        ]), LOCK_EX);
+    }
+
+    $index = rtrim($directory, "/\\") . DIRECTORY_SEPARATOR . 'index.html';
+    if (!is_file($index)) {
+        @file_put_contents($index, '', LOCK_EX);
+    }
+}
+
 function getSecurityAllowedOrigins(mysqli $conn): array {
     $configured = trim(getAppSettingString($conn, 'security_allowed_origins', ''));
     if ($configured === '') {
@@ -906,7 +1220,15 @@ function applyApiCorsPolicy(mysqli $conn, array $methods = ['GET', 'POST', 'OPTI
         header('Vary: Origin');
         header('Access-Control-Allow-Credentials: true');
         header('Access-Control-Allow-Methods: ' . implode(', ', array_unique($methods)));
-        $headers = array_unique(array_merge(['Content-Type', 'X-Requested-With', 'Accept', 'X-Device-Token', 'X-CSRF-Token'], $extraHeaders));
+        $headers = array_unique(array_merge([
+            'Content-Type',
+            'X-Requested-With',
+            'Accept',
+            'X-Device-Token',
+            'X-PensionsGo-Session-Id',
+            'X-PensionsGo-User-Id',
+            'X-CSRF-Token'
+        ], $extraHeaders));
         header('Access-Control-Allow-Headers: ' . implode(', ', $headers));
     }
 }

@@ -94,9 +94,7 @@ if (!empty($docSettings['link_registry_required'])) {
 
 $safeFolder = $regNo ? preg_replace('/[^a-zA-Z0-9_-]/', '_', $regNo) : 'staff_' . $staffId;
 $targetDir = __DIR__ . '/../uploads/documents/' . $safeFolder;
-if (!is_dir($targetDir)) {
-    mkdir($targetDir, 0775, true);
-}
+ensureUploadDirectoryGuard($targetDir);
 
 $buildDocumentLabel = static function (?string $value, string $fallback = 'Document') : string {
     $value = trim((string)$value);

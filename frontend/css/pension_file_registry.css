@@ -145,6 +145,7 @@
 
 .registry-toolbar {
   margin-top: 1rem;
+  min-height: 84px;
   padding: 0.8rem;
   border: 1px solid var(--border-color);
   border-radius: 10px;
@@ -158,6 +159,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  min-width: 0;
 }
 
 .toolbar-field span {
@@ -169,6 +171,7 @@
 
 .toolbar-field input,
 .toolbar-field select {
+  min-height: 42px;
   padding: 0.58rem 0.7rem;
   border: 1px solid var(--border-color);
   border-radius: 8px;
@@ -332,6 +335,14 @@
   display: grid;
   gap: 0.78rem;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  min-height: min(720px, calc(100vh - var(--main-header-height, 70px) - 230px));
+  align-content: start;
+}
+
+.registry-grid > .app-state-message {
+  min-height: 168px;
+  display: flex;
+  align-items: center;
 }
 
 .registry-card {
@@ -1954,6 +1965,7 @@
 @media (max-width: 920px) {
   .registry-toolbar {
     grid-template-columns: 1fr 1fr;
+    min-height: 148px;
   }
 
   .toolbar-field-search {
@@ -1979,12 +1991,14 @@
   .registry-grid {
     grid-template-columns: 1fr;
     gap: 0.65rem;
+    min-height: min(640px, calc(100vh - var(--main-header-height, 70px) - 310px));
   }
 
   .registry-toolbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.5rem;
     padding: 0.58rem;
+    min-height: 238px;
   }
 
   .registry-toolbar .toolbar-field {

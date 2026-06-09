@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", async () => {
+async function initPensionFileRegistryController() {
   const buildViewerUrl = (sourceUrl, label, returnState = null) => {
     if (window.PensionsGoDocumentViewer?.buildViewerUrl) {
       const viewerUrl = window.PensionsGoDocumentViewer.buildViewerUrl(sourceUrl, {
@@ -3932,4 +3932,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   initEditTabs();
   await loadCards();
   await restoreViewerReturnContextIfPresent();
-});
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => {
+    initPensionFileRegistryController().catch((error) => {
+      console.error("Unable to initialize pension file registry:", error);
+    });
+  }, { once: true });
+} else {
+  initPensionFileRegistryController().catch((error) => {
+    console.error("Unable to initialize pension file registry:", error);
+  });
+}

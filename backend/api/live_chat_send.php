@@ -1,40 +1,47 @@
 <?php
 require_once __DIR__ . '/live_chat_common.php';
+require_once __DIR__ . '/../runtime_admin_tools.php';
 
-function liveChatStoreUpload(array $file, string $prefix): array
+function liveChatStoreUpload(mysqli $conn, array $file, string $prefix): array
 {
-    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-        throw new RuntimeException('Upload failed.');
-    }
-
     $uploadDir = realpath(__DIR__ . '/../uploads') ?: (__DIR__ . '/../uploads');
     $chatDir = $uploadDir . DIRECTORY_SEPARATOR . 'live_chat';
-    if (!is_dir($chatDir) && !mkdir($chatDir, 0775, true)) {
-        throw new RuntimeException('Unable to prepare live chat upload storage.');
+    ensureUploadDirectoryGuard($chatDir);
+
+    $allowedExtensions = $prefix === 'voice'
+        ? ['mp3', 'wav', 'ogg', 'm4a', 'webm']
+        : ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'mp3', 'wav', 'ogg', 'm4a', 'webm', 'mp4', 'mov'];
+    $allowedMimes = $prefix === 'voice'
+        ? ['audio/', 'video/webm', 'application/ogg']
+        : ['image/', 'audio/', 'video/', 'application/pdf', 'application/msword', 'application/vnd.', 'text/plain', 'text/csv'];
+    $validated = assertUploadedFileIsSafe($conn, $file, $allowedExtensions, $allowedMimes, ucfirst($prefix) . ' upload');
+
+    $scanResult = runVirusScanOnFile($conn, (string)$validated['tmp_name'], [
+        'storage_context' => 'live_chat_' . $prefix,
+        'file_name' => (string)$validated['original_name'],
+        'file_path' => null,
+        'mime_type' => (string)$validated['mime_type'],
+        'scanned_by' => $_SESSION['userId'] ?? null,
+        'scanned_by_name' => $_SESSION['userName'] ?? null,
+        'scanned_by_role' => $_SESSION['userRole'] ?? null
+    ]);
+    if (($scanResult['enabled'] ?? true) && in_array(($scanResult['status'] ?? ''), ['infected', 'suspicious', 'error'], true)) {
+        $reason = trim((string)($scanResult['findings'] ?? 'Attachment failed the configured virus scan.'));
+        throw new RuntimeException($reason !== '' ? $reason : 'Attachment failed the configured virus scan.');
     }
 
-    $original = basename((string)$file['name']);
-    $safe = preg_replace('/[^a-zA-Z0-9._-]+/', '_', $original) ?: 'upload.bin';
-    $stored = $prefix . '_' . time() . '_' . bin2hex(random_bytes(4)) . '_' . $safe;
+    $safe = sanitizeUploadedFileName((string)$validated['original_name'], 'upload.' . (string)$validated['extension']);
+    $stored = $prefix . '_' . time() . '_' . bin2hex(random_bytes(8)) . '_' . $safe;
     $target = $chatDir . DIRECTORY_SEPARATOR . $stored;
-    if (!move_uploaded_file((string)$file['tmp_name'], $target)) {
+    if (!move_uploaded_file((string)$validated['tmp_name'], $target)) {
         throw new RuntimeException('Unable to store uploaded file.');
     }
 
-    $mime = 'application/octet-stream';
-    if (function_exists('finfo_open')) {
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        if ($finfo) {
-            $mime = finfo_file($finfo, $target) ?: $mime;
-            finfo_close($finfo);
-        }
-    }
-
     return [
-        'file_name' => $original,
+        'file_name' => (string)$validated['original_name'],
         'file_path' => 'uploads/live_chat/' . $stored,
-        'file_size' => filesize($target) ?: (int)$file['size'],
-        'mime_type' => $mime
+        'file_size' => filesize($target) ?: (int)$validated['file_size'],
+        'mime_type' => (string)$validated['mime_type']
     ];
 }
 
@@ -77,7 +84,7 @@ try {
 
     $upload = null;
     if (!empty($_FILES['file']) && in_array($kind, ['voice', 'attachment'], true)) {
-        $upload = liveChatStoreUpload($_FILES['file'], $kind);
+        $upload = liveChatStoreUpload($conn, $_FILES['file'], $kind);
     }
 
     if ($text === '' && !$upload) {

@@ -13,6 +13,9 @@ import { initAppUI } from './modules/ui_feedback.js';
 import { initPwaShell } from './modules/pwa.js?v=20260528b';
 
 const DEVICE_TOKEN_STORAGE_KEY = 'pensionsgo_device_token';
+const HOSTED_SESSION_ID_STORAGE_KEY = 'pensionsgo_hosted_session_id';
+const HOSTED_SESSION_USER_STORAGE_KEY = 'pensionsgo_hosted_session_user';
+const HOSTED_SESSION_VERIFIED_AT_STORAGE_KEY = 'pensionsgo_hosted_session_verified_at';
 const TAB_AUTH_MARKER_KEY = 'pensionsgo_tab_auth_verified';
 const SESSION_VALIDATION_CACHE_KEY = 'pensionsgo_session_validation_state';
 const LAST_SECURE_PAGE_KEY = 'pensionsgo_last_secure_page';
@@ -71,7 +74,34 @@ function withDeviceTokenHeaders(headers = {}) {
   if (deviceToken) {
     mergedHeaders['X-Device-Token'] = deviceToken;
   }
+  return withHostedSessionHeaders(mergedHeaders);
+}
+
+function withHostedSessionHeaders(headers = {}) {
+  const mergedHeaders = { ...headers };
+  const hostedSessionId = (localStorage.getItem(HOSTED_SESSION_ID_STORAGE_KEY) || '').trim();
+  const hostedSessionUser = (localStorage.getItem(HOSTED_SESSION_USER_STORAGE_KEY) || '').trim();
+  if (/^[a-f0-9]{64}$/i.test(hostedSessionId) && hostedSessionUser) {
+    syncHostedSessionClientCookies(hostedSessionId, hostedSessionUser);
+    mergedHeaders['X-PensionsGo-Session-Id'] = hostedSessionId;
+    mergedHeaders['X-PensionsGo-User-Id'] = hostedSessionUser;
+  }
   return mergedHeaders;
+}
+
+function syncHostedSessionClientCookies(sessionId, userId) {
+  const sid = String(sessionId || '').trim();
+  const uid = String(userId || '').trim();
+  if (!/^[a-f0-9]{64}$/i.test(sid) || !uid) return;
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `PENSION_APP_CLIENT_SID=${encodeURIComponent(sid)}; Path=/; SameSite=Lax${secure}`;
+  document.cookie = `PENSION_APP_CLIENT_UID=${encodeURIComponent(uid)}; Path=/; SameSite=Lax${secure}`;
+}
+
+function clearHostedSessionClientCookies() {
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `PENSION_APP_CLIENT_SID=; Max-Age=0; Path=/; SameSite=Lax${secure}`;
+  document.cookie = `PENSION_APP_CLIENT_UID=; Max-Age=0; Path=/; SameSite=Lax${secure}`;
 }
 
 function normalizeDocumentViewerCandidate(url) {
@@ -1150,11 +1180,20 @@ async function parseJsonResponseStrict(response, fallbackMessage = 'Server retur
 if (!window.__pensionsgoCsrfFetchPatched) {
   window.__pensionsgoCsrfFetchPatched = true;
   window.fetch = async (input, init = {}) => {
+    const url = resolveRequestUrl(input);
+    const isSameOriginApi = Boolean(url && url.origin === window.location.origin && (url.pathname || '').toLowerCase().includes('/backend/api/'));
+    const shouldAttachHostedSession = isSameOriginApi && clientHasAuthenticatedSessionHint();
     if (!shouldAttachCsrf(input, init)) {
-      return nativeFetch(input, init);
+      if (!shouldAttachHostedSession) {
+        return nativeFetch(input, init);
+      }
+      const headers = mergeRequestHeaders(input, init);
+      new Headers(withHostedSessionHeaders(Object.fromEntries(headers.entries()))).forEach((value, key) => headers.set(key, value));
+      return nativeFetch(input, { ...init, headers });
     }
 
     const headers = mergeRequestHeaders(input, init);
+    new Headers(withHostedSessionHeaders(Object.fromEntries(headers.entries()))).forEach((value, key) => headers.set(key, value));
     const existingToken = (headers.get('X-CSRF-Token') || '').trim();
     if (!existingToken) {
       const csrfToken = await fetchCsrfToken();
@@ -1169,13 +1208,33 @@ if (!window.__pensionsgoCsrfFetchPatched) {
 }
 
 function getCachedOfflineSessionState() {
-  const loggedInFlag = sessionStorage.getItem('isLoggedIn') === 'true';
-  const userRole = (sessionStorage.getItem('userRole') || localStorage.getItem('userRole') || '').toLowerCase();
-  const userRoleEffective = (sessionStorage.getItem('userRoleEffective') || localStorage.getItem('userRoleEffective') || '').toLowerCase();
-  const userName = sessionStorage.getItem('userName') || '';
-  const userId = sessionStorage.getItem('userId') || '';
-  const userEmail = sessionStorage.getItem('userEmail') || '';
-  const userPhoto = sessionStorage.getItem('userPhoto') || '';
+  let storedUser = {};
+  try {
+    storedUser = JSON.parse(localStorage.getItem('loggedInUser') || '{}') || {};
+  } catch (_error) {
+    storedUser = {};
+  }
+
+  const userId = sessionStorage.getItem('userId') || storedUser.id || storedUser.userId || '';
+  const userName = sessionStorage.getItem('userName') || storedUser.name || storedUser.userName || '';
+  const userRole = (
+    sessionStorage.getItem('userRole')
+    || localStorage.getItem('userRole')
+    || storedUser.role
+    || storedUser.userRole
+    || ''
+  ).toLowerCase();
+  const userRoleEffective = (
+    sessionStorage.getItem('userRoleEffective')
+    || localStorage.getItem('userRoleEffective')
+    || storedUser.roleEffective
+    || storedUser.userRoleEffective
+    || userRole
+    || ''
+  ).toLowerCase();
+  const userEmail = sessionStorage.getItem('userEmail') || storedUser.email || storedUser.userEmail || '';
+  const userPhoto = sessionStorage.getItem('userPhoto') || storedUser.photo || storedUser.userPhoto || '';
+  const loggedInFlag = sessionStorage.getItem('isLoggedIn') === 'true' || Boolean(userId && (userRole || userRoleEffective));
 
   if (!loggedInFlag || (!userRole && !userRoleEffective)) {
     return { active: false };
@@ -1192,6 +1251,48 @@ function getCachedOfflineSessionState() {
     userEmail,
     userPhoto
   };
+}
+
+function hasHostedDeploymentSessionHint() {
+  const sessionId = (localStorage.getItem(HOSTED_SESSION_ID_STORAGE_KEY) || '').trim();
+  const userId = (localStorage.getItem(HOSTED_SESSION_USER_STORAGE_KEY) || '').trim();
+  const verifiedAt = Number(localStorage.getItem(HOSTED_SESSION_VERIFIED_AT_STORAGE_KEY) || 0);
+  let timeoutSeconds = Number(sessionStorage.getItem('sessionTimeout') || 0);
+  if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0) {
+    try {
+      const settings = JSON.parse(localStorage.getItem('sessionSettings') || '{}');
+      timeoutSeconds = Number(settings.session_timeout || settings.sessionTimeout || 0);
+    } catch (_error) {
+      timeoutSeconds = 0;
+    }
+  }
+  if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0) timeoutSeconds = 1800;
+  const maxAgeMs = Math.max(5 * 60 * 1000, timeoutSeconds * 1000);
+  return /^[a-f0-9]{64}$/i.test(sessionId)
+    && Boolean(userId)
+    && verifiedAt > 0
+    && Date.now() - verifiedAt <= maxAgeMs;
+}
+
+function getHostedDeploymentSessionState() {
+  const sessionId = (localStorage.getItem(HOSTED_SESSION_ID_STORAGE_KEY) || '').trim();
+  const hostedUserId = (localStorage.getItem(HOSTED_SESSION_USER_STORAGE_KEY) || '').trim();
+  if (!/^[a-f0-9]{64}$/i.test(sessionId) || !hostedUserId || !hasHostedDeploymentSessionHint()) {
+    return { active: false };
+  }
+
+  const cached = getCachedOfflineSessionState();
+  if (cached.active) {
+    syncHostedSessionClientCookies(sessionId, hostedUserId);
+    return {
+      ...cached,
+      userId: cached.userId || hostedUserId,
+      hostedSessionFallback: true,
+      sessionCheckDegraded: true,
+      offline: !navigator.onLine
+    };
+  }
+  return { active: false };
 }
 
 function getStoredEffectiveRole() {
@@ -2508,7 +2609,8 @@ class SessionManager {
     try {
       const response = await fetch('../backend/api/get_session_settings.php', {
         credentials: 'include',
-        cache: 'no-store'
+        cache: 'no-store',
+        headers: withDeviceTokenHeaders({ 'X-Requested-With': 'XMLHttpRequest' })
       });
       
       if (response.ok) {
@@ -2539,7 +2641,7 @@ class SessionManager {
       }
 
       try {
-          const workerURL = new URL("./modules/session-worker.js", import.meta.url);
+          const workerURL = new URL("./modules/session-worker.js?v=20260606b", import.meta.url);
           this.worker = new Worker(workerURL, { type: "module" });
 
           this.worker.onmessage = this.handleSessionWorkerMessage;
@@ -2573,7 +2675,9 @@ class SessionManager {
               type: "CONFIG",
               BASE_API: computedBaseApi,
               tabId: this.tabId,
-              deviceToken: getPersistentDeviceToken()
+              deviceToken: getPersistentDeviceToken(),
+              hostedSessionId: (localStorage.getItem(HOSTED_SESSION_ID_STORAGE_KEY) || '').trim(),
+              hostedSessionUser: (localStorage.getItem(HOSTED_SESSION_USER_STORAGE_KEY) || '').trim()
           });
 
           // Start monitoring
@@ -2675,7 +2779,7 @@ class SessionManager {
     
     try {
       const controller = new AbortController();
-      timeoutId = setTimeout(() => controller.abort('session_check_timeout'), 5000);
+      timeoutId = setTimeout(() => controller.abort('session_check_timeout'), 10000);
       
       const response = await fetch('../backend/api/check_session.php', {
         signal: controller.signal,
@@ -2723,7 +2827,7 @@ class SessionManager {
         error: normalizeRequestErrorMessage(error, 'Session check timed out.'),
         consecutiveFailures: this.consecutiveFailures,
         duration: Date.now() - startTime,
-        silent: isAbortLikeError(error)
+        silent: isAbortLikeError(error) || String(error?.message || error || '').includes('session_check_timeout')
       });
     } finally {
       if (timeoutId) {
@@ -3057,6 +3161,10 @@ class SessionManager {
     localStorage.removeItem('lastVisitedPage');
     localStorage.removeItem(LAST_SECURE_PAGE_KEY);
     localStorage.removeItem('sessionSettings');
+    localStorage.removeItem(HOSTED_SESSION_ID_STORAGE_KEY);
+    localStorage.removeItem(HOSTED_SESSION_USER_STORAGE_KEY);
+    localStorage.removeItem(HOSTED_SESSION_VERIFIED_AT_STORAGE_KEY);
+    clearHostedSessionClientCookies();
     
     // Clear all sessionStorage
     sessionStorage.clear();
@@ -4158,6 +4266,11 @@ async function validateActiveSession() {
   if (freshValidation?.active) {
     return freshValidation;
   }
+  const hostedPrecheck = getHostedDeploymentSessionState();
+  if (hostedPrecheck.active) {
+    rememberSessionValidationState(hostedPrecheck);
+    return hostedPrecheck;
+  }
   let timeoutId = null;
 
   try {
@@ -4211,6 +4324,12 @@ async function validateActiveSession() {
       return activeState;
     }
 
+    const hostedFallback = getHostedDeploymentSessionState();
+    if (hostedFallback.active && ['not_authenticated', 'not_found', 'invalid', null, undefined, ''].includes(data?.reason)) {
+      rememberSessionValidationState(hostedFallback);
+      return hostedFallback;
+    }
+
     sessionStorage.removeItem(SESSION_VALIDATION_CACHE_KEY);
     return { active: false };
   } catch (error) {
@@ -4224,6 +4343,12 @@ async function validateActiveSession() {
         offline: !navigator.onLine,
         sessionCheckDegraded: navigator.onLine
       };
+    }
+
+    const hostedFallback = getHostedDeploymentSessionState();
+    if (hostedFallback.active) {
+      rememberSessionValidationState(hostedFallback);
+      return hostedFallback;
     }
 
     if (!navigator.onLine) {
@@ -4518,13 +4643,21 @@ function initScrollToTopButton() {
   button.innerHTML = '<span class="scroll-to-top-icon" aria-hidden="true">&#10095;</span>';
   document.body.appendChild(button);
 
+  let visibilityFrame = 0;
   const updateVisibility = () => {
-    const isMobile = window.matchMedia('(max-width: 767px)').matches;
-    const shouldShow = isMobile && window.scrollY > 220;
-    button.classList.toggle('show', shouldShow);
+    if (visibilityFrame) return;
+    visibilityFrame = window.requestAnimationFrame(() => {
+      visibilityFrame = 0;
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+      const pageHeight = document.documentElement.scrollHeight || 0;
+      const shouldShow = viewportWidth <= 767 && scrollTop > 220;
+      const nearFooter = shouldShow && (viewportHeight + scrollTop) >= (pageHeight - 120);
 
-    const nearFooter = (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 120);
-    button.classList.toggle('near-footer', nearFooter);
+      button.classList.toggle('show', shouldShow);
+      button.classList.toggle('near-footer', nearFooter);
+    });
   };
 
   button.addEventListener('click', () => {
@@ -4532,8 +4665,8 @@ function initScrollToTopButton() {
   });
 
   window.addEventListener('scroll', updateVisibility, { passive: true });
-  window.addEventListener('resize', updateVisibility);
-  updateVisibility();
+  window.addEventListener('resize', updateVisibility, { passive: true });
+  window.requestAnimationFrame(updateVisibility);
 }
 
 function bindHardRefreshTriggers() {
@@ -4683,10 +4816,11 @@ function scheduleLiveChatInitialization(sessionState = {}) {
     return;
   }
   window.__pensionsgoLiveChatInitScheduled = true;
+  
 
   const startLiveChat = async () => {
     try {
-      const { initLiveChat } = await import('./modules/live_chat.js?v=20260602x');
+      const { initLiveChat } = await import('./modules/live_chat.js?v=20260609b');
       await initLiveChat({ userId: sessionState.userId || '' });
     } catch (error) {
       console.warn('Live chat initialization failed:', error.message || error);
@@ -4702,6 +4836,7 @@ function scheduleLiveChatInitialization(sessionState = {}) {
     startLiveChat();
   });
 }
+
 
 /* 18. APP INITIALIZATION ENTRY POINT */
 async function initializeApplication() {
@@ -4748,7 +4883,7 @@ async function initializeApplication() {
   if (sessionState.active) {
     const hasPublicDropdownAllowance = hasValidAuthenticatedPublicAllowance(currentPage);
 
-    if (requiresAuth && !hasTabAuthenticationVerified()) {
+    if (requiresAuth && !hasTabAuthenticationVerified() && !sessionState.hostedSessionFallback) {
       await forceReauthentication(window.location.href, 'tab_reauthentication_required');
       return;
     }
@@ -4874,4 +5009,3 @@ window.addEventListener('unhandledrejection', function(e) {
 });
 
 console.log('[ok] main.js loaded successfully.');
-

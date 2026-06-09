@@ -1,5 +1,5 @@
 const FALLBACK_APP_VERSION = '1.0.0-dev';
-const ASSET_REVISION = '20260602x';
+const ASSET_REVISION = '20260609b';
 try {
   importScripts('../backend/api/pwa_version.php');
 } catch (error) {
@@ -66,8 +66,9 @@ const PRECACHE_URLS = [
   './css/file_tracking.css',
   './css/ui_feedback.css',
   './css/broadcast_popup.css',
+  './js/auth_bootstrap.js',
   './js/main.js',
-  './js/auth.js',
+  './js/auth.js?v=20260606b',
   './js/faq.js',
   './js/calculator.js',
   './js/track-status.js',
@@ -115,7 +116,7 @@ function normalizedCacheUrl(input) {
 
   if (url.origin === self.location.origin) {
     url.hash = '';
-    if (!url.pathname.includes('/backend/')) {
+    if (!url.pathname.includes('/backend/') && !/\.(?:js|css)$/i.test(url.pathname)) {
       url.search = '';
     }
   }
@@ -277,6 +278,7 @@ function shouldBypassCache(request) {
   const url = new URL(request.url);
   if (url.searchParams.has('sw-bypass')) return true;
   if (request.cache === 'reload' || request.cache === 'no-store') return true;
+  if (url.origin === self.location.origin && /\/backend\/(?:api|uploads|cache)\//i.test(url.pathname)) return true;
   return false;
 }
 

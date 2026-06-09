@@ -192,7 +192,7 @@ try {
             'typingIdleSeconds' => liveChatSettingInt($conn, 'live_chat_typing_idle_seconds', 5, 2, 30),
             'messagePollMs' => liveChatSettingInt($conn, 'live_chat_message_poll_ms', 350, 150, 5000),
             'receiptPollMs' => liveChatSettingInt($conn, 'live_chat_receipt_poll_ms', 250, 150, 5000),
-            'callPollMs' => liveChatSettingInt($conn, 'live_chat_call_poll_ms', 900, 300, 10000),
+            'callPollMs' => liveChatSettingInt($conn, 'live_chat_call_poll_ms', 500, 300, 10000),
             'signalPollMs' => liveChatSettingInt($conn, 'live_chat_signal_poll_ms', 350, 150, 5000)
         ],
         'messageSettings' => [

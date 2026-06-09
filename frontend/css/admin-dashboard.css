@@ -325,6 +325,58 @@
     color: var(--muted-color);
 }
 
+.chat-oversight-call-record {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.6rem;
+    padding: 0.7rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--primary-gold);
+    background: var(--surface-soft);
+    color: var(--text-color);
+}
+
+.chat-oversight-call-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.15rem;
+    height: 2.15rem;
+    border-radius: 50%;
+    background: rgba(109, 17, 22, 0.12);
+    color: var(--primary-color);
+}
+
+.chat-oversight-call-main {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.chat-oversight-call-main span,
+.chat-oversight-call-main small,
+.chat-oversight-call-meta {
+    color: var(--muted-color);
+}
+
+.chat-oversight-call-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.15rem;
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+
+.chat-oversight-call-record.missed,
+.chat-oversight-call-record.rejected,
+.chat-oversight-call-record.failed {
+    border-left-color: var(--danger-color);
+}
+
 .chat-oversight-message-foot {
     justify-content: flex-start;
     margin-top: 0.65rem;

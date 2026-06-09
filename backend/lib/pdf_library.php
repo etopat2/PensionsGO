@@ -11,7 +11,7 @@ if (!function_exists('pgoPdfEnsureDirectory')) {
     function pgoPdfEnsureDirectory(string $path): string
     {
         if (!is_dir($path)) {
-            mkdir($path, 0777, true);
+            mkdir($path, 0775, true);
         }
         return $path;
     }

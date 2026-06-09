@@ -2,11 +2,14 @@
 $__baseBufferLevel = ob_get_level();
 ob_start();
 
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Credentials: true');
-
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../lib/pdf_library.php';
+applyApiCorsPolicy($conn, ['GET', 'OPTIONS']);
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();

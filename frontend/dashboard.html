@@ -25,10 +25,27 @@
 
   <!-- ================== SCRIPTS ================== -->
   <!-- main.js handles header/footer loading -->
-  <script type="module" src="js/main.js?v=20260602x"></script>
+  <script src="js/auth_bootstrap.js?v=20260606b"></script>
+  <script type="module" src="js/main.js?v=20260609b"></script>
   <script defer src="js/modules/filterable_select.js?v=20260429a"></script>
   <script defer src="js/modules/retirement-types.js"></script>
-  <script defer src="js/dashboard.js?v=20260429b"></script>
+  <script defer>
+    window.addEventListener('load', function () {
+      var loadDashboardController = function () {
+        if (document.getElementById('dashboardControllerScript')) return;
+        var script = document.createElement('script');
+        script.id = 'dashboardControllerScript';
+        script.src = 'js/dashboard.js?v=20260608f';
+        script.defer = true;
+        document.head.appendChild(script);
+      };
+      if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(loadDashboardController, { timeout: 900 });
+      } else {
+        window.setTimeout(loadDashboardController, 120);
+      }
+    }, { once: true });
+  </script>
   
 
 </head>
@@ -1896,7 +1913,6 @@
   <!-- Footer will be dynamically inserted here by main.js -->
 </body>
 </html>
-
 
 
 

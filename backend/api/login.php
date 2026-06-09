@@ -97,6 +97,28 @@ try {
         throw new Exception('Missing credentials. Please provide both email/phone and password.', 400);
     }
 
+    $requestIp = function_exists('getClientIP') ? getClientIP() : ($_SERVER['REMOTE_ADDR'] ?? '');
+    $ipAttemptLimit = max(10, (int)(function_exists('getAppSettingInt') ? getAppSettingInt($conn, 'login_ip_attempt_limit', 20) : 20));
+    $ipLockoutMinutes = max(5, (int)(function_exists('getAppSettingInt') ? getAppSettingInt($conn, 'login_ip_lockout_minutes', 15) : 15));
+    if ($requestIp !== '') {
+        $ipStmt = $conn->prepare("
+            SELECT COUNT(*) AS fail_count
+            FROM tb_user_logs
+            WHERE activity_type = 'login_failed'
+              AND ip_address = ?
+              AND created_at >= (NOW() - INTERVAL ? MINUTE)
+        ");
+        if ($ipStmt) {
+            $ipStmt->bind_param('si', $requestIp, $ipLockoutMinutes);
+            $ipStmt->execute();
+            $ipRow = $ipStmt->get_result()->fetch_assoc();
+            $ipStmt->close();
+            if ((int)($ipRow['fail_count'] ?? 0) >= $ipAttemptLimit) {
+                throw new Exception('Too many failed attempts from this network. Please wait before trying again.', 429);
+            }
+        }
+    }
+
     // 
     // Identify login method (email or phone)
     // 
@@ -144,6 +166,20 @@ try {
     }
 
     if (!$user) {
+        if (function_exists('logUserActivity')) {
+            logUserActivity($conn, [
+                'user_id' => 'unknown',
+                'user_name' => 'Unknown User',
+                'user_role' => 'guest',
+                'activity_type' => 'login_failed',
+                'ip_address' => getClientIP(),
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown',
+                'device_type' => detectDeviceType($_SERVER['HTTP_USER_AGENT'] ?? ''),
+                'location' => getLocationFromIP(getClientIP()),
+                'session_id' => session_id(),
+                'details' => "Failed login attempt for unknown account: {$identifierRaw}"
+            ]);
+        }
         throw new Exception('Invalid credentials. User not found.', 401);
     }
 
@@ -387,6 +423,10 @@ try {
           ? resolveRoleAccessKey($conn, (string)($user['userRole'] ?? ''))
           : (string)($user['userRole'] ?? '');
 
+    // Regenerate PHP session ID before storing auth data so shared hosts persist
+    // the final session record that the browser receives.
+    session_regenerate_id(true);
+
       // 
       // Store session data
       // 
@@ -400,9 +440,10 @@ try {
     $_SESSION['session_id']    = $sessionInfo['session_id'];
     $_SESSION['last_activity'] = time();
     $_SESSION['device_id']     = $deviceId;
-    
-    // Regenerate session ID for security
-    session_regenerate_id(true);
+    setSignedSessionCookies((string)$sessionInfo['session_id'], (string)$user['userId']);
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
+    }
 
     // 
     // Log successful login
@@ -439,7 +480,10 @@ try {
         'gracePeriod'          => $sessionInfo['grace_period'] ?? 300,
         'allowMultipleDevices' => $sessionInfo['allow_multiple_devices'] ?? $allowMultipleDevices,
         'hasExistingSession'   => $hasExistingSession,
-        'sessionId'            => $sessionInfo['session_id']
+        'sessionPersisted'     => true,
+        'sessionId'            => $sessionInfo['session_id'],
+        'sessionLoginTime'     => $sessionInfo['login_time'] ?? date('Y-m-d H:i:s'),
+        'appTimezone'          => function_exists('getConfiguredAppTimezone') ? getConfiguredAppTimezone() : date_default_timezone_get()
     ];
 
     // Clear output buffer and send response

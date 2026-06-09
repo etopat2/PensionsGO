@@ -14,12 +14,29 @@
   <link rel="stylesheet" href="css/profile.css?v=20260504a">
   <link rel="stylesheet" href="css/menu.css?v=20260504d">
   <link rel="stylesheet" href="css/overlay.css?v=20260504a">
-  <link rel="stylesheet" href="css/pension_file_registry.css?v=20260602a">
-  <script type="module" src="js/main.js?v=20260602x"></script>
+  <link rel="stylesheet" href="css/pension_file_registry.css?v=20260608a">
+  <script src="js/auth_bootstrap.js?v=20260606b"></script>
+  <script type="module" src="js/main.js?v=20260609b"></script>
   <script defer src="js/modules/filterable_select.js?v=20260429a"></script>
   <script defer src="js/modules/district_selector.js?v=20260429a"></script>
   <script defer src="js/modules/retirement-types.js"></script>
-  <script defer src="js/pension_file_registry.js?v=20260602a"></script>
+  <script defer>
+    window.addEventListener('load', function () {
+      var loadRegistryController = function () {
+        if (document.getElementById('registryControllerScript')) return;
+        var script = document.createElement('script');
+        script.id = 'registryControllerScript';
+        script.src = 'js/pension_file_registry.js?v=20260608a';
+        script.defer = true;
+        document.head.appendChild(script);
+      };
+      if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(loadRegistryController, { timeout: 900 });
+      } else {
+        window.setTimeout(loadRegistryController, 120);
+      }
+    }, { once: true });
+  </script>
 </head>
 <body>
   <main class="registry-wrapper">
@@ -574,6 +591,5 @@
   </div>
 </body>
 </html>
-
 
 

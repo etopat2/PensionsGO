@@ -24,6 +24,15 @@ const PICKER_EMOJIS = ['\u{1F600}', '\u{1F602}', '\u{1F60A}', '\u{1F60D}', '\u{1
 const REACTION_PICKER_EMOJIS = ['\u{1F44D}', '\u{1F44E}', '\u{2764}\u{FE0F}', '\u{1F60D}', '\u{1F602}', '\u{1F62E}', '\u{1F622}', '\u{1F621}', '\u{1F64F}', '\u{1F44F}', '\u{2705}', '\u{1F389}', '\u{1F525}', '\u{1F4AF}', '\u{1F4A1}', '\u{1F4CC}', '\u{1F680}', '\u{23F3}', '\u{26A0}\u{FE0F}', '\u{1F44B}', '\u{1F91D}', '\u{1F4AA}', '\u{1F914}', '\u{1F642}'];
 const INCOMING_RING_URL = new URL('audio/notification.mp3', APP_ROOT).href;
 const TYPING_IDLE_TIMEOUT_MS = 5000;
+const LIVE_CHAT_ASSET_VERSION = '20260609b';
+const LIVE_CHAT_CALL_API_ACTIONS = Object.freeze({
+  START: 'start',
+  UPDATE: 'update',
+  POLL: 'poll',
+  HISTORY: 'history',
+  SIGNAL: 'signal',
+  SIGNALS: 'signals'
+});
 
 function escapeHtml(value) {
   const div = document.createElement('div');
@@ -79,7 +88,7 @@ function ensureStylesheet() {
   const link = document.createElement('link');
   link.id = LIVE_CHAT_STYLE_ID;
   link.rel = 'stylesheet';
-  link.href = new URL('css/live_chat.css?v=20260602x', APP_ROOT).href;
+  link.href = new URL(`css/live_chat.css?v=${LIVE_CHAT_ASSET_VERSION}`, APP_ROOT).href;
   liveChatStylesheetReady = new Promise((resolve) => {
     link.addEventListener('load', resolve, { once: true });
     link.addEventListener('error', resolve, { once: true });
@@ -158,6 +167,9 @@ class LiveChatApp {
     this.messagePollInFlight = false;
     this.messageAbortController = null;
     this.messageCacheByThread = new Map();
+    this.threadRefreshTimers = new Map();
+    this.contactRefreshTimer = null;
+    this.lastBootstrapAt = 0;
     this.receiptSyncInFlight = false;
     this.selectedMessageIds = new Set();
     this.replyToMessage = null;
@@ -224,7 +236,8 @@ class LiveChatApp {
     this.messageNoticeTimer = null;
     this.autoScrollEnabled = true;
     this.availableVideoDevices = [];
-    this.selectedVideoDeviceId = '';
+    this.selectedVideoDeviceId = localStorage.getItem('liveCallPreferredVideoDeviceId') || '';
+    this.userPreferredVideoDeviceId = localStorage.getItem('liveCallPreferredVideoDeviceId') || '';
     this.attachmentCaptureMode = 'photo';
     this.attachmentCameraFilter = 'none';
     this.attachmentMediaRecorder = null;
@@ -251,6 +264,7 @@ class LiveChatApp {
     this.callAddParticipantModalOpen = false;
     this.callFastSignalUntil = 0;
     this.deferIncomingVideoCapture = false;
+    this.lastMediaFallbackReason = '';
     this.localVideoPrimary = false;
     this.bound = false;
     this.typingNotifyTimer = null;
@@ -645,7 +659,7 @@ class LiveChatApp {
     modal?.classList.remove('hidden');
     if (list) list.innerHTML = '<div class="live-chat-empty">Loading call history...</div>';
     try {
-      const data = await this.postCall({ action: 'history' }, 'GET');
+      const data = await this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.HISTORY }, 'GET');
       this.renderCallHistory(data.history || []);
     } catch (error) {
       if (list) list.innerHTML = `<div class="live-chat-empty">${escapeHtml(error.message || 'Unable to load call history.')}</div>`;
@@ -783,6 +797,7 @@ class LiveChatApp {
       this.messageSettings = { ...this.messageSettings, ...(data.messageSettings || {}) };
       this.callSettings = { ...this.callSettings, ...(data.callSettings || {}) };
       this.featureSettings = { ...this.featureSettings, ...(data.featureSettings || {}) };
+      this.lastBootstrapAt = Date.now();
       this.applyFeatureSettings();
       this.unreadCountsReady = true;
       this.renderThreads();
@@ -925,18 +940,21 @@ class LiveChatApp {
     if (!this.featureSettings.attachmentsEnabled) document.getElementById('liveAttachBtn')?.classList.add('hidden');
     this.restoreDraftForCurrentThread();
     const key = this.threadKey();
-    this.lastMessageIdByThread[key] = 0;
+    const cachedMessages = this.messageCacheByThread.get(key);
+    const hasCachedMessages = Boolean(cachedMessages?.length);
+    this.lastMessageIdByThread[key] = hasCachedMessages
+      ? Math.max(...cachedMessages.map((message) => Number(message.id || 0)).filter(Boolean), this.lastMessageIdByThread[key] || 0)
+      : 0;
     this.renderedMessageIds.clear();
     this.pendingMessages.clear();
     delete this.typingByThread[key];
     this.hideTypingIndicator();
-    const cachedMessages = this.messageCacheByThread.get(key);
-    if (cachedMessages?.length) {
+    if (hasCachedMessages) {
       this.renderMessages(cachedMessages, true);
     } else {
       document.getElementById('liveChatMessages').innerHTML = '<div class="live-chat-empty">Loading conversation...</div>';
     }
-    this.loadMessages(true).catch(() => {});
+    this.scheduleThreadRefresh(key, hasCachedMessages ? 35 : 0, { force: !hasCachedMessages });
   }
 
   showThreadList() {
@@ -951,9 +969,11 @@ class LiveChatApp {
       this.timers.receipts = setInterval(() => this.syncReceiptsFast(), this.liveChatPollMs('receiptPollMs', 250, 150, 5000));
     }
     if (this.featureSettings.audioCallsEnabled || this.featureSettings.videoCallsEnabled) {
-      this.timers.calls = setInterval(() => this.pollCalls(), this.liveChatPollMs('callPollMs', 900, 300, 10000));
+      this.timers.calls = setInterval(() => this.pollCalls(), this.liveChatPollMs('callPollMs', 500, 300, 10000));
     }
-    this.refreshPresence();
+    if (Date.now() - this.lastBootstrapAt > 1200) {
+      this.refreshPresence();
+    }
     if (this.featureSettings.audioCallsEnabled || this.featureSettings.videoCallsEnabled) this.pollCalls();
   }
 
@@ -973,12 +993,37 @@ class LiveChatApp {
     window.clearTimeout(this.readReceiptTimer);
     window.clearTimeout(this.typingStopTimer);
     window.clearTimeout(this.chatDateBadgeTimer);
+    window.clearTimeout(this.contactRefreshTimer);
+    this.contactRefreshTimer = null;
     if (this.typingPulseTimer) window.clearInterval(this.typingPulseTimer);
     this.typingPulseTimer = null;
     this.messageAbortController?.abort();
     this.messageAbortController = null;
     this.messagePollInFlight = false;
+    this.threadRefreshTimers.forEach((timer) => window.clearTimeout(timer));
+    this.threadRefreshTimers.clear();
     this.cleanupCall();
+  }
+
+  scheduleThreadRefresh(key = this.threadKey(), delay = 80, { force = false } = {}) {
+    if (!key || !this.selectedThread || key !== this.threadKey()) return;
+    const existing = this.threadRefreshTimers.get(key);
+    if (existing) window.clearTimeout(existing);
+    const timer = window.setTimeout(() => {
+      this.threadRefreshTimers.delete(key);
+      if (this.selectedThread && this.threadKey() === key) {
+        this.loadMessages(force).catch(() => {});
+      }
+    }, Math.max(0, Number(delay) || 0));
+    this.threadRefreshTimers.set(key, timer);
+  }
+
+  scheduleContactRefresh(delay = 220) {
+    window.clearTimeout(this.contactRefreshTimer);
+    this.contactRefreshTimer = window.setTimeout(() => {
+      this.contactRefreshTimer = null;
+      this.loadUsers().catch(() => {});
+    }, Math.max(0, Number(delay) || 0));
   }
 
   async refreshPresence() {
@@ -991,6 +1036,7 @@ class LiveChatApp {
       this.messageSettings = { ...this.messageSettings, ...(data.messageSettings || {}) };
       this.callSettings = { ...this.callSettings, ...(data.callSettings || {}) };
       this.featureSettings = { ...this.featureSettings, ...(data.featureSettings || {}) };
+      this.lastBootstrapAt = Date.now();
       this.applyFeatureSettings();
       this.unreadCountsReady = true;
       this.renderThreads();
@@ -1033,8 +1079,8 @@ class LiveChatApp {
       if (!force && incoming.length > 0) {
         this.playMessageNotification(incoming[incoming.length - 1]);
       }
-      if (force || incoming.length > 0) {
-        this.loadUsers().catch(() => {});
+      if (incoming.length > 0) {
+        this.scheduleContactRefresh();
       }
     } catch (error) {
       if (error?.name !== 'AbortError') console.warn('Live chat message poll failed:', error);
@@ -3476,7 +3522,7 @@ class LiveChatApp {
       this.showCallModal(`Calling ${this.selectedThread.name}`, 'Checking availability...', callType, false);
       let response;
       try {
-        response = await this.postCall({ action: 'start', callee_id: this.selectedThread.id, call_type: callType });
+        response = await this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.START, callee_id: this.selectedThread.id, call_type: callType });
       } catch (startError) {
         const recoveredCall = await this.recoverOutgoingCall(this.selectedThread.id, callType).catch(() => null);
         if (!recoveredCall) throw startError;
@@ -3560,7 +3606,16 @@ class LiveChatApp {
   }
 
   async startGroupCallToPeer(peer, callType) {
-    const response = await this.postCall({ action: 'start', callee_id: peer.userId, call_type: callType });
+    if (!this.localStream || !this.localStream.getAudioTracks?.().length) {
+      const stream = await this.getCallMediaStream(callType || 'audio', callType === 'video' ? true : false);
+      this.localStream = stream;
+      await this.tuneCallAudioTrack(this.localStream);
+      const localVideo = document.getElementById('liveLocalVideo');
+      if (localVideo) localVideo.srcObject = this.localStream;
+      this.updateLocalMicIndicator();
+      this.syncCallCameraPreview();
+    }
+    const response = await this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.START, callee_id: peer.userId, call_type: callType });
     if (response.offline) {
       showNotice('Group Call', `${peer.userName || 'A group member'} is offline. A missed call record was added.`, 'info');
       return null;
@@ -3576,7 +3631,7 @@ class LiveChatApp {
   }
 
   async startCallToPeer(peer, callType, title) {
-    const response = await this.postCall({ action: 'start', callee_id: peer.userId, call_type: callType });
+    const response = await this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.START, callee_id: peer.userId, call_type: callType });
     if (response.offline) {
       this.showCallModal(`Calling ${title || peer.userName}`, 'Recipient offline', callType, false);
       showNotice('Recipient Offline', response.message || `${peer.userName || 'The recipient'} is offline. A missed call record has been added.`, 'info');
@@ -3600,7 +3655,7 @@ class LiveChatApp {
 
   async pollCalls() {
     try {
-      const data = await this.postCall({ action: 'poll' }, 'GET');
+      const data = await this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.POLL }, 'GET');
       if (this.activeCall) {
         if (this.activeCall.isGroupCall) return;
         const currentCall = (data.calls || []).find((call) => call.callId === this.activeCall.callId);
@@ -3674,7 +3729,7 @@ class LiveChatApp {
       document.getElementById('liveEndCallBtn')?.classList.remove('hidden');
       acceptButton && (acceptButton.disabled = true);
       rejectButton && (rejectButton.disabled = true);
-      const updatePromise = this.postCall({ action: 'update', call_id: this.activeCall.callId, status: 'accepted' }).catch(() => {});
+      const updatePromise = this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.UPDATE, call_id: this.activeCall.callId, status: 'accepted' }).catch(() => {});
       this.activeCall.status = 'accepted';
       this.callFastSignalUntil = Date.now() + 15000;
       const acceptedAt = new Date().toISOString();
@@ -3704,7 +3759,7 @@ class LiveChatApp {
     const call = this.activeCall;
     this.accelerateSignalPolling(5000);
     const signalPromise = call ? this.sendSignal('hangup', { reason: 'rejected' }).catch(() => {}) : Promise.resolve();
-    const updatePromise = call ? this.postCall({ action: 'update', call_id: call.callId, status: 'rejected' }).catch(() => {}) : Promise.resolve();
+    const updatePromise = call ? this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.UPDATE, call_id: call.callId, status: 'rejected' }).catch(() => {}) : Promise.resolve();
     this.cleanupCall();
     await Promise.allSettled([signalPromise, updatePromise]);
   }
@@ -3717,7 +3772,7 @@ class LiveChatApp {
       const sessions = Array.from(this.groupCallSessions.values());
       this.accelerateSignalPolling(5000);
       const signalPromises = sessions.map((session) => this.sendSignalForCall(session.call, 'hangup', { reason: 'ended' }).catch(() => {}));
-      const updatePromises = sessions.map((session) => this.postCall({ action: 'update', call_id: session.call.callId, status: 'ended' }).catch(() => {}));
+      const updatePromises = sessions.map((session) => this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.UPDATE, call_id: session.call.callId, status: 'ended' }).catch(() => {}));
       this.cleanupCall();
       await Promise.allSettled([...signalPromises, ...updatePromises]);
       return;
@@ -3726,9 +3781,9 @@ class LiveChatApp {
     const sessions = Array.from(this.groupCallSessions.values());
     this.accelerateSignalPolling(5000);
     const signalPromise = call ? this.sendSignal('hangup', { reason: 'ended' }).catch(() => {}) : Promise.resolve();
-    const updatePromise = call ? this.postCall({ action: 'update', call_id: call.callId, status: 'ended' }).catch(() => {}) : Promise.resolve();
+    const updatePromise = call ? this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.UPDATE, call_id: call.callId, status: 'ended' }).catch(() => {}) : Promise.resolve();
     const extraSignals = sessions.map((session) => this.sendSignalForCall(session.call, 'hangup', { reason: 'ended' }).catch(() => {}));
-    const extraUpdates = sessions.map((session) => this.postCall({ action: 'update', call_id: session.call.callId, status: 'ended' }).catch(() => {}));
+    const extraUpdates = sessions.map((session) => this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.UPDATE, call_id: session.call.callId, status: 'ended' }).catch(() => {}));
     this.cleanupCall();
     await Promise.allSettled([signalPromise, updatePromise, ...extraSignals, ...extraUpdates]);
   }
@@ -3923,14 +3978,14 @@ class LiveChatApp {
       const sessions = Array.from(this.groupCallSessions.values());
       await Promise.allSettled(sessions.flatMap((session) => [
         this.sendSignalForCall(session.call, 'hangup', { reason: 'unanswered' }).catch(() => {}),
-        this.postCall({ action: 'update', call_id: session.call.callId, status: 'missed' }).catch(() => {})
+        this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.UPDATE, call_id: session.call.callId, status: 'missed' }).catch(() => {})
       ]));
       showNotice('Group Call', 'The group call was not answered in time.', 'info');
       this.cleanupCall();
       return;
     }
     await this.sendSignal('hangup', { reason: 'unanswered' }).catch(() => {});
-    await this.postCall({ action: 'update', call_id: this.activeCall.callId, status: 'missed' }).catch(() => {});
+    await this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.UPDATE, call_id: this.activeCall.callId, status: 'missed' }).catch(() => {});
     showNotice(direction === 'incoming' ? 'Missed Call' : 'Call Ended', 'The call was not answered in time.', 'info');
     this.cleanupCall();
   }
@@ -3964,6 +4019,7 @@ class LiveChatApp {
   }
 
   async getCallMediaStream(callType, videoConstraint = false) {
+    this.lastMediaFallbackReason = '';
     const resolvedVideoConstraint = callType === 'video'
       ? await this.resolveDefaultCallVideoConstraint(videoConstraint)
       : false;
@@ -3972,15 +4028,26 @@ class LiveChatApp {
       video: callType === 'video' ? this.getCallVideoConstraints(resolvedVideoConstraint) : false
     };
     try {
-      return await navigator.mediaDevices.getUserMedia(constraints);
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      this.rememberActiveVideoDevice(stream);
+      return stream;
     } catch (error) {
       if (!constraints.video) {
         return navigator.mediaDevices.getUserMedia({ audio: this.getCallAudioConstraints(), video: false });
       }
-      return navigator.mediaDevices.getUserMedia({
-        audio: this.getCallAudioConstraints(),
-        video: this.getCallVideoConstraints(await this.resolveDefaultCallVideoConstraint(true))
-      });
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: this.getCallAudioConstraints(),
+          video: this.getCallVideoConstraints(await this.resolveDefaultCallVideoConstraint(true))
+        });
+        this.rememberActiveVideoDevice(stream);
+        return stream;
+      } catch (videoRetryError) {
+        this.lastMediaFallbackReason = videoRetryError?.message || error?.message || 'Camera could not be opened.';
+        const audioOnly = await navigator.mediaDevices.getUserMedia({ audio: this.getCallAudioConstraints(), video: false });
+        showNotice('Camera Unavailable', 'The call will continue with audio while the camera is unavailable.', 'info');
+        return audioOnly;
+      }
     }
   }
 
@@ -4013,22 +4080,45 @@ class LiveChatApp {
       this.cameraFacingMode = 'user';
       return { facingMode: { ideal: 'user' } };
     }
-    if (this.selectedVideoDeviceId) {
-      return { deviceId: { ideal: this.selectedVideoDeviceId } };
-    }
     if (!navigator.mediaDevices?.enumerateDevices) return true;
     try {
       const devices = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === 'videoinput');
+      const preferred = this.userPreferredVideoDeviceId
+        ? devices.find((device) => device.deviceId === this.userPreferredVideoDeviceId)
+        : null;
       const integrated = devices.find((device) => /integrated\s+webcam/i.test(device.label || ''))
         || devices.find((device) => /integrated/i.test(device.label || ''))
         || devices.find((device) => /built.?in|internal|webcam/i.test(device.label || ''));
-      const selected = integrated || devices[0];
+      const selected = preferred || integrated || devices.find((device) => device.deviceId === this.selectedVideoDeviceId) || devices[0];
       if (selected?.deviceId) {
         this.selectedVideoDeviceId = selected.deviceId;
         return { deviceId: { ideal: selected.deviceId } };
       }
     } catch (_error) {}
     return true;
+  }
+
+  rememberActiveVideoDevice(stream, { userSelected = false } = {}) {
+    const settings = stream?.getVideoTracks?.()[0]?.getSettings?.() || {};
+    if (!settings.deviceId) return;
+    this.selectedVideoDeviceId = settings.deviceId;
+    if (userSelected) {
+      this.userPreferredVideoDeviceId = settings.deviceId;
+      localStorage.setItem('liveCallPreferredVideoDeviceId', settings.deviceId);
+    }
+  }
+
+  selectPreferredVideoDevice(devices = []) {
+    if (!Array.isArray(devices) || !devices.length) return null;
+    const preferred = this.userPreferredVideoDeviceId
+      ? devices.find((device) => device.deviceId === this.userPreferredVideoDeviceId)
+      : null;
+    if (preferred) return preferred;
+    return devices.find((device) => /integrated\s+webcam/i.test(device.label || ''))
+      || devices.find((device) => /integrated/i.test(device.label || ''))
+      || devices.find((device) => /built.?in|internal|webcam/i.test(device.label || ''))
+      || devices.find((device) => /front/i.test(device.label || ''))
+      || devices[0];
   }
 
   async tuneCallAudioTrack(stream) {
@@ -4062,6 +4152,15 @@ class LiveChatApp {
     }
   }
 
+  ensurePeerConnectionReceivers(pc, callType = 'audio') {
+    if (!pc?.addTransceiver || !pc?.getTransceivers) return;
+    const transceivers = pc.getTransceivers();
+    const hasAudio = transceivers.some((item) => item.receiver?.track?.kind === 'audio' || item.sender?.track?.kind === 'audio');
+    const hasVideo = transceivers.some((item) => item.receiver?.track?.kind === 'video' || item.sender?.track?.kind === 'video');
+    if (!hasAudio) pc.addTransceiver('audio', { direction: 'recvonly' });
+    if (callType === 'video' && !hasVideo) pc.addTransceiver('video', { direction: 'recvonly' });
+  }
+
   createPeerConnection() {
     return new RTCPeerConnection({
       iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
@@ -4084,6 +4183,7 @@ class LiveChatApp {
       status: 'ringing'
     };
     this.localStream?.getTracks().forEach((track) => pc.addTrack(track, this.localStream));
+    this.ensurePeerConnectionReceivers(pc, call.callType || this.activeCall?.callType || 'audio');
     await this.tunePeerConnectionSenders(pc);
     pc.ontrack = (event) => {
       const tracks = event.streams[0]?.getTracks?.()?.length ? event.streams[0].getTracks() : [event.track];
@@ -4425,9 +4525,15 @@ class LiveChatApp {
     if (remoteVideo) this.renderRemoteVideoNow();
     this.syncCallCameraPreview();
     document.getElementById('liveToggleCameraBtn')?.classList.toggle('active', Boolean(this.localStream.getVideoTracks()[0]?.enabled));
+    if (callType === 'video' && !this.localStream.getVideoTracks()[0]) {
+      document.getElementById('liveToggleCameraBtn')?.classList.remove('active');
+      const status = document.getElementById('liveCallStatus');
+      if (status) status.textContent = 'Audio connected. Camera unavailable.';
+    }
     const pc = this.createPeerConnection();
     this.peerConnection = pc;
     this.localStream.getTracks().forEach((track) => pc.addTrack(track, this.localStream));
+    this.ensurePeerConnectionReceivers(pc, callType);
     await this.tunePeerConnectionSenders(pc);
     pc.ontrack = (event) => {
       const tracks = event.streams[0]?.getTracks?.()?.length ? event.streams[0].getTracks() : [event.track];
@@ -4496,13 +4602,26 @@ class LiveChatApp {
     if (!navigator.mediaDevices?.enumerateDevices) return;
     const select = document.getElementById('liveCameraSelect');
     if (!select) return;
-    const devices = await navigator.mediaDevices.enumerateDevices();
+    let devices = await navigator.mediaDevices.enumerateDevices();
     this.availableVideoDevices = devices.filter((device) => device.kind === 'videoinput');
+    if (!this.availableVideoDevices.length && navigator.mediaDevices.getUserMedia) {
+      const probe = await navigator.mediaDevices.getUserMedia({ audio: false, video: true }).catch(() => null);
+      if (probe) {
+        probe.getTracks().forEach((track) => track.stop());
+        devices = await navigator.mediaDevices.enumerateDevices();
+        this.availableVideoDevices = devices.filter((device) => device.kind === 'videoinput');
+      }
+    }
     const activeDeviceId = this.localStream?.getVideoTracks?.()[0]?.getSettings?.().deviceId || this.selectedVideoDeviceId;
+    if (!activeDeviceId && this.availableVideoDevices.length) {
+      const preferred = this.selectPreferredVideoDevice(this.availableVideoDevices);
+      if (preferred?.deviceId) this.selectedVideoDeviceId = preferred.deviceId;
+    }
+    const selectedDeviceId = activeDeviceId || this.selectedVideoDeviceId;
     select.innerHTML = this.availableVideoDevices.map((device, index) => {
-      const selected = device.deviceId === activeDeviceId ? 'selected' : '';
+      const selected = device.deviceId === selectedDeviceId ? 'selected' : '';
       return `<option value="${escapeHtml(device.deviceId)}" ${selected}>${escapeHtml(device.label || `Camera ${index + 1}`)}</option>`;
-    }).join('');
+    }).join('') || '<option value="">No camera detected</option>';
     select.disabled = this.availableVideoDevices.length === 0;
     this.syncVideoParticipantLabels();
   }
@@ -4515,10 +4634,9 @@ class LiveChatApp {
       this.cameraSwitching = true;
       if (button) button.disabled = true;
       if (select) select.disabled = true;
-      this.selectedVideoDeviceId = deviceId;
       await this.replaceCallVideoTrack(
         [{ deviceId: { exact: deviceId } }, { deviceId: { ideal: deviceId } }],
-        { stopOldFirst: true, requiredDeviceId: deviceId }
+        { stopOldFirst: true, requiredDeviceId: deviceId, userSelected: true }
       );
       await this.populateCameraDevices();
     } catch (error) {
@@ -4562,7 +4680,7 @@ class LiveChatApp {
         this.selectedVideoDeviceId = nextDevice.deviceId;
         await this.replaceCallVideoTrack(
           [{ deviceId: { exact: nextDevice.deviceId } }, { deviceId: { ideal: nextDevice.deviceId } }],
-          { stopOldFirst: true, requiredDeviceId: nextDevice.deviceId }
+          { stopOldFirst: true, requiredDeviceId: nextDevice.deviceId, userSelected: true }
         );
       } else {
         this.cameraFacingMode = nextFacing;
@@ -4579,7 +4697,7 @@ class LiveChatApp {
     }
   }
 
-  async replaceCallVideoTrack(videoConstraint, { stopOldFirst = false, requiredDeviceId = '' } = {}) {
+  async replaceCallVideoTrack(videoConstraint, { stopOldFirst = false, requiredDeviceId = '', userSelected = false } = {}) {
     if (!this.localStream || !this.peerConnection) return;
     const constraints = Array.isArray(videoConstraint) ? videoConstraint : [videoConstraint];
     const oldTrack = this.localStream.getVideoTracks()[0];
@@ -4624,7 +4742,13 @@ class LiveChatApp {
     if (settings.facingMode === 'user' || settings.facingMode === 'environment') {
       this.cameraFacingMode = settings.facingMode;
     }
-    if (settings.deviceId) this.selectedVideoDeviceId = settings.deviceId;
+    if (settings.deviceId) {
+      this.selectedVideoDeviceId = settings.deviceId;
+      if (userSelected) {
+        this.userPreferredVideoDeviceId = settings.deviceId;
+        localStorage.setItem('liveCallPreferredVideoDeviceId', settings.deviceId);
+      }
+    }
     const localVideo = document.getElementById('liveLocalVideo');
     if (localVideo) localVideo.srcObject = this.localStream;
     this.syncCallCameraPreview();
@@ -4831,7 +4955,7 @@ class LiveChatApp {
   }
 
   async recoverOutgoingCall(calleeId, callType = 'audio') {
-    const data = await this.postCall({ action: 'poll' }, 'GET');
+    const data = await this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.POLL }, 'GET');
     return (data.calls || []).find((call) => (
       String(call.callerId || '') === String(this.currentUserId || '')
       && String(call.calleeId || '') === String(calleeId || '')
@@ -5062,7 +5186,7 @@ class LiveChatApp {
     const sessions = Array.from(this.groupCallSessions.values());
     await Promise.all(sessions.map(async (session) => {
       try {
-        const data = await this.postCall({ action: 'signals', call_id: session.call.callId, after_id: session.lastSignalId || 0 }, 'GET');
+        const data = await this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.SIGNALS, call_id: session.call.callId, after_id: session.lastSignalId || 0 }, 'GET');
         for (const signal of data.signals || []) {
           session.lastSignalId = Math.max(session.lastSignalId || 0, Number(signal.signalId || 0));
           await this.handleGroupSignal(session, signal);
@@ -5154,7 +5278,7 @@ class LiveChatApp {
     if (!this.activeCall || this.signalPollInFlight) return;
     this.signalPollInFlight = true;
     try {
-      const data = await this.postCall({ action: 'signals', call_id: this.activeCall.callId, after_id: this.lastSignalId }, 'GET');
+      const data = await this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.SIGNALS, call_id: this.activeCall.callId, after_id: this.lastSignalId }, 'GET');
       for (const signal of data.signals || []) {
         this.lastSignalId = Math.max(this.lastSignalId, Number(signal.signalId || 0));
         await this.handleSignal(signal);
@@ -5277,13 +5401,13 @@ class LiveChatApp {
   async sendSignal(signalType, payload) {
     if (!this.activeCall) return null;
     const recipientId = String(this.activeCall.callerId || '') === String(this.currentUserId || '') ? this.activeCall.calleeId : this.activeCall.callerId;
-    return this.postCall({ action: 'signal', call_id: this.activeCall.callId, recipient_id: recipientId, signal_type: signalType, payload });
+    return this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.SIGNAL, call_id: this.activeCall.callId, recipient_id: recipientId, signal_type: signalType, payload });
   }
 
   async sendSignalForCall(call, signalType, payload) {
     if (!call) return null;
     const recipientId = String(call.callerId || '') === String(this.currentUserId || '') ? call.calleeId : call.callerId;
-    return this.postCall({ action: 'signal', call_id: call.callId, recipient_id: recipientId, signal_type: signalType, payload });
+    return this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.SIGNAL, call_id: call.callId, recipient_id: recipientId, signal_type: signalType, payload });
   }
 
   closeGroupPeerSession(callId) {

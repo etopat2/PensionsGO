@@ -7,9 +7,21 @@
 // - Manages session and localStorage
 // - Redirects user based on role or return URL
 // - Single device login with confirmation modal
-// - Enhanced error handling for ngrok compatibility
+// - Error handling for server compatibility
 // 
 const DEVICE_TOKEN_STORAGE_KEY = "pensionsgo_device_token";
+const HOSTED_SESSION_ID_STORAGE_KEY = "pensionsgo_hosted_session_id";
+const HOSTED_SESSION_USER_STORAGE_KEY = "pensionsgo_hosted_session_user";
+const HOSTED_SESSION_VERIFIED_AT_STORAGE_KEY = "pensionsgo_hosted_session_verified_at";
+
+function setHostedSessionClientCookies(sessionId, userId) {
+  const sid = String(sessionId || "").trim();
+  const uid = String(userId || "").trim();
+  if (!/^[a-f0-9]{64}$/i.test(sid) || !uid) return;
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `PENSION_APP_CLIENT_SID=${encodeURIComponent(sid)}; Path=/; SameSite=Lax${secure}`;
+  document.cookie = `PENSION_APP_CLIENT_UID=${encodeURIComponent(uid)}; Path=/; SameSite=Lax${secure}`;
+}
 
 function isPrivateIpv4Address(hostname) {
   const match = String(hostname || "").match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
@@ -462,6 +474,12 @@ function completeLogin(loginData, returnUrl = null, sessionSettings = null) {
   sessionStorage.setItem("gracePeriod", loginData.gracePeriod || 5);
   sessionStorage.setItem("pensionsgo_tab_auth_verified", "true");
   sessionStorage.removeItem("pensionsgo_public_session_allowance");
+  if (loginData.sessionId && loginData.userId) {
+    localStorage.setItem(HOSTED_SESSION_ID_STORAGE_KEY, String(loginData.sessionId));
+    localStorage.setItem(HOSTED_SESSION_USER_STORAGE_KEY, String(loginData.userId));
+    localStorage.setItem(HOSTED_SESSION_VERIFIED_AT_STORAGE_KEY, Date.now().toString());
+    setHostedSessionClientCookies(loginData.sessionId, loginData.userId);
+  }
 
   // Store persistent data
   const userData = {

@@ -140,7 +140,9 @@ function notificationBuildSoundRecord(string $path, string $name, bool $isBuilti
 function notificationEnsureCustomSoundDirectory(): string
 {
     $directory = notificationCustomSoundStorageDirectory();
-    if (!is_dir($directory)) {
+    if (function_exists('ensureUploadDirectoryGuard')) {
+        ensureUploadDirectoryGuard($directory);
+    } elseif (!is_dir($directory)) {
         mkdir($directory, 0775, true);
     }
     return $directory;
@@ -272,4 +274,3 @@ function notificationDeleteCustomSound(string $path): bool
 
     return unlink($absolutePath);
 }
-

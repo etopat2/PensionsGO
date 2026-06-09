@@ -59,6 +59,25 @@ try {
         if (!in_array($status, ['accepted', 'rejected', 'ended', 'missed'], true)) {
             throw new RuntimeException('Invalid call status.');
         }
+        $callStmt = $conn->prepare("SELECT caller_id, callee_id, status FROM tb_live_chat_calls WHERE call_id = ? LIMIT 1");
+        $callStmt->bind_param('s', $callId);
+        $callStmt->execute();
+        $callRow = $callStmt->get_result()->fetch_assoc();
+        $callStmt->close();
+        if (!$callRow) {
+            throw new RuntimeException('Call not found.');
+        }
+        $callerId = (string)($callRow['caller_id'] ?? '');
+        $calleeId = (string)($callRow['callee_id'] ?? '');
+        if (!in_array((string)$userId, [$callerId, $calleeId], true)) {
+            throw new RuntimeException('Invalid call participant.');
+        }
+        if (in_array($status, ['accepted', 'rejected'], true) && (string)$userId !== $calleeId) {
+            throw new RuntimeException('Only the recipient can answer or reject this call.');
+        }
+        if ($status === 'missed' && (string)$userId !== $callerId) {
+            throw new RuntimeException('Only the caller can mark this call as missed.');
+        }
         $stmt = $conn->prepare("
             UPDATE tb_live_chat_calls
             SET status = ?,
@@ -120,6 +139,10 @@ try {
         if ($callId === '' || $recipientId === '' || !in_array($signalType, ['offer', 'answer', 'ice', 'hangup', 'call_accept', 'video_request', 'video_accept', 'video_decline', 'mic_state', 'remote_mute_request', 'peer_connected', 'peer_disconnected'], true)) {
             throw new RuntimeException('Invalid call signal.');
         }
+        $payloadJson = json_encode($payload, JSON_UNESCAPED_SLASHES);
+        if ($payloadJson === false || strlen($payloadJson) > 65535) {
+            throw new RuntimeException('Call signal payload is invalid or too large.');
+        }
         $callStmt = $conn->prepare("SELECT caller_id, callee_id FROM tb_live_chat_calls WHERE call_id = ? LIMIT 1");
         $callStmt->bind_param('s', $callId);
         $callStmt->execute();
@@ -133,7 +156,6 @@ try {
         if ($signalType === 'remote_mute_request' && $callerId !== (string)$userId) {
             throw new RuntimeException('Only the call host can control a participant microphone.');
         }
-        $payloadJson = json_encode($payload, JSON_UNESCAPED_SLASHES);
         $stmt = $conn->prepare("INSERT INTO tb_live_chat_signals (call_id, sender_id, recipient_id, signal_type, payload_json) VALUES (?, ?, ?, ?, ?)");
         $stmt->bind_param('sssss', $callId, $userId, $recipientId, $signalType, $payloadJson);
         $stmt->execute();
