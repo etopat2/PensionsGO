@@ -53,7 +53,7 @@ function liveChatSettingInt(mysqli $conn, string $key, int $default, int $min, i
 
 function liveChatEnsureTables(mysqli $conn): void
 {
-    $schemaMarker = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'live_chat_schema_ready_v9.json';
+    $schemaMarker = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'live_chat_schema_ready_v10.json';
     if (is_file($schemaMarker)) {
         return;
     }
@@ -274,6 +274,9 @@ function liveChatEnsureTables(mysqli $conn): void
     $conn->query("ALTER TABLE tb_live_chat_messages MODIFY message_kind ENUM('text','voice','attachment','call') NOT NULL DEFAULT 'text'");
     liveChatAddIndexIfMissing($conn, 'tb_live_chat_messages', 'idx_live_chat_delivery_fast', 'sender_id, recipient_id, delivered_at, chat_message_id');
     liveChatAddIndexIfMissing($conn, 'tb_live_chat_messages', 'idx_live_chat_group_fast', 'recipient_id, admin_deleted_at, chat_message_id');
+    liveChatAddIndexIfMissing($conn, 'tb_live_chat_messages', 'idx_live_chat_direct_reverse_fast', 'recipient_id, sender_id, admin_deleted_at, chat_message_id');
+    liveChatAddIndexIfMissing($conn, 'tb_live_chat_messages', 'idx_live_chat_reply_fast', 'reply_to_message_id');
+    liveChatAddIndexIfMissing($conn, 'tb_live_chat_message_deletions', 'idx_live_chat_deletions_user_message', 'user_id, chat_message_id');
     liveChatAddIndexIfMissing($conn, 'tb_live_chat_signals', 'idx_live_chat_signals_fast', 'call_id, recipient_id, signal_id');
     $conn->query("
         ALTER TABLE tb_live_chat_signals
@@ -294,7 +297,7 @@ function liveChatEnsureTables(mysqli $conn): void
     }
     @file_put_contents($schemaMarker, json_encode([
         'ready' => true,
-        'schema' => 9,
+        'schema' => 10,
         'checked_at' => date('c')
     ], JSON_PRETTY_PRINT), LOCK_EX);
 }

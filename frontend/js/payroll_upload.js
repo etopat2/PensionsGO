@@ -646,7 +646,7 @@ document.addEventListener('DOMContentLoaded', () => {
       hideAccessMessage();
       setPageEnabled(true);
       state.canAccess = true;
-      state.canManage = (role === 'admin');
+      state.canManage = (role === 'admin' || role === 'super_admin');
       if (replaceCycleDownloadTemplateBtn) {
         replaceCycleDownloadTemplateBtn.disabled = !state.canManage;
       }

@@ -154,8 +154,8 @@ if (isPrivilegedAdminAccountRole($currentUserRole) && !$actorCanManageAdminAccou
     echo json_encode(['success' => false, 'message' => 'Only the super administrator can modify administrator accounts']);
     exit;
 }
-if ($userRole === 'super_admin') {
-    echo json_encode(['success' => false, 'message' => 'The super administrator role is reserved and cannot be assigned from user management']);
+if ($userRole === 'super_admin' && !$actorCanManageAdminAccounts) {
+    echo json_encode(['success' => false, 'message' => 'Only the super administrator can assign the super administrator role']);
     exit;
 }
 if ($userRole === 'admin' && !$actorCanManageAdminAccounts) {
@@ -166,7 +166,7 @@ if ($currentUserRole === 'admin' && $userRole !== '' && $userRole !== 'admin' &&
     echo json_encode(['success' => false, 'message' => 'Only the super administrator can demote administrator accounts']);
     exit;
 }
-if ($userRole !== '' && $actorRole !== 'admin' && $userRole !== $currentUserRole) {
+if ($userRole !== '' && !sessionRoleIn($conn, ['admin']) && $userRole !== $currentUserRole) {
     echo json_encode(['success' => false, 'message' => 'Only administrators can change user role']);
     exit;
 }

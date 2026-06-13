@@ -130,7 +130,7 @@
   right: 1rem;
   display: grid;
   gap: 0.55rem;
-  z-index: 12040;
+  z-index: var(--z-feedback-layer, 2147483647) !important;
   width: min(360px, calc(100vw - 1.2rem));
 }
 

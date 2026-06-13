@@ -183,6 +183,148 @@ window.PensionsGoDocumentViewer = {
   }
 };
 
+function escapeExportHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function triggerPensionsGoExportDownload(url, fileName = '') {
+  const safeUrl = String(url || '').trim();
+  if (!safeUrl) return false;
+  const anchor = document.createElement('a');
+  anchor.href = safeUrl;
+  if (fileName) {
+    anchor.download = fileName;
+  }
+  anchor.rel = 'noopener';
+  anchor.style.display = 'none';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  return true;
+}
+
+function openPensionsGoPdfExportViewer(url, label = 'Exported PDF') {
+  const safeUrl = String(url || '').trim();
+  if (!safeUrl) return false;
+  const viewerUrl = buildInAppDocumentViewerUrl(safeUrl, {
+    label,
+    backUrl: window.location.href
+  });
+  window.location.assign(viewerUrl || safeUrl);
+  return true;
+}
+
+function deliverPensionsGoExport(url, options = {}) {
+  const safeUrl = String(url || '').trim();
+  if (!safeUrl) return false;
+  const format = String(options.format || '').trim().toLowerCase();
+  if (format === 'pdf') {
+    return openPensionsGoPdfExportViewer(safeUrl, options.label || 'Exported PDF');
+  }
+  return triggerPensionsGoExportDownload(safeUrl, options.fileName || '');
+}
+
+function buildPensionsGoPrintDocument({ title = 'PensionsGo Export', meta = '', columns = [], rows = [] } = {}) {
+  const safeColumns = Array.from(columns || []).map((column) => String(column ?? ''));
+  const safeRows = Array.from(rows || []);
+  return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${escapeExportHtml(title)}</title>
+  <style>
+    @page { margin: 14mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Tahoma, Arial, sans-serif; font-size: 12pt; color: #1f2937; background: #fff; }
+    h1 { margin: 0 0 3px; color: #741a2d; font-size: 12pt; line-height: 1.25; }
+    p { margin: 0 0 5px; color: #475569; font-size: 12pt; line-height: 1.25; }
+    table { width: 100%; border-collapse: collapse; table-layout: auto; }
+    thead tr { background: #741a2d; color: #fff; }
+    th, td { border: 1px solid #b44556; padding: 5px; text-align: left; vertical-align: middle; line-height: 1.2; white-space: normal; overflow-wrap: normal; word-break: normal; }
+    th { font-weight: 700; border-top: 2px solid #d6a64a; border-bottom: 2px solid #d6a64a; }
+    tbody tr:nth-child(even) td { background: #fffdf8; }
+    tbody tr:nth-child(odd) td { background: #fff8eb; }
+  </style>
+</head>
+<body>
+  <h1>${escapeExportHtml(title)}</h1>
+  ${meta ? `<p>${escapeExportHtml(meta)}</p>` : ''}
+  <table>
+    <thead><tr>${safeColumns.map((column) => `<th>${escapeExportHtml(column)}</th>`).join('')}</tr></thead>
+    <tbody>${safeRows.map((row) => `<tr>${safeColumns.map((column) => `<td>${escapeExportHtml(row?.[column] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table>
+</body>
+</html>`;
+}
+
+function ensurePensionsGoPrintPreviewModal() {
+  let modal = document.getElementById('pgoPrintPreviewModal');
+  if (modal) return modal;
+  modal = document.createElement('div');
+  modal.id = 'pgoPrintPreviewModal';
+  modal.className = 'pgo-export-preview-modal';
+  modal.setAttribute('aria-hidden', 'true');
+  modal.innerHTML = `
+    <div class="pgo-export-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="pgoPrintPreviewTitle">
+      <div class="pgo-export-preview-header">
+        <div>
+          <span>Secure Document Viewer</span>
+          <h3 id="pgoPrintPreviewTitle">Print Preview</h3>
+        </div>
+        <button type="button" id="pgoPrintPreviewClose" aria-label="Close print preview">&times;</button>
+      </div>
+      <iframe id="pgoPrintPreviewFrame" class="pgo-export-preview-frame" referrerpolicy="same-origin"></iframe>
+      <div class="pgo-export-preview-footer">
+        <button type="button" class="btn-action btn-secondary" id="pgoPrintPreviewPrint">Print</button>
+        <button type="button" class="btn-action" id="pgoPrintPreviewDone">Close</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  const close = () => {
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('modal-open');
+  };
+  modal.querySelector('#pgoPrintPreviewClose')?.addEventListener('click', close);
+  modal.querySelector('#pgoPrintPreviewDone')?.addEventListener('click', close);
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) close();
+  });
+  modal.querySelector('#pgoPrintPreviewPrint')?.addEventListener('click', () => {
+    modal.querySelector('#pgoPrintPreviewFrame')?.contentWindow?.print();
+  });
+  return modal;
+}
+
+function openPensionsGoPrintPreview({ title = 'Print Preview', html = '' } = {}) {
+  const modal = ensurePensionsGoPrintPreviewModal();
+  const titleEl = modal.querySelector('#pgoPrintPreviewTitle');
+  const frame = modal.querySelector('#pgoPrintPreviewFrame');
+  if (titleEl) titleEl.textContent = title;
+  if (frame) {
+    frame.removeAttribute('src');
+    frame.srcdoc = String(html || '');
+  }
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('modal-open');
+  return modal;
+}
+
+window.PensionsGoExports = {
+  deliver: deliverPensionsGoExport,
+  download: triggerPensionsGoExportDownload,
+  openPdf: openPensionsGoPdfExportViewer,
+  buildPrintDocument: buildPensionsGoPrintDocument,
+  openPrintPreview: openPensionsGoPrintPreview
+};
+
 const MONEY_INPUT_SELECTOR = 'input[data-money-input]';
 let moneyInputObserver = null;
 
@@ -1669,7 +1811,6 @@ const AppSettingsManager = {
     if (Number.isNaN(date.getTime())) return '';
 
     const timeZone = this.get('timezone', 'Africa/Kampala') || 'Africa/Kampala';
-    const dateFormat = this.get('date_format', 'YYYY-MM-DD');
     const timeFormat = this.get('time_format', '24h');
     const includeSeconds = Boolean(options.includeSeconds);
     const includeTime = options.includeTime !== false;
@@ -1679,8 +1820,8 @@ const AppSettingsManager = {
     const formatter = new Intl.DateTimeFormat('en-GB', {
       timeZone,
       year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
+      month: 'short',
+      day: 'numeric',
       hour: includeTime ? '2-digit' : undefined,
       minute: includeTime ? '2-digit' : undefined,
       second: includeTime && includeSeconds ? '2-digit' : undefined,
@@ -1698,13 +1839,7 @@ const AppSettingsManager = {
 
     let dateString = '';
     if (includeDate) {
-      if (dateFormat === 'DD/MM/YYYY') {
-        dateString = `${day}/${month}/${year}`;
-      } else if (dateFormat === 'MM/DD/YYYY') {
-        dateString = `${month}/${day}/${year}`;
-      } else {
-        dateString = `${year}-${month}-${day}`;
-      }
+      dateString = `${day}-${month}-${year}`;
     }
 
     let timeString = '';
@@ -4820,7 +4955,7 @@ function scheduleLiveChatInitialization(sessionState = {}) {
 
   const startLiveChat = async () => {
     try {
-      const { initLiveChat } = await import('./modules/live_chat.js?v=20260609b');
+      const { initLiveChat } = await import('./modules/live_chat.js?v=20260609d');
       await initLiveChat({ userId: sessionState.userId || '' });
     } catch (error) {
       console.warn('Live chat initialization failed:', error.message || error);

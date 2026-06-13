@@ -82,6 +82,7 @@ INSERT INTO `tb_app_settings` (`setting_key`, `setting_value`, `updated_at`) VAL
 ('pensioner_dashboard_enable_documents', '1', '2026-03-28 15:18:15'),
 ('pensioner_dashboard_enable_status_explanations', '1', '2026-03-28 15:18:15'),
 ('pensioner_login_enabled', '1', '2026-03-28 15:18:15'),
+('staff_login_enabled', '1', '2026-03-28 15:18:15'),
 ('pensioner_lookup_enabled', '1', '2026-03-28 15:18:15'),
 ('pensioner_lookup_log_activity', '1', '2026-03-28 15:18:15'),
 ('pensioner_lookup_require_consent', '1', '2026-03-28 15:18:15'),
@@ -136,7 +137,7 @@ ON DUPLICATE KEY UPDATE
 -- Seed: tb_roles
 -- -------------------------------------------------------------------
 INSERT INTO `tb_roles` (`role_key`, `role_label`, `role_description`, `clone_from_role`, `is_active`, `is_system`, `created_at`, `updated_at`) VALUES
-('super_admin', 'Super Administrator', 'Highest platform governance role with unrestricted administration, security, audit, backup, restore, data, and role-management authority', 'admin', 1, 1, '2026-05-26 00:00:00', '2026-05-26 00:00:00'),
+('super_admin', 'Super Administrator', 'Highest platform governance role with unrestricted administration, security, audit, backup, restore, data, role-management, and administrator-account governance authority', NULL, 1, 1, '2026-05-26 00:00:00', '2026-05-26 00:00:00'),
 ('admin', 'Administrator', 'Full administration privileges', NULL, 1, 1, '2026-02-17 05:49:56', '2026-02-17 05:49:56'),
 ('approver', 'Approver', 'Final approval authority for pension workflow', NULL, 1, 1, '2026-02-17 05:49:56', '2026-02-17 05:49:56'),
 ('assessor', 'Assessor', 'Assesses pension benefits and calculations', NULL, 1, 1, '2026-02-17 05:49:56', '2026-02-17 05:49:56'),

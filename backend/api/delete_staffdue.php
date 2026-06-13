@@ -12,7 +12,7 @@ if (!isset($_SESSION['userId'], $_SESSION['userRole'])) {
 }
 
 $role = strtolower((string)($_SESSION['userRole'] ?? ''));
-$directDeleteRoles = ['admin', 'oc_pen', 'dep_oc', 'deputy_oc', 'deputy_oc_pen', 'deputy_oc_pension'];
+$directDeleteRoles = ['super_admin', 'admin', 'oc_pen', 'dep_oc', 'deputy_oc', 'deputy_oc_pen', 'deputy_oc_pension'];
 if (!in_array($role, $directDeleteRoles, true)) {
     echo json_encode(['success' => false, 'message' => 'Access denied']);
     exit;

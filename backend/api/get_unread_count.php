@@ -44,7 +44,7 @@ try {
 
     // Count unread broadcasts (only if not admin)
     $broadcastCount = 0;
-    if (strtolower($userRole) !== 'admin') {
+    if (!sessionRoleIn($conn, ['admin'])) {
         $broadcastStmt = $conn->prepare("
             SELECT COUNT(*) AS count
             FROM tb_broadcast_messages bm

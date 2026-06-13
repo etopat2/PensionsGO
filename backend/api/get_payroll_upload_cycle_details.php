@@ -18,7 +18,7 @@ if ($role === 'pensioner') {
     echo json_encode(['success' => false, 'message' => 'Access denied']);
     exit;
 }
-$canManage = ($role === 'admin');
+$canManage = roleHasAdminAccess($conn, $role);
 
 ensurePayrollManagementTables($conn);
 

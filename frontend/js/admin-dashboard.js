@@ -2088,6 +2088,25 @@ class AdminDashboard {
 
                     <section class="settings-card">
                         <div class="settings-card-header">
+                            <h3>Staff Accounts</h3>
+                            <p>Control staff access for all non-admin staff accounts at once.</p>
+                        </div>
+                        <div class="settings-fields">
+                            <div class="settings-toggle">
+                                <div>
+                                    <div class="toggle-title">Allow Staff Login</div>
+                                    <div class="toggle-subtitle">Disable sign-in for all staff accounts except administrators and the super administrator during support, migration, or controlled maintenance work.</div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" name="staff_login_enabled">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="settings-card">
+                        <div class="settings-card-header">
                             <h3>Feedback Governance</h3>
                             <p>Control who can submit feedback, how fast it should be handled, and whether the dashboard inbox can assign and export cases.</p>
                         </div>
@@ -5228,12 +5247,13 @@ class AdminDashboard {
                                 <th>User</th>
                                 <th>Contact</th>
                                 <th>Role</th>
+                                <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="userManagementTableBody">
                             <tr>
-                                <td colspan="5">
+                                <td colspan="6">
                                     <div class="table-loading">Loading users...</div>
                                 </td>
                             </tr>
@@ -7543,6 +7563,7 @@ class AdminDashboard {
             currency: getString('currency'),
             log_retention_days: getNumber('log_retention_days'),
             enable_notifications: getBool('enable_notifications'),
+            staff_login_enabled: getBool('staff_login_enabled'),
             pensioner_login_enabled: getBool('pensioner_login_enabled'),
             pensioner_dashboard_enable_claims: getBool('pensioner_dashboard_enable_claims'),
             pensioner_dashboard_enable_documents: getBool('pensioner_dashboard_enable_documents'),
@@ -8043,7 +8064,7 @@ class AdminDashboard {
         if (!tableBody) return;
 
         tableBody.innerHTML = `
-            <tr><td colspan="5"><div class="table-loading">Loading users...</div></td></tr>
+            <tr><td colspan="6"><div class="table-loading">Loading users...</div></td></tr>
         `;
 
         try {
@@ -8052,7 +8073,7 @@ class AdminDashboard {
 
             if (!data.success) {
                 tableBody.innerHTML = `
-                    <tr><td colspan="5"><div class="table-empty">Unable to load users.</div></td></tr>
+                    <tr><td colspan="6"><div class="table-empty">Unable to load users.</div></td></tr>
                 `;
                 return;
             }
@@ -8064,7 +8085,7 @@ class AdminDashboard {
         } catch (error) {
             console.error('Error loading users:', error);
             tableBody.innerHTML = `
-                <tr><td colspan="5"><div class="table-empty">Failed to load users.</div></td></tr>
+                <tr><td colspan="6"><div class="table-empty">Failed to load users.</div></td></tr>
             `;
         }
     }
@@ -8116,7 +8137,7 @@ class AdminDashboard {
 
         if (this.filteredUserManagementUsers.length === 0) {
             tableBody.innerHTML = `
-                <tr><td colspan="5"><div class="table-empty">No users match the current filters.</div></td></tr>
+                <tr><td colspan="6"><div class="table-empty">No users match the current filters.</div></td></tr>
             `;
             return;
         }
@@ -8127,6 +8148,10 @@ class AdminDashboard {
             const isChecked = this.selectedUserIds.has(user.userId) ? 'checked' : '';
             const canManage = this.canManageUserAccount(user);
             const canDelete = this.canDeleteUserAccount(user);
+            const canToggleStatus = this.canToggleUserAccountStatus(user);
+            const isActive = user.is_active !== false;
+            const statusLabel = isActive ? 'Active' : 'Inactive';
+            const statusClass = isActive ? 'active' : 'inactive';
             return `
                 <tr>
                     <td class="table-checkbox">
@@ -8149,10 +8174,14 @@ class AdminDashboard {
                     <td>
                         <span class="role-badge role-${this.escapeHtml(user.userRole || 'user')}">${this.escapeHtml(roleLabel)}</span>
                     </td>
+                    <td><span class="status-pill ${statusClass}">${statusLabel}</span></td>
                     <td>
                         <div class="user-actions">
                             <button class="user-action-btn" data-action="edit" data-user-id="${user.userId}" ${canManage ? '' : 'disabled'}>Edit</button>
                             <button class="user-action-btn" data-action="reset" data-user-id="${user.userId}" ${canManage ? '' : 'disabled'}>Reset Password</button>
+                            <button class="user-action-btn ${isActive ? 'warning' : ''}" data-action="toggle-status" data-user-id="${user.userId}" ${canToggleStatus ? '' : 'disabled'}>
+                                ${isActive ? 'Deactivate' : 'Activate'}
+                            </button>
                             <button class="user-action-btn danger" data-action="delete" data-user-id="${user.userId}" ${canDelete ? '' : 'disabled'}>Delete</button>
                         </div>
                     </td>
@@ -8178,6 +8207,8 @@ class AdminDashboard {
                     this.openUserModal('edit', user);
                 } else if (action === 'reset') {
                     this.openResetPasswordModal(user);
+                } else if (action === 'toggle-status') {
+                    this.confirmToggleUserStatus(user);
                 } else if (action === 'delete') {
                     this.confirmUserDelete(user);
                 }
@@ -10893,7 +10924,7 @@ class AdminDashboard {
         return resolvedRoles
             .filter((role) => {
                 const key = String(role.role_key || '').toLowerCase();
-                if (key === 'super_admin') return ensureKey === 'super_admin';
+                if (key === 'super_admin') return actor.isSuperAdmin || ensureKey === 'super_admin';
                 if (key === 'admin') return actor.isSuperAdmin || ensureKey === 'admin';
                 return true;
             })
@@ -10994,13 +11025,22 @@ class AdminDashboard {
         if (!actor.isAdmin) return false;
         const targetRole = String(user.userRole || '').toLowerCase();
         if (!this.isAdminAccountRole(targetRole)) return true;
-        return actor.isSuperAdmin && targetRole !== 'super_admin';
+        return actor.isSuperAdmin;
     }
 
     canDeleteUserAccount(user = {}) {
         const actor = this.getCurrentAdminUserContext();
         if (!this.canManageUserAccount(user)) return false;
         return String(user.userId || '') !== String(actor.id || '');
+    }
+
+    canToggleUserAccountStatus(user = {}) {
+        const actor = this.getCurrentAdminUserContext();
+        if (!actor.isAdmin) return false;
+        if (String(user.userId || '') === String(actor.id || '') && user.is_active !== false) return false;
+        const targetRole = String(user.userRole || '').toLowerCase();
+        if (this.isAdminAccountRole(targetRole)) return actor.isSuperAdmin;
+        return true;
     }
 
     openUserModal(mode, user = {}) {
@@ -11124,6 +11164,103 @@ class AdminDashboard {
         } catch (error) {
             console.error('User form error:', error);
             this.showNotification('Unable to save user. Please try again.', 'error');
+        }
+    }
+
+    confirmToggleUserStatus(user) {
+        if (!this.canToggleUserAccountStatus(user)) {
+            this.showNotification('Only the super administrator can activate or deactivate administrator accounts.', 'error');
+            return;
+        }
+
+        document.querySelector('.admin-confirm-overlay.user-status-confirm-overlay')?.remove();
+
+        const isActive = user.is_active !== false;
+        const nextActive = !isActive;
+        const actionLabel = nextActive ? 'Activate' : 'Deactivate';
+        const userName = user.userName || 'this user';
+        const roleLabel = this.formatRoleLabel(user.userRole || 'user');
+        const statusCopy = nextActive
+            ? 'This user will be able to sign in again, subject to the global staff or pensioner login settings.'
+            : 'This user will be blocked from signing in and any active sessions for this account will be ended.';
+
+        const overlay = document.createElement('div');
+        overlay.className = 'admin-confirm-overlay user-status-confirm-overlay';
+        overlay.innerHTML = `
+            <div class="admin-confirm-modal">
+                <h3>${actionLabel} User Account</h3>
+                <p>
+                    Are you sure you want to ${nextActive ? 'activate' : 'deactivate'}
+                    <strong>${this.escapeHtml(userName)}</strong>?
+                </p>
+                <div class="settings-definition-list">
+                    <div class="settings-definition-row">
+                        <span>Role</span>
+                        <strong>${this.escapeHtml(roleLabel)}</strong>
+                    </div>
+                    <div class="settings-definition-row">
+                        <span>Current Status</span>
+                        <strong>${isActive ? 'Active' : 'Inactive'}</strong>
+                    </div>
+                    <div class="settings-definition-row">
+                        <span>New Status</span>
+                        <strong>${nextActive ? 'Active' : 'Inactive'}</strong>
+                    </div>
+                </div>
+                <p class="modal-hint">${statusCopy}</p>
+                <div class="admin-modal-footer">
+                    <button class="action-btn secondary" type="button" data-action="cancel">Cancel</button>
+                    <button class="action-btn ${nextActive ? '' : 'danger'}" type="button" data-action="confirm">${actionLabel} Account</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        const close = () => overlay.remove();
+        overlay.querySelector('[data-action="cancel"]')?.addEventListener('click', close);
+        overlay.querySelector('[data-action="confirm"]')?.addEventListener('click', async (event) => {
+            const button = event.currentTarget;
+            button.disabled = true;
+            button.textContent = nextActive ? 'Activating...' : 'Deactivating...';
+            const result = await this.updateUserAccountStatus(user.userId, nextActive);
+            if (result?.success) {
+                close();
+                this.showNotification(result.message || 'Account status updated.', 'success');
+            } else {
+                button.disabled = false;
+                button.textContent = `${actionLabel} Account`;
+            }
+        });
+        overlay.addEventListener('click', (event) => {
+            if (event.target === overlay) close();
+        });
+    }
+
+    async updateUserAccountStatus(userId, isActive) {
+        try {
+            const response = await this.performSensitiveAdminRequest('../backend/api/update_user_status.php', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, is_active: isActive })
+            }, isActive ? 'activate user account' : 'deactivate user account');
+
+            const data = response.__adminPayloadAttached || await this.safeJson(response, { success: false });
+            if (!response.ok || !data.success) {
+                this.showNotification(data.message || 'Unable to update account status.', 'error');
+                return { success: false };
+            }
+
+            await this.loadUserManagementUsers();
+            return {
+                success: true,
+                message: data.message || 'Account status updated.'
+            };
+        } catch (error) {
+            console.error('User status update error:', error);
+            this.showNotification(error.message || 'Unable to update account status.', 'error');
+            return { success: false };
         }
     }
 

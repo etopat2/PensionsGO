@@ -19,6 +19,7 @@ $userRole = $_SESSION['userRole'] ?? '';
 $normalizedUserRole = normalizeWorkflowRoleKey($userRole);
 $status = isset($_GET['status']) ? trim($_GET['status']) : '';
 $includeDelegated = isset($_GET['include_delegated']) && $_GET['include_delegated'] === '1';
+$escapedUserIdLike = '%' . $conn->real_escape_string($userId) . '%';
 
 $query = "
     SELECT 
@@ -56,7 +57,7 @@ $query = "
 $params = [];
 $types = "";
 
-$isAdmin = $normalizedUserRole === 'admin';
+$isAdmin = in_array($normalizedUserRole, ['super_admin', 'admin'], true);
 $inboxRoles = getWorkflowRoleKeysForInbox($userRole);
 $rolePlaceholders = implode(',', array_fill(0, count($inboxRoles), '?'));
 
@@ -71,6 +72,7 @@ if (!$isAdmin) {
                 t.assigned_to = ?
                 OR (t.assigned_to IS NULL AND t.assigned_role IN ($rolePlaceholders))
                 OR (t.created_by = ? AND (t.assigned_to IS NULL OR t.assigned_to <> ?))
+                OR (t.metadata LIKE '%\"pending_delegation\"%' AND t.metadata LIKE ?)
             )";
             $params[] = $userId;
             foreach ($inboxRoles as $roleKey) {
@@ -78,17 +80,20 @@ if (!$isAdmin) {
             }
             $params[] = $userId;
             $params[] = $userId;
-            $types .= "s" . str_repeat("s", count($inboxRoles)) . "ss";
+            $params[] = $escapedUserIdLike;
+            $types .= "s" . str_repeat("s", count($inboxRoles)) . "sss";
         } else {
             $query .= " AND (
                 t.assigned_to = ?
                 OR (t.assigned_to IS NULL AND t.assigned_role IN ($rolePlaceholders))
+                OR (t.metadata LIKE '%\"pending_delegation\"%' AND t.metadata LIKE ?)
             )";
             $params[] = $userId;
             foreach ($inboxRoles as $roleKey) {
                 $params[] = $roleKey;
             }
-            $types .= "s" . str_repeat("s", count($inboxRoles));
+            $params[] = $escapedUserIdLike;
+            $types .= "s" . str_repeat("s", count($inboxRoles)) . "s";
         }
     }
 }
@@ -115,6 +120,18 @@ $result = $stmt->get_result();
 $tasks = [];
 
 while ($row = $result->fetch_assoc()) {
+    $metadataArray = [];
+    if (!empty($row['metadata'])) {
+        $decoded = json_decode((string)$row['metadata'], true);
+        if (is_array($decoded)) {
+            $metadataArray = $decoded;
+        }
+    }
+    $pendingDelegation = is_array($metadataArray['pending_delegation'] ?? null) ? $metadataArray['pending_delegation'] : null;
+    $isDelegationRecipient = $pendingDelegation && trim((string)($pendingDelegation['to_user_id'] ?? '')) === $userId;
+    $delegatedToName = trim((string)($pendingDelegation['to_user_name'] ?? ''));
+    $delegatedFromName = trim((string)($pendingDelegation['from_user_name'] ?? ''));
+
     $isOverdue = false;
     // Overdue is policy-driven (business-day aware) and only applies
     // to non-terminal task states.
@@ -141,6 +158,10 @@ while ($row = $result->fetch_assoc()) {
         'due_at' => $row['due_at'],
         'declined_reason' => $row['declined_reason'],
         'metadata' => $row['metadata'],
+        'pending_delegation' => $pendingDelegation,
+        'is_delegation_recipient' => $isDelegationRecipient,
+        'delegated_to_name' => $delegatedToName,
+        'delegated_from_name' => $delegatedFromName,
         'updated_at' => $row['updated_at'],
         'completed_at' => $row['completed_at'],
         'created_at' => $row['timeStamp'],

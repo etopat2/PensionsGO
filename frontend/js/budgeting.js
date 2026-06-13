@@ -1111,6 +1111,9 @@
   }
 
   function triggerCurrentTabDownload(url, fileName = '') {
+    if (window.PensionsGoExports?.download) {
+      return window.PensionsGoExports.download(url, fileName);
+    }
     const safeUrl = String(url || '').trim();
     if (!safeUrl) return false;
     const anchor = document.createElement('a');
@@ -1127,6 +1130,9 @@
   }
 
   function openPdfInSecureViewer(url, label = 'Budget Export PDF') {
+    if (window.PensionsGoExports?.openPdf) {
+      return window.PensionsGoExports.openPdf(url, label);
+    }
     const safeUrl = String(url || '').trim();
     if (!safeUrl) return false;
     const viewerUrl = window.PensionsGoDocumentViewer?.buildViewerUrl
@@ -1144,6 +1150,9 @@
   }
 
   function deliverBudgetExport(url, format, label) {
+    if (window.PensionsGoExports?.deliver) {
+      return window.PensionsGoExports.deliver(url, { format, label });
+    }
     const safeUrl = String(url || '').trim();
     const normalized = String(format || '').trim().toLowerCase();
     if (!safeUrl) return false;

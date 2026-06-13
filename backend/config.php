@@ -1252,7 +1252,7 @@ function hasRecentAdminSensitiveVerification(mysqli $conn): bool {
 }
 
 function requireRecentAdminSensitiveVerification(mysqli $conn, string $message = 'Admin password verification is required for this action.'): void {
-    if (!requestHasAuthenticatedSession() || strtolower((string)($_SESSION['userRole'] ?? '')) !== 'admin') {
+    if (!requestHasAuthenticatedSession() || !currentSessionHasAdminAccess($conn)) {
         sendRequestSecurityFailure(403, 'Admin access required.');
     }
 
@@ -2646,6 +2646,20 @@ function ensureUserPasswordUpdatedAtColumn(mysqli $conn): void {
     $checked = true;
 }
 
+function ensureUserActiveColumn(mysqli $conn): void {
+    static $checked = false;
+    if ($checked) {
+        return;
+    }
+
+    $result = $conn->query("SHOW COLUMNS FROM tb_users LIKE 'is_active'");
+    if ($result && $result->num_rows === 0) {
+        $conn->query("ALTER TABLE tb_users ADD COLUMN is_active tinyint(1) NOT NULL DEFAULT 1");
+    }
+
+    $checked = true;
+}
+
 // 
 // Message Compression Helpers //
 function encodeMessageText(string $text, bool $compressEnabled): string {
@@ -4032,7 +4046,7 @@ function recordDataExportRun(mysqli $conn, array $payload): bool {
 // User Permission Helpers //
 function getDefaultRoleCatalog(): array {
     return [
-        'super_admin' => ['label' => 'Super Administrator', 'description' => 'Highest platform governance role with unrestricted administration, security, audit, backup, restore, data, and role-management authority', 'is_system' => 1, 'clone_from_role' => 'admin'],
+        'super_admin' => ['label' => 'Super Administrator', 'description' => 'Highest platform governance role with unrestricted administration, security, audit, backup, restore, data, role-management, and administrator-account governance authority', 'is_system' => 1],
         'admin' => ['label' => 'Administrator', 'description' => 'Full administration privileges', 'is_system' => 1],
         'clerk' => ['label' => 'Clerk', 'description' => 'Application intake and verification support', 'is_system' => 1],
         'oc_pen' => ['label' => 'OC/Pension', 'description' => 'Workflow control and assignment authority', 'is_system' => 1],
@@ -4240,6 +4254,17 @@ function ensureRoleGovernanceTables(mysqli $conn): void {
             $stmt->close();
         }
     }
+
+    $conn->query("
+        UPDATE tb_roles
+        SET
+            role_label = 'Super Administrator',
+            role_description = 'Highest platform governance role with unrestricted administration, security, audit, backup, restore, data, role-management, and administrator-account governance authority',
+            clone_from_role = NULL,
+            is_active = 1,
+            is_system = 1
+        WHERE role_key = 'super_admin'
+    ");
 
     $created = true;
 }
@@ -4582,6 +4607,9 @@ function resolveRoleAccessKey(mysqli $conn, string $roleKey): string {
     if ($normalized === '') {
         return '';
     }
+    if ($normalized === 'super_admin') {
+        return 'super_admin';
+    }
 
     $cloneMap = getRoleCloneMap($conn);
     $visited = [];
@@ -4626,7 +4654,8 @@ function getSessionEffectiveRoleKey(mysqli $conn): string {
 
 function sessionRoleIn(mysqli $conn, array $roles): bool {
     $effective = getSessionEffectiveRoleKey($conn);
-    if ($effective === '') {
+    $rawRole = normalizeRoleKey((string)($_SESSION['userRole'] ?? ''));
+    if ($effective === '' && $rawRole === '') {
         return false;
     }
 
@@ -4638,7 +4667,31 @@ function sessionRoleIn(mysqli $conn, array $roles): bool {
         }
     }
 
-    return isset($allowed[$effective]);
+    if ($effective !== '' && isset($allowed[$effective])) {
+        return true;
+    }
+    if ($rawRole !== '' && isset($allowed[$rawRole])) {
+        return true;
+    }
+
+    return $rawRole === 'super_admin' && isset($allowed['admin']);
+}
+
+function roleHasAdminAccess(mysqli $conn, string $roleKey): bool {
+    $rawRole = normalizeRoleKey($roleKey);
+    if ($rawRole === 'super_admin' || $rawRole === 'admin') {
+        return true;
+    }
+
+    return getEffectiveRoleKey($conn, $rawRole) === 'admin';
+}
+
+function currentSessionHasAdminAccess(mysqli $conn): bool {
+    if (!isset($_SESSION['userId'])) {
+        return false;
+    }
+
+    return sessionRoleIn($conn, ['admin']);
 }
 
 function isCurrentSessionSuperAdmin(): bool {
@@ -4802,6 +4855,9 @@ function normalizeWorkflowRoleKey(string $roleKey): string {
     $normalized = normalizeRoleKey($roleKey);
     if ($normalized === '') {
         return '';
+    }
+    if ($normalized === 'super_admin') {
+        return 'admin';
     }
     if (isOcPenEquivalentRole($normalized)) {
         return 'oc_pen';
@@ -5193,9 +5249,17 @@ function roleHasDefaultPermission(mysqli $conn, string $role, string $permission
         return false;
     }
 
+    $rawRole = normalizeRoleKey($role);
+    if ($rawRole === 'super_admin') {
+        return true;
+    }
+
     $roleNormalized = getEffectiveRoleKey($conn, $role);
     if ($roleNormalized === '') {
         return false;
+    }
+    if ($roleNormalized === 'super_admin') {
+        return true;
     }
 
     $roleOverride = getRolePermissionOverride($conn, $roleNormalized, $permissionKey);
@@ -11658,12 +11722,13 @@ function ensureTasksTable(mysqli $conn): void {
             task_type varchar(100) DEFAULT NULL,
             task_title varchar(255) DEFAULT NULL,
             task_description text DEFAULT NULL,
-            status enum('pending','assigned','in_progress','completed','declined','cancelled','deferred','returned') NOT NULL DEFAULT 'pending',
+            status enum('pending','assigned','in_progress','delegated','completed','declined','cancelled','deferred','returned') NOT NULL DEFAULT 'pending',
             priority enum('low','normal','high','urgent') NOT NULL DEFAULT 'normal',
             related_staff_id int(11) DEFAULT NULL,
             related_reg_no varchar(50) DEFAULT NULL,
             parent_task_id int(11) DEFAULT NULL,
             due_at datetime DEFAULT NULL,
+            assigned_at timestamp NULL DEFAULT NULL,
             declined_reason text DEFAULT NULL,
             metadata text DEFAULT NULL,
             updated_at datetime DEFAULT NULL,
@@ -11680,12 +11745,13 @@ function ensureTasksTable(mysqli $conn): void {
         'task_type' => "VARCHAR(100) DEFAULT NULL",
         'task_title' => "VARCHAR(255) DEFAULT NULL",
         'task_description' => "TEXT DEFAULT NULL",
-        'status' => "ENUM('pending','assigned','in_progress','completed','declined','cancelled','deferred','returned') NOT NULL DEFAULT 'pending'",
+        'status' => "ENUM('pending','assigned','in_progress','delegated','completed','declined','cancelled','deferred','returned') NOT NULL DEFAULT 'pending'",
         'priority' => "ENUM('low','normal','high','urgent') NOT NULL DEFAULT 'normal'",
         'related_staff_id' => "INT(11) DEFAULT NULL",
         'related_reg_no' => "VARCHAR(50) DEFAULT NULL",
         'parent_task_id' => "INT(11) DEFAULT NULL",
         'due_at' => "DATETIME DEFAULT NULL",
+        'assigned_at' => "TIMESTAMP NULL DEFAULT NULL",
         'declined_reason' => "TEXT DEFAULT NULL",
         'metadata' => "TEXT DEFAULT NULL",
         'updated_at' => "DATETIME DEFAULT NULL",
@@ -11707,10 +11773,10 @@ function ensureTasksTable(mysqli $conn): void {
     $statusColumn = $conn->query("SHOW COLUMNS FROM tb_tasks LIKE 'status'");
     if ($statusColumn && $row = $statusColumn->fetch_assoc()) {
         $type = $row['Type'] ?? '';
-        if (strpos($type, 'deferred') === false || strpos($type, 'returned') === false) {
+        if (strpos($type, 'delegated') === false || strpos($type, 'deferred') === false || strpos($type, 'returned') === false) {
             $conn->query("
                 ALTER TABLE tb_tasks
-                MODIFY status ENUM('pending','assigned','in_progress','completed','declined','cancelled','deferred','returned')
+                MODIFY status ENUM('pending','assigned','in_progress','delegated','completed','declined','cancelled','deferred','returned')
                 NOT NULL DEFAULT 'pending'
             ");
         }
@@ -13210,7 +13276,10 @@ function ensureFileRegistryPerformanceIndexes(mysqli $conn): void
         'idx_fileregistry_availability_recent' => "ALTER TABLE tb_fileregistry ADD INDEX idx_fileregistry_availability_recent (availability_status, timeStamp, id)",
         'idx_fileregistry_name_sort' => "ALTER TABLE tb_fileregistry ADD INDEX idx_fileregistry_name_sort (sName, fName, id)",
         'idx_fileregistry_regno_active' => "ALTER TABLE tb_fileregistry ADD INDEX idx_fileregistry_regno_active (regNo, is_deleted)",
-        'idx_fileregistry_box_active' => "ALTER TABLE tb_fileregistry ADD INDEX idx_fileregistry_box_active (is_deleted, boxNo)"
+        'idx_fileregistry_box_active' => "ALTER TABLE tb_fileregistry ADD INDEX idx_fileregistry_box_active (is_deleted, boxNo)",
+        'idx_fileregistry_active_recent' => "ALTER TABLE tb_fileregistry ADD INDEX idx_fileregistry_active_recent (is_deleted, timeStamp, id)",
+        'idx_fileregistry_active_name' => "ALTER TABLE tb_fileregistry ADD INDEX idx_fileregistry_active_name (is_deleted, sName, fName, id)",
+        'idx_fileregistry_active_payroll' => "ALTER TABLE tb_fileregistry ADD INDEX idx_fileregistry_active_payroll (is_deleted, payrollStatus, id)"
     ];
 
     foreach ($indexes as $indexName => $sql) {
@@ -13234,6 +13303,9 @@ function ensureStaffDuePerformanceIndexes(mysqli $conn): void
         'idx_staffdue_regno' => "ALTER TABLE tb_staffdue ADD INDEX idx_staffdue_regno (regNo)",
         'idx_staffdue_workflow_status' => "ALTER TABLE tb_staffdue ADD INDEX idx_staffdue_workflow_status (is_deleted, submissionStatus, appnStatus, submission_at)",
         'idx_staffdue_retirement_type' => "ALTER TABLE tb_staffdue ADD INDEX idx_staffdue_retirement_type (retirementType)",
+        'idx_staffdue_active_submission_order' => "ALTER TABLE tb_staffdue ADD INDEX idx_staffdue_active_submission_order (is_deleted, submission_at, timeStamp, id)",
+        'idx_staffdue_active_retirement' => "ALTER TABLE tb_staffdue ADD INDEX idx_staffdue_active_retirement (is_deleted, retirementType, id)",
+        'idx_staffdue_active_appn' => "ALTER TABLE tb_staffdue ADD INDEX idx_staffdue_active_appn (is_deleted, appnStatus, id)",
         'idx_application_queue_staff_status' => "ALTER TABLE tb_application_queue ADD INDEX idx_application_queue_staff_status (staffdue_id, status)"
     ];
 

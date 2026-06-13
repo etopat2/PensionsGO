@@ -286,6 +286,19 @@ body.modal-open {
   font-size: 0.69rem;
 }
 
+.step-node .node-duration {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin-top: 0.26rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #0f62ae 12%, var(--card-bg));
+  color: #0f62ae;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
 .step-node .node-panel p {
   margin: 0.28rem 0 0;
   font-size: 0.74rem;

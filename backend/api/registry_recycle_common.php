@@ -10,7 +10,7 @@ function registryRecycleActorContext(mysqli $conn, bool $adminOnly = false): arr
     $userName = (string)($actor['user_name'] ?? 'Unknown');
 
     if ($adminOnly) {
-        if ($role !== 'admin') {
+        if (!roleHasAdminAccess($conn, $role)) {
             throw new RuntimeException('Access denied');
         }
     } elseif (!currentUserHasPermission($conn, 'registry.delete_queue.process')) {

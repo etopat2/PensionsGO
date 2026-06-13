@@ -33,7 +33,7 @@ if (!in_array($mode, $allowedModes, true)) {
 
 $currentUserId = (string)($_SESSION['userId'] ?? '');
 $currentUserRole = strtolower((string)($_SESSION['userRole'] ?? ''));
-$isAdmin = $currentUserRole === 'admin';
+$isAdmin = roleHasAdminAccess($conn, $currentUserRole);
 
 if ($mode === 'writeup_verify' && !$isAdmin && $currentUserRole !== 'writeup_officer') {
     echo json_encode(['success' => false, 'message' => 'Write-up verification is restricted to writeup officers.']);

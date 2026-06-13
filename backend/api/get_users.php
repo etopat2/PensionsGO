@@ -7,6 +7,10 @@
 // Include config and start session
 require_once __DIR__ . '/../config.php';
 
+if (function_exists('ensureUserActiveColumn')) {
+    ensureUserActiveColumn($conn);
+}
+
 // Ensure user is logged in before fetching users
 if (!isset($_SESSION['userId'])) {
     header('HTTP/1.1 401 Unauthorized');
@@ -42,7 +46,8 @@ try {
             userEmail, 
             phoneNo,
             userRole, 
-            userPhoto 
+            userPhoto,
+            is_active
         FROM tb_users 
         {$whereClause}
         ORDER BY userName
@@ -65,7 +70,8 @@ try {
             'phoneNo'     => $row['phoneNo'] ?? '',
             'userRole'    => $roleKey,
             'roleLabel'   => getRoleLabel($conn, $roleKey),
-            'userPhoto'   => $row['userPhoto'] ?: 'images/default-user.png'
+            'userPhoto'   => $row['userPhoto'] ?: 'images/default-user.png',
+            'is_active'   => ((int)($row['is_active'] ?? 1)) === 1
         ];
     }
 

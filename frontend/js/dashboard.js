@@ -81,6 +81,9 @@ function initDashboardController() {
     return window.PensionsGoRetirementTypes?.getLabel?.(value) || String(value || "").trim() || "N/A";
   }
   const workflowInsightGrid = document.getElementById("workflowInsightGrid");
+  const workflowDelegationGrid = document.getElementById("workflowDelegationGrid");
+  const workflowProcessGrid = document.getElementById("workflowProcessGrid");
+  const workflowProcessTrendBody = document.getElementById("workflowProcessTrendBody");
   const feedbackAccessNotice = document.getElementById("feedbackAccessNotice");
   const feedbackWorkspace = document.getElementById("feedbackWorkspace");
   const feedbackSummaryCards = document.getElementById("feedbackSummaryCards");
@@ -907,9 +910,16 @@ function initDashboardController() {
   setInterval(refreshDashboardLiveStampLabel, 30000);
 
   /* HELPER FUNCTION: Create Card */
-  function createCard(title, total, subtitle1 = "", val1 = "", subtitle2 = "", val2 = "", color = "blue") {
+  function createCard(title, total, subtitle1 = "", val1 = "", subtitle2 = "", val2 = "", color = "blue", options = {}) {
     const card = document.createElement("div");
     card.className = `card ${color}`;
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
+    card.dataset.analyticsLabel = String(options.analyticsLabel || title || "Records");
+    card.dataset.analyticsValue = String(options.analyticsValue ?? total ?? "");
+    if (options.analyticsSource) {
+      card.dataset.analyticsSource = String(options.analyticsSource);
+    }
     card.innerHTML = `
       <h4>${title}</h4>
       <p>${total}</p>
@@ -923,6 +933,1086 @@ function initDashboardController() {
     if (!container) return;
     container.innerHTML = `<div class="analytics-empty-state">${escapeHtml(message)}</div>`;
   }
+
+  const analyticsRecordsState = {
+    source: "",
+    label: "",
+    title: "",
+    page: 1,
+    limit: 12,
+    totalPages: 1,
+    totalRows: 0,
+    rows: [],
+    columns: {},
+    availableColumns: {},
+    search: "",
+    dateFrom: "",
+    dateTo: "",
+    searchTimer: null,
+    listController: null,
+    countController: null,
+    columnsLoading: null,
+    pendingAction: null
+  };
+
+  function ensureAnalyticsRecordsModal() {
+    let modal = document.getElementById("analyticsRecordsModal");
+    if (modal) return modal;
+
+    modal = document.createElement("div");
+    modal.id = "analyticsRecordsModal";
+    modal.className = "analytics-records-modal";
+    modal.setAttribute("aria-hidden", "true");
+    modal.innerHTML = `
+      <div class="analytics-records-dialog" role="dialog" aria-modal="true" aria-labelledby="analyticsRecordsTitle">
+        <div class="analytics-records-header">
+          <div>
+            <span class="analytics-records-eyebrow" id="analyticsRecordsEyebrow">Analytics Records</span>
+            <h3 id="analyticsRecordsTitle">Records</h3>
+            <p id="analyticsRecordsSubtitle">Review the records behind this dashboard count.</p>
+          </div>
+          <button type="button" class="analytics-records-close" id="analyticsRecordsCloseBtn" aria-label="Close analytics records">&times;</button>
+        </div>
+        <section class="analytics-records-toolbar">
+          <label>
+            <span>Search</span>
+            <input type="search" id="analyticsRecordsSearch" placeholder="Name, file no, status...">
+          </label>
+          <label>
+            <span>From</span>
+            <input type="date" id="analyticsRecordsDateFrom">
+          </label>
+          <label>
+            <span>To</span>
+            <input type="date" id="analyticsRecordsDateTo">
+          </label>
+          <label>
+            <span>Rows</span>
+            <select id="analyticsRecordsLimit">
+              <option value="12">12</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </label>
+          <div class="analytics-records-actions">
+            <button type="button" class="btn-action btn-import" id="analyticsRecordsRefreshBtn">Refresh</button>
+            <button type="button" class="btn-action btn-secondary" id="analyticsRecordsPrintBtn">Print</button>
+            <button type="button" class="btn-action btn-secondary" id="analyticsRecordsCsvBtn">CSV</button>
+            <button type="button" class="btn-action btn-secondary" id="analyticsRecordsPdfBtn">Export PDF</button>
+          </div>
+        </section>
+        <div class="analytics-records-table-wrap">
+          <table class="analytics-records-table">
+            <thead id="analyticsRecordsHead"></thead>
+            <tbody id="analyticsRecordsBody"></tbody>
+          </table>
+        </div>
+        <div class="analytics-records-footer">
+          <span id="analyticsRecordsPageInfo">No records loaded.</span>
+          <div class="analytics-records-pagination">
+            <button type="button" id="analyticsRecordsFirstBtn">First</button>
+            <button type="button" id="analyticsRecordsPrevBtn">Previous</button>
+            <span id="analyticsRecordsPageLabel">Page 1 of 1</span>
+            <button type="button" id="analyticsRecordsNextBtn">Next</button>
+            <button type="button" id="analyticsRecordsLastBtn">Last</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    document.getElementById("analyticsRecordsCloseBtn")?.addEventListener("click", closeAnalyticsRecordsModal);
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) closeAnalyticsRecordsModal();
+    });
+    document.getElementById("analyticsRecordsRefreshBtn")?.addEventListener("click", () => {
+      analyticsRecordsState.page = 1;
+      analyticsRecordsState.search = document.getElementById("analyticsRecordsSearch")?.value?.trim() || "";
+      analyticsRecordsState.dateFrom = document.getElementById("analyticsRecordsDateFrom")?.value || "";
+      analyticsRecordsState.dateTo = document.getElementById("analyticsRecordsDateTo")?.value || "";
+      analyticsRecordsState.limit = Number(document.getElementById("analyticsRecordsLimit")?.value || 12);
+      loadAnalyticsRecords();
+    });
+    ["analyticsRecordsSearch", "analyticsRecordsDateFrom", "analyticsRecordsDateTo", "analyticsRecordsLimit"].forEach((id) => {
+      document.getElementById(id)?.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") document.getElementById("analyticsRecordsRefreshBtn")?.click();
+      });
+      if (id === "analyticsRecordsLimit") {
+        document.getElementById(id)?.addEventListener("change", () => document.getElementById("analyticsRecordsRefreshBtn")?.click());
+      }
+    });
+    document.getElementById("analyticsRecordsSearch")?.addEventListener("input", (event) => {
+      const value = String(event.target?.value || "").trim();
+      if (analyticsRecordsState.searchTimer) {
+        clearTimeout(analyticsRecordsState.searchTimer);
+      }
+      if (value.length > 0 && value.length < 3) {
+        return;
+      }
+      analyticsRecordsState.searchTimer = setTimeout(() => {
+        analyticsRecordsState.search = value;
+        analyticsRecordsState.page = 1;
+        loadAnalyticsRecords();
+      }, 300);
+    });
+    document.getElementById("analyticsRecordsFirstBtn")?.addEventListener("click", () => setAnalyticsRecordsPage(1));
+    document.getElementById("analyticsRecordsPrevBtn")?.addEventListener("click", () => setAnalyticsRecordsPage(analyticsRecordsState.page - 1));
+    document.getElementById("analyticsRecordsNextBtn")?.addEventListener("click", () => setAnalyticsRecordsPage(analyticsRecordsState.page + 1));
+    document.getElementById("analyticsRecordsLastBtn")?.addEventListener("click", () => setAnalyticsRecordsPage(analyticsRecordsState.totalPages));
+    document.getElementById("analyticsRecordsPrintBtn")?.addEventListener("click", () => openAnalyticsColumnModal("print"));
+    document.getElementById("analyticsRecordsCsvBtn")?.addEventListener("click", () => openAnalyticsColumnModal("csv"));
+    document.getElementById("analyticsRecordsPdfBtn")?.addEventListener("click", () => openAnalyticsColumnModal("pdf"));
+
+    return modal;
+  }
+
+  function closeAnalyticsRecordsModal() {
+    const modal = document.getElementById("analyticsRecordsModal");
+    if (!modal) return;
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("modal-open");
+  }
+
+  function openAnalyticsRecordsModal(source, label, displayedValue = "") {
+    const modal = ensureAnalyticsRecordsModal();
+    analyticsRecordsState.source = source;
+    analyticsRecordsState.label = label;
+    analyticsRecordsState.title = `${label} Records`;
+    analyticsRecordsState.page = 1;
+    analyticsRecordsState.search = "";
+    analyticsRecordsState.dateFrom = "";
+    analyticsRecordsState.dateTo = "";
+    analyticsRecordsState.availableColumns = {};
+    analyticsRecordsState.columnsLoading = null;
+    document.getElementById("analyticsRecordsSearch").value = "";
+    document.getElementById("analyticsRecordsDateFrom").value = "";
+    document.getElementById("analyticsRecordsDateTo").value = "";
+    document.getElementById("analyticsRecordsLimit").value = String(analyticsRecordsState.limit);
+    document.getElementById("analyticsRecordsTitle").textContent = analyticsRecordsState.title;
+    document.getElementById("analyticsRecordsSubtitle").textContent = displayedValue
+      ? `${displayedValue} record value displayed on the dashboard.`
+      : "Review the records behind this dashboard count.";
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+    loadAnalyticsRecords();
+  }
+
+  function setAnalyticsRecordsPage(page) {
+    const nextPage = Math.max(1, Math.min(Number(page || 1), analyticsRecordsState.totalPages || 1));
+    if (nextPage === analyticsRecordsState.page) return;
+    analyticsRecordsState.page = nextPage;
+    loadAnalyticsRecords();
+  }
+
+  async function loadAnalyticsRecords() {
+    const head = document.getElementById("analyticsRecordsHead");
+    const body = document.getElementById("analyticsRecordsBody");
+    if (!head || !body) return;
+    if (analyticsRecordsState.listController) {
+      analyticsRecordsState.listController.abort();
+    }
+    if (analyticsRecordsState.countController) {
+      analyticsRecordsState.countController.abort();
+    }
+    analyticsRecordsState.listController = new AbortController();
+    const requestKey = [
+      analyticsRecordsState.source,
+      analyticsRecordsState.label,
+      analyticsRecordsState.page,
+      analyticsRecordsState.limit,
+      analyticsRecordsState.search,
+      analyticsRecordsState.dateFrom,
+      analyticsRecordsState.dateTo
+    ].join("|");
+    body.innerHTML = `<tr><td colspan="8"><div class="analytics-records-loading">Loading records...</div></td></tr>`;
+    const params = new URLSearchParams({
+      source: analyticsRecordsState.source,
+      label: analyticsRecordsState.label,
+      page: String(analyticsRecordsState.page),
+      limit: String(analyticsRecordsState.limit),
+      search: analyticsRecordsState.search,
+      date_from: analyticsRecordsState.dateFrom,
+      date_to: analyticsRecordsState.dateTo,
+      fast: "1"
+    });
+    try {
+      const response = await fetch(`../backend/api/get_analytics_records.php?${params.toString()}`, {
+        credentials: "include",
+        cache: "no-store",
+        signal: analyticsRecordsState.listController.signal,
+        headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" }
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Unable to load analytics records.");
+      }
+      if (requestKey !== [
+        analyticsRecordsState.source,
+        analyticsRecordsState.label,
+        analyticsRecordsState.page,
+        analyticsRecordsState.limit,
+        analyticsRecordsState.search,
+        analyticsRecordsState.dateFrom,
+        analyticsRecordsState.dateTo
+      ].join("|")) {
+        return;
+      }
+      analyticsRecordsState.rows = Array.isArray(data.rows) ? data.rows : [];
+      analyticsRecordsState.columns = data.columns || {};
+      analyticsRecordsState.availableColumns = data.available_columns || analyticsRecordsState.availableColumns || {};
+      analyticsRecordsState.title = data.title || analyticsRecordsState.title;
+      analyticsRecordsState.page = Number(data.pagination?.page || 1);
+      analyticsRecordsState.limit = Number(data.pagination?.limit || analyticsRecordsState.limit);
+      analyticsRecordsState.totalRows = Number(data.pagination?.totalRows || 0);
+      analyticsRecordsState.totalPages = Number(data.pagination?.totalPages || 1);
+      document.getElementById("analyticsRecordsTitle").textContent = analyticsRecordsState.title;
+      renderAnalyticsRecordsTable();
+      loadAnalyticsRecordsCount(requestKey);
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+      body.innerHTML = `<tr><td colspan="8">${escapeHtml(error.message || "Unable to load records.")}</td></tr>`;
+    }
+  }
+
+  async function loadAnalyticsRecordsCount(requestKey = "") {
+    if (analyticsRecordsState.countController) {
+      analyticsRecordsState.countController.abort();
+    }
+    analyticsRecordsState.countController = new AbortController();
+    const params = new URLSearchParams({
+      action: "count",
+      source: analyticsRecordsState.source,
+      label: analyticsRecordsState.label,
+      page: String(analyticsRecordsState.page),
+      limit: String(analyticsRecordsState.limit),
+      search: analyticsRecordsState.search,
+      date_from: analyticsRecordsState.dateFrom,
+      date_to: analyticsRecordsState.dateTo
+    });
+    try {
+      const response = await fetch(`../backend/api/get_analytics_records.php?${params.toString()}`, {
+        credentials: "include",
+        cache: "no-store",
+        signal: analyticsRecordsState.countController.signal,
+        headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" }
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) return;
+      const currentKey = [
+        analyticsRecordsState.source,
+        analyticsRecordsState.label,
+        analyticsRecordsState.page,
+        analyticsRecordsState.limit,
+        analyticsRecordsState.search,
+        analyticsRecordsState.dateFrom,
+        analyticsRecordsState.dateTo
+      ].join("|");
+      if (requestKey && requestKey !== currentKey) return;
+      analyticsRecordsState.totalRows = Number(data.pagination?.totalRows || analyticsRecordsState.totalRows || 0);
+      analyticsRecordsState.totalPages = Number(data.pagination?.totalPages || analyticsRecordsState.totalPages || 1);
+      renderAnalyticsRecordsFooter(true);
+    } catch (error) {
+      if (error?.name !== "AbortError") {
+        renderAnalyticsRecordsFooter(false);
+      }
+    }
+  }
+
+  function renderAnalyticsRecordsTable() {
+    const head = document.getElementById("analyticsRecordsHead");
+    const body = document.getElementById("analyticsRecordsBody");
+    const columns = Object.entries(analyticsRecordsState.columns || {}).filter(([key]) => !analyticsFrontendShouldHideField(key));
+    head.innerHTML = `<tr>${columns.map(([, label]) => `<th>${escapeHtml(label)}</th>`).join("")}<th>Action</th></tr>`;
+    if (!analyticsRecordsState.rows.length) {
+      body.innerHTML = `<tr><td colspan="${columns.length + 1}">No records found for this analytics bucket.</td></tr>`;
+    } else {
+      body.innerHTML = analyticsRecordsState.rows.map((row) => `
+        <tr>
+          ${columns.map(([key]) => `<td>${escapeHtml(formatAnalyticsCellValue(row[key], key))}</td>`).join("")}
+          <td><button type="button" class="btn-action btn-secondary analytics-record-detail-btn" data-record-id="${escapeHtml(row.__record_id || "")}">View</button></td>
+        </tr>
+      `).join("");
+      body.querySelectorAll(".analytics-record-detail-btn").forEach((button) => {
+        button.addEventListener("click", () => loadAnalyticsRecordDetail(button.dataset.recordId || ""));
+      });
+    }
+    renderAnalyticsRecordsFooter(false);
+  }
+
+  function renderAnalyticsRecordsFooter(exact = false) {
+    const first = ((analyticsRecordsState.page - 1) * analyticsRecordsState.limit) + (analyticsRecordsState.totalRows > 0 ? 1 : 0);
+    const last = Math.min(analyticsRecordsState.page * analyticsRecordsState.limit, analyticsRecordsState.totalRows);
+    const estimated = exact ? "" : "+";
+    document.getElementById("analyticsRecordsPageInfo").textContent = `${first.toLocaleString()}-${last.toLocaleString()} of ${analyticsRecordsState.totalRows.toLocaleString()}${estimated} records`;
+    document.getElementById("analyticsRecordsPageLabel").textContent = exact
+      ? `Page ${analyticsRecordsState.page} of ${analyticsRecordsState.totalPages}`
+      : `Page ${analyticsRecordsState.page}${analyticsRecordsState.page < analyticsRecordsState.totalPages ? "+" : ""}`;
+    document.getElementById("analyticsRecordsFirstBtn").disabled = analyticsRecordsState.page <= 1;
+    document.getElementById("analyticsRecordsPrevBtn").disabled = analyticsRecordsState.page <= 1;
+    document.getElementById("analyticsRecordsNextBtn").disabled = analyticsRecordsState.page >= analyticsRecordsState.totalPages;
+    document.getElementById("analyticsRecordsLastBtn").disabled = analyticsRecordsState.page >= analyticsRecordsState.totalPages;
+  }
+
+  function analyticsFrontendShouldHideField(key) {
+    const normalized = String(key || "").trim();
+    if (!normalized) return true;
+    if (/^(__record_id|id|pk|row_id|record_id)$/i.test(normalized)) return true;
+    if (/(^|_)(id)$/i.test(normalized) || (/id$/i.test(normalized) && !/(regNo|fileNo|computerNo|supplierNo|phone)$/i.test(normalized))) return true;
+    if (/(password|token|hash|secret|otp|session|remember|csrf)/i.test(normalized)) return true;
+    if (/(^|_)(submission_by|appn_status_by|created_by|updated_by|recorded_by|resolved_by|closed_by|delivered_by|received_by|assigned_to|assigned_to_user_id|owner|actor|assignee)$/i.test(normalized) || /(by|userid|user_id)$/i.test(normalized)) return true;
+    if (/(^|_)(is_)?deleted($|_)|delete|deleted_/i.test(normalized)) return true;
+    if (/^(timestamp|timeStamp)$/i.test(normalized)) return true;
+    return false;
+  }
+
+  function formatAnalyticsCellValue(value, key = "") {
+    if (value === null || value === undefined || value === "") return "N/A";
+    const lower = String(key || "").toLowerCase();
+    if (/(^|_)(role|assigned_role|userrole|deleted_by_role|restored_by_role)$/i.test(lower)) {
+      return formatRoleName(value);
+    }
+    if (/(date|_at$|timestamp|created|updated|completed|submitted|moved|returned|due)/i.test(key)) {
+      return formatDashboardDateTime(value);
+    }
+    let text = analyticsDetailHumanizeCode(value);
+    if (String(text).length > 90) return `${String(text).slice(0, 87)}...`;
+    return String(text);
+  }
+
+  async function loadAnalyticsRecordDetail(recordId) {
+    if (!recordId) return;
+    const params = new URLSearchParams({
+      action: "detail",
+      source: analyticsRecordsState.source,
+      label: analyticsRecordsState.label,
+      record_id: recordId
+    });
+    try {
+      const response = await fetch(`../backend/api/get_analytics_records.php?${params.toString()}`, {
+        credentials: "include",
+        cache: "no-store",
+        headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" }
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success || !data.record) {
+        throw new Error(data.message || "Unable to load record details.");
+      }
+      openAnalyticsDetailModal(data.record, data.title || analyticsRecordsState.title);
+    } catch (error) {
+      notifyDashboard?.("error", error.message || "Unable to load record details.", "Analytics");
+    }
+  }
+
+  function openAnalyticsDetailModal(record, title) {
+    let modal = document.getElementById("analyticsRecordDetailModal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "analyticsRecordDetailModal";
+      modal.className = "analytics-records-modal analytics-record-detail-modal";
+      modal.setAttribute("aria-hidden", "true");
+      modal.innerHTML = `
+        <div class="analytics-records-dialog analytics-detail-dialog" role="dialog" aria-modal="true">
+          <div class="analytics-records-header">
+            <div>
+              <span class="analytics-records-eyebrow">Record Detail</span>
+              <h3 id="analyticsRecordDetailTitle">Record Detail</h3>
+              <p>Complete database details grouped for review.</p>
+            </div>
+            <button type="button" class="analytics-records-close" id="analyticsRecordDetailCloseBtn" aria-label="Close record detail">&times;</button>
+          </div>
+          <div class="analytics-detail-tabs" id="analyticsRecordDetailTabs" role="tablist" aria-label="Record detail sections"></div>
+          <div class="analytics-detail-panels" id="analyticsRecordDetailGrid"></div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      document.getElementById("analyticsRecordDetailCloseBtn")?.addEventListener("click", () => {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+      });
+    }
+    document.getElementById("analyticsRecordDetailTitle").textContent = title || "Record Detail";
+    renderAnalyticsDetailTabs(record);
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+  }
+
+  function analyticsDetailShouldHideField(key, record = {}) {
+    const normalized = String(key || "").trim();
+    const lower = normalized.toLowerCase();
+    if (!normalized) return true;
+    if (lower.startsWith("_document_preview")) return true;
+    if (/^(id|__record_id|record_id|row_id|pk)$/i.test(normalized)) return true;
+    if (/^(userid|user_id)$/i.test(normalized)) return true;
+    if (record && Object.prototype.hasOwnProperty.call(record, `${normalized}_label`)) return true;
+    if (/(^|_)(id)$/i.test(normalized) || (/id$/i.test(normalized) && !/(regNo|fileNo|computerNo|supplierNo|phone)$/i.test(normalized))) return true;
+    if (/(password|token|hash|secret|otp|session|remember|csrf)/i.test(normalized)) return true;
+    if (/(^|_)(is_)?deleted($|_)|delete|deleted_/i.test(normalized)) return true;
+    if (lower.endsWith("_label")) return false;
+    if (/^(timestamp|timeStamp)$/i.test(normalized)) return true;
+    if (/(snapshot|metadata|json|raw|payload|file_path|relative_path|other)$/i.test(normalized)) return true;
+    if (
+      /(^|_)(submission_by|appn_status_by|created_by|updated_by|recorded_by|resolved_by|closed_by|delivered_by|received_by|assigned_to|assigned_to_user_id)$/i.test(normalized)
+      || /^(submissionby|appnstatusby|createdby|updatedby|recordedby|resolvedby|closedby|deliveredby|receivedby)$/i.test(normalized)
+    ) {
+      return true;
+    }
+    if (/(^|_)(by|user|owner|actor|assignee)$/i.test(normalized)) {
+      const value = String(record[key] ?? "").trim();
+      return /^[a-f0-9]{24,}$/i.test(value) || /^\d+$/.test(value);
+    }
+    return false;
+  }
+
+  function analyticsDetailDisplayLabel(key) {
+    return formatDashboardLabel(
+      String(key || "")
+        .replace(/_label$/i, "")
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+    );
+  }
+
+  function analyticsDetailHumanizeCode(value) {
+    const text = String(value ?? "").trim();
+    if (!text) return "N/A";
+    const normalized = text.toLowerCase();
+    const labels = {
+      in_shelf: "In Shelf",
+      out_shelf: "Out of Shelf",
+      out_of_shelf: "Out of Shelf",
+      in_process: "In Process",
+      not_submitted: "Not Submitted",
+      submitted_to_oc: "Submitted to OC",
+      due_soon: "Due Soon",
+      querried: "Queried",
+      queried: "Queried",
+      super_admin: "Super Admin",
+      data_entry: "Data Entry",
+      oc_pen: "OC Pension",
+      dep_oc: "Deputy OC"
+    };
+    if (labels[normalized]) return labels[normalized];
+    if (/^[a-z0-9]+([_-][a-z0-9]+)+$/i.test(text)) {
+      return formatDashboardLabel(text);
+    }
+    return text;
+  }
+
+  function analyticsDetailIsTruthy(value) {
+    const text = String(value ?? "").trim().toLowerCase();
+    return ["1", "yes", "true", "available", "uploaded"].includes(text);
+  }
+
+  function analyticsDetailDocumentUrl(record = {}) {
+    const docId = String(record._document_preview_id || "").trim();
+    if (!docId) return "";
+    const sourceUrl = `../backend/api/view_staff_document.php?document_id=${encodeURIComponent(docId)}`;
+    const label = String(record._document_preview_label || "Uploaded Document").trim();
+    return window.PensionsGoDocumentViewer?.buildViewerUrl
+      ? (window.PensionsGoDocumentViewer.buildViewerUrl(sourceUrl, {
+        label,
+        backUrl: window.location.href,
+        returnState: {
+          page: "dashboard",
+          analyticsSource: analyticsRecordsState.source,
+          analyticsLabel: analyticsRecordsState.label,
+          analyticsPage: analyticsRecordsState.page,
+          analyticsSearch: analyticsRecordsState.search
+        }
+      }) || sourceUrl)
+      : sourceUrl;
+  }
+
+  function analyticsDetailValueMarkup(key, value, record = {}) {
+    const lower = String(key || "").toLowerCase();
+    if (lower === "documents_uploaded") {
+      const hasDocs = analyticsDetailIsTruthy(value) && String(record._document_preview_id || "").trim() !== "";
+      if (!hasDocs) {
+        return '<span class="analytics-detail-badge muted">No documents</span>';
+      }
+      const url = analyticsDetailDocumentUrl(record);
+      const label = record._document_preview_label ? `View ${record._document_preview_label}` : "View Documents";
+      return `<a class="analytics-detail-link-badge" href="${escapeHtml(url)}">${escapeHtml(label)}</a>`;
+    }
+    if (/(^is_|_active$|active$|uploaded$|restored$|completed$)/i.test(key) && /^(0|1|true|false|yes|no)$/i.test(String(value ?? "").trim())) {
+      return `<span class="analytics-detail-badge ${analyticsDetailIsTruthy(value) ? "success" : "muted"}">${analyticsDetailIsTruthy(value) ? "Yes" : "No"}</span>`;
+    }
+    if (/(amount|salary|pension|gratuity|balance|paid|expected|total|cost|price)/i.test(key) && value !== null && value !== "" && !Number.isNaN(Number(value))) {
+      return escapeHtml(formatCurrencyUGX(value));
+    }
+    if (/(date|_at$|moved|returned|completed|due|created|updated)/i.test(key)) {
+      return escapeHtml(formatDashboardDateTime(value));
+    }
+    if (/(^|_)(role|userRole|assigned_role|actor_role|submitted_by_role|created_by_role|updated_by_role)$/i.test(key) || /role$/i.test(key)) {
+      return escapeHtml(formatRoleName(value));
+    }
+    return escapeHtml(analyticsDetailHumanizeCode(value));
+  }
+
+  function analyticsDetailDisplayEntries(record = {}) {
+    return Object.entries(record || {})
+      .filter(([key]) => !analyticsDetailShouldHideField(key, record))
+      .map(([key, value]) => [analyticsDetailDisplayLabel(key), analyticsDetailValueMarkup(key, value, record), key]);
+  }
+
+  function analyticsDetailGroups(record = {}) {
+    const groups = [
+      { key: "identity", label: "Identity", match: /(name|title|reg|computer|supplier|user|email|phone|tel|nin|tin|gender)/i, rows: [] },
+      { key: "status", label: "Status & Workflow", match: /(status|role|priority|assigned|submitted|reviewed|resolved|closed|restored|alert|severity|workflow|queue|active|documents)/i, rows: [] },
+      { key: "service", label: "Service & Finance", match: /(retirement|station|unit|office|pay|amount|salary|pension|gratuity|claim|ledger|period|quarter|financial|bank|account)/i, rows: [] },
+      { key: "dates", label: "Dates", match: /(date|time|_at$|created|updated|moved|returned|completed|due)/i, rows: [] },
+      { key: "notes", label: "Notes", match: /(note|reason|message|description|address|context|summary)/i, rows: [] }
+    ];
+    analyticsDetailDisplayEntries(record).forEach(([label, markup, key]) => {
+      const target = groups.find((group) => group.match.test(key)) || groups[groups.length - 1];
+      target.rows.push([label, markup]);
+    });
+    return groups.filter((group) => group.rows.length);
+  }
+
+  function renderAnalyticsDetailTabs(record = {}) {
+    const tabs = document.getElementById("analyticsRecordDetailTabs");
+    const panels = document.getElementById("analyticsRecordDetailGrid");
+    if (!tabs || !panels) return;
+    const groups = analyticsDetailGroups(record);
+    tabs.innerHTML = groups.map((group, index) => `
+      <button type="button" class="analytics-detail-tab ${index === 0 ? "is-active" : ""}" data-analytics-detail-tab="${escapeHtml(group.key)}" role="tab" aria-selected="${index === 0 ? "true" : "false"}">${escapeHtml(group.label)}</button>
+    `).join("");
+    panels.innerHTML = groups.map((group, index) => `
+      <section class="analytics-detail-panel ${index === 0 ? "is-active" : ""}" data-analytics-detail-panel="${escapeHtml(group.key)}" role="tabpanel">
+        <div class="analytics-detail-grid">
+          ${group.rows.map(([label, markup]) => `<div><span>${escapeHtml(label)}</span><strong>${markup}</strong></div>`).join("")}
+        </div>
+      </section>
+    `).join("");
+    tabs.querySelectorAll(".analytics-detail-tab").forEach((button) => {
+      button.addEventListener("click", () => {
+        const key = button.dataset.analyticsDetailTab || "";
+        tabs.querySelectorAll(".analytics-detail-tab").forEach((tab) => {
+          const active = tab.dataset.analyticsDetailTab === key;
+          tab.classList.toggle("is-active", active);
+          tab.setAttribute("aria-selected", active ? "true" : "false");
+        });
+        panels.querySelectorAll(".analytics-detail-panel").forEach((panel) => {
+          panel.classList.toggle("is-active", panel.dataset.analyticsDetailPanel === key);
+        });
+      });
+    });
+  }
+
+  async function ensureAnalyticsAvailableColumns() {
+    if (Object.keys(analyticsRecordsState.availableColumns || {}).length) {
+      return analyticsRecordsState.availableColumns;
+    }
+    if (analyticsRecordsState.columnsLoading) {
+      return analyticsRecordsState.columnsLoading;
+    }
+    const columnSource = analyticsRecordsState.source;
+    const columnLabel = analyticsRecordsState.label;
+    analyticsRecordsState.columnsLoading = (async () => {
+      const params = new URLSearchParams({
+        action: "columns",
+        source: columnSource,
+        label: columnLabel
+      });
+      const response = await fetch(`../backend/api/get_analytics_records.php?${params.toString()}`, {
+        credentials: "include",
+        cache: "no-store",
+        headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" }
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Unable to load output columns.");
+      }
+      if (columnSource !== analyticsRecordsState.source || columnLabel !== analyticsRecordsState.label) {
+        return analyticsRecordsState.availableColumns || {};
+      }
+      analyticsRecordsState.availableColumns = data.columns || analyticsRecordsState.columns || {};
+      return analyticsRecordsState.availableColumns;
+    })().finally(() => {
+      analyticsRecordsState.columnsLoading = null;
+    });
+    return analyticsRecordsState.columnsLoading;
+  }
+
+  async function openAnalyticsColumnModal(action) {
+    try {
+      await ensureAnalyticsAvailableColumns();
+    } catch (error) {
+      notifyDashboard?.("error", error.message || "Unable to load output columns.", "Analytics Export");
+      return;
+    }
+    const columns = Object.entries(analyticsRecordsState.availableColumns || analyticsRecordsState.columns || {});
+    if (!columns.length) return;
+    let modal = document.getElementById("analyticsColumnModal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "analyticsColumnModal";
+      modal.className = "analytics-records-modal analytics-column-modal";
+      modal.setAttribute("aria-hidden", "true");
+      modal.innerHTML = `
+        <div class="analytics-column-dialog" role="dialog" aria-modal="true">
+          <div class="analytics-records-header">
+            <div>
+              <span class="analytics-records-eyebrow">Customize Output</span>
+              <h3 id="analyticsColumnTitle">Choose Columns</h3>
+              <p>Select the columns to include in the print or export output.</p>
+            </div>
+            <button type="button" class="analytics-records-close" id="analyticsColumnCloseBtn" aria-label="Close column options">&times;</button>
+          </div>
+          <div class="analytics-column-list" id="analyticsColumnList"></div>
+          <div class="analytics-column-footer">
+            <button type="button" class="btn-action btn-secondary" id="analyticsColumnAllBtn">Select All</button>
+            <button type="button" class="btn-action btn-secondary" id="analyticsColumnDefaultBtn">Defaults</button>
+            <button type="button" class="btn-action btn-import" id="analyticsColumnApplyBtn">Continue</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      document.getElementById("analyticsColumnCloseBtn")?.addEventListener("click", closeAnalyticsColumnModal);
+      document.getElementById("analyticsColumnAllBtn")?.addEventListener("click", () => {
+        document.querySelectorAll("#analyticsColumnList input").forEach((input) => { input.checked = true; });
+      });
+      document.getElementById("analyticsColumnDefaultBtn")?.addEventListener("click", () => renderAnalyticsColumnChoices(false));
+      document.getElementById("analyticsColumnApplyBtn")?.addEventListener("click", runAnalyticsOutputAction);
+    }
+    analyticsRecordsState.pendingAction = action;
+    document.getElementById("analyticsColumnTitle").textContent = action === "print" ? "Choose Print Columns" : (action === "pdf" ? "Choose PDF Columns" : "Choose Export Columns");
+    renderAnalyticsColumnChoices(false);
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+  }
+
+  function renderAnalyticsColumnChoices(selectAll = false) {
+    const entries = Object.entries(analyticsRecordsState.availableColumns || analyticsRecordsState.columns || {});
+    document.getElementById("analyticsColumnList").innerHTML = entries.map(([key, label], index) => `
+      <label>
+        <input type="checkbox" value="${escapeHtml(key)}" ${selectAll || index < 6 ? "checked" : ""}>
+        <span>${escapeHtml(label)}</span>
+      </label>
+    `).join("");
+  }
+
+  function closeAnalyticsColumnModal() {
+    const modal = document.getElementById("analyticsColumnModal");
+    if (!modal) return;
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+  }
+
+  async function runAnalyticsOutputAction() {
+    const selected = Array.from(document.querySelectorAll("#analyticsColumnList input:checked")).map((input) => input.value);
+    if (!selected.length) {
+      notifyDashboard?.("error", "Select at least one column.", "Analytics Export");
+      return;
+    }
+    const action = analyticsRecordsState.pendingAction || "csv";
+    closeAnalyticsColumnModal();
+    const button = document.getElementById("analyticsColumnApplyBtn");
+    const originalLabel = button?.textContent || "Continue";
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Preparing...";
+    }
+    try {
+      if (action === "pdf") {
+        await openAnalyticsPdfViewer(selected);
+        return;
+      }
+      const payload = await fetchAnalyticsRowsForOutput(selected);
+      const outputRows = payload.rows || [];
+      const outputColumns = payload.columns || analyticsRecordsState.availableColumns || analyticsRecordsState.columns || {};
+      if (action === "print") {
+        openAnalyticsPrintPreview(selected, outputRows, outputColumns);
+      } else {
+        exportAnalyticsRows(selected, action, outputRows, outputColumns);
+      }
+    } catch (error) {
+      notifyDashboard?.("error", error.message || "Unable to prepare analytics output.", "Analytics Export");
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalLabel;
+      }
+    }
+  }
+
+  async function fetchAnalyticsRowsForOutput(columns = []) {
+    const response = await fetch("../backend/api/get_analytics_records.php", {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest"
+      },
+      body: JSON.stringify({
+        action: "rows",
+        source: analyticsRecordsState.source,
+        label: analyticsRecordsState.label,
+        search: analyticsRecordsState.search,
+        date_from: analyticsRecordsState.dateFrom,
+        date_to: analyticsRecordsState.dateTo,
+        columns,
+        export_limit: 2000
+      })
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || "Unable to prepare analytics output.");
+    }
+    return data;
+  }
+
+  function getSelectedAnalyticsRows(columns, sourceRows = analyticsRecordsState.rows, columnLabels = analyticsRecordsState.columns) {
+    return sourceRows.map((row) => {
+      const item = {};
+      columns.forEach((key) => {
+        item[columnLabels[key] || analyticsRecordsState.availableColumns[key] || analyticsRecordsState.columns[key] || key] = row[key] ?? "";
+      });
+      return item;
+    });
+  }
+
+  function exportAnalyticsRows(columns, format, sourceRows = analyticsRecordsState.rows, columnLabels = analyticsRecordsState.columns) {
+    const rows = getSelectedAnalyticsRows(columns, sourceRows, columnLabels);
+    const filename = `${analyticsRecordsState.title || "analytics-records"}-${new Date().toISOString().slice(0, 10)}`;
+    const headers = Object.keys(rows[0] || Object.fromEntries(columns.map((key) => [columnLabels[key] || analyticsRecordsState.availableColumns[key] || analyticsRecordsState.columns[key] || key, ""])));
+    const csv = [headers.join(",")]
+      .concat(rows.map((row) => headers.map((header) => `"${String(row[header] ?? "").replace(/"/g, '""')}"`).join(",")))
+      .join("\n");
+    downloadTextFile(`${filename}.csv`, csv, "text/csv");
+  }
+
+  function downloadTextFile(filename, content, type) {
+    const blob = new Blob([content], { type: `${type};charset=utf-8` });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename.replace(/[^\w.-]+/g, "_");
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function buildAnalyticsPrintDocument(columns, sourceRows, columnLabels) {
+    const rows = getSelectedAnalyticsRows(columns, sourceRows, columnLabels);
+    const headers = Object.keys(rows[0] || Object.fromEntries(columns.map((key) => [columnLabels[key] || key, ""])));
+    return window.PensionsGoExports?.buildPrintDocument
+      ? window.PensionsGoExports.buildPrintDocument({
+        title: analyticsRecordsState.title || "Analytics Records",
+        meta: `${new Date().toLocaleString()} | ${rows.length.toLocaleString()} prepared records`,
+        columns: headers,
+        rows
+      })
+      : `
+        <!doctype html><html><head><title>${escapeHtml(analyticsRecordsState.title)}</title></head>
+        <body><h1>${escapeHtml(analyticsRecordsState.title)}</h1><table><thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
+        <tbody>${rows.map((row) => `<tr>${headers.map((header) => `<td>${escapeHtml(row[header] ?? "")}</td>`).join("")}</tr>`).join("")}</tbody></table></body></html>
+      `;
+  }
+
+  function openAnalyticsPrintPreview(columns, sourceRows = analyticsRecordsState.rows, columnLabels = analyticsRecordsState.columns) {
+    const html = buildAnalyticsPrintDocument(columns, sourceRows, columnLabels);
+    const modal = ensureAnalyticsDocumentViewer();
+    hideAnalyticsPdfProgress();
+    document.getElementById("analyticsDocumentViewerTitle").textContent = "Print Preview";
+    const subtitle = document.getElementById("analyticsDocumentViewerSubtitle");
+    if (subtitle) {
+      subtitle.textContent = "Review print settings and document layout before printing.";
+      subtitle.hidden = false;
+    }
+    const frame = document.getElementById("analyticsDocumentViewerFrame");
+    frame.removeAttribute("src");
+    frame.srcdoc = html;
+    document.getElementById("analyticsDocumentPrintBtn").style.display = "";
+    document.getElementById("analyticsDocumentDownloadBtn").style.display = "none";
+    document.getElementById("analyticsDocumentPrintBtn").onclick = () => frame.contentWindow?.print();
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+  }
+
+  async function openAnalyticsPdfViewer(columns) {
+    const modal = ensureAnalyticsDocumentViewer();
+    const previousUrl = modal.dataset.objectUrl || "";
+    if (previousUrl) {
+      URL.revokeObjectURL(previousUrl);
+      modal.dataset.objectUrl = "";
+    }
+    document.getElementById("analyticsDocumentViewerTitle").textContent = "PDF Export Preview";
+    const subtitle = document.getElementById("analyticsDocumentViewerSubtitle");
+    if (subtitle) {
+      subtitle.textContent = "";
+      subtitle.hidden = true;
+    }
+    const frame = document.getElementById("analyticsDocumentViewerFrame");
+    frame.removeAttribute("srcdoc");
+    frame.removeAttribute("src");
+    setAnalyticsPdfProgress("preparing", "Preparing PDF request", "Collecting selected columns and active filters.", 14);
+    document.getElementById("analyticsDocumentPrintBtn").style.display = "none";
+    document.getElementById("analyticsDocumentDownloadBtn").style.display = "none";
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+
+    let url = "";
+    try {
+      setAnalyticsPdfProgress("working", "Generating PDF", "The server is rendering the selected records. Large exports can take a moment.", 34);
+      const startedAt = performance.now();
+      const response = await fetch("../backend/api/get_analytics_records.php", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          Accept: "application/pdf",
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        body: JSON.stringify({
+          action: "pdf",
+          source: analyticsRecordsState.source,
+          label: analyticsRecordsState.label,
+          search: analyticsRecordsState.search,
+          date_from: analyticsRecordsState.dateFrom,
+          date_to: analyticsRecordsState.dateTo,
+          columns,
+          export_limit: 2000
+        })
+      });
+      if (!response.ok) {
+        throw new Error("Unable to generate analytics PDF.");
+      }
+      setAnalyticsPdfProgress("working", "Receiving PDF", "PDF bytes are ready. Loading the secure in-app preview.", 68);
+      const blob = await response.blob();
+      if (!blob.size) {
+        throw new Error("The generated PDF was empty.");
+      }
+      url = URL.createObjectURL(blob);
+      setAnalyticsPdfProgress("rendering", "Rendering preview", "Chrome is opening the PDF inside the application viewer.", 84);
+      let renderSettled = false;
+      const finishRender = (message = "") => {
+        if (renderSettled) return;
+        renderSettled = true;
+        const seconds = Math.max(0.1, (performance.now() - startedAt) / 1000);
+        setAnalyticsPdfProgress("complete", "PDF ready", message || `Rendered ${formatFileSize(blob.size)} in ${seconds.toFixed(1)}s.`, 100);
+        window.setTimeout(() => hideAnalyticsPdfProgress(), 700);
+      };
+      frame.onload = () => {
+        finishRender();
+      };
+      frame.onerror = () => {
+        setAnalyticsPdfProgress("error", "Preview warning", "The PDF was generated, but the browser preview did not report a clean load. You can still download it.", 100);
+        window.setTimeout(() => hideAnalyticsPdfProgress(), 1800);
+      };
+      window.setTimeout(() => finishRender(`PDF prepared (${formatFileSize(blob.size)}). Preview is available in the viewer.`), 1400);
+    } catch (error) {
+      setAnalyticsPdfProgress("error", "PDF generation failed", error.message || "Unable to generate analytics PDF.", 100);
+      throw error;
+    }
+
+    frame.src = url;
+    const downloadBtn = document.getElementById("analyticsDocumentDownloadBtn");
+    downloadBtn.style.display = "";
+    downloadBtn.onclick = () => {
+      hideAnalyticsPdfProgress();
+      showAnalyticsPdfDownloadProgress("preparing", "Preparing Download", "Handing the generated PDF to your browser...", 35);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${(analyticsRecordsState.title || "analytics-export").replace(/[^\w.-]+/g, "_")}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => {
+        showAnalyticsPdfDownloadProgress("complete", "Download Started", "The PDF has been sent to your browser downloads.", 100);
+        window.setTimeout(hideAnalyticsPdfDownloadProgress, 1200);
+      }, 250);
+    };
+    document.getElementById("analyticsDocumentPrintBtn").style.display = "none";
+    modal.dataset.objectUrl = url;
+  }
+
+  function formatFileSize(bytes) {
+    const size = Number(bytes || 0);
+    if (!Number.isFinite(size) || size <= 0) return "0 KB";
+    if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    return `${Math.max(1, Math.round(size / 1024)).toLocaleString()} KB`;
+  }
+
+  function setAnalyticsPdfProgress(state, title, message, percent = 0) {
+    const overlay = document.getElementById("analyticsPdfProgress");
+    if (!overlay) return;
+    overlay.classList.remove("hidden", "state-preparing", "state-working", "state-rendering", "state-complete", "state-error");
+    overlay.classList.add(`state-${state || "working"}`);
+    document.getElementById("analyticsPdfProgressTitle").textContent = title || "Preparing PDF";
+    document.getElementById("analyticsPdfProgressMessage").textContent = message || "";
+    document.getElementById("analyticsPdfProgressBar").style.width = `${Math.max(0, Math.min(100, Number(percent || 0)))}%`;
+    const log = document.getElementById("analyticsPdfProgressLog");
+    if (log) {
+      const row = document.createElement("li");
+      row.textContent = `${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })} - ${title || "PDF update"}`;
+      log.prepend(row);
+      while (log.children.length > 5) log.lastElementChild?.remove();
+    }
+  }
+
+  function hideAnalyticsPdfProgress() {
+    document.getElementById("analyticsPdfProgress")?.classList.add("hidden");
+  }
+
+  function showAnalyticsPdfDownloadProgress(state, title, message, percent = 0) {
+    const modal = ensureAnalyticsPdfDownloadModal();
+    modal.classList.remove("hidden", "state-preparing", "state-complete", "state-error");
+    modal.classList.add(`state-${state || "preparing"}`);
+    modal.setAttribute("aria-hidden", "false");
+    document.getElementById("analyticsPdfDownloadTitle").textContent = title || "Preparing Download";
+    document.getElementById("analyticsPdfDownloadMessage").textContent = message || "";
+    document.getElementById("analyticsPdfDownloadBar").style.width = `${Math.max(0, Math.min(100, Number(percent || 0)))}%`;
+  }
+
+  function hideAnalyticsPdfDownloadProgress() {
+    const modal = document.getElementById("analyticsPdfDownloadModal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    modal.setAttribute("aria-hidden", "true");
+  }
+
+  function ensureAnalyticsPdfDownloadModal() {
+    let modal = document.getElementById("analyticsPdfDownloadModal");
+    if (modal) return modal;
+    modal = document.createElement("div");
+    modal.id = "analyticsPdfDownloadModal";
+    modal.className = "analytics-pdf-download-modal hidden";
+    modal.setAttribute("aria-hidden", "true");
+    modal.innerHTML = `
+      <div class="analytics-pdf-download-card" role="status" aria-live="polite">
+        <div class="analytics-pdf-download-icon" aria-hidden="true"></div>
+        <div class="analytics-pdf-download-copy">
+          <strong id="analyticsPdfDownloadTitle">Preparing Download</strong>
+          <span id="analyticsPdfDownloadMessage">Starting download...</span>
+          <div class="analytics-pdf-download-track"><span id="analyticsPdfDownloadBar"></span></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  function ensureAnalyticsDocumentViewer() {
+    let modal = document.getElementById("analyticsDocumentViewerModal");
+    if (modal) return modal;
+    modal = document.createElement("div");
+    modal.id = "analyticsDocumentViewerModal";
+    modal.className = "analytics-records-modal analytics-document-viewer-modal";
+    modal.setAttribute("aria-hidden", "true");
+    modal.innerHTML = `
+      <div class="analytics-document-viewer-dialog" role="dialog" aria-modal="true">
+        <div class="analytics-records-header">
+          <div>
+            <span class="analytics-records-eyebrow">Secure Document Viewer</span>
+            <h3 id="analyticsDocumentViewerTitle">Document Preview</h3>
+            <p id="analyticsDocumentViewerSubtitle">Review the generated document inside the application.</p>
+          </div>
+          <button type="button" class="analytics-records-close" id="analyticsDocumentViewerCloseBtn" aria-label="Close document viewer">&times;</button>
+        </div>
+        <div id="analyticsPdfProgress" class="analytics-pdf-progress hidden" role="status" aria-live="polite">
+          <div class="analytics-pdf-progress-panel">
+            <div class="analytics-pdf-spinner" aria-hidden="true"></div>
+            <div class="analytics-pdf-progress-copy">
+              <strong id="analyticsPdfProgressTitle">Preparing PDF</strong>
+              <span id="analyticsPdfProgressMessage">Starting renderer...</span>
+              <div class="analytics-pdf-progress-track"><span id="analyticsPdfProgressBar"></span></div>
+              <ol id="analyticsPdfProgressLog" class="analytics-pdf-progress-log"></ol>
+            </div>
+          </div>
+        </div>
+        <iframe id="analyticsDocumentViewerFrame" class="analytics-document-frame" referrerpolicy="same-origin"></iframe>
+        <div class="analytics-column-footer">
+          <button type="button" class="btn-action btn-secondary" id="analyticsDocumentPrintBtn">Print Preview</button>
+          <button type="button" class="btn-action btn-import" id="analyticsDocumentDownloadBtn">Download PDF</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    document.getElementById("analyticsDocumentViewerCloseBtn")?.addEventListener("click", () => {
+      const objectUrl = modal.dataset.objectUrl || "";
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      modal.dataset.objectUrl = "";
+      hideAnalyticsPdfProgress();
+      hideAnalyticsPdfDownloadProgress();
+      modal.classList.remove("open");
+      modal.setAttribute("aria-hidden", "true");
+    });
+    return modal;
+  }
+
+  function resolveAnalyticsRecordsTrigger(target) {
+    const row = target?.closest?.(".analytics-bar-row");
+    if (row) {
+      return {
+        source: row.dataset.analyticsSource || row.closest(".analytics-bar-list")?.id || "",
+        label: row.dataset.analyticsLabel || row.querySelector(".analytics-bar-label")?.textContent?.trim() || "Records",
+        value: row.dataset.analyticsValue || row.querySelector(".analytics-bar-value")?.textContent?.trim() || ""
+      };
+    }
+    const statCard = target?.closest?.(".analytics-stat-card");
+    if (statCard) {
+      return {
+        source: statCard.dataset.analyticsSource || statCard.parentElement?.id || "",
+        label: statCard.dataset.analyticsLabel || statCard.querySelector(".analytics-stat-label")?.textContent?.trim() || "Records",
+        value: statCard.dataset.analyticsValue || statCard.querySelector(".analytics-stat-value")?.textContent?.trim() || ""
+      };
+    }
+    const dataTrigger = target?.closest?.("[data-analytics-source][data-analytics-label]");
+    if (dataTrigger) {
+      return {
+        source: dataTrigger.dataset.analyticsSource || "",
+        label: dataTrigger.dataset.analyticsLabel || "Records",
+        value: dataTrigger.dataset.analyticsValue || dataTrigger.textContent?.trim() || ""
+      };
+    }
+    const card = target?.closest?.(".cards-container .card");
+    if (card) {
+      return {
+        source: card.dataset.analyticsSource || card.closest(".cards-container")?.id || "",
+        label: card.dataset.analyticsLabel || card.querySelector("h4")?.textContent?.trim() || "Records",
+        value: card.dataset.analyticsValue || card.querySelector("p")?.textContent?.trim() || ""
+      };
+    }
+    return null;
+  }
+
+  function openAnalyticsRecordsFromTrigger(target) {
+    const trigger = resolveAnalyticsRecordsTrigger(target);
+    if (!trigger || !trigger.source || trigger.value === "..." || trigger.value === "") return false;
+    const labelKey = String(trigger.label || "").toLowerCase();
+    const rawValue = String(trigger.value || "").trim();
+    const numericValue = Number(rawValue.replace(/[^0-9.-]+/g, ""));
+    if (Number.isFinite(numericValue) && numericValue === 0) {
+      notifyDashboard?.("info", "No records are available for this metric.", "Analytics Records");
+      return false;
+    }
+    if (/(ratio|rate|average|avg|percentage|percent|duration|turnaround|amount|balance|salary|cost|value)/i.test(labelKey) && !/(records|files|tasks|alerts|users|accounts|pensioners|claims|movements|certificates|applications|submissions|staff due)/i.test(labelKey)) {
+      notifyDashboard?.("info", "This dashboard metric is a calculated value and does not have a direct record list.", "Analytics Records");
+      return false;
+    }
+    openAnalyticsRecordsModal(trigger.source, trigger.label, trigger.value);
+    return true;
+  }
+
+  document.addEventListener("click", (event) => {
+    openAnalyticsRecordsFromTrigger(event.target);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (!["Enter", " "].includes(event.key)) return;
+    if (resolveAnalyticsRecordsTrigger(event.target)) {
+      event.preventDefault();
+      openAnalyticsRecordsFromTrigger(event.target);
+    }
+  });
 
   function renderAnalyticsBarList(container, items = [], options = {}) {
     if (!container) return;
@@ -940,11 +2030,15 @@ function initDashboardController() {
     container.innerHTML = rows.map((item) => {
       const value = Number(item.value || 0);
       const fillPercent = Math.max(4, Math.min(100, (value / maxValue) * 100));
+      const source = item.analyticsSource || options.analyticsSource || container.id || "";
+      const label = item.analyticsLabel || item.label || "Item";
+      const displayValue = valueFormatter(value, item);
+      const analyticsValue = item.analyticsValue ?? displayValue;
       return `
-        <div class="analytics-bar-row tone-${escapeHtml(item.tone || "info")}">
+        <div class="analytics-bar-row tone-${escapeHtml(item.tone || "info")}" role="button" tabindex="0" data-analytics-source="${escapeHtml(source)}" data-analytics-label="${escapeHtml(label)}" data-analytics-value="${escapeHtml(analyticsValue)}" aria-label="Open ${escapeHtml(label)} records">
           <div class="analytics-bar-topline">
             <span class="analytics-bar-label">${escapeHtml(item.label || "Item")}</span>
-            <span class="analytics-bar-value">${escapeHtml(valueFormatter(value, item))}</span>
+            <span class="analytics-bar-value">${escapeHtml(displayValue)}</span>
           </div>
           <div class="analytics-bar-track">
             <div class="analytics-bar-fill" style="--fill:${fillPercent.toFixed(2)}%;"></div>
@@ -963,13 +2057,19 @@ function initDashboardController() {
       return;
     }
 
-    container.innerHTML = rows.map((item) => `
-      <article class="analytics-stat-card tone-${escapeHtml(item.tone || "info")}">
+    container.innerHTML = rows.map((item) => {
+      const source = item.analyticsSource || options.analyticsSource || container.id || "";
+      const label = item.analyticsLabel || item.label || "Records";
+      const displayValue = item.value ?? "0";
+      const analyticsValue = item.analyticsValue ?? displayValue;
+      return `
+      <article class="analytics-stat-card tone-${escapeHtml(item.tone || "info")}" role="button" tabindex="0" data-analytics-source="${escapeHtml(source)}" data-analytics-label="${escapeHtml(label)}" data-analytics-value="${escapeHtml(analyticsValue)}" aria-label="Open ${escapeHtml(label)} records">
         <span class="analytics-stat-label">${escapeHtml(item.label)}</span>
-        <strong class="analytics-stat-value">${escapeHtml(item.value ?? "0")}</strong>
+        <strong class="analytics-stat-value">${escapeHtml(displayValue)}</strong>
         <span class="analytics-stat-helper">${escapeHtml(item.helper || "")}</span>
       </article>
-    `).join("");
+    `;
+    }).join("");
   }
 
   function renderAnalyticsNotes(container, items = [], options = {}) {
@@ -1120,9 +2220,10 @@ function initDashboardController() {
     }
 
     const roleMap = {
+      'super_admin': 'Super Administrator',
       'admin': 'Admin',
       'clerk': 'Clerk',
-      'oc_pen': 'OC-PEN',
+      'oc_pen': 'OC Pension',
       'dep_oc': 'Deputy OC-PEN',
       'deputy_oc': 'Deputy OC-PEN',
       'deputy_oc_pen': 'Deputy OC-PEN',
@@ -1144,6 +2245,7 @@ function initDashboardController() {
   function getRoleColor(role) {
     const roleKey = String(role || '').toLowerCase().trim();
     const colorMap = {
+      'super_admin': 'purple',
       'admin': 'purple',
       'clerk': 'blue',
       'oc_pen': 'teal',
@@ -1360,6 +2462,28 @@ function initDashboardController() {
     return `${hours.toFixed(1)}h`;
   }
 
+  function formatProcessDurationMinutes(value) {
+    const totalMinutes = Math.max(0, Math.round(Number(value || 0)));
+    if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return "0 minutes";
+    if (totalMinutes < 1440) {
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      const parts = [];
+      if (hours > 0) parts.push(`${hours} ${hours === 1 ? "hour" : "hours"}`);
+      if (minutes > 0 || parts.length === 0) parts.push(`${minutes} ${minutes === 1 ? "minute" : "minutes"}`);
+      return parts.join(" ");
+    }
+    const totalDays = Math.floor(totalMinutes / 1440);
+    const months = Math.floor(totalDays / 30);
+    const weeks = Math.floor((totalDays % 30) / 7);
+    const days = totalDays % 7;
+    const parts = [];
+    if (months > 0) parts.push(`${months} ${months === 1 ? "month" : "months"}`);
+    if (weeks > 0) parts.push(`${weeks} ${weeks === 1 ? "week" : "weeks"}`);
+    if (days > 0 || parts.length === 0) parts.push(`${days} ${days === 1 ? "day" : "days"}`);
+    return parts.join(" ");
+  }
+
   function getFilteredWorkflowItems() {
     const items = Array.isArray(workflowState.items) ? workflowState.items : [];
     if (!items.length) return [];
@@ -1370,6 +2494,9 @@ function initDashboardController() {
 
     return items.filter((item) => {
       const role = String(item.user_role || "").toLowerCase().trim();
+      if (role === "admin" || role === "super_admin") {
+        return false;
+      }
       const name = String(item.user_name || "").toLowerCase().trim();
       const roleLabel = String(item.user_role_label || "").toLowerCase().trim();
       const hasSearchMatch = !searchPhrase
@@ -1459,6 +2586,9 @@ function initDashboardController() {
   }
 
   function triggerCurrentTabDownload(url, filename = "") {
+    if (window.PensionsGoExports?.download) {
+      return window.PensionsGoExports.download(url, filename);
+    }
     const safeUrl = String(url || "").trim();
     if (!safeUrl) return false;
     const anchor = document.createElement("a");
@@ -1475,6 +2605,9 @@ function initDashboardController() {
   }
 
   function openPdfInSecureViewer(url, label = "Exported PDF") {
+    if (window.PensionsGoExports?.openPdf) {
+      return window.PensionsGoExports.openPdf(url, label);
+    }
     const safeUrl = String(url || "").trim();
     if (!safeUrl) return false;
     const viewerUrl = window.PensionsGoDocumentViewer?.buildViewerUrl
@@ -1492,6 +2625,9 @@ function initDashboardController() {
   }
 
   function deliverDashboardExport(url, options = {}) {
+    if (window.PensionsGoExports?.deliver) {
+      return window.PensionsGoExports.deliver(url, options);
+    }
     const safeUrl = String(url || "").trim();
     if (!safeUrl) return false;
     const normalizedFormat = String(options.format || "").trim().toLowerCase();
@@ -2284,13 +3420,16 @@ function initDashboardController() {
       return text;
     }
     try {
-      return parsed.toLocaleString([], {
+      const dateText = parsed.toLocaleDateString("en-GB", {
         year: "numeric",
         month: "short",
-        day: "2-digit",
+        day: "numeric"
+      }).replace(/ /g, "-");
+      const timeText = parsed.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit"
       });
+      return `${dateText} ${timeText}`;
     } catch {
       return text;
     }
@@ -2306,11 +3445,11 @@ function initDashboardController() {
       return text;
     }
     try {
-      return parsed.toLocaleDateString([], {
+      return parsed.toLocaleDateString("en-GB", {
         year: "numeric",
         month: "short",
-        day: "2-digit"
-      });
+        day: "numeric"
+      }).replace(/ /g, "-");
     } catch {
       return text;
     }
@@ -4451,18 +5590,21 @@ function initDashboardController() {
       renderAnalyticsBarList(lifeCertAnalyticsBars, [
         {
           label: "Submitted",
+          analyticsLabel: `Submitted (${selectedYear})`,
           value: Number(summary.submitted || 0),
           meta: `${toPercent(summary.submitted || 0, eligibleLifeCertCount || 1)} compliance for ${selectedYear}, based on eligible alive pensioner files.`,
           tone: "success"
         },
         {
           label: "Not Submitted",
+          analyticsLabel: `Not Submitted (${selectedYear})`,
           value: Number(summary.notSubmitted || 0),
           meta: `${pluralize(summary.notSubmitted || 0, "record")} still need annual confirmation.`,
           tone: "danger"
         },
         {
           label: "Exempt",
+          analyticsLabel: `Exempt (${selectedYear})`,
           value: Number(summary.exempt || 0),
           meta: `${pluralize(summary.exempt || 0, "record")} are excluded because of living-status or pay-type rules out of ${pluralize(lifeCertPortfolioCount, "tracked file")}.`,
           tone: "info"
@@ -4665,22 +5807,25 @@ function initDashboardController() {
       }
 
       const summary = data.summary || {};
+      const payrollAnalyticsPeriod = `${String(resolvedYear).padStart(4, "0")}-${String(resolvedMonth).padStart(2, "0")}`;
       payrollCards.innerHTML = "";
-      payrollCards.appendChild(createCard("On Payroll", Number(summary.onPayroll || 0), "", "", "", "", "green"));
-      payrollCards.appendChild(createCard("Not on Payroll", Number(summary.offPayroll || 0), "", "", "", "", "orange"));
-      payrollCards.appendChild(createCard("Total Beneficiaries", Number(summary.total || 0), "", "", "", "", "blue"));
+      payrollCards.appendChild(createCard("On Payroll", Number(summary.onPayroll || 0), "", "", "", "", "green", { analyticsLabel: `On Payroll (${payrollAnalyticsPeriod})` }));
+      payrollCards.appendChild(createCard("Not on Payroll", Number(summary.offPayroll || 0), "", "", "", "", "orange", { analyticsLabel: `Not on Payroll (${payrollAnalyticsPeriod})` }));
+      payrollCards.appendChild(createCard("Total Beneficiaries", Number(summary.total || 0), "", "", "", "", "blue", { analyticsLabel: `Total Beneficiaries (${payrollAnalyticsPeriod})` }));
       payrollCards.appendChild(createCard("Monthly Amount (Registry Match)", formatCurrencyUGX(summary.onPayrollAmount || 0), "", "", "", "", "purple"));
       payrollCards.appendChild(createCard("Monthly Amount (Payroll)", formatCurrencyUGX(summary.payrollUploadedAmount || 0), "", "", "", "", "teal"));
 
       renderAnalyticsBarList(payrollCoverageAnalytics, [
         {
           label: "On Payroll",
+          analyticsLabel: `On Payroll (${payrollAnalyticsPeriod})`,
           value: Number(summary.onPayroll || 0),
           meta: `${toPercent(summary.onPayroll || 0, summary.total || 1)} of reconciled beneficiaries are on payroll.`,
           tone: "success"
         },
         {
           label: "Not on Payroll",
+          analyticsLabel: `Not on Payroll (${payrollAnalyticsPeriod})`,
           value: Number(summary.offPayroll || 0),
           meta: `${pluralize(summary.offPayroll || 0, "beneficiary")} remain unmatched or inactive in the selected cycle.`,
           tone: "danger"
@@ -5380,6 +6525,11 @@ function initDashboardController() {
     workflowSummaryCards.appendChild(createCard("Completed (7d)", "...", "", "", "", "", "green"));
     workflowSummaryCards.appendChild(createCard("Avg Completion", "...", "", "", "", "", "teal"));
     workflowPerformanceBody.innerHTML = '<tr><td colspan="8">Loading metrics...</td></tr>';
+    setAnalyticsEmpty(workflowDelegationGrid, "Loading delegation insights...");
+    setAnalyticsEmpty(workflowProcessGrid, "Loading process duration insights...");
+    if (workflowProcessTrendBody) {
+      workflowProcessTrendBody.innerHTML = '<tr><td colspan="3">Loading process trends...</td></tr>';
+    }
     if (workflowAlertSummaryCards) {
       workflowAlertSummaryCards.innerHTML = "";
       workflowAlertSummaryCards.appendChild(createCard("Open Alerts", "...", "", "", "", "", "orange"));
@@ -5420,6 +6570,9 @@ function initDashboardController() {
         workflowPerformanceBody.innerHTML = `<tr><td colspan="8">${msg}</td></tr>`;
         setAnalyticsEmpty(workflowResponseAnalytics, msg);
         setAnalyticsEmpty(workflowInsightGrid, msg);
+        setAnalyticsEmpty(workflowDelegationGrid, msg);
+        setAnalyticsEmpty(workflowProcessGrid, msg);
+        if (workflowProcessTrendBody) workflowProcessTrendBody.innerHTML = `<tr><td colspan="3">${escapeHtml(msg)}</td></tr>`;
         return;
       }
 
@@ -5436,6 +6589,9 @@ function initDashboardController() {
       }
 
       const summary = data.summary || {};
+      const delegationSummary = data.delegation_summary || {};
+      const processSummary = data.process_summary || {};
+      const processTrends = Array.isArray(data.process_trends) ? data.process_trends : [];
       const verificationEscalatedCount = Number(staffDueSummary.verificationEscalated || 0);
       const verificationDueSoonCount = Number(staffDueSummary.verificationDueSoon || 0);
       const verificationEscalationWindowDays = Number(staffDueSummary.verificationEscalationWindowDays || 60);
@@ -5472,6 +6628,57 @@ function initDashboardController() {
         workflowPerformanceBody.innerHTML = '<tr><td colspan="8">No performance records found.</td></tr>';
         setAnalyticsEmpty(workflowResponseAnalytics, "No workflow response analytics available.");
         setAnalyticsEmpty(workflowInsightGrid, "No workflow insight metrics available.");
+        renderAnalyticsStatGrid(workflowDelegationGrid, [
+          {
+            label: "Delegation Requests",
+            value: Number(delegationSummary.requested_total || 0).toLocaleString(),
+            analyticsSource: "delegatedTaskAnalytics",
+            analyticsLabel: "Delegation Requests",
+            analyticsValue: Number(delegationSummary.requested_total || 0),
+            helper: "All task delegation requests recorded in the workflow.",
+            tone: "info"
+          },
+          {
+            label: "Pending Acceptance",
+            value: Number(delegationSummary.pending_total || 0).toLocaleString(),
+            analyticsSource: "delegatedTaskAnalytics",
+            analyticsLabel: "Pending Delegations",
+            analyticsValue: Number(delegationSummary.pending_total || 0),
+            helper: "Delegated tasks waiting for response.",
+            tone: Number(delegationSummary.pending_total || 0) > 0 ? "warning" : "success"
+          }
+        ]);
+        renderAnalyticsStatGrid(workflowProcessGrid, [
+          {
+            label: "Completed Processes",
+            value: Number(processSummary.completed_total || 0).toLocaleString(),
+            analyticsSource: "workflowProcessAnalytics",
+            analyticsLabel: "Completed Processes",
+            analyticsValue: Number(processSummary.completed_total || 0),
+            helper: "Applications that reached final Approval after Verification.",
+            tone: "success"
+          },
+          {
+            label: "Avg Processing",
+            value: formatProcessDurationMinutes(processSummary.avg_processing_minutes || 0),
+            analyticsSource: "workflowProcessAnalytics",
+            analyticsLabel: "Completed Processes",
+            analyticsValue: Number(processSummary.completed_total || 0),
+            helper: "Average duration from Verification to Approval.",
+            tone: "info"
+          }
+        ]);
+        if (workflowProcessTrendBody) {
+          workflowProcessTrendBody.innerHTML = processTrends.length
+            ? processTrends.map((row) => `
+              <tr class="analytics-stat-label" role="button" tabindex="0" data-analytics-source="workflowProcessAnalytics" data-analytics-label="Completed ${escapeHtml(row.period_date || "")}" data-analytics-value="${Number(row.completed_total || 0)}">
+                <td>${escapeHtml(formatDashboardDate(row.period_date || ""))}</td>
+                <td>${Number(row.completed_total || 0).toLocaleString()}</td>
+                <td>${escapeHtml(formatProcessDurationMinutes(row.avg_processing_minutes || 0))}</td>
+              </tr>
+            `).join("")
+            : '<tr><td colspan="3">No completed workflow trend records yet.</td></tr>';
+        }
         await renderWorkflowAlertAnalytics();
         return;
       }
@@ -5488,6 +6695,8 @@ function initDashboardController() {
           .slice(0, 6)
           .map((item) => ({
             label: item.user_name || "Unknown",
+            analyticsLabel: `Staff Performance: ${item.user_name || "Unknown"}`,
+            analyticsValue: Number(item.assigned_total || 0),
             value: Number(item.response_rate || 0),
             meta: `${formatRoleName(item.user_role || "", item.user_role_label || "")} | Open ${Number(item.active_open || 0)} | Overdue ${Number(item.overdue_open || 0)}`,
             tone: Number(item.overdue_open || 0) > 0 ? "warning" : "success"
@@ -5503,16 +6712,111 @@ function initDashboardController() {
       const completed7d = Number(summary.completed_7d || 0);
       const avgCompletion = Number(summary.avg_completion_hours || 0);
       const bestResponder = [...items].sort((a, b) => Number(b.response_rate || 0) - Number(a.response_rate || 0))[0];
+      renderAnalyticsStatGrid(workflowDelegationGrid, [
+        {
+          label: "Delegation Requests",
+          value: Number(delegationSummary.requested_total || 0).toLocaleString(),
+          analyticsSource: "delegatedTaskAnalytics",
+          analyticsLabel: "Delegation Requests",
+          analyticsValue: Number(delegationSummary.requested_total || 0),
+          helper: "All task delegation requests recorded in the workflow.",
+          tone: "info"
+        },
+        {
+          label: "Pending Acceptance",
+          value: Number(delegationSummary.pending_total || 0).toLocaleString(),
+          analyticsSource: "delegatedTaskAnalytics",
+          analyticsLabel: "Pending Delegations",
+          analyticsValue: Number(delegationSummary.pending_total || 0),
+          helper: "Delegated tasks waiting for the recipient to accept or decline.",
+          tone: Number(delegationSummary.pending_total || 0) > 0 ? "warning" : "success"
+        },
+        {
+          label: "Accepted Delegations",
+          value: Number(delegationSummary.accepted_total || 0).toLocaleString(),
+          analyticsSource: "delegatedTaskAnalytics",
+          analyticsLabel: "Accepted Delegations",
+          analyticsValue: Number(delegationSummary.accepted_total || 0),
+          helper: `Average acceptance time ${formatDurationHours(delegationSummary.avg_accept_hours || 0)}.`,
+          tone: "success"
+        },
+        {
+          label: "Declined Delegations",
+          value: Number(delegationSummary.declined_total || 0).toLocaleString(),
+          analyticsSource: "delegatedTaskAnalytics",
+          analyticsLabel: "Declined Delegations",
+          analyticsValue: Number(delegationSummary.declined_total || 0),
+          helper: "Delegation requests declined by proposed recipients.",
+          tone: Number(delegationSummary.declined_total || 0) > 0 ? "danger" : "info"
+        }
+      ]);
+
+      renderAnalyticsStatGrid(workflowProcessGrid, [
+        {
+          label: "Completed Processes",
+          value: Number(processSummary.completed_total || 0).toLocaleString(),
+          analyticsSource: "workflowProcessAnalytics",
+          analyticsLabel: "Completed Processes",
+          analyticsValue: Number(processSummary.completed_total || 0),
+          helper: "Applications that reached final Approval after Verification.",
+          tone: "success"
+        },
+        {
+          label: "Avg Processing",
+          value: formatProcessDurationMinutes(processSummary.avg_processing_minutes || 0),
+          analyticsSource: "workflowProcessAnalytics",
+          analyticsLabel: "Completed Processes",
+          analyticsValue: Number(processSummary.completed_total || 0),
+          helper: "Average duration from Verification to Approval.",
+          tone: Number(processSummary.avg_processing_minutes || 0) > 86400 ? "warning" : "info"
+        },
+        {
+          label: "Fastest Process",
+          value: formatProcessDurationMinutes(processSummary.fastest_minutes || 0),
+          analyticsSource: "workflowProcessAnalytics",
+          analyticsLabel: "Completed Processes",
+          analyticsValue: Number(processSummary.completed_total || 0),
+          helper: "Shortest Verification-to-Approval process.",
+          tone: "success"
+        },
+        {
+          label: "Slowest Process",
+          value: formatProcessDurationMinutes(processSummary.slowest_minutes || 0),
+          analyticsSource: "workflowProcessAnalytics",
+          analyticsLabel: "Completed Processes",
+          analyticsValue: Number(processSummary.completed_total || 0),
+          helper: "Longest Verification-to-Approval process.",
+          tone: Number(processSummary.slowest_minutes || 0) > 172800 ? "danger" : "warning"
+        }
+      ]);
+
+      if (workflowProcessTrendBody) {
+        workflowProcessTrendBody.innerHTML = processTrends.length
+          ? processTrends.map((row) => `
+            <tr class="analytics-stat-label" role="button" tabindex="0" data-analytics-source="workflowProcessAnalytics" data-analytics-label="Completed ${escapeHtml(row.period_date || "")}" data-analytics-value="${Number(row.completed_total || 0)}">
+              <td>${escapeHtml(formatDashboardDate(row.period_date || ""))}</td>
+              <td>${Number(row.completed_total || 0).toLocaleString()}</td>
+              <td>${escapeHtml(formatProcessDurationMinutes(row.avg_processing_minutes || 0))}</td>
+            </tr>
+          `).join("")
+          : '<tr><td colspan="3">No completed workflow trend records yet.</td></tr>';
+      }
       renderAnalyticsStatGrid(workflowInsightGrid, [
         {
           label: "Overdue Risk",
           value: toPercent(overdueOpen, totalOpen || 1),
+          analyticsSource: "workflowResponseAnalytics",
+          analyticsLabel: "Overdue Tasks",
+          analyticsValue: overdueOpen,
           helper: `${pluralize(overdueOpen, "task")} overdue out of ${pluralize(totalOpen, "open task")}.`,
           tone: overdueOpen > 0 ? "danger" : "success"
         },
         {
           label: "7-Day Throughput",
           value: pluralize(completed7d, "completion"),
+          analyticsSource: "workflowResponseAnalytics",
+          analyticsLabel: "Completed (7d)",
+          analyticsValue: completed7d,
           helper: `Completed within the last seven days across the full workflow chain.`,
           tone: "success"
         },
@@ -5525,12 +6829,18 @@ function initDashboardController() {
         {
           label: "Pre-Workflow Escalations",
           value: pluralize(verificationEscalatedCount, "submission"),
+          analyticsSource: "staffDuePipelineAnalytics",
+          analyticsLabel: "Verification Escalations",
+          analyticsValue: verificationEscalatedCount,
           helper: `${pluralize(verificationDueSoonCount, "submission")} more are approaching the ${verificationEscalationWindowDays}-day verification-start deadline before entering live workflow.`,
           tone: verificationEscalatedCount > 0 ? "danger" : (verificationDueSoonCount > 0 ? "warning" : "success")
         },
         {
           label: "Best Response Lead",
           value: bestResponder ? `${bestResponder.user_name} (${Number(bestResponder.response_rate || 0).toFixed(1)}%)` : "N/A",
+          analyticsSource: "workflowResponseAnalytics",
+          analyticsLabel: bestResponder ? `Staff Performance: ${bestResponder.user_name}` : "Best Response Lead",
+          analyticsValue: bestResponder ? Number(bestResponder.assigned_total || 0) : 0,
           helper: `Current top response-rate performer from live workflow monitoring.`,
           tone: "info"
         }
@@ -5557,6 +6867,9 @@ function initDashboardController() {
       }
       setAnalyticsEmpty(workflowResponseAnalytics, "Unable to load workflow response analytics.");
       setAnalyticsEmpty(workflowInsightGrid, "Unable to load workflow insight metrics.");
+      setAnalyticsEmpty(workflowDelegationGrid, "Unable to load delegation insights.");
+      setAnalyticsEmpty(workflowProcessGrid, "Unable to load process duration insights.");
+      if (workflowProcessTrendBody) workflowProcessTrendBody.innerHTML = '<tr><td colspan="3">Unable to load process trends.</td></tr>';
       console.error('Error loading workflow performance:', error);
     }
   }
@@ -6805,8 +8118,10 @@ function initDashboardController() {
       const displayValue = typeof valueFormatter === "function"
         ? valueFormatter(value, item)
         : (item.displayValue || Number(value || 0).toLocaleString());
+      const source = item.analyticsSource || "summaryReportAnalytics";
+      const label = item.analyticsLabel || item.label || "Item";
       return `
-        <div class="analytics-bar-row tone-${escapeHtml(item.tone || "info")}">
+        <div class="analytics-bar-row tone-${escapeHtml(item.tone || "info")}" role="button" tabindex="0" data-analytics-source="${escapeHtml(source)}" data-analytics-label="${escapeHtml(label)}" data-analytics-value="${escapeHtml(displayValue)}" aria-label="Open ${escapeHtml(label)} records">
           <div class="analytics-bar-topline">
             <span class="analytics-bar-label">${escapeHtml(item.label || "Item")}</span>
             <span class="analytics-bar-value">${escapeHtml(displayValue)}</span>
@@ -7469,6 +8784,15 @@ function initDashboardController() {
       return;
     }
 
+    const html = createSummaryReportHtml(summaryReportState.model, { documentMode: true });
+    if (window.PensionsGoExports?.openPrintPreview) {
+      window.PensionsGoExports.openPrintPreview({
+        title: "Summary Report Print Preview",
+        html
+      });
+      return;
+    }
+
     const printFrame = document.createElement("iframe");
     printFrame.setAttribute("aria-hidden", "true");
     printFrame.style.position = "fixed";
@@ -7493,7 +8817,7 @@ function initDashboardController() {
     }
 
     frameWindow.document.open();
-    frameWindow.document.write(createSummaryReportHtml(summaryReportState.model, { documentMode: true }));
+    frameWindow.document.write(html);
     frameWindow.document.close();
     frameWindow.onafterprint = cleanup;
     window.setTimeout(() => {
@@ -8418,7 +9742,7 @@ function initDashboardController() {
       const analyticsRefreshMs = Math.max(60000, Number(analyticsSettings.refreshIntervalMs || 0));
       const role = getCurrentRole();
 
-      if (role === 'admin' || role === 'oc_pen') {
+      if (role === 'admin' || role === 'super_admin' || role === 'oc_pen') {
         setInterval(() => {
           const workflowSection = document.getElementById('workflowSection');
           if (workflowSection && workflowSection.classList.contains('active')) {

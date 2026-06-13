@@ -13,6 +13,55 @@ $isAuthenticated = isset($_SESSION['userId']);
 
 ensureAppnStatusTrackingColumns($conn);
 
+function formatTrackingDuration(?string $start, ?string $end): string
+{
+    if (!$start || !$end) {
+        return 'Not yet';
+    }
+    $startTs = strtotime($start);
+    $endTs = strtotime($end);
+    if ($startTs === false || $endTs === false || $endTs < $startTs) {
+        return 'Not yet';
+    }
+    $secondsTotal = max(0, $endTs - $startTs);
+    if ($secondsTotal < 86400) {
+        $hours = intdiv($secondsTotal, 3600);
+        $minutes = intdiv($secondsTotal % 3600, 60);
+        $parts = [];
+        if ($hours > 0) {
+            $parts[] = $hours . ' ' . ($hours === 1 ? 'hour' : 'hours');
+        }
+        if ($minutes > 0 || $parts === []) {
+            $parts[] = $minutes . ' ' . ($minutes === 1 ? 'minute' : 'minutes');
+        }
+        return implode(' ', $parts);
+    }
+    $daysTotal = (int)floor($secondsTotal / 86400);
+    $months = intdiv($daysTotal, 30);
+    $weeks = intdiv($daysTotal % 30, 7);
+    $days = $daysTotal % 7;
+    $parts = [];
+    if ($months > 0) {
+        $parts[] = $months . ' ' . ($months === 1 ? 'month' : 'months');
+    }
+    if ($weeks > 0) {
+        $parts[] = $weeks . ' ' . ($weeks === 1 ? 'week' : 'weeks');
+    }
+    if ($days > 0 || $parts === []) {
+        $parts[] = $days . ' ' . ($days === 1 ? 'day' : 'days');
+    }
+    return implode(' ', $parts);
+}
+
+function formatTrackingStepDuration(?string $start, ?string $end, ?string $status): string
+{
+    $statusText = strtolower(trim((string)$status));
+    if (!$end && $start && $statusText !== '' && !in_array($statusText, ['pending', 'not started', 'not_started'], true)) {
+        $end = date('Y-m-d H:i:s');
+    }
+    return formatTrackingDuration($start, $end);
+}
+
 $query = trim($_GET['q'] ?? '');
 if ($query === '') {
     echo json_encode(['success' => false, 'message' => 'Search term is required']);
@@ -41,6 +90,7 @@ $result = $stmt->get_result();
 $records = [];
 
 while ($row = $result->fetch_assoc()) {
+    $verificationAt = $row['verification_at'] ?? null;
     $records[] = [
         'id' => $row['id'],
         'regNo' => $row['regNo'],
@@ -54,49 +104,57 @@ while ($row = $result->fetch_assoc()) {
                 'label' => 'Verification',
                 'status' => $row['verification'],
                 'time' => $row['verification_at'],
-                'comment' => $row['verification_comment']
+                'comment' => $row['verification_comment'],
+                'cumulativeDuration' => formatTrackingStepDuration($verificationAt, $row['verification_at'] ?? null, $row['verification'] ?? null)
             ],
             [
                 'label' => 'Write Up',
                 'status' => $row['writeUp'],
                 'time' => $row['writeUp_at'],
-                'comment' => $row['writeUp_comment']
+                'comment' => $row['writeUp_comment'],
+                'cumulativeDuration' => formatTrackingStepDuration($verificationAt, $row['writeUp_at'] ?? null, $row['writeUp'] ?? null)
             ],
             [
                 'label' => 'File Creation',
                 'status' => $row['fileCreation'],
                 'time' => $row['fileCreation_at'],
-                'comment' => $row['fileCreation_comment']
+                'comment' => $row['fileCreation_comment'],
+                'cumulativeDuration' => formatTrackingStepDuration($verificationAt, $row['fileCreation_at'] ?? null, $row['fileCreation'] ?? null)
             ],
             [
                 'label' => 'Data Allocation',
                 'status' => $row['entrantAllocation'],
                 'time' => $row['entrantAllocation_at'],
-                'comment' => $row['entrantAllocation_comment']
+                'comment' => $row['entrantAllocation_comment'],
+                'cumulativeDuration' => formatTrackingStepDuration($verificationAt, $row['entrantAllocation_at'] ?? null, $row['entrantAllocation'] ?? null)
             ],
             [
                 'label' => 'Data Capture',
                 'status' => $row['dataCapture'],
                 'time' => $row['dataCapture_at'],
-                'comment' => $row['dataCapture_comment']
+                'comment' => $row['dataCapture_comment'],
+                'cumulativeDuration' => formatTrackingStepDuration($verificationAt, $row['dataCapture_at'] ?? null, $row['dataCapture'] ?? null)
             ],
             [
                 'label' => 'Assessment',
                 'status' => $row['assessment'],
                 'time' => $row['assessment_at'],
-                'comment' => $row['assessment_comment']
+                'comment' => $row['assessment_comment'],
+                'cumulativeDuration' => formatTrackingStepDuration($verificationAt, $row['assessment_at'] ?? null, $row['assessment'] ?? null)
             ],
             [
                 'label' => 'Audit',
                 'status' => $row['audit'],
                 'time' => $row['audit_at'],
-                'comment' => $row['audit_comment']
+                'comment' => $row['audit_comment'],
+                'cumulativeDuration' => formatTrackingStepDuration($verificationAt, $row['audit_at'] ?? null, $row['audit'] ?? null)
             ],
             [
                 'label' => 'Approval',
                 'status' => $row['approval'],
                 'time' => $row['approval_at'],
-                'comment' => $row['approval_comment']
+                'comment' => $row['approval_comment'],
+                'cumulativeDuration' => formatTrackingStepDuration($verificationAt, $row['approval_at'] ?? null, $row['approval'] ?? null)
             ]
         ]
     ];

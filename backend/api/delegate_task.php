@@ -85,7 +85,7 @@ if ($assignee !== '') {
     }
 }
 
-if ($normalizedCurrentRole !== 'admin') {
+if (!in_array($normalizedCurrentRole, ['super_admin', 'admin'], true)) {
     $canDelegate = false;
     if (!empty($taskAssignedTo) && $taskAssignedTo === $_SESSION['userId']) {
         $canDelegate = true;
@@ -115,7 +115,7 @@ if ($assignee !== '') {
 }
 
 // Enforce delegation rules
-if (!isOcPenEquivalentRole($normalizedCurrentRole) && $normalizedCurrentRole !== 'admin') {
+if (!isOcPenEquivalentRole($normalizedCurrentRole) && !in_array($normalizedCurrentRole, ['super_admin', 'admin'], true)) {
     if ($taskAssignedRole !== '' && !rolesAreWorkflowEquivalent($taskAssignedRole, $currentRole)) {
         echo json_encode(['success' => false, 'message' => 'You cannot delegate tasks outside your role.']);
         exit;
@@ -149,6 +149,20 @@ $taskMetadata['last_assigned_at'] = date('Y-m-d H:i:s');
 if ($assignee !== '') {
     $taskMetadata['assignment_history'][] = $assignee;
     $taskMetadata['assignment_history'] = array_values(array_unique(array_filter($taskMetadata['assignment_history'])));
+    $taskMetadata['pending_delegation'] = [
+        'to_user_id' => $assignee,
+        'to_user_name' => $assigneeName,
+        'to_user_role' => normalizeRoleKey((string)$assigneeRole),
+        'from_user_id' => $_SESSION['userId'] ?? '',
+        'from_user_name' => $_SESSION['userName'] ?? '',
+        'from_user_role' => normalizeRoleKey((string)($_SESSION['userRole'] ?? '')),
+        'previous_assigned_to' => (string)($taskAssignedTo ?? ''),
+        'previous_assigned_role' => normalizeRoleKey((string)($taskAssignedRole ?? '')),
+        'previous_status' => $taskStatus,
+        'note' => $note,
+        'priority' => $priority,
+        'delegated_at' => date('Y-m-d H:i:s')
+    ];
 }
 $metadataJson = json_encode($taskMetadata, JSON_UNESCAPED_SLASHES);
 
@@ -156,7 +170,7 @@ $stmt = $conn->prepare("
     UPDATE tb_tasks
     SET assigned_to = ?,
         assigned_role = ?,
-        status = 'assigned',
+        status = ?,
         priority = ?,
         due_at = ?,
         metadata = ?,
@@ -169,11 +183,12 @@ if (!$stmt) {
     exit;
 }
 
-$assignedTo = $assignee !== '' ? $assignee : null;
-$assignedRole = $assigneeRole !== '' ? $assigneeRole : null;
+$assignedTo = $taskAssignedTo !== '' ? $taskAssignedTo : null;
+$assignedRole = $taskAssignedRole !== '' ? $taskAssignedRole : ($assigneeRole !== '' ? $assigneeRole : null);
+$nextStatus = $taskStatus !== '' ? $taskStatus : 'assigned';
 $dueAtValue = calculateTaskDueDateTime($conn);
 
-$stmt->bind_param("sssssi", $assignedTo, $assignedRole, $priority, $dueAtValue, $metadataJson, $taskId);
+$stmt->bind_param("ssssssi", $assignedTo, $assignedRole, $nextStatus, $priority, $dueAtValue, $metadataJson, $taskId);
 $stmt->execute();
 $stmt->close();
 
@@ -196,9 +211,9 @@ if (function_exists('recordWorkflowLog')) {
         'task_id' => $taskId,
         'staffdue_id' => (int)($taskMetadata['staffdue_id'] ?? 0),
         'regNo' => (string)($taskMetadata['reg_no'] ?? $taskMetadata['regNo'] ?? $taskRow['related_reg_no'] ?? ''),
-        'action' => 'task_delegated',
+        'action' => 'task_delegation_requested',
         'from_status' => (string)($taskRow['status'] ?? ''),
-        'to_status' => 'assigned',
+        'to_status' => $nextStatus,
         'actor_id' => $_SESSION['userId'] ?? '',
         'actor_name' => $_SESSION['userName'] ?? 'System User',
         'actor_role' => normalizeRoleKey($_SESSION['userRole'] ?? ''),
@@ -249,7 +264,8 @@ if ($note !== '') {
     }
 }
 
-if (($taskRow['task_type'] ?? '') === 'feedback_followup' && $assignee !== '') {
+$applyAcceptedAssignment = false;
+if ($applyAcceptedAssignment && ($taskRow['task_type'] ?? '') === 'feedback_followup' && $assignee !== '') {
     $submissionId = (int)($taskMetadata['submission_id'] ?? 0);
     $allowFeedbackAssignment = getAppSettingBool($conn, 'feedback_allow_assignment', true);
     if ($submissionId > 0 && $allowFeedbackAssignment) {
@@ -357,6 +373,6 @@ if (($taskRow['task_type'] ?? '') === 'feedback_followup' && $assignee !== '') {
     }
 }
 
-echo json_encode(['success' => true, 'message' => 'Task delegated.']);
+echo json_encode(['success' => true, 'message' => 'Delegation request sent. The task will transfer after the recipient accepts it.']);
 $conn->close();
 ?>

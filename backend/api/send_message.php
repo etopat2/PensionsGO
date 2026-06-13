@@ -329,7 +329,7 @@ try {
 
     // Broadcast permissions validation
     if ($isBroadcast) {
-        if ($userRole !== 'admin') {
+        if (!sessionRoleIn($conn, ['admin'])) {
             throw new Exception("Only administrators can send broadcast messages");
         }
         

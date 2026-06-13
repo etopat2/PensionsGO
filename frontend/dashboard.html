@@ -16,17 +16,17 @@
   <meta http-equiv="Expires" content="0">
 
   <!-- ================== STYLES ================== -->
-  <link rel="stylesheet" href="css/styles.css?v=20260602b" />
+  <link rel="stylesheet" href="css/styles.css?v=20260612a" />
   <link rel="stylesheet" href="css/overlay.css?v=20260504a" />
   <link rel="stylesheet" href="css/auth.css?v=20260504a" />
   <link rel="stylesheet" href="css/menu.css?v=20260504d" />
-  <link rel="stylesheet" href="css/dashboard.css?v=20260602a" />
+  <link rel="stylesheet" href="css/dashboard.css?v=20260613a" />
   <link rel="stylesheet" href="css/broadcast_popup.css?v=20260504a" />
 
   <!-- ================== SCRIPTS ================== -->
   <!-- main.js handles header/footer loading -->
   <script src="js/auth_bootstrap.js?v=20260606b"></script>
-  <script type="module" src="js/main.js?v=20260609b"></script>
+  <script type="module" src="js/main.js?v=20260612a"></script>
   <script defer src="js/modules/filterable_select.js?v=20260429a"></script>
   <script defer src="js/modules/retirement-types.js"></script>
   <script defer>
@@ -35,7 +35,7 @@
         if (document.getElementById('dashboardControllerScript')) return;
         var script = document.createElement('script');
         script.id = 'dashboardControllerScript';
-        script.src = 'js/dashboard.js?v=20260608f';
+        script.src = 'js/dashboard.js?v=20260613c';
         script.defer = true;
         document.head.appendChild(script);
       };
@@ -618,6 +618,36 @@
                 <p>Backlog, overdue, and throughput indicators for operational control.</p>
               </div>
               <div class="analytics-stat-grid" id="workflowInsightGrid"></div>
+            </article>
+          </div>
+          <div class="section-analytics-grid workflow-extended-analytics">
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Delegated Tasks</h3>
+                <p>Delegation requests, acceptance, decline, and pending handoffs.</p>
+              </div>
+              <div class="analytics-stat-grid" id="workflowDelegationGrid"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Processing Duration</h3>
+                <p>Verification-to-Approval process timing and recent approval trends.</p>
+              </div>
+              <div class="analytics-stat-grid" id="workflowProcessGrid"></div>
+              <div class="workflow-table-wrap compact">
+                <table class="workflow-table workflow-process-trend-table">
+                  <thead>
+                    <tr>
+                      <th>Period</th>
+                      <th>Completed</th>
+                      <th>Avg Duration</th>
+                    </tr>
+                  </thead>
+                  <tbody id="workflowProcessTrendBody">
+                    <tr><td colspan="3">Loading process trends...</td></tr>
+                  </tbody>
+                </table>
+              </div>
             </article>
           </div>
           <div class="workflow-filter-bar">
@@ -1913,6 +1943,3 @@
   <!-- Footer will be dynamically inserted here by main.js -->
 </body>
 </html>
-
-
-

@@ -13,7 +13,7 @@ if (!isset($_SESSION['userId'])) {
 }
 
 $role = $_SESSION['userRole'] ?? '';
-$allowedRoles = ['admin', 'clerk', 'data_entry'];
+$allowedRoles = ['super_admin', 'admin', 'clerk', 'data_entry'];
 if (!in_array($role, $allowedRoles, true)) {
     echo json_encode(['success' => false, 'message' => 'Access denied']);
     exit;

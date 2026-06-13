@@ -232,7 +232,7 @@ echo json_encode([
         'notSubmitted' => (int)($summaryRow['not_submitted_count'] ?? 0),
         'exempt' => (int)($summaryRow['exempt_count'] ?? 0)
     ],
-    'canMarkSubmission' => in_array($role, ['admin', 'clerk', 'data_entry', 'oc_pen'], true),
+    'canMarkSubmission' => roleHasAdminAccess($conn, $role) || in_array($role, ['clerk', 'data_entry', 'oc_pen'], true),
     'page' => $page,
     'limit' => $limit,
     'totalPages' => $totalPages,

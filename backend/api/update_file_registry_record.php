@@ -15,7 +15,7 @@ $userId = (string)($_SESSION['userId'] ?? '');
 $sessionRole = normalizeRoleKey((string)($_SESSION['userRole'] ?? ''));
 $effectiveRole = $sessionRole !== '' ? getEffectiveRoleKey($conn, $sessionRole) : '';
 $role = $sessionRole;
-$canEditRegNo = $effectiveRole === 'admin' || isOcPenEquivalentRole($effectiveRole);
+$canEditRegNo = roleHasAdminAccess($conn, $sessionRole) || isOcPenEquivalentRole($effectiveRole);
 if (!currentUserHasPermission($conn, 'registry.edit')) {
     echo json_encode(['success' => false, 'message' => 'Access denied']);
     exit;

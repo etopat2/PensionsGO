@@ -12,7 +12,7 @@ if (!isset($_SESSION['userId'], $_SESSION['userRole'])) {
 }
 
 $role = strtolower((string)($_SESSION['userRole'] ?? ''));
-if ($role !== 'admin' && !(function_exists('isOcPenEquivalentRole') && isOcPenEquivalentRole($role))) {
+if (!roleHasAdminAccess($conn, $role) && !(function_exists('isOcPenEquivalentRole') && isOcPenEquivalentRole($role))) {
     echo json_encode(['success' => false, 'message' => 'Access denied']);
     exit;
 }

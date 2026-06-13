@@ -24,7 +24,7 @@ const PICKER_EMOJIS = ['\u{1F600}', '\u{1F602}', '\u{1F60A}', '\u{1F60D}', '\u{1
 const REACTION_PICKER_EMOJIS = ['\u{1F44D}', '\u{1F44E}', '\u{2764}\u{FE0F}', '\u{1F60D}', '\u{1F602}', '\u{1F62E}', '\u{1F622}', '\u{1F621}', '\u{1F64F}', '\u{1F44F}', '\u{2705}', '\u{1F389}', '\u{1F525}', '\u{1F4AF}', '\u{1F4A1}', '\u{1F4CC}', '\u{1F680}', '\u{23F3}', '\u{26A0}\u{FE0F}', '\u{1F44B}', '\u{1F91D}', '\u{1F4AA}', '\u{1F914}', '\u{1F642}'];
 const INCOMING_RING_URL = new URL('audio/notification.mp3', APP_ROOT).href;
 const TYPING_IDLE_TIMEOUT_MS = 5000;
-const LIVE_CHAT_ASSET_VERSION = '20260609b';
+const LIVE_CHAT_ASSET_VERSION = '20260609d';
 const LIVE_CHAT_CALL_API_ACTIONS = Object.freeze({
   START: 'start',
   UPDATE: 'update',
@@ -281,6 +281,7 @@ class LiveChatApp {
     this.chatDateBadgeTimer = null;
     this.lastChatDateLabel = '';
     this.drafts = this.loadDrafts();
+    this.loadStoredMessageCache();
     this.timers = { presence: null, messages: null, receipts: null, calls: null, signals: null };
   }
 
@@ -724,6 +725,42 @@ class LiveChatApp {
     return thread ? `${thread.type}:${thread.id}` : '';
   }
 
+  messageCacheStorageKey() {
+    return `pensionsgoLiveChatMessageCache:${this.currentUserId || 'guest'}`;
+  }
+
+  loadStoredMessageCache() {
+    try {
+      const raw = sessionStorage.getItem(this.messageCacheStorageKey());
+      const data = raw ? JSON.parse(raw) : {};
+      if (!data || typeof data !== 'object') return;
+      Object.entries(data).forEach(([key, messages]) => {
+        if (Array.isArray(messages) && messages.length) {
+          this.messageCacheByThread.set(key, messages.slice(-120));
+        }
+      });
+    } catch (_error) {}
+  }
+
+  saveStoredMessageCache() {
+    try {
+      const data = {};
+      this.messageCacheByThread.forEach((messages, key) => {
+        if (Array.isArray(messages) && messages.length) {
+          data[key] = messages.slice(-120);
+        }
+      });
+      sessionStorage.setItem(this.messageCacheStorageKey(), JSON.stringify(data));
+    } catch (_error) {}
+  }
+
+  rememberThreadMessages(key, messages = []) {
+    if (!key || !Array.isArray(messages)) return;
+    const clean = messages.filter((message) => Number(message?.id || 0) > 0).slice(-120);
+    this.messageCacheByThread.set(key, clean);
+    this.saveStoredMessageCache();
+  }
+
   draftStorageKey() {
     return `pensionsgoLiveChatDrafts:${this.currentUserId || 'guest'}`;
   }
@@ -1068,12 +1105,12 @@ class LiveChatApp {
       this.renderTypingIndicator(data.typing || []);
       this.renderMessages(data.messages || [], force);
       if (force) {
-        this.messageCacheByThread.set(key, data.messages || []);
+        this.rememberThreadMessages(key, data.messages || []);
       } else if ((data.messages || []).length) {
         const existing = this.messageCacheByThread.get(key) || [];
         const byId = new Map(existing.map((message) => [Number(message.id || 0), message]));
         (data.messages || []).forEach((message) => byId.set(Number(message.id || 0), message));
-        this.messageCacheByThread.set(key, Array.from(byId.values()).sort((a, b) => Number(a.id || 0) - Number(b.id || 0)).slice(-120));
+        this.rememberThreadMessages(key, Array.from(byId.values()).sort((a, b) => Number(a.id || 0) - Number(b.id || 0)).slice(-120));
       }
       this.reportVisibleMessagesRead();
       if (!force && incoming.length > 0) {
@@ -1420,14 +1457,25 @@ class LiveChatApp {
 
   applyDeletedMessageUpdates(updates = []) {
     let changed = false;
+    const key = this.threadKey();
+    const cached = key ? (this.messageCacheByThread.get(key) || []) : [];
+    const deletedIds = new Set();
     updates.forEach((update) => {
       const id = Number(update.id || 0);
       if (!id) return;
+      deletedIds.add(id);
       const bubble = document.querySelector(`.live-chat-bubble[data-message-id="${id}"]`);
       if (!bubble || bubble.dataset.deleted === '1') return;
       this.markBubbleDeletedForEveryone(bubble);
       changed = true;
     });
+    if (key && deletedIds.size && cached.length) {
+      this.rememberThreadMessages(key, cached.map((message) => (
+        deletedIds.has(Number(message.id || 0))
+          ? { ...message, isDeleted: true, text: '', canEdit: false, reactionEmoji: '' }
+          : message
+      )));
+    }
     if (changed) {
       document.querySelectorAll('.live-message-menu').forEach((menu) => menu.remove());
       this.pruneEmptyDateDividers();
@@ -3201,7 +3249,7 @@ class LiveChatApp {
         this.replacePendingMessage(clientNonce, data.chatMessage);
         const key = this.threadKey();
         const existing = this.messageCacheByThread.get(key) || [];
-        this.messageCacheByThread.set(key, [...existing.filter((message) => Number(message.id || 0) !== Number(data.chatMessage.id || 0)), data.chatMessage].slice(-120));
+        this.rememberThreadMessages(key, [...existing.filter((message) => Number(message.id || 0) !== Number(data.chatMessage.id || 0)), data.chatMessage].slice(-120));
       }
       this.clearCurrentDraft();
       this.scheduleReceiptBurst();

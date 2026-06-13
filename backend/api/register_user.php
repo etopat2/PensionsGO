@@ -15,6 +15,9 @@ if (session_status() === PHP_SESSION_NONE) {
 if (function_exists('ensureUserPasswordUpdatedAtColumn')) {
     ensureUserPasswordUpdatedAtColumn($conn);
 }
+if (function_exists('ensureUserActiveColumn')) {
+    ensureUserActiveColumn($conn);
+}
 $logFile = __DIR__ . '/../logs/register_errors.log';
 $uploadDir = __DIR__ . '/../uploads/profiles/';
 
@@ -161,8 +164,8 @@ if ($userRole === '') {
 if (!in_array($userRole, $allowedRoles, true)) {
     respond(false, 'Invalid user role specified.');
 }
-if ($userRole === 'super_admin') {
-    respond(false, 'The super administrator role is reserved and cannot be assigned from user registration.');
+if ($userRole === 'super_admin' && !canCurrentSessionManageAdminAccounts($conn)) {
+    respond(false, 'Only the super administrator can register super administrator accounts.');
 }
 if ($userRole === 'admin' && !canCurrentSessionManageAdminAccounts($conn)) {
     respond(false, 'Only the super administrator can register administrator accounts.');
@@ -305,7 +308,7 @@ if (isset($_FILES['userPhoto']) && $_FILES['userPhoto']['error'] !== UPLOAD_ERR_
 }
 
 // Insert new user - using only existing columns from your schema
-$insertSql = "INSERT INTO tb_users (userId, userTitle, userName, userRole, userEmail, phoneNo, userPassword, password_updated_at, userPhoto, other) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)";
+$insertSql = "INSERT INTO tb_users (userId, userTitle, userName, userRole, userEmail, phoneNo, userPassword, password_updated_at, userPhoto, other, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, 1)";
 $stmt = $conn->prepare($insertSql);
 if (!$stmt) {
     logError("Prepare failed (insert): " . $conn->error);

@@ -238,6 +238,7 @@ INSERT INTO `tb_app_settings` (`setting_key`, `setting_value`, `updated_at`) VAL
 ('pensioner_dashboard_enable_documents', '1', '2026-03-28 12:18:15'),
 ('pensioner_dashboard_enable_status_explanations', '1', '2026-03-28 12:18:15'),
 ('pensioner_login_enabled', '1', '2026-03-28 12:18:15'),
+('staff_login_enabled', '1', '2026-03-28 12:18:15'),
 ('pensioner_lookup_enabled', '1', '2026-03-28 12:18:15'),
 ('pensioner_lookup_log_activity', '1', '2026-03-28 12:18:15'),
 ('pensioner_lookup_require_consent', '1', '2026-03-28 12:18:15'),
@@ -1917,7 +1918,7 @@ CREATE TABLE `tb_roles` (
 --
 
 INSERT INTO `tb_roles` (`role_key`, `role_label`, `role_description`, `clone_from_role`, `is_active`, `is_system`, `created_at`, `updated_at`) VALUES
-('super_admin', 'Super Administrator', 'Highest platform governance role with unrestricted administration, security, audit, backup, restore, data, and role-management authority', 'admin', 1, 1, '2026-05-26 00:00:00', '2026-05-26 00:00:00'),
+('super_admin', 'Super Administrator', 'Highest platform governance role with unrestricted administration, security, audit, backup, restore, data, role-management, and administrator-account governance authority', NULL, 1, 1, '2026-05-26 00:00:00', '2026-05-26 00:00:00'),
 ('admin', 'Administrator', 'Full administration privileges', NULL, 1, 1, '2026-02-17 02:49:56', '2026-02-17 02:49:56'),
 ('approver', 'Approver', 'Final approval authority for pension workflow', NULL, 1, 1, '2026-02-17 02:49:56', '2026-02-17 02:49:56'),
 ('assessor', 'Assessor', 'Assesses pension benefits and calculations', NULL, 1, 1, '2026-02-17 02:49:56', '2026-02-17 02:49:56'),
@@ -2189,11 +2190,12 @@ CREATE TABLE `tb_tasks` (
   `task_type` varchar(100) DEFAULT NULL,
   `task_title` varchar(255) DEFAULT NULL,
   `task_description` text DEFAULT NULL,
-  `status` enum('pending','assigned','in_progress','completed','declined','cancelled','deferred','returned') NOT NULL DEFAULT 'pending',
+  `status` enum('pending','assigned','in_progress','delegated','completed','declined','cancelled','deferred','returned') NOT NULL DEFAULT 'pending',
   `priority` enum('low','normal','high','urgent') NOT NULL DEFAULT 'normal',
   `related_staff_id` int(11) DEFAULT NULL,
   `related_reg_no` varchar(50) DEFAULT NULL,
   `due_at` datetime DEFAULT NULL,
+  `assigned_at` timestamp NULL DEFAULT NULL,
   `declined_reason` text DEFAULT NULL,
   `metadata` text DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
@@ -2537,7 +2539,8 @@ CREATE TABLE `tb_users` (
   `userPhoto` varchar(255) DEFAULT NULL,
   `timeStamp` timestamp NOT NULL DEFAULT current_timestamp(),
   `other` text DEFAULT NULL,
-  `password_updated_at` timestamp NULL DEFAULT NULL
+  `password_updated_at` timestamp NULL DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --

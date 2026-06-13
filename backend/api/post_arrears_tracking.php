@@ -463,7 +463,7 @@ try {
 
     if ($action === 'run_auto_reconcile') {
         $role = strtolower(trim((string)($_SESSION['userRole'] ?? '')));
-        $isStrategic = in_array($role, ['admin', 'oc_pen', 'dep_oc', 'deputy_oc', 'deputy_oc_pen', 'deputy_oc_pension'], true);
+        $isStrategic = roleHasAdminAccess($conn, $role) || in_array($role, ['oc_pen', 'dep_oc', 'deputy_oc', 'deputy_oc_pen', 'deputy_oc_pension'], true);
         if (!$isStrategic) {
             echo json_encode(['success' => false, 'message' => 'Only Admin, OC/Pension, or Deputy OC/Pension can run full reconciliation.']);
             exit;
@@ -491,7 +491,7 @@ try {
 } catch (Throwable $e) {
     error_log('post_arrears_tracking error: ' . $e->getMessage());
     $role = strtolower(trim((string)($_SESSION['userRole'] ?? '')));
-    $isPrivileged = in_array($role, ['admin', 'oc_pen', 'deputy_oc_pen', 'dep_oc', 'deputy_oc', 'deputy_oc_pension'], true);
+    $isPrivileged = roleHasAdminAccess($conn, $role) || in_array($role, ['oc_pen', 'deputy_oc_pen', 'dep_oc', 'deputy_oc', 'deputy_oc_pension'], true);
     $payload = ['success' => false, 'message' => 'Failed to process arrears request'];
     if ($isPrivileged) {
         $debug = $e->getMessage();

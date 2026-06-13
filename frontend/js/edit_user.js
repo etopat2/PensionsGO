@@ -211,7 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
             userRoleSelect.innerHTML = '<option value="">Select Role</option>';
             roles.filter((role) => {
                 const key = String(role?.key || '').toLowerCase();
-                if (key === 'super_admin') return selectedRole === 'super_admin';
+                if (key === 'super_admin') return isSuperAdmin || selectedRole === 'super_admin';
                 if (key === 'admin') return isSuperAdmin || selectedRole === 'admin';
                 return true;
             }).forEach((role) => {

@@ -20,7 +20,7 @@ try {
         'permissions' => [
             'can_restore' => currentUserHasPermission($conn, 'registry.delete_queue.process'),
             'can_clear' => currentUserHasPermission($conn, 'registry.delete_queue.process'),
-            'can_purge' => (($actor['user_role'] ?? '') === 'admin'),
+            'can_purge' => roleHasAdminAccess($conn, (string)($actor['user_role'] ?? '')),
             'can_export' => currentUserHasPermission($conn, 'registry.delete_queue.process')
         ]
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);

@@ -126,6 +126,7 @@ document.addEventListener("DOMContentLoaded", () => {
         stepModalBody.innerHTML = `
           <div class="status-detail-row"><span>Status</span><strong>${escapeHtml(data.statusLabel)}</strong></div>
           <div class="status-detail-row"><span>Time</span><strong>${escapeHtml(data.timeLabel)}</strong></div>
+          <div class="status-detail-row"><span>From Verification</span><strong>${escapeHtml(data.cumulativeDuration || "Not yet")}</strong></div>
           <div class="status-detail-row"><span>Applicant</span><strong>${escapeHtml(data.applicantName)}</strong></div>
           <div class="status-msg">${escapeHtml(detailText)}</div>
         `;
@@ -178,11 +179,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const statusLabel = step.statusLabel;
       const timeLabel = step.timeLabel;
+      const cumulativeDuration = step.cumulativeDuration || "Not yet";
       const detailText = step.comment && step.comment.trim() !== "" ? step.comment : buildFallbackMessage(state);
       const stepId = registerStep({
         label: step.label,
         statusLabel,
         timeLabel,
+        cumulativeDuration,
         comment: step.comment,
         state,
         applicantName
@@ -198,6 +201,7 @@ document.addEventListener("DOMContentLoaded", () => {
               <span class="node-state">${escapeHtml(statusLabel)}</span>
             </div>
             <small>${escapeHtml(timeLabel)}</small>
+            <span class="node-duration">From verification: ${escapeHtml(cumulativeDuration)}</span>
             <p>${escapeHtml(detailText)}</p>
           </div>
         </button>
@@ -234,6 +238,7 @@ document.addEventListener("DOMContentLoaded", () => {
       comment: step.comment || "",
       statusLabel: rawStatus !== "" ? toTitleCase(rawStatus) : "Pending",
       timeLabel: step.time || "Not yet",
+      cumulativeDuration: step.cumulativeDuration || "Not yet",
       baseState
     };
   }

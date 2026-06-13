@@ -15,7 +15,7 @@ if (!isset($_SESSION['userId'], $_SESSION['userRole'])) {
 }
 
 $currentRole = getSessionEffectiveRoleKey($conn);
-if ($currentRole !== 'admin') {
+if (!sessionRoleIn($conn, ['admin'])) {
     echo json_encode([
         'success' => false,
         'message' => 'Admin access required'

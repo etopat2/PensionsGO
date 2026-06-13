@@ -93,7 +93,7 @@ $requestedByRole = $role;
 $regNo = (string)($record['regNo'] ?? '');
 $staffName = trim(trim((string)($record['sName'] ?? '')) . ' ' . trim((string)($record['fName'] ?? '')));
 $staffTitle = trim((string)($record['title'] ?? ''));
-$canDeleteImmediately = ($role === 'admin') || (function_exists('isOcPenEquivalentRole') && isOcPenEquivalentRole($role));
+$canDeleteImmediately = roleHasAdminAccess($conn, $role) || (function_exists('isOcPenEquivalentRole') && isOcPenEquivalentRole($role));
 
 if ($canDeleteImmediately) {
     $conn->begin_transaction();

@@ -286,9 +286,10 @@ try {
     usort($audienceAnalytics, static fn($a, $b) => ($b['value'] <=> $a['value']));
 
     $trendAnalytics = [];
-    foreach ($trendCounts as $bucket) {
+    foreach ($trendCounts as $bucketKey => $bucket) {
         $trendAnalytics[] = [
             'label' => $bucket['label'],
+            'analyticsLabel' => 'Week of ' . $bucketKey,
             'value' => $bucket['count'],
             'meta' => $bucket['resolved'] . ' resolved',
             'tone' => $bucket['count'] > $bucket['resolved'] ? 'warning' : 'info'

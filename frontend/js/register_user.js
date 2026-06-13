@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'Sr.'
   ];
   const staticRoles = [
+    { key: 'super_admin', label: 'Super Administrator' },
     { key: 'admin', label: 'Administrator' },
     { key: 'clerk', label: 'Clerk' },
     { key: 'oc_pen', label: 'OC/Pension' },
@@ -45,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const filterAssignableRoles = (roles) => roles.filter((role) => {
     const key = String(role?.key || '').toLowerCase();
-    if (key === 'super_admin') return false;
+    if (key === 'super_admin') return isSuperAdmin;
     if (key === 'admin') return isSuperAdmin;
     return true;
   });

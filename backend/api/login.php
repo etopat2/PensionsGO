@@ -81,6 +81,9 @@ try {
     if (function_exists('ensureUserPasswordUpdatedAtColumn')) {
         ensureUserPasswordUpdatedAtColumn($conn);
     }
+    if (function_exists('ensureUserActiveColumn')) {
+        ensureUserActiveColumn($conn);
+    }
 
     // 
     // Validate request
@@ -135,7 +138,7 @@ try {
     // 
     $user = null;
     if ($isEmail) {
-        $stmt = $conn->prepare("SELECT userId, userName, userRole, userPassword, userPhoto, phoneNo, userEmail, password_updated_at, timeStamp FROM tb_users WHERE userEmail = ? LIMIT 1");
+        $stmt = $conn->prepare("SELECT userId, userName, userRole, userPassword, userPhoto, phoneNo, userEmail, password_updated_at, timeStamp, is_active FROM tb_users WHERE userEmail = ? LIMIT 1");
         if (!$stmt) {
             throw new Exception('Database query preparation failed: ' . $conn->error);
         }
@@ -148,7 +151,7 @@ try {
         $stmt->close();
     } else {
         $phoneCandidates = buildPhoneLookupCandidates($identifierRaw);
-        $stmt = $conn->prepare("SELECT userId, userName, userRole, userPassword, userPhoto, phoneNo, userEmail, password_updated_at, timeStamp FROM tb_users WHERE phoneNo = ? LIMIT 1");
+        $stmt = $conn->prepare("SELECT userId, userName, userRole, userPassword, userPhoto, phoneNo, userEmail, password_updated_at, timeStamp, is_active FROM tb_users WHERE phoneNo = ? LIMIT 1");
         if (!$stmt) {
             throw new Exception('Database query preparation failed: ' . $conn->error);
         }
@@ -181,6 +184,24 @@ try {
             ]);
         }
         throw new Exception('Invalid credentials. User not found.', 401);
+    }
+
+    if ((int)($user['is_active'] ?? 1) !== 1) {
+        if (function_exists('logUserActivity')) {
+            logUserActivity($conn, [
+                'user_id' => $user['userId'],
+                'user_name' => $user['userName'],
+                'user_role' => $user['userRole'],
+                'activity_type' => 'login_failed',
+                'ip_address' => getClientIP(),
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown',
+                'device_type' => detectDeviceType($_SERVER['HTTP_USER_AGENT'] ?? ''),
+                'location' => getLocationFromIP(getClientIP()),
+                'session_id' => session_id(),
+                'details' => 'Login blocked: Account is deactivated'
+            ]);
+        }
+        throw new Exception('This account has been deactivated. Please contact the system administrator.', 403);
     }
 
     // Verify password
@@ -229,6 +250,36 @@ try {
         throw new Exception('Pensioner login is currently disabled. Please contact the pensions office for assistance.', 403);
     }
 
+    $staffLoginEnabled = function_exists('getAppSettingBool')
+        ? getAppSettingBool($conn, 'staff_login_enabled', true)
+        : true;
+    $loginRoleRaw = function_exists('normalizeRoleKey')
+        ? normalizeRoleKey((string)($user['userRole'] ?? ''))
+        : strtolower(trim((string)($user['userRole'] ?? '')));
+    $loginRoleForStaffGate = function_exists('resolveRoleAccessKey')
+        ? resolveRoleAccessKey($conn, $loginRoleRaw)
+        : $loginRoleRaw;
+    $isStaffAccount = $loginRoleRaw !== 'pensioner' && $loginRoleRaw !== 'super_admin' && $loginRoleForStaffGate !== 'admin';
+
+    if ($isStaffAccount && !$staffLoginEnabled) {
+        if (function_exists('logUserActivity')) {
+            logUserActivity($conn, [
+                'user_id' => $user['userId'],
+                'user_name' => $user['userName'],
+                'user_role' => $user['userRole'],
+                'activity_type' => 'login_failed',
+                'ip_address' => getClientIP(),
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown',
+                'device_type' => detectDeviceType($_SERVER['HTTP_USER_AGENT'] ?? ''),
+                'location' => getLocationFromIP(getClientIP()),
+                'session_id' => session_id(),
+                'details' => 'Login blocked: Staff login is currently disabled'
+            ]);
+        }
+
+        throw new Exception('Staff account login is currently disabled. Please contact the system administrator.', 403);
+    }
+
     // 
     // Password expiry enforcement
     // 
@@ -269,7 +320,10 @@ try {
     $loginRoleEffective = function_exists('resolveRoleAccessKey')
         ? resolveRoleAccessKey($conn, (string)($user['userRole'] ?? ''))
         : (string)($user['userRole'] ?? '');
-    if ($maintenanceEnabled && $loginRoleEffective !== 'admin') {
+    $loginHasAdminAccess = function_exists('roleHasAdminAccess')
+        ? roleHasAdminAccess($conn, (string)($user['userRole'] ?? ''))
+        : in_array($loginRoleEffective, ['admin', 'super_admin'], true);
+    if ($maintenanceEnabled && !$loginHasAdminAccess) {
         if (function_exists('logUserActivity')) {
             logUserActivity($conn, [
                 'user_id' => $user['userId'],

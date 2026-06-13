@@ -191,8 +191,12 @@ document.addEventListener("DOMContentLoaded", () => {
     return normalizeRoleKey(roleValue) === "oc_pen";
   }
 
+  function isAdminLikeRole(roleValue = currentUserRole) {
+    return ["super_admin", "admin"].includes(normalizeRoleKey(roleValue));
+  }
+
   function canAccessTaskAlerts() {
-    return currentUserRole === "admin" || isOcPenLikeRole(currentUserRole);
+    return isAdminLikeRole() || isOcPenLikeRole(currentUserRole);
   }
 
   function getTaskAlertsPrefKey() {
@@ -213,7 +217,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function shouldShowTaskCompletionQueue() {
-    return currentUserRole !== "admin";
+    return !isAdminLikeRole();
   }
 
   function applyTaskQueueVisibility() {
@@ -405,6 +409,34 @@ document.addEventListener("DOMContentLoaded", () => {
   function formatCurrency(value) {
     const amount = Number.isFinite(Number(value)) ? Number(value) : 0;
     return `UGX ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  function parseAppDate(value) {
+    const text = String(value || "").trim();
+    if (!text) return null;
+    const parsed = new Date(text.replace(" ", "T"));
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  function formatTaskDate(value) {
+    const parsed = parseAppDate(value);
+    if (!parsed) return value ? String(value) : "N/A";
+    return parsed.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric"
+    }).replace(/ /g, "-");
+  }
+
+  function formatTaskDateTime(value) {
+    const parsed = parseAppDate(value);
+    if (!parsed) return value ? String(value) : "N/A";
+    const datePart = formatTaskDate(value);
+    const timePart = parsed.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+    return `${datePart} ${timePart}`;
   }
 
   function normalizePhone(value) {
@@ -672,7 +704,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function applyHeaderForRole() {
     if (!tasksHeading || !tasksSubheading) return;
-    if (currentUserRole === "admin") {
+    if (isAdminLikeRole()) {
       tasksHeading.textContent = "Tasks Collection";
       tasksSubheading.textContent = "Administrative command view for all workflow tasks. Monitor timelines, reprioritize, extend schedules, realign ownership, and enforce controls.";
       return;
@@ -823,7 +855,7 @@ document.addEventListener("DOMContentLoaded", () => {
         due_at: task.due_at || ""
       },
       permissions: {
-        can_manage: currentUserRole === "admin"
+        can_manage: isAdminLikeRole()
       },
       activity: []
     };
@@ -862,7 +894,22 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function canManageTask(task) {
-    return currentUserRole === "admin" || isCurrentAssignee(task);
+    return isCurrentAssignee(task);
+  }
+
+  function getPendingDelegation(task) {
+    if (task?.pending_delegation && typeof task.pending_delegation === "object") {
+      return task.pending_delegation;
+    }
+    const metadata = parseMetadata(task?.metadata);
+    return metadata?.pending_delegation && typeof metadata.pending_delegation === "object"
+      ? metadata.pending_delegation
+      : null;
+  }
+
+  function isPendingDelegationForCurrentUser(task) {
+    const pending = getPendingDelegation(task);
+    return Boolean(pending && String(pending.to_user_id || "") === currentUserId);
   }
 
   function rolesAreEquivalentForTask(roleA, roleB) {
@@ -1063,7 +1110,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const fileNo = escapeHtml(alert.related_reg_no || "N/A");
       const taskId = Number(alert.task_id || 0);
       const canAcknowledge = String(alert.alert_status || "") === "open";
-      const canResolve = currentUserRole === "admin" || isOcPenLikeRole(currentUserRole);
+      const canResolve = isAdminLikeRole() || isOcPenLikeRole(currentUserRole);
       return `
         <article class="task-alert-item" data-alert-id="${Number(alert.alert_id || 0)}" data-task-id="${taskId}">
           <div class="task-alert-main">
@@ -1128,7 +1175,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       const params = new URLSearchParams();
-      params.set("scope", (currentUserRole === "admin" || isOcPenLikeRole(currentUserRole)) ? "all" : "mine");
+      params.set("scope", (isAdminLikeRole() || isOcPenLikeRole(currentUserRole)) ? "all" : "mine");
       params.set("limit", "40");
       const response = await fetch(`../backend/api/get_task_alerts.php?${params.toString()}`, {
         credentials: "include",
@@ -1543,7 +1590,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const bucket = taskBucketFilter ? taskBucketFilter.value : "all";
       const params = new URLSearchParams();
       if (status) params.append("status", status);
-      if (currentUserRole === "admin") {
+      if (isAdminLikeRole()) {
         params.append("scope", "all");
       }
       if (bucket === "delegated") {
@@ -1563,9 +1610,12 @@ document.addEventListener("DOMContentLoaded", () => {
       // (name fallback, overdue pulses, due-soon labels).
       tasks = (Array.isArray(data.tasks) ? data.tasks : []).map((task) => {
         const flags = computeDueFlags(task);
+        const metadata = parseMetadata(task.metadata);
+        const pendingDelegation = task.pending_delegation || metadata.pending_delegation || null;
         return {
           ...task,
           assigned_role: normalizeRoleKey(task.assigned_role || ""),
+          pending_delegation: pendingDelegation,
           applicant_name: getApplicantName(task),
           created_by_name: task.created_by_name || resolveUserName(task.created_by) || "System",
           is_overdue: Boolean(task.is_overdue) || flags.isOverdue,
@@ -1636,9 +1686,11 @@ document.addEventListener("DOMContentLoaded", () => {
     // This keeps each role's task lens predictable across workflow stages.
     switch (bucket) {
       case "received":
-        return isCurrentAssignee(task) && ACTIVE_STATUSES.has(task.status);
+        return (isCurrentAssignee(task) || isPendingDelegationForCurrentUser(task)) && ACTIVE_STATUSES.has(task.status);
       case "delegated":
-        return task.created_by === currentUserId && task.assigned_to && task.assigned_to !== currentUserId;
+        return (task.created_by === currentUserId && task.assigned_to && task.assigned_to !== currentUserId)
+          || String(getPendingDelegation(task)?.from_user_id || "") === currentUserId
+          || isPendingDelegationForCurrentUser(task);
       case "pending":
         return task.status === "pending" || task.status === "assigned";
       case "in_progress":
@@ -1731,6 +1783,10 @@ document.addEventListener("DOMContentLoaded", () => {
         ? '<span class="due-pill due-overdue pulse">Overdue</span>'
         : (task.is_due_soon ? '<span class="due-pill due-soon pulse">Due Soon</span>' : "");
       const metadata = parseMetadata(task.metadata);
+      const pendingDelegation = getPendingDelegation(task);
+      const delegationBadge = pendingDelegation
+        ? `<span class="due-pill due-delegated">${isPendingDelegationForCurrentUser(task) ? "Delegation Request" : "Delegated Pending"}</span>`
+        : "";
       const applicantName = getApplicantName(task);
       const isFeedback = isFeedbackTask(task);
       const subMeta = isFeedback
@@ -1746,6 +1802,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="task-card-side">
             <span class="status-pill status-${escapeHtml(task.status || "pending")}">${escapeHtml(formatStatus(task.status))}</span>
             ${dueBadge}
+            ${delegationBadge}
           </div>
         </div>
       `;
@@ -1765,7 +1822,15 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function buildTaskActions(task, metadata = parseMetadata(task?.metadata), activeQueueItem = null) {
-    if (!canManageTask(task) && currentUserRole !== "admin") return "";
+    const pendingDelegation = getPendingDelegation(task);
+    if (pendingDelegation && isPendingDelegationForCurrentUser(task)) {
+      return [
+        '<button class="primary" data-action="accept_delegation">Accept Delegation</button>',
+        '<button class="danger" data-action="decline_delegation">Decline Delegation</button>'
+      ].join("");
+    }
+
+    if (!canManageTask(task)) return "";
 
     // Button generation follows task-state transitions, not static role menus.
     // This prevents exposing invalid actions for the current state.
@@ -1790,11 +1855,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!requiresNamedAssignee) {
         buttons.push(`<button class="primary" data-action="complete"${disabledAttr}>Complete & Forward</button>`);
       }
-      if (currentUserRole !== "admin" && !requiresNamedAssignee) {
+      if (!isAdminLikeRole() && !requiresNamedAssignee) {
         const queueLabel = isQueuedForBatch ? "Queued" : "Queue For Batch Forwarding";
         buttons.push(`<button class="secondary" data-action="queue_complete"${disabledAttr}>${queueLabel}</button>`);
       }
-      if (isOcPenLikeRole(currentUserRole) || currentUserRole === "admin") {
+      if (isOcPenLikeRole(currentUserRole) || isAdminLikeRole()) {
         buttons.push(`<button class="secondary" data-action="defer"${disabledAttr}>Schedule Later</button>`);
       }
       if (!isOc) {
@@ -1812,7 +1877,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function getFeedbackDelegationUsers() {
-    if (currentUserRole === "admin" || isOcPenLikeRole(currentUserRole)) {
+    if (isAdminLikeRole() || isOcPenLikeRole(currentUserRole)) {
       return users
         .filter((user) => {
           const roleKey = normalizeRoleKey(user.userRole);
@@ -1825,7 +1890,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function buildFeedbackActions(task, feedbackStatus) {
-    const canAct = canManageTask(task) || currentUserRole === "admin";
+    const canAct = canManageTask(task) || isAdminLikeRole();
     if (!canAct) return "";
 
     const buttons = [];
@@ -1902,7 +1967,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const feedbackStatusLabel = submission.status_label || formatFeedbackStatus(feedbackStatus);
     const priority = String(submission.priority || task.priority || "normal").toLowerCase();
     const priorityTone = priority === "critical" ? "urgent" : priority;
-    const dueLabel = task.due_at || submission.due_at || "N/A";
+    const dueLabel = task.due_at || submission.due_at ? formatTaskDateTime(task.due_at || submission.due_at) : "N/A";
     const normalizedPhone = normalizePhone(submission.phone_number || "") || submission.phone_number || "";
     const applicantName = submission.full_name || getApplicantName(task);
     const assignedByLabel = task.created_by_name || resolveUserName(task.created_by) || task.created_by || "System";
@@ -1911,7 +1976,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const dueBadge = dueFlags.isOverdue
       ? '<span class="due-pill due-overdue pulse">Overdue</span>'
       : (dueFlags.isDueSoon ? '<span class="due-pill due-soon pulse">Due Soon</span>' : "");
-    const canAct = canManageTask(task) || currentUserRole === "admin";
+    const canAct = canManageTask(task) || isAdminLikeRole();
     const actionButtons = buildFeedbackActions(task, feedbackStatus);
 
     taskDetails.innerHTML = `
@@ -1933,7 +1998,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="detail-field"><span>Assigned By</span><strong>${escapeHtml(assignedByLabel)}</strong></div>
           <div class="detail-field"><span>Assigned To</span><strong>${escapeHtml(assignedToLabel)}</strong></div>
           <div class="detail-field"><span>Due</span><strong>${escapeHtml(dueLabel)}</strong></div>
-          <div class="detail-field"><span>Submitted</span><strong>${escapeHtml(submission.submitted_at || task.created_at || "N/A")}</strong></div>
+          <div class="detail-field"><span>Submitted</span><strong>${escapeHtml(formatTaskDateTime(submission.submitted_at || task.created_at))}</strong></div>
         </div>
         <div class="feedback-case-grid">
           <div class="feedback-card">
@@ -1961,7 +2026,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="feedback-card">
             <h4>Case Timeline</h4>
             <ul class="feedback-timeline">
-              <li class="active">Submitted <small>${escapeHtml(submission.submitted_at || "N/A")}</small></li>
+              <li class="active">Submitted <small>${escapeHtml(formatTaskDateTime(submission.submitted_at))}</small></li>
               <li class="${submission.reviewed_at ? "active" : ""}">In Review <small>${escapeHtml(submission.reviewed_at || "Pending")}</small></li>
               <li class="${submission.resolved_at ? "active" : ""}">Resolved <small>${escapeHtml(submission.resolved_at || "Pending")}</small></li>
               <li class="${submission.closed_at ? "active" : ""}">Closed <small>${escapeHtml(submission.closed_at || "Pending")}</small></li>
@@ -1990,7 +2055,7 @@ document.addEventListener("DOMContentLoaded", () => {
           </div>
         </div>
         ` : '<div class="tasks-empty">This feedback task is read-only for your role.</div>'}
-        ${canManageTask(task) || currentUserRole === "admin" ? `
+        ${canManageTask(task) || isAdminLikeRole() ? `
         <div class="delegate-box">
           <strong>Delegate Feedback Task</strong>
           <select id="delegateUserSelect">
@@ -2154,10 +2219,11 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     const metadata = parseMetadata(task.metadata);
-    const dueLabel = task.due_at ? task.due_at : "N/A";
+    const dueLabel = task.due_at ? formatTaskDateTime(task.due_at) : "N/A";
     const applicantName = task.applicant_name || "Unknown Applicant";
     const assignedByLabel = task.created_by_name || resolveUserName(task.created_by) || task.created_by || "System";
     const assignedToLabel = getAssignedToLabel(task, metadata);
+    const pendingDelegation = getPendingDelegation(task);
     const ocAssignmentRole = getOcAssignmentRole(task, metadata);
     const ocAssignmentUsers = ocAssignmentRole ? getUsersByWorkflowRole(ocAssignmentRole) : [];
     const eligibleRealignUsers = getEligibleRealignmentUsers(task, metadata);
@@ -2168,12 +2234,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const queueStateNotice = isQueuedForBatch
       ? `<div class="task-queue-error"><strong>Queued for batch forwarding:</strong> This task is already staged in your completion queue. Review or process it from the Completion Queue window.</div>`
       : "";
+    const delegationNotice = pendingDelegation
+      ? `<div class="task-delegation-notice">
+          <strong>${isPendingDelegationForCurrentUser(task) ? "Delegation request awaiting your response" : "Delegation request pending"}</strong>
+          <span>From ${escapeHtml(pendingDelegation.from_user_name || "Current owner")} to ${escapeHtml(pendingDelegation.to_user_name || "Selected user")}${pendingDelegation.delegated_at ? ` on ${escapeHtml(formatTaskDateTime(pendingDelegation.delegated_at))}` : ""}.</span>
+          ${pendingDelegation.note ? `<small>${escapeHtml(pendingDelegation.note)}</small>` : ""}
+        </div>`
+      : "";
     const actionButtons = buildTaskActions(task, metadata, activeQueueItem);
 
     taskDetails.innerHTML = `
       <h3>${escapeHtml(task.task_title || "Untitled Task")}</h3>
       <p>${escapeHtml(task.task_description || "No description provided.")}</p>
       ${queueStateNotice}
+      ${delegationNotice}
       <div class="task-detail-grid">
         <div class="detail-field"><span>Status</span><strong>${escapeHtml(formatStatus(task.status))}</strong></div>
         <div class="detail-field"><span>Priority</span><strong>${escapeHtml((task.priority || "normal").toUpperCase())}</strong></div>
@@ -2184,7 +2258,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <div class="detail-field"><span>Assigned By</span><strong>${escapeHtml(assignedByLabel)}</strong></div>
         <div class="detail-field"><span>Assigned To</span><strong>${escapeHtml(assignedToLabel)}</strong></div>
         <div class="detail-field"><span>Due</span><strong>${escapeHtml(dueLabel)}</strong></div>
-        <div class="detail-field"><span>Created</span><strong>${escapeHtml(task.created_at || "N/A")}</strong></div>
+        <div class="detail-field"><span>Created</span><strong>${escapeHtml(formatTaskDateTime(task.created_at))}</strong></div>
       </div>
       <div class="task-forward-controls">
         <div class="inline-field">
@@ -2227,7 +2301,7 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
       </div>
       ` : ""}
-      ${currentUserRole !== "admin" && canManageTask(task) && !TERMINAL_STATUSES.has(task.status) ? `
+      ${!isAdminLikeRole() && canManageTask(task) && !TERMINAL_STATUSES.has(task.status) ? `
       <div class="delegate-box">
         <strong>Delegate Task</strong>
         ${isQueuedForBatch ? `<p class="task-queue-helper">Delegation is disabled because this task is already queued for batch forwarding.</p>` : ""}
@@ -2249,7 +2323,7 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
       </div>
       ` : ""}
-      ${currentUserRole === "admin" ? `
+      ${isAdminLikeRole() ? `
       <div class="admin-governance">
         <h4>Admin Task Governance</h4>
         <div class="admin-grid">
@@ -2491,6 +2565,17 @@ document.addEventListener("DOMContentLoaded", () => {
           action = task.assigned_to ? "resume" : "accept";
         }
 
+        if (action === "decline_delegation") {
+          if (!reason) {
+            const declineDelegationReason = await appPrompt("Provide a reason for declining this delegation:", "", {
+              title: "Decline Delegation",
+              confirmText: "Decline"
+            });
+            reason = declineDelegationReason === null ? "" : String(declineDelegationReason || "");
+          }
+          if (!reason) return;
+        }
+
         if (action === "decline") {
           if (!reason) {
             const declineReason = await appPrompt("Provide a reason for declining this task:", "", {
@@ -2646,7 +2731,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function attachAdminGovernance(task) {
-    if (currentUserRole !== "admin") return;
+    if (!isAdminLikeRole()) return;
     const realignBtn = document.getElementById("adminRealignBtn");
     const extendScheduleBtn = document.getElementById("adminExtendScheduleBtn");
     const cancelBtn = document.getElementById("adminCancelTaskBtn");
@@ -2843,7 +2928,7 @@ document.addEventListener("DOMContentLoaded", () => {
       list.innerHTML = data.comments.map((comment) => `
         <div class="comment-item">
           <strong>${escapeHtml(comment.author_name || "User")} (${escapeHtml(formatRoleLabel(comment.author_role || ""))})</strong>
-          <small>${escapeHtml(comment.created_at || "")}</small>
+          <small>${escapeHtml(formatTaskDateTime(comment.created_at))}</small>
           <div>${escapeHtml(comment.comment || "")}</div>
         </div>
       `).join("");

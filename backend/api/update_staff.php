@@ -176,7 +176,7 @@ $existingAddress = trim((string)($currentRow['address'] ?? ''));
 $existingLivingStatus = (string)($currentRow['livingStatus'] ?? '');
 $existingPayType = (string)($currentRow['payType'] ?? '');
 $userRole = $normalizedRole;
-$isAdmin = ($userRole === 'admin');
+$isAdmin = roleHasAdminAccess($conn, $userRole);
 $canEditRegNo = $isAdmin || isOcPenEquivalentRole($userRole);
 
 $requiredMessages = [

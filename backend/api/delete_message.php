@@ -308,7 +308,7 @@ try {
         
         // Handle broadcast deletion
         if ($isBroadcast) {
-            if ($userRole === 'admin') {
+            if (roleHasAdminAccess($conn, $userRole)) {
                 // FIXED: Admin should completely delete broadcast and all associated data
                 $attachmentsDeleted = deleteMessageCompletely($messageId, $conn);
                 $deletedAttachments += $attachmentsDeleted;

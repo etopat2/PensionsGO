@@ -1748,11 +1748,12 @@ CREATE TABLE IF NOT EXISTS `tb_tasks` (
   `task_type` varchar(100) DEFAULT NULL,
   `task_title` varchar(255) DEFAULT NULL,
   `task_description` text DEFAULT NULL,
-  `status` enum('pending','assigned','in_progress','completed','declined','cancelled','deferred','returned') NOT NULL DEFAULT 'pending',
+  `status` enum('pending','assigned','in_progress','delegated','completed','declined','cancelled','deferred','returned') NOT NULL DEFAULT 'pending',
   `priority` enum('low','normal','high','urgent') NOT NULL DEFAULT 'normal',
   `related_staff_id` int(11) DEFAULT NULL,
   `related_reg_no` varchar(50) DEFAULT NULL,
   `due_at` datetime DEFAULT NULL,
+  `assigned_at` timestamp NULL DEFAULT NULL,
   `declined_reason` text DEFAULT NULL,
   `metadata` text DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
@@ -1988,7 +1989,8 @@ CREATE TABLE IF NOT EXISTS `tb_users` (
   `userPhoto` varchar(255) DEFAULT NULL,
   `timeStamp` timestamp NOT NULL DEFAULT current_timestamp(),
   `other` text DEFAULT NULL,
-  `password_updated_at` timestamp NULL DEFAULT NULL
+  `password_updated_at` timestamp NULL DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -3223,16 +3225,32 @@ CALL schema_add_column_if_missing('tb_tasks', 'assigned_role', '`assigned_role` 
 CALL schema_add_column_if_missing('tb_tasks', 'task_type', '`task_type` varchar(100) DEFAULT NULL');
 CALL schema_add_column_if_missing('tb_tasks', 'task_title', '`task_title` varchar(255) DEFAULT NULL');
 CALL schema_add_column_if_missing('tb_tasks', 'task_description', '`task_description` text DEFAULT NULL');
-CALL schema_add_column_if_missing('tb_tasks', 'status', '`status` enum(''pending'',''assigned'',''in_progress'',''completed'',''declined'',''cancelled'',''deferred'',''returned'') NOT NULL DEFAULT ''pending''');
+CALL schema_add_column_if_missing('tb_tasks', 'status', '`status` enum(''pending'',''assigned'',''in_progress'',''delegated'',''completed'',''declined'',''cancelled'',''deferred'',''returned'') NOT NULL DEFAULT ''pending''');
 CALL schema_add_column_if_missing('tb_tasks', 'priority', '`priority` enum(''low'',''normal'',''high'',''urgent'') NOT NULL DEFAULT ''normal''');
 CALL schema_add_column_if_missing('tb_tasks', 'related_staff_id', '`related_staff_id` int(11) DEFAULT NULL');
 CALL schema_add_column_if_missing('tb_tasks', 'related_reg_no', '`related_reg_no` varchar(50) DEFAULT NULL');
 CALL schema_add_column_if_missing('tb_tasks', 'due_at', '`due_at` datetime DEFAULT NULL');
+CALL schema_add_column_if_missing('tb_tasks', 'assigned_at', '`assigned_at` timestamp NULL DEFAULT NULL');
 CALL schema_add_column_if_missing('tb_tasks', 'declined_reason', '`declined_reason` text DEFAULT NULL');
 CALL schema_add_column_if_missing('tb_tasks', 'metadata', '`metadata` text DEFAULT NULL');
 CALL schema_add_column_if_missing('tb_tasks', 'updated_at', '`updated_at` datetime DEFAULT NULL');
 CALL schema_add_column_if_missing('tb_tasks', 'completed_at', '`completed_at` datetime DEFAULT NULL');
 CALL schema_add_column_if_missing('tb_tasks', 'parent_task_id', '`parent_task_id` int(11) DEFAULT NULL');
+SET @tb_tasks_status_column_type := (
+  SELECT COLUMN_TYPE
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'tb_tasks'
+    AND COLUMN_NAME = 'status'
+  LIMIT 1
+);
+SET @tb_tasks_status_migration_sql := IF(
+  @tb_tasks_status_column_type IS NOT NULL
+    AND LOCATE('''delegated''', @tb_tasks_status_column_type) = 0,
+  'ALTER TABLE `tb_tasks` MODIFY `status` enum(''pending'',''assigned'',''in_progress'',''delegated'',''completed'',''declined'',''cancelled'',''deferred'',''returned'') NOT NULL DEFAULT ''pending''',
+  'SELECT 1'
+);
+CALL schema_exec_ddl(@tb_tasks_status_migration_sql);
 
 -- Table: `tb_task_alerts`
 CALL schema_add_column_if_missing('tb_task_alerts', 'alert_id', '`alert_id` int(11) NOT NULL');
@@ -3359,6 +3377,7 @@ CALL schema_add_column_if_missing('tb_users', 'userPhoto', '`userPhoto` varchar(
 CALL schema_add_column_if_missing('tb_users', 'timeStamp', '`timeStamp` timestamp NOT NULL DEFAULT current_timestamp()');
 CALL schema_add_column_if_missing('tb_users', 'other', '`other` text DEFAULT NULL');
 CALL schema_add_column_if_missing('tb_users', 'password_updated_at', '`password_updated_at` timestamp NULL DEFAULT NULL');
+CALL schema_add_column_if_missing('tb_users', 'is_active', '`is_active` tinyint(1) NOT NULL DEFAULT 1');
 
 -- Table: `tb_user_broadcast_status`
 CALL schema_add_column_if_missing('tb_user_broadcast_status', 'status_id', '`status_id` int(11) NOT NULL');

@@ -13,7 +13,7 @@ function requireAdminDataManagementAccess(mysqli $conn): array
     }
 
     $role = getSessionEffectiveRoleKey($conn);
-    if ($role !== 'admin') {
+    if (!sessionRoleIn($conn, ['admin'])) {
         throw new RuntimeException('Admin access required');
     }
 

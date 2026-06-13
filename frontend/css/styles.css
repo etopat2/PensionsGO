@@ -1060,6 +1060,7 @@ footer {
   --z-modal-layer: 12000;
   --z-modal-panel: 12010;
   --z-session-overlay: 2147483647;
+  --z-feedback-layer: 2147483647;
 }
 
 [class*="modal-overlay"],
@@ -2734,5 +2735,98 @@ body.layout-public > footer #footerDeveloperPhoneSeparator {
 
   body.layout-public > footer .developed-by {
     row-gap: 0;
+  }
+}
+
+.pgo-export-preview-modal {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal-layer, 2147483600);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(0.75rem, 2vw, 1.25rem);
+  background: rgba(15, 23, 42, 0.64);
+}
+
+.pgo-export-preview-modal.open {
+  display: flex;
+}
+
+.pgo-export-preview-dialog {
+  width: min(1180px, 100%);
+  height: min(92vh, 940px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--card-bg, #fff);
+  color: var(--text-color, #1f2937);
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.32);
+}
+
+.pgo-export-preview-header,
+.pgo-export-preview-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.pgo-export-preview-footer {
+  justify-content: flex-end;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  border-bottom: 0;
+}
+
+.pgo-export-preview-header span {
+  display: block;
+  margin-bottom: 0.1rem;
+  color: var(--muted-color, #64748b);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.pgo-export-preview-header h3 {
+  margin: 0;
+  color: var(--heading-color, #111827);
+  font-size: 1rem;
+}
+
+.pgo-export-preview-header button {
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-soft, #f1f5f9);
+  color: var(--heading-color, #111827);
+  cursor: pointer;
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.pgo-export-preview-frame {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  background: #f8fafc;
+}
+
+@media (max-width: 560px) {
+  .pgo-export-preview-modal {
+    align-items: stretch;
+    padding: 0;
+  }
+
+  .pgo-export-preview-dialog {
+    width: 100%;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
   }
 }

@@ -32,7 +32,7 @@ function bindDynamic(mysqli_stmt $stmt, string $types, array &$params): void {
 
 function isStrategicClaimsRole(string $role): bool {
     $normalized = strtolower(trim($role));
-    return in_array($normalized, ['admin', 'oc_pen', 'dep_oc', 'deputy_oc', 'deputy_oc_pen', 'deputy_oc_pension'], true);
+    return in_array($normalized, ['super_admin', 'admin', 'oc_pen', 'dep_oc', 'deputy_oc', 'deputy_oc_pen', 'deputy_oc_pension'], true);
 }
 
 try {

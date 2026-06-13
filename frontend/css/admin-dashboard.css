@@ -4287,7 +4287,7 @@
     position: fixed;
     right: 1.5rem;
     bottom: 1.5rem;
-    z-index: 11050;
+    z-index: var(--z-feedback-layer, 2147483647) !important;
     padding: 0.85rem 1rem;
     color: #fff;
     border-radius: 10px;

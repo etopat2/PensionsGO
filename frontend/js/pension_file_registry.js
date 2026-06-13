@@ -178,6 +178,8 @@ async function initPensionFileRegistryController() {
   let documentTypeOptions = [];
   let registrySubmitAttempted = false;
   const registryTouchedFields = new Set();
+  const REGISTRY_CACHE_KEY = "pensionsgoRegistrySessionCache:v1";
+  const REGISTRY_CACHE_TTL_MS = 3 * 60 * 1000;
   let lifeCertProfileRecordId = 0;
   let lifeCertProfileEditable = false;
   let lifeCertProfileLoadedRegNo = "";
@@ -245,6 +247,41 @@ async function initPensionFileRegistryController() {
       currentPage = 1;
       loadCards();
     }, 220);
+  }
+
+  function readRegistryCache() {
+    try {
+      return JSON.parse(sessionStorage.getItem(REGISTRY_CACHE_KEY) || "{}") || {};
+    } catch (_error) {
+      return {};
+    }
+  }
+
+  function writeRegistryCache(cache) {
+    try {
+      sessionStorage.setItem(REGISTRY_CACHE_KEY, JSON.stringify(cache || {}));
+    } catch (_error) {}
+  }
+
+  function getRegistryCachedPayload(key) {
+    const entry = readRegistryCache()[key];
+    if (!entry || !entry.payload || Date.now() - Number(entry.savedAt || 0) > REGISTRY_CACHE_TTL_MS) return null;
+    return entry.payload;
+  }
+
+  function setRegistryCachedPayload(key, payload) {
+    const cache = readRegistryCache();
+    cache[key] = { savedAt: Date.now(), payload };
+    const compact = Object.fromEntries(Object.entries(cache)
+      .sort((a, b) => Number(b[1]?.savedAt || 0) - Number(a[1]?.savedAt || 0))
+      .slice(0, 24));
+    writeRegistryCache(compact);
+  }
+
+  function clearRegistryCache() {
+    try {
+      sessionStorage.removeItem(REGISTRY_CACHE_KEY);
+    } catch (_error) {}
   }
 
   function syncFilterableSelect(selectEl) {
@@ -1959,6 +1996,23 @@ async function initPensionFileRegistryController() {
     }
   }
 
+  function applyRegistryPayload(data) {
+    populateSelectOptions(boxNumberFilter, data.boxNumberOptions || [], "All Box Numbers");
+
+    totalRecords = Number(data.totalRecords || 0);
+    totalPages = Number(data.totalPages || 1);
+    currentPage = Number(data.page || 1);
+    updateSummary(totalRecords, currentPage, totalPages);
+
+    if (!Array.isArray(data.records) || !data.records.length) {
+      grid.innerHTML = '<div class="app-state-message app-state-neutral">No pension registry records found.</div>';
+      return;
+    }
+
+    grid.innerHTML = data.records.map((record) => renderCard(record)).join("");
+    bindCardActions(data.records);
+  }
+
   async function loadCards() {
     if (!grid) return;
     if (activeCardsController) {
@@ -1966,7 +2020,6 @@ async function initPensionFileRegistryController() {
     }
     const requestSeq = ++cardsRequestSeq;
     activeCardsController = new AbortController();
-    grid.innerHTML = '<div class="app-state-message app-state-neutral">Loading pension file registry...</div>';
 
     // Keep heavy filtering, sorting, and pagination on the server for scale.
     const params = new URLSearchParams({
@@ -1978,6 +2031,13 @@ async function initPensionFileRegistryController() {
       pay_type: payTypeFilter?.value || "",
       sort: sortSelect?.value || "recent"
     });
+    const cacheKey = params.toString();
+    const cachedPayload = getRegistryCachedPayload(cacheKey);
+    if (cachedPayload) {
+      applyRegistryPayload(cachedPayload);
+    } else {
+      grid.innerHTML = '<div class="app-state-message app-state-neutral">Loading pension file registry...</div>';
+    }
 
     try {
       const res = await fetch(`../backend/api/fetch_file_registry.php?${params.toString()}`, {
@@ -1995,20 +2055,8 @@ async function initPensionFileRegistryController() {
         return;
       }
 
-      populateSelectOptions(boxNumberFilter, data.boxNumberOptions || [], "All Box Numbers");
-
-      totalRecords = Number(data.totalRecords || 0);
-      totalPages = Number(data.totalPages || 1);
-      currentPage = Number(data.page || 1);
-      updateSummary(totalRecords, currentPage, totalPages);
-
-      if (!Array.isArray(data.records) || !data.records.length) {
-        grid.innerHTML = '<div class="app-state-message app-state-neutral">No pension registry records found.</div>';
-        return;
-      }
-
-      grid.innerHTML = data.records.map((record) => renderCard(record)).join("");
-      bindCardActions(data.records);
+      setRegistryCachedPayload(cacheKey, data);
+      applyRegistryPayload(data);
     } catch (err) {
       if (err?.name === "AbortError") {
         return;
@@ -3643,7 +3691,10 @@ async function initPensionFileRegistryController() {
   }
 
   if (refreshBtn) {
-    refreshBtn.addEventListener("click", () => loadCards());
+    refreshBtn.addEventListener("click", () => {
+      clearRegistryCache();
+      loadCards();
+    });
   }
 
   if (addFileBtn) {

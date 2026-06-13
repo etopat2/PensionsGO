@@ -135,16 +135,21 @@ if ($peerType === 'group') {
 
 $messages = [];
 $messageIds = [];
+$hasPollCandidate = false;
 while ($row = $result->fetch_assoc()) {
     $messageId = (int)$row['chat_message_id'];
     $messageIds[] = $messageId;
+    $messageText = (string)($row['message_text'] ?? '');
+    if (!$hasPollCandidate && str_contains($messageText, '"type":"poll"')) {
+        $hasPollCandidate = true;
+    }
     $messages[] = [
         'id' => $messageId,
         'clientNonce' => $row['client_nonce'] ?? '',
         'senderId' => $row['sender_id'],
         'recipientId' => $row['recipient_id'],
         'kind' => $row['message_kind'],
-        'text' => $row['message_text'] ?? '',
+        'text' => $messageText,
         'fileName' => $row['file_name'] ?? '',
         'filePath' => $row['file_path'] ?? '',
         'fileSize' => (int)($row['file_size'] ?? 0),
@@ -176,7 +181,7 @@ while ($row = $result->fetch_assoc()) {
         $messageIds = array_reverse($messageIds);
     }
 
-    if (!empty($messageIds)) {
+    if (!empty($messageIds) && $hasPollCandidate) {
         $placeholders = implode(',', array_fill(0, count($messageIds), '?'));
         $types = str_repeat('i', count($messageIds));
         $pollStmt = $conn->prepare("
@@ -254,7 +259,7 @@ while ($row = $result->fetch_assoc()) {
         usort($messages, static fn($a, $b) => (int)($a['id'] ?? 0) <=> (int)($b['id'] ?? 0));
     }
 
-    $receipts = ($peerType !== 'group' && liveChatFeatureEnabled($conn, 'live_chat_read_receipts_enabled', true)) ? liveChatDirectReceipts($conn, $userId, $peerId) : [];
+    $receipts = ($sinceId > 0 && $peerType !== 'group' && liveChatFeatureEnabled($conn, 'live_chat_read_receipts_enabled', true)) ? liveChatDirectReceipts($conn, $userId, $peerId) : [];
 
     $typing = [];
     $typingStmt = null;

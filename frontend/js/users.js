@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const actor = getCurrentUserContext();
         if (!actor.isAdmin) return false;
         if (!isAdminAccountRole(user?.userRole)) return true;
-        return actor.isSuperAdmin && String(user?.userRole || '').toLowerCase() !== 'super_admin';
+        return actor.isSuperAdmin;
     }
 
     function canDeleteUserAccount(user) {

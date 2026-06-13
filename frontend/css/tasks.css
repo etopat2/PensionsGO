@@ -799,6 +799,12 @@ body.modal-open {
   color: #991b1b;
 }
 
+.due-delegated {
+  background: #e0f2fe;
+  color: #075985;
+  border: 1px solid color-mix(in srgb, #0284c7 35%, transparent);
+}
+
 .pulse {
   animation: taskPulse 1.5s ease-in-out infinite;
 }
@@ -1114,6 +1120,27 @@ body.modal-open {
   padding: 0.75rem;
   border-radius: 8px;
   margin-bottom: 1rem;
+}
+
+.task-delegation-notice {
+  margin: 0.85rem 0;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid color-mix(in srgb, #0284c7 35%, var(--border-color));
+  border-left: 4px solid #0284c7;
+  border-radius: 10px;
+  background: color-mix(in srgb, #e0f2fe 42%, var(--card-bg));
+  display: grid;
+  gap: 0.25rem;
+}
+
+.task-delegation-notice strong {
+  color: var(--heading-color);
+}
+
+.task-delegation-notice span,
+.task-delegation-notice small {
+  color: var(--muted-color);
+  line-height: 1.4;
 }
 
 .delegate-box select,

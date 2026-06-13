@@ -75,17 +75,119 @@ if (in_array($action, ['accept', 'resume', 'defer', 'return_to_oc', 'decline', '
 $currentUserId = $_SESSION['userId'];
 $currentUserRole = $_SESSION['userRole'] ?? '';
 $normalizedCurrentUserRole = normalizeWorkflowRoleKey($currentUserRole);
-$isAdmin = $normalizedCurrentUserRole === 'admin';
+$isAdmin = in_array($normalizedCurrentUserRole, ['super_admin', 'admin'], true);
 
 $assignedTo = $taskData['assigned_to'] ?? null;
 $assignedRole = $taskData['assigned_role'] ?? null;
-$isAuthorizedActor = $isAdmin
-    || (!empty($assignedTo) && $assignedTo === $currentUserId)
+$pendingDelegation = is_array($taskMetadata['pending_delegation'] ?? null) ? $taskMetadata['pending_delegation'] : null;
+$isDelegationRecipient = $pendingDelegation
+    && trim((string)($pendingDelegation['to_user_id'] ?? '')) === $currentUserId;
+$isEffectiveAssignee = (!empty($assignedTo) && $assignedTo === $currentUserId)
     || (empty($assignedTo) && !empty($assignedRole) && rolesAreWorkflowEquivalent($assignedRole, $currentUserRole));
+$isAuthorizedActor = $isAdmin
+    || $isEffectiveAssignee;
+
+if (in_array($action, ['accept_delegation', 'decline_delegation'], true)) {
+    if (!$isDelegationRecipient) {
+        echo json_encode(['success' => false, 'message' => 'This delegation request is not assigned to you.']);
+        exit;
+    }
+
+    $decisionHistory = is_array($taskMetadata['delegation_decisions'] ?? null) ? $taskMetadata['delegation_decisions'] : [];
+    $decisionHistory[] = [
+        'action' => $action === 'accept_delegation' ? 'accepted' : 'declined',
+        'user_id' => $currentUserId,
+        'user_name' => $_SESSION['userName'] ?? '',
+        'note' => $reason,
+        'decided_at' => date('Y-m-d H:i:s')
+    ];
+    $taskMetadata['delegation_decisions'] = $decisionHistory;
+    unset($taskMetadata['pending_delegation']);
+    $metadataJson = json_encode($taskMetadata, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+    if ($action === 'accept_delegation') {
+        $dueAtValue = calculateTaskDueDateTime($conn);
+        $acceptedRole = normalizeWorkflowRoleKey((string)($pendingDelegation['to_user_role'] ?? $currentUserRole));
+        $acceptedPriority = strtolower(trim((string)($pendingDelegation['priority'] ?? $nextPriority)));
+        if (!in_array($acceptedPriority, ['low', 'normal', 'high', 'urgent'], true)) {
+            $acceptedPriority = 'normal';
+        }
+        $stmt = $conn->prepare("
+            UPDATE tb_tasks
+            SET assigned_to = ?,
+                assigned_role = ?,
+                status = 'in_progress',
+                priority = ?,
+                due_at = ?,
+                assigned_at = NOW(),
+                metadata = ?,
+                updated_at = NOW()
+            WHERE taskId = ?
+        ");
+        if ($stmt) {
+            $stmt->bind_param("sssssi", $currentUserId, $acceptedRole, $acceptedPriority, $dueAtValue, $metadataJson, $taskId);
+            $stmt->execute();
+            $stmt->close();
+        }
+        if (function_exists('recordWorkflowLog')) {
+            recordWorkflowLog($conn, [
+                'task_id' => $taskId,
+                'staffdue_id' => (int)($taskData['related_staff_id'] ?? 0),
+                'regNo' => (string)($taskData['related_reg_no'] ?? ''),
+                'action' => 'task_delegation_accepted',
+                'from_status' => $currentTaskStatus,
+                'to_status' => 'in_progress',
+                'actor_id' => $currentUserId,
+                'actor_name' => $_SESSION['userName'] ?? 'System',
+                'actor_role' => $_SESSION['userRole'] ?? '',
+                'note' => $reason,
+                'metadata' => ['delegated_by' => (string)($pendingDelegation['from_user_id'] ?? ''), 'due_at' => $dueAtValue]
+            ]);
+        }
+        echo json_encode(['success' => true, 'message' => 'Delegation accepted. The task is now assigned to you.']);
+        $conn->close();
+        exit;
+    }
+
+    $stmt = $conn->prepare("
+        UPDATE tb_tasks
+        SET metadata = ?,
+            updated_at = NOW()
+        WHERE taskId = ?
+    ");
+    if ($stmt) {
+        $stmt->bind_param("si", $metadataJson, $taskId);
+        $stmt->execute();
+        $stmt->close();
+    }
+    if (function_exists('recordWorkflowLog')) {
+        recordWorkflowLog($conn, [
+            'task_id' => $taskId,
+            'staffdue_id' => (int)($taskData['related_staff_id'] ?? 0),
+            'regNo' => (string)($taskData['related_reg_no'] ?? ''),
+            'action' => 'task_delegation_declined',
+            'from_status' => $currentTaskStatus,
+            'to_status' => $currentTaskStatus,
+            'actor_id' => $currentUserId,
+            'actor_name' => $_SESSION['userName'] ?? 'System',
+            'actor_role' => $_SESSION['userRole'] ?? '',
+            'note' => $reason,
+            'metadata' => ['delegated_by' => (string)($pendingDelegation['from_user_id'] ?? '')]
+        ]);
+    }
+    echo json_encode(['success' => true, 'message' => 'Delegation declined. The original task owner remains unchanged.']);
+    $conn->close();
+    exit;
+}
 
 // Only the effective assignee/role actor (or admin override) can transition.
 if (!$isAuthorizedActor) {
     echo json_encode(['success' => false, 'message' => 'You are not allowed to update this task.']);
+    exit;
+}
+
+if (in_array($action, ['accept', 'resume', 'decline'], true) && !$isEffectiveAssignee) {
+    echo json_encode(['success' => false, 'message' => 'Only the assigned task owner can start or decline this task.']);
     exit;
 }
 
@@ -173,7 +275,11 @@ if ($action === 'accept') {
     $dueAtValue = calculateTaskDueDateTime($conn);
     $stmt = $conn->prepare("
         UPDATE tb_tasks
-        SET assigned_to = ?, status = 'in_progress', due_at = ?, updated_at = NOW()
+        SET assigned_to = ?,
+            status = 'in_progress',
+            due_at = ?,
+            assigned_at = COALESCE(assigned_at, NOW()),
+            updated_at = NOW()
         WHERE taskId = ?
     ");
     if ($stmt) {
@@ -206,6 +312,7 @@ if ($action === 'resume') {
         UPDATE tb_tasks
         SET status = 'in_progress',
             due_at = ?,
+            assigned_at = COALESCE(assigned_at, NOW()),
             updated_at = NOW()
         WHERE taskId = ?
     ");

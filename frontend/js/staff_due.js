@@ -44,6 +44,51 @@ async function initStaffDueController() {
   let currentRecords = [];
   let verificationEscalationWindowDays = 60;
   let verificationDueSoonWindowDays = 45;
+  const STAFF_DUE_CACHE_KEY = "pensionsgoStaffDueSessionCache:v1";
+  const STAFF_DUE_CACHE_TTL_MS = 5 * 60 * 1000;
+
+  function readStaffDueCache() {
+    try {
+      return JSON.parse(sessionStorage.getItem(STAFF_DUE_CACHE_KEY) || "{}") || {};
+    } catch (_error) {
+      return {};
+    }
+  }
+
+  function writeStaffDueCache(cache) {
+    try {
+      sessionStorage.setItem(STAFF_DUE_CACHE_KEY, JSON.stringify(cache || {}));
+    } catch (_error) {}
+  }
+
+  function getStaffDueCachedPayload(key) {
+    const entry = readStaffDueCache()[key];
+    if (!entry || !entry.payload || Date.now() - Number(entry.savedAt || 0) > STAFF_DUE_CACHE_TTL_MS) return null;
+    return entry.payload;
+  }
+
+  function setStaffDueCachedPayload(key, payload) {
+    const cache = readStaffDueCache();
+    cache[key] = { savedAt: Date.now(), payload };
+    const compact = Object.fromEntries(Object.entries(cache)
+      .sort((a, b) => Number(b[1]?.savedAt || 0) - Number(a[1]?.savedAt || 0))
+      .slice(0, 16));
+    writeStaffDueCache(compact);
+  }
+
+  function clearStaffDueCache() {
+    try {
+      sessionStorage.removeItem(STAFF_DUE_CACHE_KEY);
+    } catch (_error) {}
+  }
+
+  function applyStaffDuePayload(data, { resetPage = true } = {}) {
+    verificationEscalationWindowDays = Math.max(7, Number(data.settings?.verificationEscalationWindowDays || verificationEscalationWindowDays || 60));
+    verificationDueSoonWindowDays = Math.max(1, Number(data.settings?.verificationDueSoonWindowDays || verificationDueSoonWindowDays || Math.max(1, verificationEscalationWindowDays - 15)));
+    currentRecords = Array.isArray(data.records) ? data.records : [];
+    if (resetPage) currentPage = 1;
+    renderStaffCards();
+  }
 
   function formatRetirementType(value) {
     return window.PensionsGoRetirementTypes?.getLabel?.(value) || String(value || "").trim() || "N/A";
@@ -228,6 +273,13 @@ async function initStaffDueController() {
         submissionStatus: filterSubmissionStatus.value,
         appnStatus: filterAppnStatus.value
       });
+      const cacheKey = params.toString();
+      const cachedPayload = getStaffDueCachedPayload(cacheKey);
+      if (cachedPayload) {
+        applyStaffDuePayload(cachedPayload);
+      } else {
+        staffContainer.innerHTML = "<div class=\"app-state-message app-state-neutral\">Loading staff due records...</div>";
+      }
       const res = await fetch(`../backend/api/fetch_staffdue.php?${params.toString()}`, {
         cache: "no-store",
         credentials: "include",
@@ -242,11 +294,8 @@ async function initStaffDueController() {
         staffContainer.innerHTML = `<div class="app-state-message app-state-error">${escapeHtml(data.message || "Unable to load records.")}</div>`;
         return;
       }
-      verificationEscalationWindowDays = Math.max(7, Number(data.settings?.verificationEscalationWindowDays || verificationEscalationWindowDays || 60));
-      verificationDueSoonWindowDays = Math.max(1, Number(data.settings?.verificationDueSoonWindowDays || verificationDueSoonWindowDays || Math.max(1, verificationEscalationWindowDays - 15)));
-      currentRecords = Array.isArray(data.records) ? data.records : [];
-      currentPage = 1;
-      renderStaffCards();
+      setStaffDueCachedPayload(cacheKey, data);
+      applyStaffDuePayload(data);
     } catch (err) {
       if (err?.name === "AbortError") return;
       console.error("Error fetching staff data:", err);
@@ -760,6 +809,7 @@ async function initStaffDueController() {
   }
 
   function triggerStaffRefresh() {
+    clearStaffDueCache();
     fetchStaffData();
     localStorage.setItem("staffDueUpdated", Date.now().toString());
   }
@@ -771,6 +821,7 @@ async function initStaffDueController() {
   window.addEventListener("pageshow", () => scheduleStaffRefresh());
   window.addEventListener("storage", (event) => {
     if (event.key === "staffDueUpdated") {
+      clearStaffDueCache();
       scheduleStaffRefresh(40);
     }
   });
