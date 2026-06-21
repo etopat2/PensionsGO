@@ -4947,6 +4947,12 @@ async function loadFooterWithCoordination(isAuthenticated = false) {
 }
 
 function scheduleLiveChatInitialization(sessionState = {}) {
+  const currentPage = (window.location.pathname.split('/').pop() || '').toLowerCase();
+  const role = String(sessionState.userRole || sessionState.role || localStorage.getItem('userRole') || '').toLowerCase();
+  if (currentPage === 'pensioner_board.html' || role === 'pensioner') {
+    document.getElementById('liveChatDock')?.remove();
+    return;
+  }
   if (window.__pensionsgoLiveChatInitScheduled) {
     return;
   }
@@ -5079,7 +5085,9 @@ async function initializeApplication() {
     window.__broadcastCheckerRunning = true;
     // Initialize session manager
     sessionManager.initialize();
-    scheduleLiveChatInitialization(sessionState);
+    if (currentPage !== 'pensioner_board.html' && String(sessionState.userRole || localStorage.getItem('userRole') || '').toLowerCase() !== 'pensioner') {
+      scheduleLiveChatInitialization(sessionState);
+    }
 
     // Additional check after 3 seconds to catch any immediate conflicts
     setTimeout(() => {

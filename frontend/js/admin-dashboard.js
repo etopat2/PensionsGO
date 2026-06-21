@@ -855,6 +855,11 @@ class AdminDashboard {
             'role-settings': 'Role Governance',
             'notification-settings': 'Notification Settings',
             'live-chat-settings': 'Live Chat Settings',
+            'public-chat-support': 'Public Chat Support',
+            'public-chat-agents': 'Public Chat Agents',
+            'public-chat-settings': 'Public Chat Settings',
+            'public-chat-reports': 'Public Chat Reports',
+            'public-chat-audit': 'Public Chat Audit Logs',
             'notification-queue': 'Notification Queue',
             'podcast-settings': 'Podcast Library',
             'title-settings': 'Title Settings',
@@ -935,6 +940,24 @@ class AdminDashboard {
                     content = await this.loadNotificationSettingsContent();
                     break;
                 case 'live-chat-settings':
+                    content = await this.loadLiveChatSettingsContent();
+                    break;
+                case 'public-chat-support':
+                case 'public-live-chat':
+                case 'public-chat-console':
+                case 'public-chat-queue':
+                case 'public-chat-active':
+                case 'public-chat-assigned':
+                case 'public-chat-offline':
+                case 'public-chat-tickets':
+                case 'public-chat-escalations':
+                case 'public-chat-canned':
+                case 'public-chat-agents':
+                case 'public-chat-reports':
+                case 'public-chat-audit':
+                    content = await this.loadPublicChatSupportContent();
+                    break;
+                case 'public-chat-settings':
                     content = await this.loadLiveChatSettingsContent();
                     break;
                 case 'notification-queue':
@@ -6401,6 +6424,24 @@ class AdminDashboard {
             case 'live-chat-settings':
                 this.initializeLiveChatSettings();
                 break;
+            case 'public-chat-support':
+            case 'public-live-chat':
+            case 'public-chat-console':
+            case 'public-chat-queue':
+            case 'public-chat-active':
+            case 'public-chat-assigned':
+            case 'public-chat-offline':
+            case 'public-chat-tickets':
+            case 'public-chat-escalations':
+            case 'public-chat-canned':
+            case 'public-chat-agents':
+            case 'public-chat-reports':
+            case 'public-chat-audit':
+                this.initializePublicChatSupport();
+                break;
+            case 'public-chat-settings':
+                this.initializeLiveChatSettings();
+                break;
             case 'notification-queue':
                 this.initializeNotificationQueue();
                 break;
@@ -6521,7 +6562,13 @@ class AdminDashboard {
             ? 'Empty the entire notification queue, including queued and sent items?'
             : 'Clear the notification queue items that match the current filters?';
 
-        const confirmed = window.confirm(confirmMessage);
+        const confirmed = typeof window.appConfirm === 'function'
+            ? await window.appConfirm(confirmMessage, {
+                title: isAll ? 'Empty Notification Queue' : 'Clear Notification Queue',
+                confirmText: isAll ? 'Empty Queue' : 'Clear Filtered',
+                cancelText: 'Cancel'
+            })
+            : false;
         if (!confirmed) {
             return;
         }
@@ -7733,7 +7780,31 @@ class AdminDashboard {
             live_chat_message_poll_ms: getNumber('live_chat_message_poll_ms'),
             live_chat_receipt_poll_ms: getNumber('live_chat_receipt_poll_ms'),
             live_chat_call_poll_ms: getNumber('live_chat_call_poll_ms'),
-            live_chat_signal_poll_ms: getNumber('live_chat_signal_poll_ms')
+            live_chat_signal_poll_ms: getNumber('live_chat_signal_poll_ms'),
+            public_chat_enabled: getBool('public_chat_enabled'),
+            public_chat_public_pages_enabled: getBool('public_chat_public_pages_enabled'),
+            public_chat_home_enabled: getBool('public_chat_home_enabled'),
+            public_chat_about_enabled: getBool('public_chat_about_enabled'),
+            public_chat_faq_enabled: getBool('public_chat_faq_enabled'),
+            public_chat_podcast_enabled: getBool('public_chat_podcast_enabled'),
+            public_chat_feedback_page_enabled: getBool('public_chat_feedback_page_enabled'),
+            public_chat_terms_enabled: getBool('public_chat_terms_enabled'),
+            public_chat_pensioner_portal_enabled: getBool('public_chat_pensioner_portal_enabled'),
+            public_chat_attachments_enabled: getBool('public_chat_attachments_enabled'),
+            public_chat_auto_assign_enabled: getBool('public_chat_auto_assign_enabled'),
+            public_chat_transcript_enabled: getBool('public_chat_transcript_enabled'),
+            public_chat_feedback_enabled: getBool('public_chat_feedback_enabled'),
+            public_chat_max_active_chats_per_agent: getNumber('public_chat_max_active_chats_per_agent'),
+            public_chat_max_message_length: getNumber('public_chat_max_message_length'),
+            public_chat_poll_interval_ms: getNumber('public_chat_poll_interval_ms'),
+            public_chat_max_attachment_size_mb: getNumber('public_chat_max_attachment_size_mb'),
+            public_chat_rate_limit_start_per_10min: getNumber('public_chat_rate_limit_start_per_10min'),
+            public_chat_rate_limit_messages_per_5min: getNumber('public_chat_rate_limit_messages_per_5min'),
+            public_chat_working_hours: String(getValue('public_chat_working_hours')?.value || '').trim(),
+            public_chat_allowed_attachment_types: String(getValue('public_chat_allowed_attachment_types')?.value || '').trim(),
+            public_chat_welcome_text: String(getValue('public_chat_welcome_text')?.value || '').trim(),
+            public_chat_consent_text: String(getValue('public_chat_consent_text')?.value || '').trim(),
+            public_chat_offline_message: String(getValue('public_chat_offline_message')?.value || '').trim()
         };
     }
 
@@ -14922,9 +14993,904 @@ AdminDashboard.prototype.loadLiveChatSettingsContent = async function () {
                         </div>
                     </div>
                 </section>
+
+                <section class="settings-card">
+                    <div class="settings-card-header">
+                        <h3>Public Live Support</h3>
+                        <p>Control the separate public-facing correspondence widget without changing staff-to-staff live chat.</p>
+                    </div>
+                    <div class="settings-fields">
+                        ${toggle('public_chat_enabled', 'Enable Public Live Support', 'Show and allow the public correspondence widget where public chat access is enabled.')}
+                        ${toggle('public_chat_public_pages_enabled', 'Public Pages', 'Show the widget on Home, About, FAQs, Podcast, Feedback, and Terms.')}
+                        ${toggle('public_chat_home_enabled', 'Home Page Widget', 'Allow the public chat launcher on the Home page.')}
+                        ${toggle('public_chat_about_enabled', 'About Page Widget', 'Allow the public chat launcher on the About page.')}
+                        ${toggle('public_chat_faq_enabled', 'FAQ Page Widget', 'Allow the public chat launcher on the FAQs page.')}
+                        ${toggle('public_chat_podcast_enabled', 'Podcast Page Widget', 'Allow the public chat launcher on the Podcast page.')}
+                        ${toggle('public_chat_feedback_page_enabled', 'Feedback Page Widget', 'Allow the public chat launcher on the Feedback page.')}
+                        ${toggle('public_chat_terms_enabled', 'Terms Page Widget', 'Allow the public chat launcher on the Terms page.')}
+                        ${toggle('public_chat_pensioner_portal_enabled', 'Pensioner Portal', 'Allow logged-in pensioners to open the same support widget with profile prefill.')}
+                        ${toggle('public_chat_attachments_enabled', 'Public Attachments', 'Reserve attachment support for the public correspondence module.')}
+                        ${toggle('public_chat_auto_assign_enabled', 'Auto Assignment', 'Allow the system to auto-route new public chats when enabled by operations.')}
+                        ${toggle('public_chat_transcript_enabled', 'Chat Transcripts', 'Keep transcripts available for authorized officers and reporting.')}
+                        ${toggle('public_chat_feedback_enabled', 'Feedback Rating', 'Ask visitors to rate support after a chat or offline request.')}
+                        ${numberField('public_chat_max_active_chats_per_agent', 'Max Active Chats Per Agent', 1, 50, 1, 'Default maximum number of active public chats assigned to one agent.')}
+                        ${numberField('public_chat_max_message_length', 'Max Message Length', 250, 5000, 50, 'Maximum characters allowed in each public chat message.')}
+                        ${numberField('public_chat_poll_interval_ms', 'Public Poll Interval (ms)', 800, 15000, 100, 'How often visitor and agent public chat windows check for updates.')}
+                        ${numberField('public_chat_max_attachment_size_mb', 'Max Attachment Size (MB)', 1, 25, 1, 'Maximum public chat attachment size.')}
+                        ${numberField('public_chat_rate_limit_start_per_10min', 'Start Rate Limit / 10 min', 1, 120, 1, 'Maximum chat/offline starts per visitor window.')}
+                        ${numberField('public_chat_rate_limit_messages_per_5min', 'Message Rate Limit / 5 min', 1, 120, 1, 'Maximum public messages per visitor window.')}
+                        <label class="settings-field">
+                            <span>Working Hours</span>
+                            <input name="public_chat_working_hours" placeholder="08:00-17:00">
+                            <small class="field-help">Displayed and available to routing logic as the public support hours.</small>
+                        </label>
+                        <label class="settings-field">
+                            <span>Allowed Attachment Types</span>
+                            <input name="public_chat_allowed_attachment_types" placeholder="pdf,jpg,jpeg,png,doc,docx">
+                            <small class="field-help">Comma-separated extensions allowed for public uploads.</small>
+                        </label>
+                        <label class="settings-field">
+                            <span>Welcome Text</span>
+                            <textarea name="public_chat_welcome_text" rows="3"></textarea>
+                        </label>
+                        <label class="settings-field">
+                            <span>Consent Text</span>
+                            <textarea name="public_chat_consent_text" rows="3"></textarea>
+                        </label>
+                        <label class="settings-field">
+                            <span>Offline Message</span>
+                            <textarea name="public_chat_offline_message" rows="3"></textarea>
+                            <small class="field-help">Shown when public live support is unavailable.</small>
+                        </label>
+                    </div>
+                </section>
             </form>
         </div>
     `;
+};
+
+AdminDashboard.prototype.loadPublicChatSupportContent = async function () {
+    const section = String(this.currentSection || 'public-chat-support').toLowerCase();
+    const titles = {
+        'public-chat-support': ['Public Chat Support', 'Manage public live chat handlers, reports, audit trails, and support settings from one settings workspace.'],
+        'public-chat-agents': ['Public Chat Agents', 'Appoint existing registered users as public chat handlers and control their correspondence rights.'],
+        'public-chat-settings': ['Public Chat Settings', 'Configure public live support widget, access, working hours, consent, feedback, uploads, and limits.'],
+        'public-chat-reports': ['Public Chat Reports', 'Filter, review, and export public live chat statistics and correspondence records.'],
+        'public-chat-audit': ['Public Chat Audit Logs', 'Review sensitive public live chat actions, agent changes, and settings updates.']
+    };
+    const [title, subtitle] = titles[section] || titles['public-chat-support'];
+    const statusActions = `
+        <div class="settings-actions">
+            <span class="settings-status" id="publicChatSupportStatus">Ready</span>
+            <select id="publicChatAgentStatus" class="settings-select">
+                <option value="online">Online</option>
+                <option value="busy">Busy</option>
+                <option value="away">Away</option>
+                <option value="offline">Offline</option>
+            </select>
+            <button class="action-btn secondary" id="refreshPublicChatSupportBtn" type="button">Refresh</button>
+        </div>
+    `;
+    const agentsPanel = `
+        <section class="settings-card public-chat-admin-panel" id="publicChatAgentsPanel">
+            <div class="settings-card-header">
+                <h3>Agent Management</h3>
+                <p>Enable eligible users for public correspondence and tune their chat handling permissions.</p>
+            </div>
+            <div class="settings-note">
+                <strong>Role alignment</strong>
+                <span>Super Admin, Admin, OC, and appointed users retain their existing app roles while public chat rights are controlled here.</span>
+            </div>
+            <div class="public-chat-admin-toolbar" data-public-chat-tools="agents">
+                <input type="search" class="filter-input" data-public-chat-filter="agents" placeholder="Search agents by name, role, status, or right">
+                <button type="button" class="action-btn secondary small" data-public-chat-export-table="agents">Export CSV</button>
+                <button type="button" class="action-btn secondary small" data-public-chat-print-table="agents">Print</button>
+            </div>
+            <div id="publicChatAgentsList"></div>
+        </section>
+    `;
+    const reportsPanel = `
+        <section class="settings-card public-chat-admin-panel" id="publicChatReportsPanel">
+            <div class="settings-card-header">
+                <h3>Reports and Statistics</h3>
+                <p>Filter by date range, district, category, status, agent, priority, pensioner/force number, or ticket status.</p>
+            </div>
+            <form id="publicChatReportFilters" class="settings-form compact-form">
+                <div class="settings-split-grid">
+                    <input type="date" name="date_from">
+                    <input type="date" name="date_to">
+                    <input name="district" placeholder="District">
+                    <select name="inquiry_category" id="publicChatReportCategory"></select>
+                    <select name="status"><option value="">Any status</option><option>waiting</option><option>active</option><option>assigned</option><option>escalated</option><option>closed</option></select>
+                    <input name="agent" placeholder="Agent name">
+                    <select name="priority"><option value="">Any priority</option><option>low</option><option>normal</option><option>high</option><option>urgent</option></select>
+                    <input name="number" placeholder="Force/Pensioner number">
+                    <select name="ticket_status"><option value="">Any ticket status</option><option>New</option><option>Assigned</option><option>In progress</option><option>Awaiting public user</option><option>Escalated</option><option>Resolved</option><option>Closed</option><option>Reopened</option></select>
+                </div>
+                <div class="settings-actions">
+                    <button type="submit" class="action-btn secondary">Apply Filters</button>
+                    <button type="button" class="action-btn secondary" id="publicChatExportBtn">Server CSV</button>
+                    <button type="button" class="action-btn secondary" data-public-chat-export-table="reports">Export Visible</button>
+                    <button type="button" class="action-btn secondary" data-public-chat-print-table="reports">Print</button>
+                </div>
+            </form>
+            <div id="publicChatReportGroups"></div>
+            <div id="publicChatReportRecords"></div>
+        </section>
+    `;
+    const auditPanel = `
+        <section class="settings-card public-chat-admin-panel" id="publicChatAuditPanel">
+            <div class="settings-card-header">
+                <h3>Audit Logs</h3>
+                <p>Track chat creation, assignment, messages, notes, escalations, tickets, closures, feedback, agent status, and settings changes.</p>
+            </div>
+            <div class="public-chat-admin-toolbar" data-public-chat-tools="audit">
+                <input type="search" class="filter-input" data-public-chat-filter="audit" placeholder="Search audit logs by action, actor, role, IP, date, or details">
+                <button type="button" class="action-btn secondary small" data-public-chat-export-table="audit">Export CSV</button>
+                <button type="button" class="action-btn secondary small" data-public-chat-print-table="audit">Print</button>
+            </div>
+            <div id="publicChatAuditList"></div>
+        </section>
+    `;
+    const overviewPanel = `
+        <div class="settings-grid public-chat-management-grid public-chat-support-overview">
+            <section class="settings-card">
+                <div class="settings-card-header"><h3>Public Chat Agents</h3><p>Manage permitted public chat handlers and availability controls.</p></div>
+                <button type="button" class="action-btn secondary" data-public-chat-section="public-chat-agents">Open Agents</button>
+            </section>
+            <section class="settings-card">
+                <div class="settings-card-header"><h3>Public Chat Settings</h3><p>Open the Live Chat Settings form directly for widget, working hours, consent, feedback, uploads, and limits.</p></div>
+                <button type="button" class="action-btn secondary" data-public-chat-section="public-chat-settings">Open Settings</button>
+            </section>
+            <section class="settings-card">
+                <div class="settings-card-header"><h3>Public Chat Reports</h3><p>Review public chat records and export filtered reports.</p></div>
+                <button type="button" class="action-btn secondary" data-public-chat-section="public-chat-reports">Open Reports</button>
+            </section>
+            <section class="settings-card">
+                <div class="settings-card-header"><h3>Public Chat Audit Logs</h3><p>Inspect sensitive public chat actions and configuration changes.</p></div>
+                <button type="button" class="action-btn secondary" data-public-chat-section="public-chat-audit">Open Audit Logs</button>
+            </section>
+        </div>
+    `;
+    const panelBySection = {
+        'public-chat-agents': agentsPanel,
+        'public-chat-reports': reportsPanel,
+        'public-chat-audit': auditPanel
+    };
+
+    return `
+        <div class="settings-content public-chat-support-admin">
+            <div class="settings-header">
+                <div>
+                    <h2 class="section-title">${this.escapeHtml(title)}</h2>
+                    <p class="section-subtitle">${this.escapeHtml(subtitle)}</p>
+                </div>
+                ${statusActions}
+            </div>
+            ${panelBySection[section] || overviewPanel}
+        </div>
+    `;
+};
+
+AdminDashboard.prototype.initializePublicChatSupport = function () {
+    this.publicChatState = { selectedId: null, selected: null, lastMessageId: 0, pollTimer: null, heartbeatTimer: null };
+    document.getElementById('refreshPublicChatSupportBtn')?.addEventListener('click', () => this.refreshPublicChatModule());
+    document.getElementById('publicChatAgentStatus')?.addEventListener('change', (event) => this.setPublicChatAgentStatus(event.target.value));
+    document.getElementById('publicChatAcceptBtn')?.addEventListener('click', () => this.publicChatAction('accept'));
+    document.getElementById('publicChatTransferBtn')?.addEventListener('click', async () => {
+        const agent = await this.resolvePublicChatTransferAgent();
+        if (agent?.userId) this.publicChatAction('transfer', { agent_user_id: agent.userId });
+    });
+    document.getElementById('publicChatEscalateBtn')?.addEventListener('click', async () => {
+        const reason = await this.publicChatPrompt('Record the escalation reason.', '', {
+            title: 'Escalate Public Chat',
+            confirmText: 'Escalate'
+        });
+        if (reason) this.publicChatAction('escalate', { reason });
+    });
+    document.getElementById('publicChatTicketBtn')?.addEventListener('click', async () => {
+        const subject = await this.publicChatPrompt('Enter the ticket subject.', this.publicChatState?.selected?.session?.subject || 'Public chat follow-up', {
+            title: 'Create Public Chat Ticket',
+            confirmText: 'Create Ticket'
+        });
+        if (subject) this.publicChatAction('ticket', { subject, description: subject });
+    });
+    document.getElementById('publicChatCloseBtn')?.addEventListener('click', async () => {
+        const reason = await this.publicChatPrompt('Record the close reason.', 'Resolved', {
+            title: 'Close Public Chat',
+            confirmText: 'Close Chat'
+        });
+        if (reason !== null) this.publicChatAction('close', { reason: reason || 'Resolved' });
+    });
+    document.getElementById('publicChatAgentReplyForm')?.addEventListener('submit', (event) => this.sendPublicChatReply(event));
+    document.getElementById('publicChatAgentNoteForm')?.addEventListener('submit', (event) => this.addPublicChatNote(event));
+    document.getElementById('publicChatCannedForm')?.addEventListener('submit', (event) => this.savePublicChatCanned(event));
+    document.getElementById('publicChatExportBtn')?.addEventListener('click', () => this.exportPublicChatReport());
+    document.getElementById('publicChatReportFilters')?.addEventListener('submit', (event) => {
+        event.preventDefault();
+        this.loadPublicChatReports();
+    });
+    document.querySelectorAll('[data-public-chat-filter]').forEach((input) => {
+        input.addEventListener('input', () => this.filterPublicChatTable(input.dataset.publicChatFilter || '', input.value));
+    });
+    document.querySelectorAll('[data-public-chat-export-table]').forEach((button) => {
+        button.addEventListener('click', () => this.exportPublicChatTable(button.dataset.publicChatExportTable || ''));
+    });
+    document.querySelectorAll('[data-public-chat-print-table]').forEach((button) => {
+        button.addEventListener('click', () => this.printPublicChatTable(button.dataset.publicChatPrintTable || ''));
+    });
+    document.querySelectorAll('[data-public-chat-section]').forEach((button) => {
+        button.addEventListener('click', () => this.navigateToSection(button.dataset.publicChatSection || 'public-chat-support'));
+    });
+    document.querySelectorAll('[data-public-chat-panel]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const panel = button.dataset.publicChatPanel;
+            const target = document.getElementById(`publicChat${panel.charAt(0).toUpperCase()}${panel.slice(1)}Panel`);
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
+    this.populatePublicChatCategorySelects();
+    this.refreshPublicChatModule();
+    const targetPanelMap = {
+        'public-chat-agents': 'publicChatAgentsPanel',
+        'public-chat-settings': 'publicChatSettingsPanel',
+        'public-chat-reports': 'publicChatReportsPanel',
+        'public-chat-audit': 'publicChatAuditPanel'
+    };
+    const targetPanel = document.getElementById(targetPanelMap[this.currentSection] || '');
+    if (targetPanel) window.setTimeout(() => targetPanel.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+    this.startPublicChatHeartbeat();
+};
+
+AdminDashboard.prototype.publicChatPrompt = async function (message, defaultValue = '', options = {}) {
+    if (typeof window.appPrompt === 'function') {
+        return window.appPrompt(message, defaultValue, options);
+    }
+    this.showNotification(message, options.type || 'info');
+    return null;
+};
+
+AdminDashboard.prototype.publicChatConfirm = async function (message, options = {}) {
+    if (typeof window.appConfirm === 'function') {
+        return window.appConfirm(message, options);
+    }
+    this.showNotification(message, options.type || 'info');
+    return false;
+};
+
+AdminDashboard.prototype.resolvePublicChatTransferAgent = async function () {
+    let agents = [];
+    try {
+        const data = await this.publicChatFetch({ action: 'transfer_agents' }, 'GET');
+        agents = Array.isArray(data.agents) ? data.agents : [];
+    } catch (error) {
+        this.showNotification(error.message || 'Unable to load public chat handlers.', 'error');
+        return null;
+    }
+    if (!agents.length) {
+        this.showNotification('No enabled public chat handlers are available for transfer.', 'info');
+        return null;
+    }
+    if (agents.length === 1) {
+        const confirmed = await this.publicChatConfirm(`Transfer this chat to ${agents[0].agentLabel || agents[0].userName || 'the available handler'}?`, {
+            title: 'Transfer Public Chat',
+            confirmText: 'Transfer',
+            cancelText: 'Cancel'
+        });
+        return confirmed ? agents[0] : null;
+    }
+    const names = agents.map((agent) => agent.agentLabel || agent.userName || 'Unnamed handler').join(', ');
+    const choice = await this.publicChatPrompt(`Type the handler name. Available handlers: ${names}`, '', {
+        title: 'Transfer Public Chat',
+        confirmText: 'Transfer'
+    });
+    const normalized = String(choice || '').trim().toLowerCase();
+    if (!normalized) return null;
+    const matches = agents.filter((agent) => String(agent.agentLabel || agent.userName || '').trim().toLowerCase().includes(normalized));
+    if (matches.length === 1) return matches[0];
+    this.showNotification(matches.length > 1 ? 'More than one handler matched that name. Type a fuller name.' : 'No handler matched that name.', 'error');
+    return null;
+};
+
+AdminDashboard.prototype.refreshPublicChatModule = async function () {
+    await Promise.allSettled([
+        this.loadPublicChatStats(),
+        this.loadPublicChatAgents(),
+        this.loadPublicChatReports(),
+        this.loadPublicChatAudit()
+    ]);
+};
+
+AdminDashboard.prototype.startPublicChatHeartbeat = function () {
+    if (this.publicChatState?.heartbeatTimer) clearInterval(this.publicChatState.heartbeatTimer);
+    this.publicChatState.heartbeatTimer = setInterval(() => {
+        const activeSection = String(this.currentSection || '').toLowerCase();
+        const isPublicChatOpen = activeSection.includes('public-chat') || activeSection === 'public-live-chat';
+        if (!isPublicChatOpen || document.hidden) return;
+        this.publicChatFetch({ action: 'heartbeat' }).catch(() => {});
+    }, 120000);
+};
+
+AdminDashboard.prototype.populatePublicChatCategorySelects = function () {
+    const categories = [
+        'Pension application status', 'Retirement benefits', 'Gratuity', 'Monthly pension', 'Arrears', 'Life certificate',
+        'Date of birth correction', 'Payroll/payment issue', 'Document requirements', 'General inquiry', 'Complaint', 'Technical support'
+    ];
+    ['publicChatCannedCategory', 'publicChatReportCategory'].forEach((id) => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        select.innerHTML = `<option value="">${id.includes('Report') ? 'Any category' : 'General'}</option>` + categories.map((cat) => `<option value="${this.escapeHtml(cat)}">${this.escapeHtml(cat)}</option>`).join('');
+    });
+};
+
+AdminDashboard.prototype.publicChatFetch = async function (payload, method = 'POST') {
+    const options = method === 'GET'
+        ? { credentials: 'include', cache: 'no-store' }
+        : { method, credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) };
+    const url = method === 'GET'
+        ? `../backend/api/public_chat_agent.php?${new URLSearchParams(payload).toString()}`
+        : '../backend/api/public_chat_agent.php';
+    const response = await fetch(url, options);
+    const data = await this.safeJson(response, { success: false });
+    if (!data.success) throw new Error(data.message || 'Public chat request failed.');
+    return data;
+};
+
+AdminDashboard.prototype.publicChatLabel = function (key) {
+    return String(key || '')
+        .replace(/[_-]+/g, ' ')
+        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+AdminDashboard.prototype.publicChatDisplayValue = function (value) {
+    if (value === null || value === undefined || value === '') return 'N/A';
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    if (Array.isArray(value)) return value.length ? value.map((item) => this.publicChatDisplayValue(item)).join(', ') : 'N/A';
+    if (typeof value === 'object') {
+        return Object.entries(value)
+            .filter(([key]) => !this.publicChatIsTechnicalKey(key))
+            .map(([key, item]) => `${this.publicChatLabel(key)}: ${this.publicChatDisplayValue(item)}`)
+            .join('; ') || 'N/A';
+    }
+    const raw = String(value);
+    if ((raw.startsWith('{') && raw.endsWith('}')) || (raw.startsWith('[') && raw.endsWith(']'))) {
+        try {
+            return this.publicChatDisplayValue(JSON.parse(raw));
+        } catch (_) {}
+    }
+    return raw;
+};
+
+AdminDashboard.prototype.publicChatIsTechnicalKey = function (key) {
+    return /(^id$|_id$|userid|user_id|session_id|message_id|attachment_id|actor_user_id|assigned_to|assigned_agent_id|response_id|ticket_id|typing_id)/i.test(String(key || ''));
+};
+
+AdminDashboard.prototype.publicChatFriendlyActor = function (row, nameKey, idKey, fallback = 'Unassigned') {
+    return row?.[nameKey] || row?.name || row?.userName || fallback;
+};
+
+AdminDashboard.prototype.publicChatStatusBadge = function (value) {
+    const label = this.publicChatDisplayValue(value);
+    const key = label.toLowerCase().replace(/\s+/g, '-');
+    return `<span class="public-chat-admin-badge status-${this.escapeHtml(key)}">${this.escapeHtml(label)}</span>`;
+};
+
+AdminDashboard.prototype.publicChatRenderTable = function (scope, rows, columns, options = {}) {
+    const safeRows = Array.isArray(rows) ? rows : [];
+    this.publicChatTables = this.publicChatTables || {};
+    this.publicChatTables[scope] = {
+        title: options.title || this.publicChatLabel(scope),
+        rows: safeRows,
+        columns
+    };
+    if (!safeRows.length) {
+        return `<div class="settings-note">No records found.</div>`;
+    }
+    const caption = options.caption ? `<caption>${this.escapeHtml(options.caption)}</caption>` : '';
+    return `
+        <div class="settings-table-container public-chat-admin-table-wrap" data-public-chat-table-scope="${this.escapeHtml(scope)}">
+            <table class="settings-table public-chat-admin-table">
+                ${caption}
+                <thead>
+                    <tr>${columns.map((column) => `<th scope="col">${this.escapeHtml(column.label || this.publicChatLabel(column.key))}</th>`).join('')}</tr>
+                </thead>
+                <tbody>
+                    ${safeRows.map((row) => `
+                        <tr data-public-chat-row="${this.escapeHtml(scope)}" data-search="${this.escapeHtml(columns.map((column) => this.publicChatDisplayValue(column.render ? column.render(row, true) : row[column.key])).join(' ').toLowerCase())}" ${options.rowId ? `data-user-id="${this.escapeHtml(row[options.rowId] || '')}"` : ''}>
+                            ${columns.map((column) => {
+                                const rendered = column.render ? column.render(row, false) : this.escapeHtml(this.publicChatDisplayValue(row[column.key]));
+                                return `<td>${rendered}</td>`;
+                            }).join('')}
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+};
+
+AdminDashboard.prototype.filterPublicChatTable = function (scope, query) {
+    const normalized = String(query || '').trim().toLowerCase();
+    document.querySelectorAll(`[data-public-chat-row="${scope}"]`).forEach((row) => {
+        row.hidden = normalized !== '' && !String(row.dataset.search || '').includes(normalized);
+    });
+};
+
+AdminDashboard.prototype.publicChatVisibleRows = function (scope) {
+    const table = this.publicChatTables?.[scope];
+    if (!table) return [];
+    const domRows = Array.from(document.querySelectorAll(`[data-public-chat-row="${scope}"]`));
+    if (!domRows.length) return table.rows;
+    const visibleIndexes = domRows
+        .map((row, index) => row.hidden ? -1 : index)
+        .filter((index) => index >= 0);
+    return visibleIndexes.map((index) => table.rows[index]).filter(Boolean);
+};
+
+AdminDashboard.prototype.exportPublicChatTable = function (scope) {
+    const table = this.publicChatTables?.[scope];
+    if (!table) {
+        this.showNotification('No public chat table is available to export.', 'info');
+        return;
+    }
+    const rows = this.publicChatVisibleRows(scope);
+    const escapeCsv = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const lines = [
+        table.columns.map((column) => escapeCsv(column.label || this.publicChatLabel(column.key))).join(','),
+        ...rows.map((row) => table.columns.map((column) => {
+            const value = column.render ? column.render(row, true) : row[column.key];
+            return escapeCsv(this.publicChatDisplayValue(value));
+        }).join(','))
+    ];
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${String(table.title || scope).toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(link.href);
+};
+
+AdminDashboard.prototype.printPublicChatTable = function (scope) {
+    const table = this.publicChatTables?.[scope];
+    if (!table) {
+        this.showNotification('No public chat table is available to print.', 'info');
+        return;
+    }
+    const rows = this.publicChatVisibleRows(scope);
+    const html = `
+        <table>
+            <thead>
+                <tr>${table.columns.map((column) => `<th>${this.escapeHtml(column.label || this.publicChatLabel(column.key))}</th>`).join('')}</tr>
+            </thead>
+            <tbody>
+                ${rows.map((row) => `
+                    <tr>
+                        ${table.columns.map((column) => {
+                            const value = column.render ? column.render(row, true) : row[column.key];
+                            return `<td>${this.escapeHtml(this.publicChatDisplayValue(value))}</td>`;
+                        }).join('')}
+                    </tr>
+                `).join('') || `<tr><td colspan="${table.columns.length}">No records found.</td></tr>`}
+            </tbody>
+        </table>
+    `;
+    const printWindow = window.open('', '_blank', 'width=1100,height=760');
+    if (!printWindow) {
+        this.showNotification('Allow popups to print public chat records.', 'error');
+        return;
+    }
+    printWindow.document.open();
+    printWindow.document.write(`
+        <!doctype html>
+        <html>
+            <head>
+                <title>${this.escapeHtml(table.title)}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; color: #222; padding: 24px; }
+                    h1 { font-size: 20px; margin: 0 0 6px; }
+                    p { color: #555; margin: 0 0 18px; }
+                    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; }
+                    th { background: #f2f2f2; }
+                    .public-chat-admin-badge { border: 1px solid #bbb; border-radius: 999px; padding: 2px 7px; display: inline-block; }
+                </style>
+            </head>
+            <body>
+                <h1>${this.escapeHtml(table.title)}</h1>
+                <p>Generated ${this.escapeHtml(new Date().toLocaleString())}</p>
+                ${html}
+            </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => printWindow.print(), 250);
+};
+
+AdminDashboard.prototype.loadPublicChatQueue = async function () {
+    try {
+        this.updateSettingsStatus('publicChatSupport', 'Loading...', 'info');
+        const data = await this.publicChatFetch({ action: 'list' }, 'GET');
+        const list = document.getElementById('publicChatQueueList');
+        if (list) {
+            list.innerHTML = (data.sessions || []).map((chat) => `
+                <button type="button" class="settings-list-row public-chat-row" data-session-id="${chat.session_id}">
+                    <strong>${this.escapeHtml(chat.chat_reference || '')}</strong>
+                    <span>${this.escapeHtml(chat.visitor_name || '')} - ${this.escapeHtml(chat.inquiry_category || '')}</span>
+                    <small>${this.escapeHtml(chat.status || '')} - ${this.escapeHtml(chat.district || '')}</small>
+                </button>
+            `).join('') || '<div class="settings-note">No active public chats.</div>';
+            list.querySelectorAll('[data-session-id]').forEach((btn) => {
+                btn.addEventListener('click', () => this.loadPublicChatDetail(Number(btn.dataset.sessionId || 0)));
+            });
+        }
+        this.updateSettingsStatus('publicChatSupport', 'Up to date', 'success');
+    } catch (error) {
+        this.updateSettingsStatus('publicChatSupport', 'Load failed', 'error');
+        this.showNotification(error.message || 'Unable to load public chats.', 'error');
+    }
+};
+
+AdminDashboard.prototype.loadPublicChatStats = async function () {
+    try {
+        const data = await this.publicChatFetch({ action: 'stats' }, 'GET');
+        const stats = data.stats || {};
+        const grid = document.getElementById('publicChatStatsGrid');
+        if (grid) {
+            const cards = [
+                ['Today', stats.totalToday], ['This Week', stats.totalWeek], ['This Month', stats.totalMonth],
+                ['Waiting', stats.waiting], ['Active', stats.active], ['Closed', stats.closed],
+                ['Unresolved', stats.unresolved], ['Escalated', stats.escalated], ['Offline', stats.offlineMessages],
+                ['Tickets', stats.ticketsCreated], ['Complaints', stats.complaints], ['Avg Rating', stats.feedbackAverageRating || 0]
+            ];
+            grid.innerHTML = cards.map(([label, value]) => `<article class="analytics-stat-card"><span>${this.escapeHtml(label)}</span><strong>${this.escapeHtml(String(value ?? 0))}</strong></article>`).join('');
+        }
+        const groups = document.getElementById('publicChatReportGroups');
+        if (groups) {
+            groups.innerHTML = `
+                <div class="public-chat-report-summary-grid">
+                    ${Object.entries(stats.groups || {}).map(([key, rows]) => `
+                        <section class="public-chat-report-summary">
+                            <h4>${this.escapeHtml(this.publicChatLabel(key))}</h4>
+                            ${this.publicChatRenderTable(`reports-${key}`, rows || [], [
+                                { key: 'label', label: 'Group' },
+                                { key: 'total', label: 'Total' }
+                            ], { title: `Public Chat ${this.publicChatLabel(key)}` })}
+                        </section>
+                    `).join('')}
+                </div>
+            `;
+        }
+    } catch (_) {}
+};
+
+AdminDashboard.prototype.loadPublicChatReports = async function () {
+    const wrap = document.getElementById('publicChatReportRecords');
+    if (!wrap) return;
+    try {
+        wrap.innerHTML = '<div class="settings-note">Loading public chat report records...</div>';
+        const form = document.getElementById('publicChatReportFilters');
+        const filters = form ? Object.fromEntries(new FormData(form).entries()) : {};
+        const statuses = filters.status ? [filters.status] : ['waiting', 'active', 'assigned', 'escalated', 'closed'];
+        const responses = await Promise.all(statuses.map((status) => this.publicChatFetch({ action: 'list', status }, 'GET').catch(() => ({ sessions: [] }))));
+        const seen = new Set();
+        let sessions = responses.flatMap((data) => data.sessions || []).filter((row) => {
+            const id = String(row.session_id || '');
+            if (!id || seen.has(id)) return false;
+            seen.add(id);
+            return true;
+        });
+        const from = filters.date_from ? new Date(`${filters.date_from}T00:00:00`) : null;
+        const to = filters.date_to ? new Date(`${filters.date_to}T23:59:59`) : null;
+        sessions = sessions.filter((row) => {
+            const created = new Date(String(row.created_at || '').replace(' ', 'T'));
+            const matchesDate = (!from || created >= from) && (!to || created <= to);
+            const matchesDistrict = !filters.district || String(row.district || '').toLowerCase().includes(String(filters.district).toLowerCase());
+            const matchesCategory = !filters.inquiry_category || row.inquiry_category === filters.inquiry_category;
+            const matchesAgent = !filters.agent || String(row.assigned_agent_name || '').toLowerCase().includes(String(filters.agent).toLowerCase());
+            const matchesPriority = !filters.priority || row.priority === filters.priority;
+            const numberText = `${row.force_number || ''} ${row.pensioner_number || ''} ${row.phone_number || ''}`.toLowerCase();
+            const matchesNumber = !filters.number || numberText.includes(String(filters.number).toLowerCase());
+            return matchesDate && matchesDistrict && matchesCategory && matchesAgent && matchesPriority && matchesNumber;
+        });
+        const ticketData = await this.publicChatFetch({ action: 'tickets' }, 'GET').catch(() => ({ tickets: [] }));
+        let tickets = ticketData.tickets || [];
+        if (filters.ticket_status) {
+            tickets = tickets.filter((ticket) => ticket.status === filters.ticket_status);
+        }
+        wrap.innerHTML = `
+            <section class="public-chat-report-section">
+                <h4>Correspondence Records</h4>
+                ${this.publicChatRenderTable('reports', sessions, [
+                    { key: 'chat_reference', label: 'Chat Reference' },
+                    { key: 'visitor_name', label: 'Visitor' },
+                    { key: 'phone_number', label: 'Phone' },
+                    { key: 'force_number', label: 'Force No.' },
+                    { key: 'pensioner_number', label: 'Pensioner No.' },
+                    { key: 'district', label: 'District' },
+                    { key: 'inquiry_category', label: 'Category' },
+                    { key: 'status', label: 'Status', render: (row, plain) => plain ? row.status : this.publicChatStatusBadge(row.status) },
+                    { key: 'priority', label: 'Priority' },
+                    { key: 'assigned_agent_name', label: 'Agent', render: (row, plain) => plain ? this.publicChatFriendlyActor(row, 'assigned_agent_name') : this.escapeHtml(this.publicChatFriendlyActor(row, 'assigned_agent_name')) },
+                    { key: 'created_at', label: 'Created' }
+                ], { title: 'Public Chat Reports' })}
+            </section>
+            <section class="public-chat-report-section">
+                <h4>Ticket Records</h4>
+                ${this.publicChatRenderTable('reportTickets', tickets, [
+                    { key: 'ticket_reference', label: 'Ticket Reference' },
+                    { key: 'chat_reference', label: 'Chat Reference' },
+                    { key: 'status', label: 'Status', render: (row, plain) => plain ? row.status : this.publicChatStatusBadge(row.status) },
+                    { key: 'subject', label: 'Subject' },
+                    { key: 'visitor_name', label: 'Visitor' },
+                    { key: 'assigned_name', label: 'Assigned To', render: (row, plain) => plain ? this.publicChatFriendlyActor(row, 'assigned_name') : this.escapeHtml(this.publicChatFriendlyActor(row, 'assigned_name')) },
+                    { key: 'created_at', label: 'Created' }
+                ], { title: 'Public Chat Ticket Reports' })}
+            </section>
+        `;
+    } catch (error) {
+        wrap.innerHTML = `<div class="settings-note">${this.escapeHtml(error.message || 'Unable to load public chat reports.')}</div>`;
+    }
+};
+
+AdminDashboard.prototype.loadPublicChatDetail = async function (sessionId) {
+    if (!sessionId) return;
+    try {
+        const data = await this.publicChatFetch({ action: 'detail', session_id: sessionId }, 'GET');
+        this.publicChatState.selectedId = sessionId;
+        this.publicChatState.selected = data;
+        document.getElementById('publicChatDetailTitle').textContent = data.session.chat_reference || 'Conversation';
+        document.getElementById('publicChatDetailMeta').textContent = `${data.session.visitor_name || ''} - ${data.session.inquiry_category || ''} - ${data.session.district || ''}`;
+        this.renderPublicChatMessages(data.messages || []);
+        this.renderPublicChatNotes(data.notes || []);
+        ['publicChatAcceptBtn', 'publicChatTransferBtn', 'publicChatEscalateBtn', 'publicChatTicketBtn', 'publicChatCloseBtn', 'publicChatAgentReplyText', 'publicChatSendReplyBtn', 'publicChatAgentNoteText', 'publicChatAddNoteBtn'].forEach((id) => {
+            const node = document.getElementById(id);
+            if (node) node.disabled = false;
+        });
+    } catch (error) {
+        this.showNotification(error.message || 'Unable to load public chat.', 'error');
+    }
+};
+
+AdminDashboard.prototype.loadPublicChatTickets = async function () {
+    try {
+        const data = await this.publicChatFetch({ action: 'tickets' }, 'GET');
+        const wrap = document.getElementById('publicChatTicketsList');
+        if (!wrap) return;
+        wrap.innerHTML = (data.tickets || []).map((ticket) => `
+            <div class="settings-list-row">
+                <strong>${this.escapeHtml(ticket.ticket_reference || '')} - ${this.escapeHtml(ticket.status || '')}</strong>
+                <span>${this.escapeHtml(ticket.subject || '')}</span>
+                <small>${this.escapeHtml(ticket.chat_reference || '')} - ${this.escapeHtml(ticket.visitor_name || '')}</small>
+            </div>
+        `).join('') || '<div class="settings-note">No tickets.</div>';
+    } catch (_) {}
+};
+
+AdminDashboard.prototype.loadPublicChatEscalations = async function () {
+    try {
+        const data = await this.publicChatFetch({ action: 'escalations' }, 'GET');
+        const wrap = document.getElementById('publicChatEscalationsList');
+        if (!wrap) return;
+        wrap.innerHTML = (data.escalations || []).map((item) => `
+            <div class="settings-list-row">
+                <strong>${this.escapeHtml(item.chat_reference || '')} - ${this.escapeHtml(item.priority || '')}</strong>
+                <span>${this.escapeHtml(item.reason || '')}</span>
+                <small>${this.escapeHtml(item.escalated_by_name || item.escalated_by || '')} to ${this.escapeHtml(item.escalated_to_name || item.escalated_to || 'Supervisor')}</small>
+            </div>
+        `).join('') || '<div class="settings-note">No escalations.</div>';
+    } catch (_) {}
+};
+
+AdminDashboard.prototype.loadPublicChatCanned = async function () {
+    try {
+        const data = await this.publicChatFetch({ action: 'canned' }, 'GET');
+        const wrap = document.getElementById('publicChatCannedList');
+        if (!wrap) return;
+        wrap.innerHTML = (data.responses || []).map((item) => `
+            <button type="button" class="settings-list-row" data-canned-id="${item.response_id}">
+                <strong>${this.escapeHtml(item.title || '')}</strong>
+                <span>${this.escapeHtml(item.inquiry_category || 'General')}</span>
+                <small>${this.escapeHtml((item.body || '').slice(0, 160))}</small>
+            </button>
+        `).join('') || '<div class="settings-note">No canned responses.</div>';
+        wrap.querySelectorAll('[data-canned-id]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const item = (data.responses || []).find((row) => String(row.response_id) === String(btn.dataset.cannedId));
+                if (!item) return;
+                const reply = document.getElementById('publicChatAgentReplyText');
+                if (reply) reply.value = item.body || '';
+                document.getElementById('publicChatCannedId').value = item.response_id || '';
+                document.getElementById('publicChatCannedTitle').value = item.title || '';
+                document.getElementById('publicChatCannedCategory').value = item.inquiry_category || '';
+                document.getElementById('publicChatCannedBody').value = item.body || '';
+            });
+        });
+    } catch (_) {}
+};
+
+AdminDashboard.prototype.savePublicChatCanned = async function (event) {
+    event.preventDefault();
+    try {
+        await this.publicChatFetch({
+            action: 'save_canned',
+            response_id: document.getElementById('publicChatCannedId')?.value || 0,
+            title: document.getElementById('publicChatCannedTitle')?.value || '',
+            inquiry_category: document.getElementById('publicChatCannedCategory')?.value || '',
+            body: document.getElementById('publicChatCannedBody')?.value || '',
+            is_active: true
+        });
+        event.target.reset();
+        await this.loadPublicChatCanned();
+    } catch (error) {
+        this.showNotification(error.message || 'Unable to save canned response.', 'error');
+    }
+};
+
+AdminDashboard.prototype.loadPublicChatAgents = async function () {
+    try {
+        const data = await this.publicChatFetch({ action: 'agents' }, 'GET');
+        const wrap = document.getElementById('publicChatAgentsList');
+        if (!wrap) return;
+        wrap.innerHTML = this.publicChatRenderTable('agents', data.agents || [], [
+            { key: 'userName', label: 'Name', render: (agent, plain) => plain ? (agent.userName || 'Unnamed user') : `<strong>${this.escapeHtml(agent.userName || 'Unnamed user')}</strong>` },
+            { key: 'userRole', label: 'Role' },
+            { key: 'userEmail', label: 'Email' },
+            { key: 'phoneNo', label: 'Phone' },
+            { key: 'is_enabled', label: 'Enabled', render: (agent, plain) => plain ? (Number(agent.is_enabled) === 1 ? 'Enabled' : 'Disabled') : this.publicChatStatusBadge(Number(agent.is_enabled) === 1 ? 'Enabled' : 'Disabled') },
+            { key: 'availability_status', label: 'Availability', render: (agent, plain) => plain ? (agent.availability_status || 'offline') : this.publicChatStatusBadge(agent.availability_status || 'offline') },
+            { key: 'max_active_chats', label: 'Max Chats' },
+            { key: 'rights', label: 'Rights', render: (agent, plain) => {
+                const rights = [
+                    ['Accept', agent.can_accept_chat], ['Transfer', agent.can_transfer_chat], ['Escalate', agent.can_escalate_chat],
+                    ['Close', agent.can_close_chat], ['All Chats', agent.can_view_all_chats], ['Reports', agent.can_view_reports],
+                    ['Canned', agent.can_manage_canned_responses], ['Settings', agent.can_manage_chat_settings]
+                ].filter(([, enabled]) => Number(enabled) === 1).map(([label]) => label);
+                return plain ? (rights.join(', ') || 'Viewer only') : `<span>${this.escapeHtml(rights.join(', ') || 'Viewer only')}</span>`;
+            }},
+            { key: 'action', label: 'Action', render: (agent, plain) => plain ? 'Edit permissions' : `<button type="button" class="action-btn secondary small" data-public-chat-edit-agent="${this.escapeHtml(agent.userId || '')}">Edit</button>` }
+        ], { title: 'Public Chat Agents', rowId: 'userId' });
+        this.filterPublicChatTable('agents', document.querySelector('[data-public-chat-filter="agents"]')?.value || '');
+        wrap.querySelectorAll('[data-public-chat-edit-agent]').forEach((button) => button.addEventListener('click', () => this.editPublicChatAgent(button.dataset.publicChatEditAgent, data.agents || [])));
+    } catch (_) {}
+};
+
+AdminDashboard.prototype.editPublicChatAgent = async function (userId, agents) {
+    const current = (agents || []).find((agent) => String(agent.userId) === String(userId)) || {};
+    const currentlyEnabled = Number(current.is_enabled || 0) === 1;
+    const confirmed = await this.publicChatConfirm(`${currentlyEnabled ? 'Disable' : 'Enable'} ${current.userName || 'this user'} as a public chat handler?`, {
+        title: 'Public Chat Agent',
+        confirmText: currentlyEnabled ? 'Disable' : 'Enable',
+        cancelText: 'Cancel'
+    });
+    if (!confirmed) return;
+    const enabled = !currentlyEnabled;
+    try {
+        await this.publicChatFetch({
+            action: 'save_agent',
+            user_id: userId,
+            enabled,
+            can_handle_public_chat: enabled,
+            can_accept_chat: enabled,
+            can_transfer_chat: enabled,
+            can_escalate_chat: enabled,
+            can_close_chat: enabled,
+            can_view_all_chats: enabled,
+            can_view_reports: enabled,
+            can_manage_canned_responses: enabled,
+            can_manage_chat_settings: false,
+            availability_status: enabled ? 'online' : 'offline',
+            max_active_chats: current.max_active_chats || 5
+        });
+        await this.loadPublicChatAgents();
+    } catch (error) {
+        this.showNotification(error.message || 'Unable to save agent.', 'error');
+    }
+};
+
+AdminDashboard.prototype.loadPublicChatAudit = async function () {
+    try {
+        const data = await this.publicChatFetch({ action: 'audit' }, 'GET');
+        const wrap = document.getElementById('publicChatAuditList');
+        if (!wrap) return;
+        wrap.innerHTML = this.publicChatRenderTable('audit', data.logs || [], [
+            { key: 'created_at', label: 'Time' },
+            { key: 'action', label: 'Action' },
+            { key: 'actor_name', label: 'Actor', render: (log, plain) => plain ? (log.actor_name || 'Public Visitor') : `<strong>${this.escapeHtml(log.actor_name || 'Public Visitor')}</strong>` },
+            { key: 'actor_role', label: 'Role' },
+            { key: 'chat_reference', label: 'Chat Reference' },
+            { key: 'details', label: 'Details', render: (log, plain) => plain ? this.publicChatDisplayValue(log.details) : this.escapeHtml(this.publicChatDisplayValue(log.details)) },
+            { key: 'ip_address', label: 'IP Address' }
+        ], { title: 'Public Chat Audit Logs' });
+        this.filterPublicChatTable('audit', document.querySelector('[data-public-chat-filter="audit"]')?.value || '');
+    } catch (_) {}
+};
+
+AdminDashboard.prototype.exportPublicChatReport = function () {
+    const form = document.getElementById('publicChatReportFilters');
+    const params = new URLSearchParams(form ? new FormData(form) : undefined);
+    window.open(`../backend/api/public_chat_export.php?${params.toString()}`, '_blank', 'noopener');
+};
+
+AdminDashboard.prototype.renderPublicChatMessages = function (messages) {
+    const wrap = document.getElementById('publicChatMessages');
+    if (!wrap) return;
+    wrap.innerHTML = messages.map((msg) => `
+        <div class="chat-oversight-message ${msg.sender_type === 'visitor' ? 'received' : 'sent'}">
+            <div>${this.escapeHtml(msg.message_text || '')}</div>
+            <small>${this.escapeHtml(msg.sender_name || msg.sender_type || '')} - ${this.escapeHtml(msg.created_at || '')}</small>
+        </div>
+    `).join('') || '<div class="settings-note">No messages yet.</div>';
+    wrap.scrollTop = wrap.scrollHeight;
+};
+
+AdminDashboard.prototype.renderPublicChatNotes = function (notes) {
+    const wrap = document.getElementById('publicChatNotes');
+    if (!wrap) return;
+    wrap.innerHTML = notes.map((note) => `
+        <div class="settings-list-row">
+            <strong>${this.escapeHtml(note.agent_name || 'Staff')}</strong>
+            <span>${this.escapeHtml(note.note_text || '')}</span>
+            <small>${this.escapeHtml(note.created_at || '')}</small>
+        </div>
+    `).join('');
+};
+
+AdminDashboard.prototype.sendPublicChatReply = async function (event) {
+    event.preventDefault();
+    const textarea = document.getElementById('publicChatAgentReplyText');
+    const message = String(textarea?.value || '').trim();
+    const sessionId = this.publicChatState?.selectedId;
+    if (!message || !sessionId) return;
+    const response = await fetch('../backend/api/public_chat_send.php', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId, message, as_agent: true })
+    });
+    const data = await this.safeJson(response, { success: false });
+    if (!data.success) {
+        this.showNotification(data.message || 'Unable to send reply.', 'error');
+        return;
+    }
+    textarea.value = '';
+    await this.loadPublicChatDetail(sessionId);
+};
+
+AdminDashboard.prototype.addPublicChatNote = async function (event) {
+    event.preventDefault();
+    const textarea = document.getElementById('publicChatAgentNoteText');
+    const note = String(textarea?.value || '').trim();
+    const sessionId = this.publicChatState?.selectedId;
+    if (!note || !sessionId) return;
+    await this.publicChatAction('note', { note });
+    textarea.value = '';
+};
+
+AdminDashboard.prototype.publicChatAction = async function (action, extra = {}) {
+    const sessionId = this.publicChatState?.selectedId;
+    if (!sessionId && !['status'].includes(action)) return;
+    try {
+        await this.publicChatFetch({ action, session_id: sessionId, ...extra });
+        if (sessionId) await this.loadPublicChatDetail(sessionId);
+        await this.loadPublicChatQueue();
+    } catch (error) {
+        this.showNotification(error.message || 'Public chat action failed.', 'error');
+    }
+};
+
+AdminDashboard.prototype.setPublicChatAgentStatus = async function (status) {
+    try {
+        await this.publicChatFetch({ action: 'status', agent_status: status });
+        this.updateSettingsStatus('publicChatSupport', 'Status saved', 'success');
+    } catch (error) {
+        this.showNotification(error.message || 'Unable to update chat status.', 'error');
+    }
 };
 
 AdminDashboard.prototype.loadChatOversightContent = async function () {
@@ -15348,9 +16314,15 @@ AdminDashboard.prototype.renderChatOversightEmptyThread = function () {
 AdminDashboard.prototype.deleteChatOversightMessages = async function (messageIds = []) {
     const ids = messageIds.map(Number).filter((id) => id > 0);
     if (!ids.length) return;
-    const confirmed = window.confirm(ids.length === 1
-        ? 'Delete this message from all peer chat views? It will remain logged for oversight.'
-        : `Delete ${ids.length} messages from all peer chat views? They will remain logged for oversight.`);
+    const confirmed = typeof window.appConfirm === 'function'
+        ? await window.appConfirm(ids.length === 1
+            ? 'Delete this message from all peer chat views? It will remain logged for oversight.'
+            : `Delete ${ids.length} messages from all peer chat views? They will remain logged for oversight.`, {
+                title: 'Delete Chat Message',
+                confirmText: 'Delete',
+                cancelText: 'Cancel'
+            })
+        : false;
     if (!confirmed) return;
     try {
         const data = await this.postChatOversight({
@@ -15369,7 +16341,13 @@ AdminDashboard.prototype.deleteChatOversightMessages = async function (messageId
 
 AdminDashboard.prototype.clearChatOversightConversation = async function (conversation) {
     if (!conversation) return;
-    const confirmed = window.confirm(`Clear all messages in "${conversation.title || 'this conversation'}" from peer chat views? They will remain logged for oversight.`);
+    const confirmed = typeof window.appConfirm === 'function'
+        ? await window.appConfirm(`Clear all messages in "${conversation.title || 'this conversation'}" from peer chat views? They will remain logged for oversight.`, {
+            title: 'Clear Chat Conversation',
+            confirmText: 'Clear',
+            cancelText: 'Cancel'
+        })
+        : false;
     if (!confirmed) return;
     try {
         const payload = {
@@ -15391,7 +16369,13 @@ AdminDashboard.prototype.clearChatOversightConversation = async function (conver
 };
 
 AdminDashboard.prototype.clearAllChatOversightMessages = async function () {
-    const confirmed = window.confirm('Clear all live chat messages from every peer and group chat view? They will remain logged for admin oversight.');
+    const confirmed = typeof window.appConfirm === 'function'
+        ? await window.appConfirm('Clear all live chat messages from every peer and group chat view? They will remain logged for admin oversight.', {
+            title: 'Clear All Chat Messages',
+            confirmText: 'Clear All',
+            cancelText: 'Cancel'
+        })
+        : false;
     if (!confirmed) return;
     try {
         const data = await this.postChatOversight({

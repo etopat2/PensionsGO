@@ -5235,6 +5235,16 @@ function getPermissionCatalog(): array {
             'description' => 'Assign, review, resolve, close, and export feedback submissions.',
             'default_roles' => ['admin', 'clerk', 'oc_pen', 'dep_oc', 'deputy_oc', 'deputy_oc_pen', 'deputy_oc_pension']
         ],
+        'public_chat.agent' => [
+            'label' => 'Public Chat Agent',
+            'description' => 'Accept and respond to public live support and pensioner correspondence chats.',
+            'default_roles' => ['admin', 'oc_pen']
+        ],
+        'public_chat.supervise' => [
+            'label' => 'Public Chat Supervisor',
+            'description' => 'Assign, supervise, escalate, and close public live support conversations.',
+            'default_roles' => ['admin', 'oc_pen']
+        ],
         'budget.manage' => [
             'label' => 'Manage Budget Forecast',
             'description' => 'Create and update arrears and pension budget forecasts by financial year.',

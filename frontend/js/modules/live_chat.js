@@ -34,6 +34,12 @@ const LIVE_CHAT_CALL_API_ACTIONS = Object.freeze({
   SIGNALS: 'signals'
 });
 
+function liveChatDisabledOnThisPage(options = {}) {
+  const page = (window.location.pathname.split('/').pop() || '').toLowerCase();
+  const role = String(options.userRole || options.role || localStorage.getItem('userRole') || '').toLowerCase();
+  return page === 'pensioner_board.html' || role === 'pensioner' || window.__disableStaffLiveChat === true;
+}
+
 function escapeHtml(value) {
   const div = document.createElement('div');
   div.textContent = String(value ?? '');
@@ -137,7 +143,12 @@ function showNotice(title, message, type = 'error') {
     window.appToast(message, { title, type, duration: 4200 });
     return;
   }
-  window.alert(`${title}: ${message}`);
+  const notice = document.createElement('div');
+  notice.className = `live-chat-notice live-chat-notice-${type}`;
+  notice.setAttribute('role', 'status');
+  notice.textContent = `${title}: ${message}`;
+  document.body.appendChild(notice);
+  window.setTimeout(() => notice.remove(), 4200);
 }
 
 function normalizePhoto(path) {
@@ -5580,6 +5591,10 @@ class LiveChatApp {
 }
 
 export async function initLiveChat(options = {}) {
+  if (liveChatDisabledOnThisPage(options)) {
+    document.getElementById('liveChatDock')?.remove();
+    return null;
+  }
   if (window.PensionsGoLiveChat?.instance) return window.PensionsGoLiveChat.instance;
   const instance = new LiveChatApp(options);
   window.PensionsGoLiveChat = { instance };

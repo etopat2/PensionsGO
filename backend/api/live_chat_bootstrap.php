@@ -31,6 +31,7 @@ try {
         LEFT JOIN tb_live_chat_presence p ON p.user_id = u.userId
         WHERE u.userId <> ?
           AND u.userRole NOT IN ('pensioner', 'user')
+          AND LOWER(REPLACE(COALESCE(u.userRole, ''), ' ', '_')) NOT IN ('super_admin', 'superadministrator', 'system_administrator')
         ORDER BY is_online DESC, u.userName ASC
     ");
     if (!$stmt) {

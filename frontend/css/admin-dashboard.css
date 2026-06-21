@@ -691,6 +691,39 @@
     font-weight: 600;
 }
 
+.submenu-group {
+    display: block;
+}
+
+.submenu-group-label {
+    font-weight: 700;
+}
+
+.nested-submenu {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0.25rem;
+    background: rgba(0, 0, 0, 0.12);
+}
+
+.nested-submenu-link {
+    padding-left: 4.4rem;
+    font-size: 0.8rem;
+    border-left-width: 3px;
+}
+
+.nested-submenu-link::before {
+    content: "";
+    display: inline-block;
+    width: 0.35rem;
+    height: 0.35rem;
+    margin-right: 0.45rem;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.55;
+    vertical-align: middle;
+}
+
 /* Sidebar Footer - DESKTOP */
 .sidebar-footer {
     padding: 1rem 1.5rem;
@@ -1971,6 +2004,99 @@
 .settings-table th {
     font-weight: 600;
     color: var(--heading-color);
+}
+
+.public-chat-admin-toolbar {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: space-between;
+    margin: 0 0 1rem;
+}
+
+.public-chat-admin-toolbar .filter-input {
+    flex: 1 1 280px;
+    min-width: 220px;
+}
+
+.public-chat-admin-table-wrap {
+    margin-bottom: 1rem;
+}
+
+.public-chat-admin-table caption {
+    color: var(--text-muted);
+    font-weight: 700;
+    padding: 0.8rem 1rem;
+    text-align: left;
+}
+
+.public-chat-admin-table td {
+    vertical-align: top;
+}
+
+.public-chat-admin-table small {
+    color: var(--text-muted);
+}
+
+.public-chat-admin-badge {
+    border: 1px solid var(--divider-color);
+    border-radius: 999px;
+    background: var(--surface-muted, rgba(0, 0, 0, 0.04));
+    color: var(--text-color);
+    display: inline-flex;
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0.35rem 0.55rem;
+    white-space: nowrap;
+}
+
+.public-chat-admin-badge.status-online,
+.public-chat-admin-badge.status-enabled,
+.public-chat-admin-badge.status-resolved,
+.public-chat-admin-badge.status-closed {
+    background: rgba(22, 126, 70, 0.1);
+    border-color: rgba(22, 126, 70, 0.28);
+    color: #167e46;
+}
+
+.public-chat-admin-badge.status-waiting,
+.public-chat-admin-badge.status-away,
+.public-chat-admin-badge.status-new {
+    background: rgba(171, 112, 0, 0.1);
+    border-color: rgba(171, 112, 0, 0.28);
+    color: #8a5a00;
+}
+
+.public-chat-admin-badge.status-escalated,
+.public-chat-admin-badge.status-urgent,
+.public-chat-admin-badge.status-disabled,
+.public-chat-admin-badge.status-offline {
+    background: rgba(165, 35, 35, 0.1);
+    border-color: rgba(165, 35, 35, 0.28);
+    color: #9c1f1f;
+}
+
+.public-chat-report-summary-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    margin-bottom: 1rem;
+}
+
+.public-chat-report-summary,
+.public-chat-report-section {
+    display: grid;
+    gap: 0.65rem;
+    margin-top: 1rem;
+}
+
+.public-chat-report-summary h4,
+.public-chat-report-section h4 {
+    color: var(--heading-color);
+    font-size: 1rem;
+    margin: 0;
 }
 
 .access-control-grid {

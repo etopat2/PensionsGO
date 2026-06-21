@@ -17,13 +17,37 @@
   <link rel="stylesheet" href="css/menu.css?v=20260504d" />
   <link rel="stylesheet" href="css/overlay.css?v=20260504a" />
   <link rel="stylesheet" href="css/pensioner_board.css?v=20260504a" />
+  <link rel="stylesheet" href="css/public_chat.css?v=20260621a" />
+  <style>
+    body.pensioner-portal-page #liveChatDock,
+    body.pensioner-portal-page .live-chat-dock,
+    body.pensioner-portal-page .live-chat-launcher {
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+  </style>
+  <script>
+    window.__disableStaffLiveChat = true;
+    document.addEventListener('DOMContentLoaded', function () {
+      document.body.classList.add('pensioner-portal-page');
+      document.getElementById('liveChatDock')?.remove();
+      new MutationObserver(function () {
+        document.getElementById('liveChatDock')?.remove();
+        document.querySelectorAll('.live-chat-launcher').forEach(function (node) {
+          node.remove();
+        });
+      }).observe(document.body, { childList: true, subtree: true });
+    });
+  </script>
   <script src="js/auth_bootstrap.js?v=20260606b"></script>
   <script type="module" src="js/main.js?v=20260612a"></script>
   <script defer src="js/modules/district_selector.js?v=20260429a"></script>
   <script defer src="js/modules/retirement-types.js"></script>
   <script defer src="js/pensioner_board.js"></script>
+  <script defer src="js/public_chat_widget.js?v=20260621a"></script>
 </head>
-<body>
+<body class="pensioner-portal-page">
   <main class="pensioner-board-main">
     <section class="pensioner-hero">
       <div class="pensioner-hero-copy">
@@ -257,6 +281,4 @@
   </div>
 </body>
 </html>
-
-
 

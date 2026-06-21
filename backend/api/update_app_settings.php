@@ -146,6 +146,30 @@ try {
         'live_chat_receipt_poll_ms' => '250',
         'live_chat_call_poll_ms' => '500',
         'live_chat_signal_poll_ms' => '350',
+        'public_chat_enabled' => '1',
+        'public_chat_public_pages_enabled' => '1',
+        'public_chat_pensioner_portal_enabled' => '1',
+        'public_chat_attachments_enabled' => '0',
+        'public_chat_auto_assign_enabled' => '0',
+        'public_chat_home_enabled' => '1',
+        'public_chat_about_enabled' => '1',
+        'public_chat_faq_enabled' => '1',
+        'public_chat_podcast_enabled' => '1',
+        'public_chat_feedback_page_enabled' => '1',
+        'public_chat_terms_enabled' => '1',
+        'public_chat_max_message_length' => '2000',
+        'public_chat_poll_interval_ms' => '2500',
+        'public_chat_offline_message' => 'Public live support is currently unavailable. Please leave a message and the pensions team will follow up.',
+        'public_chat_welcome_text' => 'Welcome to UPS PensionsGo public support. How can we help?',
+        'public_chat_consent_text' => 'I consent to UPS PensionsGo using these details to respond to this support request.',
+        'public_chat_working_hours' => '08:00-17:00',
+        'public_chat_max_active_chats_per_agent' => '5',
+        'public_chat_allowed_attachment_types' => 'pdf,jpg,jpeg,png,doc,docx',
+        'public_chat_max_attachment_size_mb' => '5',
+        'public_chat_transcript_enabled' => '1',
+        'public_chat_feedback_enabled' => '1',
+        'public_chat_rate_limit_start_per_10min' => '5',
+        'public_chat_rate_limit_messages_per_5min' => '20',
         'notify_quiet_hours_start' => '22:00',
         'notify_quiet_hours_end' => '06:00',
         'notify_admin_digest_enabled' => '1',
@@ -301,6 +325,19 @@ try {
         'live_chat_drafts_enabled',
         'live_chat_admin_archive_enabled',
         'live_chat_admin_delete_enabled',
+        'public_chat_enabled',
+        'public_chat_public_pages_enabled',
+        'public_chat_pensioner_portal_enabled',
+        'public_chat_attachments_enabled',
+        'public_chat_auto_assign_enabled',
+        'public_chat_home_enabled',
+        'public_chat_about_enabled',
+        'public_chat_faq_enabled',
+        'public_chat_podcast_enabled',
+        'public_chat_feedback_page_enabled',
+        'public_chat_terms_enabled',
+        'public_chat_transcript_enabled',
+        'public_chat_feedback_enabled',
         'notify_admin_digest_enabled',
         'notify_queue_worker_enabled',
         'notify_queue_process_on_request',
@@ -387,6 +424,12 @@ try {
         'live_chat_receipt_poll_ms',
         'live_chat_call_poll_ms',
         'live_chat_signal_poll_ms',
+        'public_chat_max_message_length',
+        'public_chat_poll_interval_ms',
+        'public_chat_max_active_chats_per_agent',
+        'public_chat_max_attachment_size_mb',
+        'public_chat_rate_limit_start_per_10min',
+        'public_chat_rate_limit_messages_per_5min',
         'notify_queue_batch_size',
         'notify_queue_retry_limit',
         'notify_queue_retry_delay_minutes',
@@ -546,6 +589,30 @@ try {
         'live_chat_receipt_poll_ms' => 'Live chat receipt poll interval',
         'live_chat_call_poll_ms' => 'Live chat call poll interval',
         'live_chat_signal_poll_ms' => 'Live chat signal poll interval',
+        'public_chat_enabled' => 'Public live support enabled',
+        'public_chat_public_pages_enabled' => 'Public chat public pages',
+        'public_chat_pensioner_portal_enabled' => 'Public chat pensioner portal',
+        'public_chat_attachments_enabled' => 'Public chat attachments',
+        'public_chat_auto_assign_enabled' => 'Public chat auto assignment',
+        'public_chat_home_enabled' => 'Public chat home page',
+        'public_chat_about_enabled' => 'Public chat about page',
+        'public_chat_faq_enabled' => 'Public chat FAQ page',
+        'public_chat_podcast_enabled' => 'Public chat podcast page',
+        'public_chat_feedback_page_enabled' => 'Public chat feedback page',
+        'public_chat_terms_enabled' => 'Public chat terms page',
+        'public_chat_max_message_length' => 'Public chat max message length',
+        'public_chat_poll_interval_ms' => 'Public chat poll interval',
+        'public_chat_offline_message' => 'Public chat offline message',
+        'public_chat_welcome_text' => 'Public chat welcome text',
+        'public_chat_consent_text' => 'Public chat consent text',
+        'public_chat_working_hours' => 'Public chat working hours',
+        'public_chat_max_active_chats_per_agent' => 'Public chat max active chats per agent',
+        'public_chat_allowed_attachment_types' => 'Public chat allowed attachment types',
+        'public_chat_max_attachment_size_mb' => 'Public chat max attachment size',
+        'public_chat_transcript_enabled' => 'Public chat transcript enabled',
+        'public_chat_feedback_enabled' => 'Public chat feedback enabled',
+        'public_chat_rate_limit_start_per_10min' => 'Public chat start rate limit',
+        'public_chat_rate_limit_messages_per_5min' => 'Public chat message rate limit',
         'notify_quiet_hours_start' => 'Quiet hours start',
         'notify_quiet_hours_end' => 'Quiet hours end',
         'notify_admin_digest_enabled' => 'Admin digest notifications',
@@ -694,6 +761,16 @@ try {
                 $value = max(150, min(5000, $value));
             } elseif ($key === 'live_chat_call_poll_ms') {
                 $value = max(300, min(10000, $value));
+            } elseif ($key === 'public_chat_max_message_length') {
+                $value = max(250, min(5000, $value));
+            } elseif ($key === 'public_chat_poll_interval_ms') {
+                $value = max(800, min(15000, $value));
+            } elseif ($key === 'public_chat_max_active_chats_per_agent') {
+                $value = max(1, min(50, $value));
+            } elseif ($key === 'public_chat_max_attachment_size_mb') {
+                $value = max(1, min(25, $value));
+            } elseif (in_array($key, ['public_chat_rate_limit_start_per_10min', 'public_chat_rate_limit_messages_per_5min'], true)) {
+                $value = max(1, min(120, $value));
             } else {
                 $value = max(0, $value);
             }
@@ -798,6 +875,48 @@ try {
             'entity_id' => 'global',
             'details' => $auditDetails
         ]);
+    }
+
+    $publicChatUpdatedKeys = array_values(array_filter(array_keys($updated), static function ($key) {
+        return strpos((string)$key, 'public_chat_') === 0;
+    }));
+    if (!empty($publicChatUpdatedKeys)) {
+        $conn->query("
+            CREATE TABLE IF NOT EXISTS public_chat_audit_logs (
+                audit_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                session_id BIGINT UNSIGNED DEFAULT NULL,
+                actor_user_id VARCHAR(100) DEFAULT NULL,
+                actor_name VARCHAR(160) DEFAULT NULL,
+                actor_role VARCHAR(80) DEFAULT NULL,
+                action VARCHAR(80) NOT NULL,
+                details LONGTEXT DEFAULT NULL,
+                ip_address VARCHAR(64) DEFAULT NULL,
+                user_agent VARCHAR(500) DEFAULT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (audit_id),
+                KEY idx_public_chat_audit_session (session_id),
+                KEY idx_public_chat_audit_action (action),
+                KEY idx_public_chat_audit_created (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        ");
+        $publicChatDetails = json_encode([
+            'updated_keys' => $publicChatUpdatedKeys,
+            'changes' => $changeNotes
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $actorId = (string)($_SESSION['userId'] ?? 'system');
+        $actorName = (string)($_SESSION['userName'] ?? 'System');
+        $actorRole = (string)($_SESSION['userRole'] ?? 'system');
+        $ipAddress = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+        $userAgent = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 500);
+        $publicAuditStmt = $conn->prepare("
+            INSERT INTO public_chat_audit_logs (actor_user_id, actor_name, actor_role, action, details, ip_address, user_agent)
+            VALUES (?, ?, ?, 'Settings changed', ?, ?, ?)
+        ");
+        if ($publicAuditStmt) {
+            $publicAuditStmt->bind_param('ssssss', $actorId, $actorName, $actorRole, $publicChatDetails, $ipAddress, $userAgent);
+            $publicAuditStmt->execute();
+            $publicAuditStmt->close();
+        }
     }
 
     if (function_exists('recordSystemLog')) {

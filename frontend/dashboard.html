@@ -22,6 +22,7 @@
   <link rel="stylesheet" href="css/menu.css?v=20260504d" />
   <link rel="stylesheet" href="css/dashboard.css?v=20260613a" />
   <link rel="stylesheet" href="css/broadcast_popup.css?v=20260504a" />
+  <link rel="stylesheet" href="css/public_chat.css?v=20260621a" />
 
   <!-- ================== SCRIPTS ================== -->
   <!-- main.js handles header/footer loading -->
@@ -29,6 +30,7 @@
   <script type="module" src="js/main.js?v=20260612a"></script>
   <script defer src="js/modules/filterable_select.js?v=20260429a"></script>
   <script defer src="js/modules/retirement-types.js"></script>
+  <script defer src="js/public_chat_management.js?v=20260621a"></script>
   <script defer>
     window.addEventListener('load', function () {
       var loadDashboardController = function () {
@@ -76,6 +78,7 @@
             <li><a href="#" data-target="usersSection">System Users</a></li>
             <li><a href="#" data-target="workflowSection">Workflow Performance</a></li>
             <li><a href="#" data-target="feedbackSection">Feedback Management</a></li>
+            <li id="publicChatDashboardNavItem" hidden><a href="#" data-target="publicChatSection">Public Live Chat</a></li>
             <li><a href="#" data-target="generalSection">General Statistics</a></li>
             <li><a href="#" data-target="dataSection">Data Management</a></li>
           </ul>
@@ -96,6 +99,7 @@
             <option value="usersSection">System Users</option>
             <option value="workflowSection">Workflow Performance</option>
             <option value="feedbackSection">Feedback Management</option>
+            <option value="publicChatSection" id="publicChatDashboardMobileOption" hidden>Public Live Chat</option>
             <option value="generalSection">General Statistics</option>
             <option value="dataSection">Data Management</option>
           </select>
@@ -908,6 +912,22 @@
               <button type="button" class="btn-action" id="feedbackNextBtn">Next</button>
             </div>
           </div>
+        </section>
+        <section id="publicChatSection" class="dashboard-section">
+          <div class="workflow-performance-header">
+            <div>
+              <h2>Public Live Chat</h2>
+              <p>Manage public correspondence, waiting chats, assigned conversations, offline messages, tickets, escalations, canned responses, agents, reports, and audit logs.</p>
+            </div>
+            <div class="workflow-alert-actions">
+              <button type="button" class="btn-action btn-secondary" id="publicChatRefreshDashboardBtn">Refresh</button>
+              <button type="button" class="btn-action" id="publicChatAvailabilityBtn">Set Online</button>
+            </div>
+          </div>
+          <div id="publicChatDashboardAccessNotice" class="dashboard-empty-message">
+            Checking Public Live Chat access...
+          </div>
+          <div id="publicChatDashboardMount" class="public-chat-dashboard-shell" hidden></div>
         </section>
         <section id="generalSection" class="dashboard-section">
           <div class="workflow-performance-header">
