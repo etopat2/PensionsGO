@@ -15,30 +15,17 @@ if ($sessionId <= 0 || empty($_FILES['attachment'])) {
     publicChatJson(['success' => false, 'message' => 'Chat session and attachment are required.'], 400);
 }
 
-publicChatRateLimit($conn, 'upload', 6, 600);
 if ($asAgent) {
-    $agentId = publicChatRequireAgent($conn);
-    $agentProfile = publicChatAgentProfile($conn, $agentId);
     publicChatRequireCapability($conn, 'can_accept_chat', 'You are not permitted to upload public chat attachments.');
-    $sessionStmt = $conn->prepare("SELECT * FROM public_chat_sessions WHERE session_id = ? LIMIT 1");
-    $sessionStmt->bind_param('i', $sessionId);
-    $sessionStmt->execute();
-    $session = $sessionStmt->get_result()->fetch_assoc();
-    $sessionStmt->close();
-    if (!$session) {
-        publicChatJson(['success' => false, 'message' => 'Chat session not found.'], 404);
-    }
-    publicChatRequireAgentSessionAccess($session, $agentId, $agentProfile, false, 'Accept this chat before uploading, or select a chat assigned to you.');
-    $senderType = 'agent';
-    $senderId = (string)$agentId;
-    $senderName = (string)($_SESSION['userName'] ?? 'Chat Agent');
+    $actor = publicChatResolveActor($conn, $sessionId, '', true, false);
 } else {
-    $session = publicChatVerifyVisitorSession($conn, $sessionId, $token);
-    $agentId = null;
-    $senderType = 'visitor';
-    $senderId = null;
-    $senderName = (string)($session['visitor_name'] ?? 'Visitor');
+    publicChatRateLimit($conn, 'upload', 6, 600);
+    $actor = publicChatResolveActor($conn, $sessionId, $token, false, false);
 }
+$session = $actor['session'];
+$senderType = (string)$actor['sender_type'];
+$senderId = $actor['sender_id'];
+$senderName = (string)$actor['sender_name'];
 if (($session['status'] ?? '') === 'closed') {
     publicChatJson(['success' => false, 'message' => 'This chat has been closed.'], 409);
 }
@@ -65,16 +52,60 @@ if (!in_array($extension, $allowed, true)) {
     publicChatJson(['success' => false, 'message' => 'Attachment type is not allowed.'], 400);
 }
 
-$safeInfo = null;
-if (function_exists('assertUploadedFileIsSafe')) {
-    try {
-        $mimePrefixes = $isVoice
-            ? ['audio/', 'video/', 'application/octet-stream']
-            : ['image/', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument'];
-        $safeInfo = assertUploadedFileIsSafe($conn, $file, $allowed, $mimePrefixes);
-    } catch (Throwable $e) {
-        publicChatJson(['success' => false, 'message' => $e->getMessage()], 400);
+$tmpPath = (string)($file['tmp_name'] ?? '');
+if ($tmpPath === '' || !is_uploaded_file($tmpPath)) {
+    publicChatJson(['success' => false, 'message' => 'Attachment upload is not valid.'], 400);
+}
+$nameParts = array_map('strtolower', array_filter(explode('.', $originalName)));
+foreach ($nameParts as $part) {
+    if (function_exists('getDangerousUploadExtensions') && in_array($part, getDangerousUploadExtensions(), true)) {
+        publicChatJson(['success' => false, 'message' => 'Attachment type is not safe.'], 400);
     }
+}
+
+$detectedMime = 'application/octet-stream';
+if (class_exists('finfo')) {
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $detected = (string)$finfo->file($tmpPath);
+    if ($detected !== '') {
+        $detectedMime = $detected;
+    }
+} elseif (function_exists('mime_content_type')) {
+    $detected = (string)@mime_content_type($tmpPath);
+    if ($detected !== '') {
+        $detectedMime = $detected;
+    }
+}
+
+$lowerMime = strtolower($detectedMime);
+if ($extension === 'docx') {
+    if (!class_exists('ZipArchive')) {
+        publicChatJson(['success' => false, 'message' => 'DOCX preview support is not enabled on this server.'], 400);
+    }
+    $zip = new ZipArchive();
+    $opened = $zip->open($tmpPath);
+    if ($opened !== true || $zip->locateName('word/document.xml') === false || $zip->locateName('[Content_Types].xml') === false) {
+        if ($opened === true) {
+            $zip->close();
+        }
+        publicChatJson(['success' => false, 'message' => 'DOCX file is not a valid Word document.'], 400);
+    }
+    $zip->close();
+} elseif ($extension === 'doc') {
+    $handle = fopen($tmpPath, 'rb');
+    $signature = $handle ? fread($handle, 8) : '';
+    if ($handle) {
+        fclose($handle);
+    }
+    if ($signature !== "\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1") {
+        publicChatJson(['success' => false, 'message' => 'DOC file is not a valid Word document.'], 400);
+    }
+} elseif (!$isVoice && in_array($extension, ['jpg', 'jpeg', 'png'], true) && !str_starts_with($lowerMime, 'image/')) {
+    publicChatJson(['success' => false, 'message' => 'Image attachment content is not valid.'], 400);
+} elseif (!$isVoice && $extension === 'pdf' && $lowerMime !== 'application/pdf') {
+    publicChatJson(['success' => false, 'message' => 'PDF attachment content is not valid.'], 400);
+} elseif ($isVoice && !str_starts_with($lowerMime, 'audio/') && !str_starts_with($lowerMime, 'video/') && $lowerMime !== 'application/octet-stream') {
+    publicChatJson(['success' => false, 'message' => 'Voice note content is not valid.'], 400);
 }
 
 $uploadDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'public_chat';
@@ -89,7 +120,7 @@ if (!move_uploaded_file((string)$file['tmp_name'], $target)) {
 
 $relativePath = 'uploads/public_chat/' . $safeName;
 $clientMime = publicChatClean((string)($file['type'] ?? ''), 120);
-$detectedMime = publicChatClean((string)($safeInfo['mime_type'] ?? ''), 120);
+$detectedMime = publicChatClean($detectedMime, 120);
 $mime = $isVoice && preg_match('/^(audio|video)\//i', $clientMime)
     ? $clientMime
     : ($detectedMime !== '' && stripos($detectedMime, 'octet-stream') === false ? $detectedMime : ($clientMime ?: $detectedMime));
@@ -102,25 +133,7 @@ $messageText = $isVoice ? 'Voice note' : 'Attachment uploaded';
 
 $conn->begin_transaction();
 try {
-    $msgStmt = $conn->prepare("
-        INSERT INTO public_chat_messages (session_id, sender_type, sender_id, sender_name, message_text, message_kind)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ");
-    if ($msgStmt) {
-        $msgStmt->bind_param('isssss', $sessionId, $senderType, $senderId, $senderName, $messageText, $messageKind);
-    } else {
-        $msgStmt = $conn->prepare("
-            INSERT INTO public_chat_messages (session_id, sender_type, sender_id, sender_name, message_text)
-            VALUES (?, ?, ?, ?, ?)
-        ");
-        if (!$msgStmt) {
-            throw new RuntimeException('Unable to prepare message insert.');
-        }
-        $msgStmt->bind_param('issss', $sessionId, $senderType, $senderId, $senderName, $messageText);
-    }
-    $msgStmt->execute();
-    $messageId = (int)$msgStmt->insert_id;
-    $msgStmt->close();
+    $messageId = publicChatInsertMessage($conn, $sessionId, $senderType, $senderId, $senderName, $messageText, $messageKind);
 
     $attStmt = $conn->prepare("
         INSERT INTO public_chat_attachments (session_id, message_id, uploaded_by_type, uploaded_by, file_name, file_path, file_size, mime_type)

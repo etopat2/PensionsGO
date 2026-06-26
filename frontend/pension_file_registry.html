@@ -26,7 +26,7 @@
         if (document.getElementById('registryControllerScript')) return;
         var script = document.createElement('script');
         script.id = 'registryControllerScript';
-        script.src = 'js/pension_file_registry.js?v=20260609e';
+        script.src = 'js/pension_file_registry.js?v=20260622a';
         script.defer = true;
         document.head.appendChild(script);
       };
@@ -142,7 +142,7 @@
           <button type="button" class="registry-modal-close" data-close-modal="edit" aria-label="Close">&times;</button>
         </div>
       </header>
-      <form id="registryEditForm" class="registry-edit-form">
+      <form id="registryEditForm" class="registry-edit-form" novalidate>
         <input type="hidden" id="editRecordId">
         <div id="registryEditFormBanner" class="registry-edit-form-banner">
           <div>
@@ -591,4 +591,3 @@
   </div>
 </body>
 </html>
-

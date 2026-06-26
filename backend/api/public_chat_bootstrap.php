@@ -31,6 +31,9 @@ publicChatJson([
     'visitor' => [
         'isLoggedIn' => !empty($_SESSION['userId']),
         'isPensioner' => $isPensioner,
+        'userId' => !empty($_SESSION['userId']) ? (string)$_SESSION['userId'] : '',
+        'userName' => !empty($_SESSION['userName']) ? (string)$_SESSION['userName'] : '',
+        'role' => !empty($_SESSION['userRole']) ? (string)$_SESSION['userRole'] : '',
         'prefill' => $prefill
     ],
     'agent' => [

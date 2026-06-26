@@ -50,10 +50,19 @@ CREATE TABLE IF NOT EXISTS public_chat_messages (
     message_text TEXT NOT NULL,
     message_kind ENUM('text','attachment','voice') NOT NULL DEFAULT 'text',
     is_internal TINYINT(1) NOT NULL DEFAULT 0,
+    delivered_at TIMESTAMP NULL DEFAULT NULL,
+    is_read TINYINT(1) NOT NULL DEFAULT 0,
+    read_at TIMESTAMP NULL DEFAULT NULL,
+    edited_at TIMESTAMP NULL DEFAULT NULL,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
+    reaction_emoji VARCHAR(24) DEFAULT NULL,
+    client_nonce VARCHAR(80) DEFAULT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (message_id),
     KEY idx_public_chat_messages_session (session_id, message_id),
     KEY idx_public_chat_messages_created (created_at),
+    KEY idx_public_chat_messages_delivery (session_id, sender_type, delivered_at, message_id),
+    KEY idx_public_chat_messages_read (session_id, sender_type, is_read, message_id),
     CONSTRAINT fk_public_chat_messages_session FOREIGN KEY (session_id) REFERENCES public_chat_sessions(session_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 

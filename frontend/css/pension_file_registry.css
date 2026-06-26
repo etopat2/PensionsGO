@@ -1174,6 +1174,18 @@
     linear-gradient(145deg, color-mix(in srgb, var(--card-bg) 92%, var(--primary-gold) 8%), color-mix(in srgb, var(--card-bg) 96%, var(--menu-bg-dark) 4%));
 }
 
+.registry-edit-form-banner.is-error {
+  border-color: color-mix(in srgb, var(--error-color, #dc2626) 52%, var(--border-color) 48%);
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--error-color, #dc2626) 16%, transparent) 0, transparent 42%),
+    linear-gradient(145deg, color-mix(in srgb, var(--card-bg) 90%, var(--error-color, #dc2626) 10%), color-mix(in srgb, var(--card-bg) 96%, var(--primary-maroon) 4%));
+}
+
+.registry-edit-form-banner.is-error strong,
+.registry-edit-form-banner.is-error p {
+  color: var(--error-color, #dc2626);
+}
+
 .registry-edit-tabs {
   display: flex;
   flex-wrap: nowrap;

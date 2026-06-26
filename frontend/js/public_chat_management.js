@@ -52,6 +52,10 @@
     }[char]));
   }
 
+  function formatText(value) {
+    return escapeHtml(value).replace(/\n/g, "<br>");
+  }
+
   async function fetchJson(path, payload = null, method = "POST") {
     const options = { credentials: "include", cache: "no-store" };
     let url = api(path);
@@ -761,6 +765,18 @@
     }).then(() => closeActionModal());
   }
 
+  function selectorEscape(value) {
+    if (window.CSS?.escape) return CSS.escape(value);
+    return String(value).replace(/["\\]/g, "\\$&");
+  }
+
+  function createClientNonce(prefix = "agent") {
+    const random = window.crypto?.getRandomValues
+      ? Array.from(window.crypto.getRandomValues(new Uint32Array(2))).map((part) => part.toString(36)).join("")
+      : Math.random().toString(36).slice(2);
+    return `${prefix}-${Date.now().toString(36)}-${random}`.slice(0, 80);
+  }
+
   async function sendReply(event) {
     event.preventDefault();
     const text = document.getElementById("publicChatDashboardReplyText");
@@ -768,11 +784,12 @@
     if (!message || !state.selectedId || !state.selectedCanReply || state.sendingReply) return;
     const sendBtn = document.getElementById("publicChatDashboardSendBtn");
     if (sendBtn) sendBtn.disabled = true;
-    const pendingNode = appendDashboardMessage({ sender_type: "agent", sender_name: "You", message_text: message, created_at: "Sending..." }, true);
+    const clientNonce = createClientNonce("agent");
+    const pendingNode = appendDashboardMessage({ sender_type: "agent", sender_name: "You", message_text: message, client_nonce: clientNonce, created_at: "Sending..." }, true);
     text.value = "";
     await stopTyping(true);
     state.sendingReply = true;
-    const data = await fetchJson("public_chat_send.php", { session_id: state.selectedId, message, as_agent: true }).catch((error) => ({ success: false, message: error.message || "Unable to send reply." }));
+    const data = await fetchJson("public_chat_send.php", { session_id: state.selectedId, message, as_agent: true, client_nonce: clientNonce }).catch((error) => ({ success: false, message: error.message || "Unable to send reply." }));
     state.sendingReply = false;
     if (!data.success) {
       showActionError(data.message || "Unable to send reply.");
@@ -784,6 +801,7 @@
       return;
     }
     if (sendBtn) sendBtn.disabled = !state.selectedCanReply;
+    if (data.message) renderDashboardMessages([data.message], { replace: false });
     const messageId = Number(data.message_id || 0);
     if (messageId > 0 && pendingNode) {
       pendingNode.dataset.messageId = String(messageId);
@@ -802,9 +820,23 @@
     wrap.querySelector(".dashboard-empty-message")?.remove();
     const id = Number(msg.message_id || 0);
     if (id > 0 && wrap.querySelector(`[data-message-id="${id}"]`)) return null;
+    const nonce = String(msg.client_nonce || "");
+    if (nonce) {
+      const pending = wrap.querySelector(`[data-client-nonce="${selectorEscape(nonce)}"]`);
+      if (pending) {
+        if (id > 0) {
+          pending.dataset.messageId = String(id);
+          state.lastDetailMessageId = Math.max(state.lastDetailMessageId || 0, id);
+        }
+        pending.classList.remove("pending", "failed");
+        pending.innerHTML = `${renderDashboardMessageContent(msg)}<small>${escapeHtml(msg.sender_name || msg.sender_type || "")} - ${escapeHtml(msg.created_at || "Sent")}</small>`;
+        return pending;
+      }
+    }
     const node = document.createElement("div");
     node.className = `public-chat-dashboard-message ${msg.sender_type === "visitor" ? "visitor" : "agent"}${pending ? " pending" : ""}`;
     if (id > 0) node.dataset.messageId = String(id);
+    if (nonce) node.dataset.clientNonce = nonce;
     node.innerHTML = `${renderDashboardMessageContent(msg)}<small>${escapeHtml(msg.sender_name || msg.sender_type || "")} - ${escapeHtml(msg.created_at || "")}</small>`;
     wrap.appendChild(node);
     wrap.scrollTop = wrap.scrollHeight;
@@ -881,6 +913,40 @@
     return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(Math.floor(total % 60)).padStart(2, "0")}`;
   }
 
+  function getSupportedVoiceRecorderType() {
+    const candidates = [
+      "audio/webm;codecs=opus",
+      "audio/ogg;codecs=opus",
+      "audio/webm",
+      "audio/ogg",
+      "audio/mp4",
+      "audio/mpeg"
+    ];
+    if (!window.MediaRecorder?.isTypeSupported) return "";
+    return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+  }
+
+  function voiceExtensionForMime(mimeType) {
+    const clean = String(mimeType || "").toLowerCase();
+    if (clean.includes("ogg")) return "ogg";
+    if (clean.includes("mp4")) return "m4a";
+    if (clean.includes("mpeg") || clean.includes("mp3")) return "mp3";
+    if (clean.includes("wav")) return "wav";
+    return "webm";
+  }
+
+  function createVoiceFile(chunks, startedAt, fallbackType = "") {
+    const type = fallbackType || chunks.find((chunk) => chunk?.type)?.type || "audio/webm";
+    const blob = new Blob(chunks, { type });
+    const extension = voiceExtensionForMime(type);
+    return {
+      blob,
+      file: new File([blob], `voice-note-${Date.now()}.${extension}`, { type }),
+      url: URL.createObjectURL(blob),
+      duration: Math.max(1, Math.round((Date.now() - startedAt) / 1000))
+    };
+  }
+
   async function toggleAgentVoiceRecording() {
     const btn = document.getElementById("publicChatDashboardVoiceBtn");
     if (state.mediaRecorder?.state === "recording") {
@@ -899,11 +965,25 @@
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1
+        }
+      });
+      const audioTrack = stream.getAudioTracks?.()[0];
+      if (!audioTrack || audioTrack.readyState === "ended") {
+        stream.getTracks().forEach((track) => track.stop());
+        showActionError("No active microphone was found.");
+        return;
+      }
       state.recordingStream = stream;
       state.voiceChunks = [];
       state.voiceStartedAt = Date.now();
-      state.mediaRecorder = new MediaRecorder(stream);
+      const mimeType = getSupportedVoiceRecorderType();
+      state.mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       state.mediaRecorder.ondataavailable = (event) => {
         if (event.data?.size) state.voiceChunks.push(event.data);
       };
@@ -911,18 +991,23 @@
         stream.getTracks().forEach((track) => track.stop());
         state.recordingStream = null;
         stopAgentRecordingTimer();
-        const blob = new Blob(state.voiceChunks, { type: "audio/webm" });
+        if (!state.voiceChunks.length) {
+          state.mediaRecorder = null;
+          showActionError("No audio was captured. Check microphone permissions and try again.");
+          return;
+        }
+        const draft = createVoiceFile(state.voiceChunks, state.voiceStartedAt, state.mediaRecorder?.mimeType || mimeType);
         state.voiceChunks = [];
-        const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: "audio/webm" });
         state.voiceDraft = {
-          file,
-          url: URL.createObjectURL(blob),
-          duration: Math.max(1, Math.round((Date.now() - state.voiceStartedAt) / 1000))
+          file: draft.file,
+          url: draft.url,
+          duration: draft.duration,
+          mimeType: draft.file.type
         };
         state.mediaRecorder = null;
         renderAgentVoiceDraft();
       };
-      state.mediaRecorder.start();
+      state.mediaRecorder.start(250);
       btn?.classList.add("recording");
       btn?.setAttribute("aria-pressed", "true");
       startAgentRecordingTimer();
@@ -1053,16 +1138,21 @@
   function renderDashboardAttachment(att) {
     const name = escapeHtml(att.file_name || "Attachment");
     const size = formatFileSize(att.file_size);
-    const url = `../backend/api/${att.view_url || ""}`;
+    const url = `../backend/api/${att.preview_url || att.view_url || ""}`;
     const download = `../backend/api/${att.download_url || att.view_url || ""}`;
     if (att.is_voice) {
+      const mime = escapeHtml(att.mime_type || "audio/webm");
       const mediaTag = String(att.mime_type || "").toLowerCase().startsWith("video/")
-        ? `<video controls preload="metadata" src="${escapeHtml(url)}"></video>`
-        : `<audio controls preload="metadata" src="${escapeHtml(url)}"></audio>`;
+        ? `<video controls preload="metadata"><source src="${escapeHtml(url)}" type="${mime}"></video>`
+        : `<audio controls preload="metadata"><source src="${escapeHtml(url)}" type="${mime}"></audio>`;
       return `
         <div class="public-chat-dashboard-attachment voice">
           <div><strong>Voice note</strong><span>${name}${size ? ` - ${escapeHtml(size)}` : ""}</span></div>
           ${mediaTag}
+          <div class="public-chat-dashboard-attachment-actions">
+            <a href="${escapeHtml(url)}" target="_blank" rel="noopener">Open</a>
+            <a href="${escapeHtml(download)}" target="_blank" rel="noopener">Download</a>
+          </div>
         </div>
       `;
     }
@@ -1082,7 +1172,7 @@
     const text = String(msg.message_text || "").trim();
     const attachmentHtml = attachments.map(renderDashboardAttachment).join("");
     const showText = text && text !== "Attachment uploaded" && text !== "Voice note";
-    return `${showText ? `<div>${escapeHtml(text)}</div>` : ""}${attachmentHtml || (!showText ? `<div>${escapeHtml(text || "Message")}</div>` : "")}`;
+    return `${showText ? `<div>${formatText(text)}</div>` : ""}${attachmentHtml || (!showText ? `<div>${formatText(text || "Message")}</div>` : "")}`;
   }
 
   function openDocumentViewer(url, downloadUrl, name, mime) {

@@ -1,4 +1,5 @@
 (function () {
+  const SCRIPT_URL = document.currentScript?.src || new URL("js/public_chat_widget.js", location.href).href;
   const PUBLIC_CHAT_PAGES = new Set(["index.html", "", "about.html", "faq.html", "podcast.html", "podcast_public.html", "feedback.html", "terms.html", "login.html", "pensioner_board.html"]);
   const state = {
     settings: null,
@@ -29,8 +30,16 @@
   const pageName = () => (location.pathname.split("/").pop() || "index.html").toLowerCase();
   const storeKey = () => "pensionsgo_public_chat_session";
 
+  function moduleUrl(path) {
+    return new URL(path, SCRIPT_URL).href;
+  }
+
   function escapeHtml(value) {
     return String(value || "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[m]));
+  }
+
+  function formatText(value) {
+    return escapeHtml(value).replace(/\n/g, "<br>");
   }
 
   async function fetchJson(url, options = {}) {
@@ -51,6 +60,46 @@
     if (body) {
       body.insertAdjacentHTML("afterbegin", `<div class="public-chat-status ${escapeHtml(type)}">${escapeHtml(message)}</div>`);
     }
+  }
+
+  function removePublicChatShell() {
+    clearTimeout(state.pollTimer);
+    clearTimeout(state.typingStopTimer);
+    if (state.voiceTimer) clearInterval(state.voiceTimer);
+    state.recordingStream?.getTracks?.().forEach((track) => track.stop());
+    state.recordingStream = null;
+    state.mediaRecorder = null;
+    document.getElementById("publicChatLauncher")?.remove();
+    document.getElementById("publicChatPanel")?.remove();
+    document.getElementById("publicChatFeedbackModal")?.remove();
+  }
+
+  async function initStaffLiveChatForAuthenticatedUser(visitor = {}) {
+    removePublicChatShell();
+    window.__disablePublicLiveChat = true;
+    if (window.PensionsGoLiveChat?.instance) return;
+    try {
+      const mod = await import(moduleUrl("modules/live_chat.js?v=20260609d"));
+      await mod?.initLiveChat?.({
+        userId: visitor.userId || localStorage.getItem("loggedInUser") || "",
+        userName: visitor.userName || localStorage.getItem("loggedInUserName") || "",
+        userRole: visitor.role || visitor.userRole || localStorage.getItem("userRole") || ""
+      });
+    } catch (error) {
+      console.warn("Staff live chat initialization failed:", error.message || error);
+    }
+  }
+
+  function selectorEscape(value) {
+    if (window.CSS?.escape) return CSS.escape(value);
+    return String(value).replace(/["\\]/g, "\\$&");
+  }
+
+  function createClientNonce(prefix = "public") {
+    const random = window.crypto?.getRandomValues
+      ? Array.from(window.crypto.getRandomValues(new Uint32Array(2))).map((part) => part.toString(36)).join("")
+      : Math.random().toString(36).slice(2);
+    return `${prefix}-${Date.now().toString(36)}-${random}`.slice(0, 80);
   }
 
   function allowedForPage(settings) {
@@ -344,6 +393,20 @@
     if (!thread) return;
     messages.forEach((msg) => {
       if (thread.querySelector(`[data-message-id="${Number(msg.message_id || 0)}"]`)) return;
+      const nonce = String(msg.client_nonce || "");
+      if (nonce) {
+        const pending = thread.querySelector(`[data-client-nonce="${selectorEscape(nonce)}"]`);
+        if (pending) {
+          const id = Number(msg.message_id || 0);
+          if (id > 0) {
+            pending.dataset.messageId = String(id);
+            state.lastId = Math.max(state.lastId, id);
+          }
+          pending.classList.remove("pending", "failed");
+          pending.innerHTML = `${renderMessageContent(msg)}<small>${escapeHtml(msg.sender_name || msg.sender_type || "")} - ${escapeHtml(msg.created_at || "Sent")}</small>`;
+          return;
+        }
+      }
       state.lastId = Math.max(state.lastId, Number(msg.message_id || 0));
       const item = document.createElement("div");
       item.className = `public-chat-message ${msg.sender_type === "visitor" ? "visitor" : "agent"}`;
@@ -365,12 +428,13 @@
   function renderAttachment(att) {
     const name = escapeHtml(att.file_name || "Attachment");
     const size = formatFileSize(att.file_size);
-    const url = `../backend/api/${att.view_url || ""}`;
+    const url = `../backend/api/${att.preview_url || att.view_url || ""}`;
     const download = `../backend/api/${att.download_url || att.view_url || ""}`;
     if (att.is_voice) {
+      const mime = escapeHtml(att.mime_type || "audio/webm");
       const mediaTag = String(att.mime_type || "").toLowerCase().startsWith("video/")
-        ? `<video controls preload="metadata" src="${escapeHtml(url)}"></video>`
-        : `<audio controls preload="metadata" src="${escapeHtml(url)}"></audio>`;
+        ? `<video controls preload="metadata"><source src="${escapeHtml(url)}" type="${mime}"></video>`
+        : `<audio controls preload="metadata"><source src="${escapeHtml(url)}" type="${mime}"></audio>`;
       return `
         <div class="public-chat-file-card voice">
           <div><strong>Voice note</strong><span>${name}${size ? ` - ${escapeHtml(size)}` : ""}</span></div>
@@ -394,7 +458,7 @@
     const text = String(msg.message_text || "").trim();
     const attachmentHtml = attachments.map(renderAttachment).join("");
     const showText = text && text !== "Attachment uploaded" && text !== "Voice note";
-    return `${showText ? `<div>${escapeHtml(text)}</div>` : ""}${attachmentHtml || (!showText ? `<div>${escapeHtml(text || "Message")}</div>` : "")}`;
+    return `${showText ? `<div>${formatText(text)}</div>` : ""}${attachmentHtml || (!showText ? `<div>${formatText(text || "Message")}</div>` : "")}`;
   }
 
   async function poll() {
@@ -432,15 +496,17 @@
     const message = textarea.value.trim();
     if (!message || !state.session || state.sendingMessage) return;
     state.sendingMessage = true;
+    const clientNonce = createClientNonce("visitor");
     textarea.value = "";
-    const tempNode = appendVisitorMessage(message);
+    const tempNode = appendVisitorMessage(message, clientNonce);
     await stopTyping(true);
     const data = await fetchJson(api("public_chat_send.php"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id: state.session.session_id, token: state.session.token, message })
+      body: JSON.stringify({ session_id: state.session.session_id, token: state.session.token, message, client_nonce: clientNonce })
     }).catch((error) => ({ success: false, message: error.message || "Unable to send message." }));
     if (data.success) {
+      if (data.message) addMessages([data.message]);
       const messageId = Number(data.message_id || 0);
       if (messageId > 0 && tempNode) {
         tempNode.dataset.messageId = String(messageId);
@@ -460,12 +526,13 @@
     state.sendingMessage = false;
   }
 
-  function appendVisitorMessage(message) {
+  function appendVisitorMessage(message, clientNonce = "") {
     const thread = document.getElementById("publicChatThread");
     if (!thread) return null;
     const item = document.createElement("div");
     item.className = "public-chat-message visitor pending";
-    item.innerHTML = `<div>${escapeHtml(message)}</div><small>You - Sending...</small>`;
+    if (clientNonce) item.dataset.clientNonce = clientNonce;
+    item.innerHTML = `<div>${formatText(message)}</div><small>You - Sending...</small>`;
     thread.appendChild(item);
     thread.scrollTop = thread.scrollHeight;
     return item;
@@ -551,6 +618,40 @@
     return `${mins}:${secs}`;
   }
 
+  function getSupportedVoiceRecorderType() {
+    const candidates = [
+      "audio/webm;codecs=opus",
+      "audio/ogg;codecs=opus",
+      "audio/webm",
+      "audio/ogg",
+      "audio/mp4",
+      "audio/mpeg"
+    ];
+    if (!window.MediaRecorder?.isTypeSupported) return "";
+    return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+  }
+
+  function voiceExtensionForMime(mimeType) {
+    const clean = String(mimeType || "").toLowerCase();
+    if (clean.includes("ogg")) return "ogg";
+    if (clean.includes("mp4")) return "m4a";
+    if (clean.includes("mpeg") || clean.includes("mp3")) return "mp3";
+    if (clean.includes("wav")) return "wav";
+    return "webm";
+  }
+
+  function createVoiceFile(chunks, startedAt, fallbackType = "") {
+    const type = fallbackType || chunks.find((chunk) => chunk?.type)?.type || "audio/webm";
+    const blob = new Blob(chunks, { type });
+    const extension = voiceExtensionForMime(type);
+    return {
+      blob,
+      file: new File([blob], `voice-note-${Date.now()}.${extension}`, { type }),
+      url: URL.createObjectURL(blob),
+      duration: Math.max(1, Math.round((Date.now() - startedAt) / 1000))
+    };
+  }
+
   async function toggleVoiceRecording() {
     const btn = document.getElementById("publicChatVoiceBtn");
     if (state.mediaRecorder?.state === "recording") {
@@ -569,11 +670,25 @@
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1
+        }
+      });
+      const audioTrack = stream.getAudioTracks?.()[0];
+      if (!audioTrack || audioTrack.readyState === "ended") {
+        stream.getTracks().forEach((track) => track.stop());
+        showChatFeedback("No active microphone was found.", "error");
+        return;
+      }
       state.recordingStream = stream;
       state.voiceChunks = [];
       state.voiceStartedAt = Date.now();
-      state.mediaRecorder = new MediaRecorder(stream);
+      const mimeType = getSupportedVoiceRecorderType();
+      state.mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       state.mediaRecorder.ondataavailable = (event) => {
         if (event.data?.size) state.voiceChunks.push(event.data);
       };
@@ -581,18 +696,23 @@
         stream.getTracks().forEach((track) => track.stop());
         state.recordingStream = null;
         stopRecordingTimer();
-        const blob = new Blob(state.voiceChunks, { type: "audio/webm" });
+        if (!state.voiceChunks.length) {
+          state.mediaRecorder = null;
+          showChatFeedback("No audio was captured. Check microphone permissions and try again.", "warning");
+          return;
+        }
+        const draft = createVoiceFile(state.voiceChunks, state.voiceStartedAt, state.mediaRecorder?.mimeType || mimeType);
         state.voiceChunks = [];
-        const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: "audio/webm" });
         state.voiceDraft = {
-          file,
-          url: URL.createObjectURL(blob),
-          duration: Math.max(1, Math.round((Date.now() - state.voiceStartedAt) / 1000))
+          file: draft.file,
+          url: draft.url,
+          duration: draft.duration,
+          mimeType: draft.file.type
         };
         state.mediaRecorder = null;
         renderVoiceDraft();
       };
-      state.mediaRecorder.start();
+      state.mediaRecorder.start(250);
       btn?.classList.add("recording");
       btn?.setAttribute("aria-pressed", "true");
       startRecordingTimer();
@@ -743,6 +863,10 @@
   document.addEventListener("DOMContentLoaded", async () => {
     try {
       const data = await fetchJson(api("public_chat_bootstrap.php"));
+      if (data.visitor?.isLoggedIn && !data.visitor?.isPensioner) {
+        await initStaffLiveChatForAuthenticatedUser(data.visitor);
+        return;
+      }
       if (!data.success || !allowedForPage(data.settings)) return;
       state.settings = data.settings;
       state.availability = data.availability;

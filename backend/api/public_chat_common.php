@@ -45,6 +45,18 @@ function publicChatClean(?string $value, int $max = 255): string
     return substr($value, 0, $max);
 }
 
+function publicChatCleanMessage(?string $value, int $max = 2000): string
+{
+    $value = trim((string)$value);
+    $value = preg_replace("/\r\n?/", "\n", $value) ?? '';
+    $value = preg_replace("/[ \t]+/", ' ', $value) ?? '';
+    $value = preg_replace("/\n{4,}/", "\n\n\n", $value) ?? '';
+    if (function_exists('mb_substr')) {
+        return mb_substr($value, 0, $max);
+    }
+    return substr($value, 0, $max);
+}
+
 function publicChatClientIp(): string
 {
     foreach (['HTTP_X_FORWARDED_FOR', 'HTTP_CLIENT_IP', 'REMOTE_ADDR'] as $key) {
@@ -164,6 +176,13 @@ function publicChatEnsureTables(mysqli $conn): void
     publicChatAddColumnIfMissing($conn, 'public_chat_sessions', 'outcome', "`outcome` varchar(120) DEFAULT NULL");
     publicChatAddColumnIfMissing($conn, 'public_chat_sessions', 'first_response_at', "`first_response_at` datetime DEFAULT NULL");
     publicChatAddColumnIfMissing($conn, 'public_chat_messages', 'message_kind', "`message_kind` enum('text','attachment','voice') NOT NULL DEFAULT 'text'");
+    publicChatAddColumnIfMissing($conn, 'public_chat_messages', 'delivered_at', "`delivered_at` timestamp NULL DEFAULT NULL");
+    publicChatAddColumnIfMissing($conn, 'public_chat_messages', 'is_read', "`is_read` tinyint(1) NOT NULL DEFAULT 0");
+    publicChatAddColumnIfMissing($conn, 'public_chat_messages', 'read_at', "`read_at` timestamp NULL DEFAULT NULL");
+    publicChatAddColumnIfMissing($conn, 'public_chat_messages', 'edited_at', "`edited_at` timestamp NULL DEFAULT NULL");
+    publicChatAddColumnIfMissing($conn, 'public_chat_messages', 'deleted_at', "`deleted_at` timestamp NULL DEFAULT NULL");
+    publicChatAddColumnIfMissing($conn, 'public_chat_messages', 'reaction_emoji', "`reaction_emoji` varchar(24) DEFAULT NULL");
+    publicChatAddColumnIfMissing($conn, 'public_chat_messages', 'client_nonce', "`client_nonce` varchar(80) DEFAULT NULL");
     publicChatAddColumnIfMissing($conn, 'public_chat_agents', 'last_seen_at', "`last_seen_at` datetime DEFAULT NULL");
     publicChatAddColumnIfMissing($conn, 'public_chat_attachments', 'uploaded_by', "`uploaded_by` varchar(100) DEFAULT NULL");
     $conn->query("UPDATE public_chat_attachments SET mime_type = 'audio/webm' WHERE LOWER(file_name) LIKE '%.webm' AND (LOWER(COALESCE(mime_type, '')) LIKE 'audio/%' OR LOWER(COALESCE(mime_type, '')) = 'video/webm')");
@@ -217,6 +236,8 @@ function publicChatEnsureTables(mysqli $conn): void
             KEY idx_public_chat_rate_window (window_start)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
+    publicChatAddIndexIfMissing($conn, 'public_chat_messages', 'idx_public_chat_messages_delivery', 'session_id, sender_type, delivered_at, message_id');
+    publicChatAddIndexIfMissing($conn, 'public_chat_messages', 'idx_public_chat_messages_read', 'session_id, sender_type, is_read, message_id');
 
     $ready = true;
 }
@@ -233,6 +254,174 @@ function publicChatAddColumnIfMissing(mysqli $conn, string $table, string $colum
         return;
     }
     $conn->query("ALTER TABLE `{$table}` ADD COLUMN {$definition}");
+}
+
+function publicChatAddIndexIfMissing(mysqli $conn, string $table, string $index, string $columns): void
+{
+    $table = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
+    $index = preg_replace('/[^a-zA-Z0-9_]/', '', $index);
+    if ($table === '' || $index === '') {
+        return;
+    }
+    $stmt = $conn->prepare("
+        SELECT COUNT(*) AS total
+        FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+          AND INDEX_NAME = ?
+    ");
+    if (!$stmt) {
+        return;
+    }
+    $stmt->bind_param('ss', $table, $index);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if ((int)($row['total'] ?? 0) === 0) {
+        $conn->query("ALTER TABLE `{$table}` ADD INDEX `{$index}` ({$columns})");
+    }
+}
+
+function publicChatJsonInput(): array
+{
+    $raw = file_get_contents('php://input');
+    if (!$raw) {
+        return [];
+    }
+    $data = json_decode($raw, true);
+    return is_array($data) ? $data : [];
+}
+
+function publicChatLoadSession(mysqli $conn, int $sessionId): array
+{
+    if ($sessionId <= 0) {
+        publicChatJson(['success' => false, 'message' => 'Chat session is required.'], 400);
+    }
+    $stmt = $conn->prepare("SELECT * FROM public_chat_sessions WHERE session_id = ? LIMIT 1");
+    if (!$stmt) {
+        publicChatJson(['success' => false, 'message' => 'Unable to load chat session.'], 500);
+    }
+    $stmt->bind_param('i', $sessionId);
+    $stmt->execute();
+    $session = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$session) {
+        publicChatJson(['success' => false, 'message' => 'Chat session not found.'], 404);
+    }
+    return $session;
+}
+
+function publicChatResolveActor(mysqli $conn, int $sessionId, string $token, bool $asAgent, bool $allowUnassignedAgent = false): array
+{
+    if ($asAgent) {
+        $agentId = publicChatRequireAgent($conn);
+        $agentProfile = publicChatAgentProfile($conn, $agentId);
+        $session = publicChatLoadSession($conn, $sessionId);
+        publicChatRequireAgentSessionAccess($session, $agentId, $agentProfile, $allowUnassignedAgent, 'You are not permitted to access this public chat.');
+        return [
+            'session' => $session,
+            'profile' => $agentProfile,
+            'sender_type' => 'agent',
+            'sender_id' => $agentId,
+            'sender_name' => (string)($_SESSION['userName'] ?? 'Chat Agent')
+        ];
+    }
+
+    $session = publicChatVerifyVisitorSession($conn, $sessionId, $token);
+    return [
+        'session' => $session,
+        'profile' => [],
+        'sender_type' => 'visitor',
+        'sender_id' => null,
+        'sender_name' => (string)($session['visitor_name'] ?? 'Visitor')
+    ];
+}
+
+function publicChatNormalizeMessage(array $row, string $viewerType): array
+{
+    $senderType = (string)($row['sender_type'] ?? '');
+    $isOwn = $senderType === $viewerType;
+    $readAt = $row['read_at'] ?? null;
+    $deliveredAt = $row['delivered_at'] ?? null;
+    return [
+        'message_id' => (int)($row['message_id'] ?? 0),
+        'id' => (int)($row['message_id'] ?? 0),
+        'sender_type' => $senderType,
+        'sender_id' => $row['sender_id'] ?? null,
+        'sender_name' => (string)($row['sender_name'] ?? ($senderType === 'agent' ? 'Chat Agent' : 'Visitor')),
+        'message_text' => (string)($row['message_text'] ?? ''),
+        'message_kind' => (string)($row['message_kind'] ?? 'text'),
+        'is_internal' => (int)($row['is_internal'] ?? 0),
+        'created_at' => (string)($row['created_at'] ?? ''),
+        'delivered_at' => $deliveredAt,
+        'is_read' => (int)($row['is_read'] ?? 0) === 1,
+        'read_at' => $readAt,
+        'edited_at' => $row['edited_at'] ?? null,
+        'deleted_at' => $row['deleted_at'] ?? null,
+        'reaction_emoji' => (string)($row['reaction_emoji'] ?? ''),
+        'client_nonce' => (string)($row['client_nonce'] ?? ''),
+        'isOwn' => $isOwn,
+        'receiptStatus' => $isOwn ? (!empty($readAt) ? 'read' : (!empty($deliveredAt) ? 'delivered' : 'sent')) : 'received'
+    ];
+}
+
+function publicChatInsertMessage(mysqli $conn, int $sessionId, string $senderType, ?string $senderId, string $senderName, string $messageText, string $messageKind = 'text', string $clientNonce = ''): int
+{
+    $stmt = $conn->prepare("
+        INSERT INTO public_chat_messages (session_id, sender_type, sender_id, sender_name, message_text, message_kind, client_nonce)
+        VALUES (?, ?, ?, ?, ?, ?, NULLIF(?, ''))
+    ");
+    if (!$stmt) {
+        publicChatJson(['success' => false, 'message' => 'Unable to save message.'], 500);
+    }
+    $stmt->bind_param('issssss', $sessionId, $senderType, $senderId, $senderName, $messageText, $messageKind, $clientNonce);
+    $stmt->execute();
+    $messageId = (int)$stmt->insert_id;
+    $stmt->close();
+    return $messageId;
+}
+
+function publicChatFetchMessages(mysqli $conn, int $sessionId, int $lastId, string $viewerType): array
+{
+    $stmt = $conn->prepare("
+        SELECT message_id, sender_type, sender_id, sender_name, message_text, message_kind, is_internal,
+               delivered_at, is_read, read_at, edited_at, deleted_at, reaction_emoji, client_nonce, created_at
+        FROM public_chat_messages
+        WHERE session_id = ?
+          AND message_id > ?
+          AND is_internal = 0
+          AND deleted_at IS NULL
+        ORDER BY message_id ASC
+    ");
+    if (!$stmt) {
+        return [];
+    }
+    $stmt->bind_param('ii', $sessionId, $lastId);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return array_map(static fn($row) => publicChatNormalizeMessage($row, $viewerType), $rows);
+}
+
+function publicChatMarkSeen(mysqli $conn, int $sessionId, string $viewerType): void
+{
+    $senderType = $viewerType === 'agent' ? 'visitor' : 'agent';
+    $stmt = $conn->prepare("
+        UPDATE public_chat_messages
+        SET delivered_at = COALESCE(delivered_at, NOW()),
+            is_read = 1,
+            read_at = COALESCE(read_at, NOW())
+        WHERE session_id = ?
+          AND sender_type = ?
+          AND is_internal = 0
+          AND deleted_at IS NULL
+          AND (is_read = 0 OR read_at IS NULL OR delivered_at IS NULL)
+    ");
+    if ($stmt) {
+        $stmt->bind_param('is', $sessionId, $senderType);
+        $stmt->execute();
+        $stmt->close();
+    }
 }
 
 function publicChatSettingBool(mysqli $conn, string $key, bool $default = true): bool
@@ -473,13 +662,19 @@ function publicChatAttachmentIsPreviewable(string $mime, string $fileName): bool
     if (in_array($mime, ['application/pdf', 'text/plain', 'text/csv'], true)) {
         return true;
     }
-    return in_array($ext, ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'txt', 'csv', 'mp3', 'wav', 'ogg', 'webm', 'm4a'], true);
+    return in_array($ext, ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'txt', 'csv', 'docx', 'mp3', 'wav', 'ogg', 'webm', 'm4a'], true);
 }
 
 function publicChatPlaybackMime(string $mime, string $fileName): string
 {
     $mime = strtolower(trim($mime));
     $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+    if ($ext === 'docx' && ($mime === '' || $mime === 'application/octet-stream' || $mime === 'application/zip')) {
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    }
+    if ($ext === 'doc' && ($mime === '' || $mime === 'application/octet-stream')) {
+        return 'application/msword';
+    }
     if ($ext === 'webm' && ($mime === '' || str_starts_with($mime, 'audio/') || str_starts_with($mime, 'video/') || $mime === 'application/octet-stream')) {
         return 'audio/webm';
     }
@@ -489,10 +684,82 @@ function publicChatPlaybackMime(string $mime, string $fileName): string
     if ($ext === 'mp3' && ($mime === '' || $mime === 'application/octet-stream')) {
         return 'audio/mpeg';
     }
+    if ($ext === 'm4a' && ($mime === '' || $mime === 'application/octet-stream' || $mime === 'audio/x-m4a' || $mime === 'video/mp4')) {
+        return 'audio/mp4';
+    }
+    if ($ext === 'mp4' && ($mime === '' || $mime === 'application/octet-stream')) {
+        return 'audio/mp4';
+    }
     if ($ext === 'wav' && ($mime === '' || $mime === 'application/octet-stream')) {
         return 'audio/wav';
     }
     return $mime ?: 'application/octet-stream';
+}
+
+function publicChatMediaTokenSecret(): string
+{
+    if (function_exists('getSignedSessionCookieSecret')) {
+        return getSignedSessionCookieSecret();
+    }
+    return hash('sha256', __DIR__ . '|public-chat-media');
+}
+
+function publicChatAgentMediaToken(int $attachmentId, int $sessionId, string $agentSessionId, string $agentUserId): string
+{
+    return hash_hmac('sha256', $attachmentId . '|' . $sessionId . '|' . $agentSessionId . '|' . $agentUserId, publicChatMediaTokenSecret());
+}
+
+function publicChatUserCanManageById(mysqli $conn, string $userId): bool
+{
+    if ($userId === '') {
+        return false;
+    }
+    $stmt = $conn->prepare("SELECT userRole FROM tb_users WHERE userId = ? LIMIT 1");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param('s', $userId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$row) {
+        return false;
+    }
+    $role = function_exists('resolveRoleAccessKey') ? resolveRoleAccessKey($conn, (string)$row['userRole']) : normalizeRoleKey((string)$row['userRole']);
+    if (in_array($role, ['super_admin', 'admin', 'oc_pen'], true)) {
+        return true;
+    }
+    $agentStmt = $conn->prepare("SELECT can_handle_public_chat, is_enabled FROM public_chat_agents WHERE user_id = ? LIMIT 1");
+    if ($agentStmt) {
+        $agentStmt->bind_param('s', $userId);
+        $agentStmt->execute();
+        $agent = $agentStmt->get_result()->fetch_assoc();
+        $agentStmt->close();
+        if ($agent && (int)($agent['is_enabled'] ?? 0) === 1 && (int)($agent['can_handle_public_chat'] ?? 0) === 1) {
+            return true;
+        }
+    }
+    return function_exists('getEffectiveUserPermission')
+        && getEffectiveUserPermission($conn, $userId, (string)$row['userRole'], 'public_chat.agent');
+}
+
+function publicChatVerifyAgentMediaToken(mysqli $conn, int $attachmentId, int $sessionId, string $agentSessionId, string $agentUserId, string $token): bool
+{
+    if ($attachmentId <= 0 || $sessionId <= 0 || $agentSessionId === '' || $agentUserId === '' || $token === '') {
+        return false;
+    }
+    if (!hash_equals(publicChatAgentMediaToken($attachmentId, $sessionId, $agentSessionId, $agentUserId), $token)) {
+        return false;
+    }
+    $stmt = $conn->prepare("SELECT 1 FROM tb_user_sessions WHERE session_id = ? AND user_id = ? AND is_active = 1 LIMIT 1");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param('ss', $agentSessionId, $agentUserId);
+    $stmt->execute();
+    $active = (bool)$stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $active && publicChatUserCanManageById($conn, $agentUserId);
 }
 
 function publicChatAttachMessageFiles(mysqli $conn, array $messages, bool $asAgent, ?string $visitorToken = null): array
@@ -534,8 +801,20 @@ function publicChatAttachMessageFiles(mysqli $conn, array $messages, bool $asAge
         if (!$asAgent) {
             $params['session_id'] = $sessionId;
             $params['token'] = (string)$visitorToken;
+        } else {
+            $agentSessionId = (string)($_SESSION['session_id'] ?? '');
+            $agentUserId = (string)($_SESSION['userId'] ?? '');
+            if ($agentSessionId !== '' && $agentUserId !== '') {
+                $params['session_id'] = $sessionId;
+                $params['agent_session_id'] = $agentSessionId;
+                $params['agent_user_id'] = $agentUserId;
+                $params['agent_token'] = publicChatAgentMediaToken($attachmentId, $sessionId, $agentSessionId, $agentUserId);
+            }
         }
         $viewUrl = 'public_chat_view_attachment.php?' . http_build_query($params);
+        $previewUrl = strtolower(pathinfo($fileName, PATHINFO_EXTENSION)) === 'docx'
+            ? 'public_chat_preview_attachment.php?' . http_build_query($params)
+            : $viewUrl;
         $downloadUrl = $viewUrl . '&download=1';
         $byMessage[(int)$row['message_id']][] = [
             'attachment_id' => $attachmentId,
@@ -547,6 +826,7 @@ function publicChatAttachMessageFiles(mysqli $conn, array $messages, bool $asAge
             'is_voice' => str_starts_with(strtolower($mime), 'audio/') || str_starts_with(strtolower($mime), 'video/') || in_array(strtolower(pathinfo($fileName, PATHINFO_EXTENSION)), ['webm', 'ogg', 'mp3', 'wav', 'm4a'], true),
             'previewable' => publicChatAttachmentIsPreviewable($mime, $fileName),
             'view_url' => $viewUrl,
+            'preview_url' => $previewUrl,
             'download_url' => $downloadUrl
         ];
     }
@@ -893,4 +1173,3 @@ function publicChatVerifyVisitorSession(mysqli $conn, int $sessionId, string $to
     }
     return $session;
 }
-?>

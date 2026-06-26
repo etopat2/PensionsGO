@@ -75,11 +75,8 @@ if ($action === 'detail') {
     $sessionId = (int)($input['session_id'] ?? 0);
     $session = publicChatAgentSession($conn, $sessionId);
     publicChatRequireAgentSessionAccess($session, $agentId, $agentProfile, true, 'You are not permitted to view this chat.');
-    $msgStmt = $conn->prepare("SELECT message_id, sender_type, sender_id, sender_name, message_text, is_internal, created_at FROM public_chat_messages WHERE session_id = ? AND is_internal = 0 ORDER BY message_id ASC");
-    $msgStmt->bind_param('i', $sessionId);
-    $msgStmt->execute();
-    $messages = $msgStmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $msgStmt->close();
+    publicChatMarkSeen($conn, $sessionId, 'agent');
+    $messages = publicChatFetchMessages($conn, $sessionId, 0, 'agent');
     $messages = publicChatAttachMessageFiles($conn, $messages, true);
 
     $noteStmt = $conn->prepare("SELECT n.note_id, n.agent_user_id, u.userName AS agent_name, n.note_text, n.created_at FROM public_chat_notes n LEFT JOIN tb_users u ON u.userId = n.agent_user_id WHERE n.session_id = ? ORDER BY n.note_id DESC");

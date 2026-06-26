@@ -12,34 +12,22 @@ if ($sessionId <= 0) {
 }
 
 if ($asAgent) {
-    $agentId = publicChatRequireAgent($conn);
-    $agentProfile = publicChatAgentProfile($conn, $agentId);
-    $stmt = $conn->prepare("SELECT * FROM public_chat_sessions WHERE session_id = ? LIMIT 1");
-    $stmt->bind_param('i', $sessionId);
-    $stmt->execute();
-    $session = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-    if (!$session) {
-        publicChatJson(['success' => false, 'message' => 'Chat session not found.'], 404);
-    }
-    publicChatRequireAgentSessionAccess($session, $agentId, $agentProfile, true, 'You are not permitted to view this chat.');
+    $actor = publicChatResolveActor($conn, $sessionId, '', true, true);
+    $agentId = (string)$actor['sender_id'];
+    $agentProfile = $actor['profile'];
 } else {
-    $session = publicChatVerifyVisitorSession($conn, $sessionId, $token);
+    $actor = publicChatResolveActor($conn, $sessionId, $token, false, false);
+    $agentId = '';
+    $agentProfile = [];
 }
+$session = $actor['session'];
+$viewerType = $asAgent ? 'agent' : 'visitor';
 
-$stmt = $conn->prepare("
-    SELECT message_id, sender_type, sender_id, sender_name, message_text, is_internal, created_at
-    FROM public_chat_messages
-    WHERE session_id = ? AND message_id > ? AND is_internal = 0
-    ORDER BY message_id ASC
-");
-$stmt->bind_param('ii', $sessionId, $lastId);
-$stmt->execute();
-$messages = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
+publicChatMarkSeen($conn, $sessionId, $viewerType);
+$messages = publicChatFetchMessages($conn, $sessionId, $lastId, $viewerType);
 $messages = publicChatAttachMessageFiles($conn, $messages, $asAgent, $asAgent ? null : $token);
 $canReply = $asAgent
-    ? publicChatAgentCanAccessSession($session, $agentId ?? '', $agentProfile ?? [], false) && ($session['status'] ?? '') !== 'closed'
+    ? publicChatAgentCanAccessSession($session, $agentId, $agentProfile, false) && ($session['status'] ?? '') !== 'closed'
     : false;
 
 publicChatJson([

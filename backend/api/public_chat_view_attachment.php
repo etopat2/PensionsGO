@@ -6,6 +6,9 @@ publicChatEnsureTables($conn);
 $attachmentId = (int)($_GET['attachment_id'] ?? 0);
 $sessionId = (int)($_GET['session_id'] ?? 0);
 $token = publicChatClean($_GET['token'] ?? '', 128);
+$agentSessionId = publicChatClean($_GET['agent_session_id'] ?? '', 128);
+$agentUserId = publicChatClean($_GET['agent_user_id'] ?? '', 100);
+$agentToken = publicChatClean($_GET['agent_token'] ?? '', 128);
 $download = isset($_GET['download']) && (string)$_GET['download'] === '1';
 
 if ($attachmentId <= 0) {
@@ -16,6 +19,11 @@ if ($attachmentId <= 0) {
 }
 
 $asAgent = !empty($_SESSION['userId']) && publicChatCanManage($conn);
+$asAgentMediaToken = false;
+if (!$asAgent && $sessionId > 0 && $agentToken !== '') {
+    $asAgentMediaToken = publicChatVerifyAgentMediaToken($conn, $attachmentId, $sessionId, $agentSessionId, $agentUserId, $agentToken);
+    $asAgent = $asAgentMediaToken;
+}
 if (!$asAgent) {
     if ($sessionId <= 0 || $token === '') {
         http_response_code(401);
@@ -43,7 +51,7 @@ $stmt->execute();
 $attachment = $stmt->get_result()->fetch_assoc() ?: null;
 $stmt->close();
 
-if (!$attachment || (!$asAgent && (int)$attachment['session_id'] !== $sessionId)) {
+if (!$attachment || ((!$asAgent || $asAgentMediaToken) && (int)$attachment['session_id'] !== $sessionId)) {
     http_response_code(404);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['success' => false, 'message' => 'Attachment not found or access denied']);
@@ -68,7 +76,8 @@ if ($mime === '' || stripos($mime, 'octet-stream') !== false) {
 $displayName = basename((string)($attachment['file_name'] ?? basename($absolutePath)));
 $mime = publicChatPlaybackMime($mime, $displayName);
 $previewEnabled = getAppSettingBool($conn, 'document_preview_enabled', true);
-$disposition = (!$download && $previewEnabled && publicChatAttachmentIsPreviewable($mime, $displayName)) ? 'inline' : 'attachment';
+$isMedia = str_starts_with(strtolower($mime), 'audio/') || str_starts_with(strtolower($mime), 'video/');
+$disposition = (!$download && ($isMedia || ($previewEnabled && publicChatAttachmentIsPreviewable($mime, $displayName)))) ? 'inline' : 'attachment';
 
 publicChatAudit($conn, (int)$attachment['session_id'], $disposition === 'inline' ? 'Attachment previewed' : 'Attachment downloaded', [
     'attachment_id' => $attachmentId,
@@ -97,6 +106,10 @@ if ($range !== '' && preg_match('/bytes=(\d*)-(\d*)/', $range, $matches)) {
 }
 
 $length = max(0, $end - $start + 1);
+while (ob_get_level() > 0) {
+    @ob_end_clean();
+}
+header_remove('Content-Type');
 header('Content-Type: ' . $mime);
 header('Content-Length: ' . $length);
 header('Accept-Ranges: bytes');

@@ -767,11 +767,34 @@ async function initPensionFileRegistryController() {
     }
   }
 
+  function getRegistryEditBannerCopy(mode = registryFormMode) {
+    const isCreate = mode === "create";
+    const canCreateDirect = canEditRegistry();
+    const canOpenBulk = canBulkUploadRegistry();
+    if (isCreate && !canCreateDirect && canOpenBulk) {
+      return {
+        title: "Registry Intake Workspace",
+        text: "Direct file creation is limited to users with registry edit rights. You can still use Bulk Upload to add approved registry schedules from CSV or XLSX."
+      };
+    }
+    if (isCreate) {
+      return {
+        title: "New Registry Intake",
+        text: "Complete the file profile section by section. Leave Box Number blank if you want the registry to allocate a shelf box automatically."
+      };
+    }
+    return {
+      title: "Registry Update Workspace",
+      text: "Use the sections below to maintain the pension file profile. Leave Box Number blank during creation to let the registry allocate one automatically."
+    };
+  }
+
   function setRegistryFormMode(mode = "edit") {
     registryFormMode = mode === "create" ? "create" : "edit";
     const isCreate = registryFormMode === "create";
     const canCreateDirect = canEditRegistry();
     const canOpenBulk = canBulkUploadRegistry();
+    const bannerCopy = getRegistryEditBannerCopy(registryFormMode);
 
     if (editTitleHeading) {
       editTitleHeading.textContent = isCreate ? "Add Pension File" : "Edit Registry Record";
@@ -782,18 +805,10 @@ async function initPensionFileRegistryController() {
         : "Update identity, service, benefits, and registry tracking details for the selected pension file.";
     }
     if (editFormBannerTitle) {
-      editFormBannerTitle.textContent = isCreate
-        ? (canCreateDirect ? "New Registry Intake" : "Registry Intake Workspace")
-        : "Registry Update Workspace";
+      editFormBannerTitle.textContent = bannerCopy.title;
     }
     if (editFormBannerText) {
-      if (isCreate && !canCreateDirect && canOpenBulk) {
-        editFormBannerText.textContent = "Direct file creation is limited to users with registry edit rights. You can still use Bulk Upload to add approved registry schedules from CSV or XLSX.";
-      } else if (isCreate) {
-        editFormBannerText.textContent = "Complete the file profile section by section. Leave Box Number blank if you want the registry to allocate a shelf box automatically.";
-      } else {
-        editFormBannerText.textContent = "Use the sections below to maintain the pension file profile. Leave Box Number blank during creation to let the registry allocate one automatically.";
-      }
+      editFormBannerText.textContent = bannerCopy.text;
     }
     if (editForm) {
       editForm.classList.toggle("is-create-readonly", isCreate && !canCreateDirect);
@@ -949,6 +964,7 @@ async function initPensionFileRegistryController() {
     if (!field) return;
     const isInvalid = Boolean(invalid);
     field.classList.toggle("registry-field-invalid", isInvalid);
+    field.toggleAttribute("aria-invalid", isInvalid);
 
     const selectorShell = field.nextElementSibling instanceof HTMLElement
       && field.nextElementSibling.classList.contains("district-select")
@@ -1117,6 +1133,35 @@ async function initPensionFileRegistryController() {
     return null;
   }
 
+  function resetRegistryEditBanner() {
+    if (!editFormBanner || !editFormBannerTitle || !editFormBannerText) return;
+    if (!editFormBanner.classList.contains("is-error")) return;
+    const bannerCopy = getRegistryEditBannerCopy(registryFormMode);
+    editFormBanner.classList.remove("is-error");
+    editFormBannerTitle.textContent = bannerCopy.title;
+    editFormBannerText.textContent = bannerCopy.text;
+  }
+
+  function showRegistryValidationIssue(validationError) {
+    if (!validationError) return;
+    registrySubmitAttempted = true;
+    loadRegistryValidationStates();
+    setEditTab(validationError.tab);
+    if (editFormBanner && editFormBannerTitle && editFormBannerText) {
+      editFormBanner.classList.add("is-error");
+      editFormBannerTitle.textContent = "Fix Required";
+      editFormBannerText.textContent = validationError.message;
+    }
+    window.setTimeout(() => {
+      validationError.field?.focus?.({ preventScroll: true });
+      validationError.field?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    }, 80);
+    showFeedbackModal("error", "Validation Error", validationError.message, () => {
+      setEditTab(validationError.tab);
+      validationError.field?.focus?.();
+    });
+  }
+
   async function loadDocumentTypeOptions() {
     try {
       const response = await fetch("../backend/api/get_document_type_options.php", {
@@ -1167,6 +1212,9 @@ async function initPensionFileRegistryController() {
         const handler = () => {
           registryTouchedFields.add(field.id);
           loadRegistryValidationStates();
+          if (!validateRegistryEditForm()) {
+            resetRegistryEditBanner();
+          }
         };
         field.addEventListener("input", handler);
         field.addEventListener("change", handler);
@@ -2914,10 +2962,7 @@ async function initPensionFileRegistryController() {
 
     const validationError = validateRegistryEditForm();
     if (validationError) {
-      showFeedbackModal("error", "Validation Error", validationError.message, () => {
-        setEditTab(validationError.tab);
-        validationError.field?.focus();
-      });
+      showRegistryValidationIssue(validationError);
       return;
     }
 
@@ -3542,10 +3587,10 @@ async function initPensionFileRegistryController() {
       nextOfKinContactLabel.textContent = requiresNextOfKin ? "Next of Kin Contact (Required for Death)" : "Next of Kin Contact";
     }
     if (editNextOfKin) {
-      editNextOfKin.required = requiresNextOfKin;
+      editNextOfKin.toggleAttribute("aria-required", requiresNextOfKin);
     }
     if (editNextOfKinContact) {
-      editNextOfKinContact.required = requiresNextOfKin;
+      editNextOfKinContact.toggleAttribute("aria-required", requiresNextOfKin);
     }
   }
 
