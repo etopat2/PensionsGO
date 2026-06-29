@@ -1,0 +1,19 @@
+# XAMPP Stack Environment Rules
+
+## Environment Context
+- OS: Windows/Mac (XAMPP Environment)
+- Local Server Path: Typically inside htdocs folder
+- PHP Version: Standard XAMPP PHP (Check errors via PHP Error Logs or display_errors)
+- Database: MySQL / MariaDB (Default port 3306)
+
+## PHP & SQL Coding Standards
+- ALWAYS use PHP Data Objects (PDO) for database connections to ensure security.
+- ALWAYS use prepared statements with named parameters to prevent SQL injection.
+- Do not use deprecated `mysql_*` or procedural `mysqli_*` functions unless explicitly asked.
+- Wrap database transactions in try-catch blocks and log exceptions.
+- Ensure all HTML forms include basic CSRF protection tokens handled via PHP sessions.
+
+## Workflow & System Commands
+- If a script requires testing, you may use curl commands in the terminal targeting `http://localhost/YOUR_PROJECT_FOLDER_NAME/` if XAMPP Apache is running.
+- Do not attempt to restart the Apache or MySQL services via terminal commands, as XAMPP handles this via its Control Panel.
+- Always check for the existence of database configuration files (like `db.php` or `config.php`) before generating new connection code.
