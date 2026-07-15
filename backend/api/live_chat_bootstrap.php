@@ -2,9 +2,12 @@
 require_once __DIR__ . '/live_chat_common.php';
 
 try {
+    $csrfToken = function_exists('getSessionCsrfToken') ? getSessionCsrfToken() : '';
     $userId = liveChatRequireStaff($conn);
     liveChatEnsureTables($conn);
+    liveChatPromoteRealtimeDefaults($conn);
     liveChatTouchPresence($conn, $userId);
+    liveChatReleaseSessionLock();
 
     $currentUserName = 'You';
     $currentStmt = $conn->prepare("SELECT userName FROM tb_users WHERE userId = ? LIMIT 1");
@@ -31,7 +34,7 @@ try {
         LEFT JOIN tb_live_chat_presence p ON p.user_id = u.userId
         WHERE u.userId <> ?
           AND u.userRole NOT IN ('pensioner', 'user')
-          AND LOWER(REPLACE(COALESCE(u.userRole, ''), ' ', '_')) NOT IN ('super_admin', 'superadministrator', 'system_administrator')
+          AND LOWER(REPLACE(REPLACE(COALESCE(u.userRole, ''), ' ', '_'), '-', '_')) NOT IN ('super_admin', 'superadministrator', 'system_administrator')
         ORDER BY is_online DESC, u.userName ASC
     ");
     if (!$stmt) {
@@ -106,59 +109,9 @@ try {
         $deliveredStmt->close();
     }
 
-    $unreadByUser = [];
-    $directUnreadStmt = $conn->prepare("
-        SELECT m.sender_id, COUNT(*) AS unread_count
-        FROM tb_live_chat_messages m
-        LEFT JOIN tb_live_chat_message_reads r
-          ON r.chat_message_id = m.chat_message_id AND r.user_id = ?
-        LEFT JOIN tb_live_chat_message_deletions d
-          ON d.chat_message_id = m.chat_message_id AND d.user_id = ?
-        WHERE m.recipient_id = ?
-          AND m.sender_id <> ?
-          AND m.deleted_at IS NULL
-          AND m.admin_deleted_at IS NULL
-          AND m.is_read = 0
-          AND r.chat_message_id IS NULL
-          AND d.chat_message_id IS NULL
-        GROUP BY m.sender_id
-    ");
-    if ($directUnreadStmt) {
-        $directUnreadStmt->bind_param('ssss', $userId, $userId, $userId, $userId);
-        $directUnreadStmt->execute();
-        $directUnreadResult = $directUnreadStmt->get_result();
-        while ($row = $directUnreadResult->fetch_assoc()) {
-            $unreadByUser[(string)$row['sender_id']] = (int)$row['unread_count'];
-        }
-        $directUnreadStmt->close();
-    }
-
-    $unreadByGroup = [];
-    $groupUnreadStmt = $conn->prepare("
-        SELECT m.recipient_id AS group_id, COUNT(*) AS unread_count
-        FROM tb_live_chat_messages m
-        INNER JOIN tb_live_chat_group_members gm
-          ON gm.group_id = m.recipient_id AND gm.user_id = ?
-        LEFT JOIN tb_live_chat_message_reads r
-          ON r.chat_message_id = m.chat_message_id AND r.user_id = ?
-        LEFT JOIN tb_live_chat_message_deletions d
-          ON d.chat_message_id = m.chat_message_id AND d.user_id = ?
-        WHERE m.sender_id <> ?
-          AND m.deleted_at IS NULL
-          AND m.admin_deleted_at IS NULL
-          AND r.chat_message_id IS NULL
-          AND d.chat_message_id IS NULL
-        GROUP BY m.recipient_id
-    ");
-    if ($groupUnreadStmt) {
-        $groupUnreadStmt->bind_param('ssss', $userId, $userId, $userId, $userId);
-        $groupUnreadStmt->execute();
-        $groupUnreadResult = $groupUnreadStmt->get_result();
-        while ($row = $groupUnreadResult->fetch_assoc()) {
-            $unreadByGroup[(string)$row['group_id']] = (int)$row['unread_count'];
-        }
-        $groupUnreadStmt->close();
-    }
+    $unreadSnapshot = liveChatUnreadSnapshot($conn, $userId);
+    $unreadByUser = $unreadSnapshot['users'];
+    $unreadByGroup = $unreadSnapshot['groups'];
 
     foreach ($users as &$user) {
         $user['unreadCount'] = $unreadByUser[(string)$user['userId']] ?? 0;
@@ -169,12 +122,13 @@ try {
     }
     unset($group);
 
-    $totalUnread = array_sum($unreadByUser) + array_sum($unreadByGroup);
+    $totalUnread = (int)$unreadSnapshot['total'];
 
     liveChatRespond([
         'success' => true,
         'currentUserId' => $userId,
         'currentUserName' => $currentUserName,
+        'csrfToken' => $csrfToken,
         'users' => $users,
         'groups' => liveChatFeatureEnabled($conn, 'live_chat_group_chats_enabled', true) ? $groups : [],
         'unreadTotal' => $totalUnread,
@@ -191,10 +145,10 @@ try {
             'readReceiptsEnabled' => liveChatFeatureEnabled($conn, 'live_chat_read_receipts_enabled', true),
             'draftsEnabled' => liveChatFeatureEnabled($conn, 'live_chat_drafts_enabled', true),
             'typingIdleSeconds' => liveChatSettingInt($conn, 'live_chat_typing_idle_seconds', 5, 2, 30),
-            'messagePollMs' => liveChatSettingInt($conn, 'live_chat_message_poll_ms', 350, 150, 5000),
-            'receiptPollMs' => liveChatSettingInt($conn, 'live_chat_receipt_poll_ms', 250, 150, 5000),
-            'callPollMs' => liveChatSettingInt($conn, 'live_chat_call_poll_ms', 500, 300, 10000),
-            'signalPollMs' => liveChatSettingInt($conn, 'live_chat_signal_poll_ms', 350, 150, 5000)
+            'messagePollMs' => liveChatSettingInt($conn, 'live_chat_message_poll_ms', 1000, 750, 5000),
+            'receiptPollMs' => liveChatSettingInt($conn, 'live_chat_receipt_poll_ms', 1500, 1000, 5000),
+            'callPollMs' => liveChatSettingInt($conn, 'live_chat_call_poll_ms', 1000, 750, 10000),
+            'signalPollMs' => liveChatSettingInt($conn, 'live_chat_signal_poll_ms', 350, 200, 5000)
         ],
         'messageSettings' => [
             'messageSoundEnabled' => getAppSettingBool($conn, 'live_message_sound_enabled', true),

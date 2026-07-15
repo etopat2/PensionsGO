@@ -1,3 +1,16 @@
+import {
+  STAFF_TYPING_HIDE_MS,
+  STAFF_TYPING_NOTIFY_MS,
+  STAFF_TYPING_PULSE_MS,
+  chatDateKey,
+  escapeHtml,
+  formatChatFullDate,
+  formatText,
+  formatTime,
+  getSupportedVoiceMimeType,
+  parseJsonResponse
+} from './chat_shared.js?v=20260714q';
+
 const APP_ROOT = new URL('../../', import.meta.url);
 const API_ROOT = new URL('../backend/api/', APP_ROOT);
 const BACKEND_ROOT = new URL('../backend/', APP_ROOT);
@@ -24,7 +37,7 @@ const PICKER_EMOJIS = ['\u{1F600}', '\u{1F602}', '\u{1F60A}', '\u{1F60D}', '\u{1
 const REACTION_PICKER_EMOJIS = ['\u{1F44D}', '\u{1F44E}', '\u{2764}\u{FE0F}', '\u{1F60D}', '\u{1F602}', '\u{1F62E}', '\u{1F622}', '\u{1F621}', '\u{1F64F}', '\u{1F44F}', '\u{2705}', '\u{1F389}', '\u{1F525}', '\u{1F4AF}', '\u{1F4A1}', '\u{1F4CC}', '\u{1F680}', '\u{23F3}', '\u{26A0}\u{FE0F}', '\u{1F44B}', '\u{1F91D}', '\u{1F4AA}', '\u{1F914}', '\u{1F642}'];
 const INCOMING_RING_URL = new URL('audio/notification.mp3', APP_ROOT).href;
 const TYPING_IDLE_TIMEOUT_MS = 5000;
-const LIVE_CHAT_ASSET_VERSION = '20260609d';
+const LIVE_CHAT_ASSET_VERSION = '20260714r';
 const LIVE_CHAT_CALL_API_ACTIONS = Object.freeze({
   START: 'start',
   UPDATE: 'update',
@@ -37,45 +50,19 @@ const LIVE_CHAT_CALL_API_ACTIONS = Object.freeze({
 function liveChatDisabledOnThisPage(options = {}) {
   const page = (window.location.pathname.split('/').pop() || '').toLowerCase();
   const role = String(options.userRole || options.role || localStorage.getItem('userRole') || '').toLowerCase();
-  return page === 'pensioner_board.html' || role === 'pensioner' || window.__disableStaffLiveChat === true;
+  const effectiveRole = String(options.userRoleEffective || options.roleEffective || localStorage.getItem('userRoleEffective') || '').toLowerCase();
+  const normalizedRoles = [role, effectiveRole].map((value) => value.replace(/[\s-]+/g, '_'));
+  return page === 'pensioner_board.html'
+    || normalizedRoles.includes('pensioner')
+    || normalizedRoles.includes('super_admin')
+    || normalizedRoles.includes('superadministrator')
+    || normalizedRoles.includes('system_administrator')
+    || window.__disableStaffLiveChat === true;
 }
 
-function escapeHtml(value) {
-  const div = document.createElement('div');
-  div.textContent = String(value ?? '');
-  return div.innerHTML;
-}
-
-function formatText(value) {
-  return escapeHtml(value).replace(/\n/g, '<br>');
-}
-
-function formatTime(value) {
-  if (!value) return '';
-  const date = new Date(String(value).replace(' ', 'T'));
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-function parseChatDate(value) {
-  if (!value) return null;
-  const date = new Date(String(value).replace(' ', 'T'));
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function chatDateKey(value) {
-  const date = parseChatDate(value);
-  if (!date) return '';
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function formatChatFullDate(value) {
-  const date = parseChatDate(value);
-  if (!date) return '';
-  return date.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+function publicChatConsoleActive() {
+  return window.__publicChatConsoleOpen === true
+    || document.getElementById('publicChatConsoleModal')?.classList.contains('open') === true;
 }
 
 function ensureStylesheet() {
@@ -128,16 +115,6 @@ function ensureIconStylesheet() {
   document.head.appendChild(link);
 }
 
-async function parseJsonResponse(response) {
-  const text = await response.text();
-  try {
-    return JSON.parse(text);
-  } catch (_error) {
-    const clean = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    throw new Error(clean || `Live chat server returned ${response.status}.`);
-  }
-}
-
 function showNotice(title, message, type = 'error') {
   if (typeof window.appToast === 'function') {
     window.appToast(message, { title, type, duration: 4200 });
@@ -167,6 +144,7 @@ class LiveChatApp {
   constructor(options = {}) {
     this.currentUserId = String(options.userId || localStorage.getItem('loggedInUser') || '');
     this.currentUserName = String(options.userName || localStorage.getItem('loggedInUserName') || 'You');
+    this.csrfToken = '';
     this.users = [];
     this.groups = [];
     this.filteredQuery = '';
@@ -176,12 +154,14 @@ class LiveChatApp {
     this.pendingMessages = new Map();
     this.failedMessages = new Map();
     this.messagePollInFlight = false;
+    this.messagePollStartedAt = 0;
     this.messageAbortController = null;
     this.messageCacheByThread = new Map();
     this.threadRefreshTimers = new Map();
     this.contactRefreshTimer = null;
     this.lastBootstrapAt = 0;
     this.receiptSyncInFlight = false;
+    this.receiptAbortController = null;
     this.selectedMessageIds = new Set();
     this.replyToMessage = null;
     this.editingMessage = null;
@@ -206,6 +186,10 @@ class LiveChatApp {
     this.lastSignalId = 0;
     this.incomingRing = null;
     this.outgoingRing = null;
+    this.iceCandidateQueue = [];
+    this.iceFlushTimer = null;
+    this.callSoundElements = new Set();
+    this.callOutcomeKeys = new Set();
     this.callSettings = {
       incomingSoundEnabled: true,
       outgoingSoundEnabled: true,
@@ -225,6 +209,8 @@ class LiveChatApp {
       messageVolume: 70,
       messageRepeatCount: 1
     };
+    this.messageNotificationAudio = null;
+    this.messageNotificationAudioSrc = '';
     this.featureSettings = {
       groupsEnabled: true,
       audioCallsEnabled: true,
@@ -237,9 +223,9 @@ class LiveChatApp {
       readReceiptsEnabled: true,
       draftsEnabled: true,
       typingIdleSeconds: 5,
-      messagePollMs: 350,
-      receiptPollMs: 250,
-      callPollMs: 300,
+      messagePollMs: 1000,
+      receiptPollMs: 1500,
+      callPollMs: 1000,
       signalPollMs: 350
     };
     this.unreadTotal = 0;
@@ -272,6 +258,12 @@ class LiveChatApp {
     this.callConnectionRecoveryTimer = null;
     this.callRestartInFlight = false;
     this.signalPollInFlight = false;
+    this.groupSignalPollInFlight = false;
+    this.callPollInFlight = false;
+    this.callPollStartedAt = 0;
+    this.lastCallPollAt = 0;
+    this.callAbortController = null;
+    this.signalPollIntervalMs = 0;
     this.callAddParticipantModalOpen = false;
     this.callFastSignalUntil = 0;
     this.deferIncomingVideoCapture = false;
@@ -282,6 +274,8 @@ class LiveChatApp {
     this.typingHideTimer = null;
     this.typingPulseTimer = null;
     this.typingStopTimer = null;
+    this.typingRequestInFlight = false;
+    this.pendingTypingPulse = false;
     this.lastTypingActivityAt = 0;
     this.typingByThread = {};
     this.readReceiptTimer = null;
@@ -445,6 +439,19 @@ class LiveChatApp {
           </div>
         </div>
       </div>
+      <div class="live-call-outcome-modal hidden" id="liveCallOutcomeModal" role="dialog" aria-modal="true" aria-labelledby="liveCallOutcomeTitle">
+        <div class="live-call-outcome-card">
+          <button type="button" id="liveCallOutcomeClose" class="live-call-outcome-close" title="Close"><i class="fas fa-times"></i></button>
+          <div class="live-call-outcome-icon" id="liveCallOutcomeIcon"><i class="fas fa-phone"></i></div>
+          <strong id="liveCallOutcomeTitle">Call ended</strong>
+          <p id="liveCallOutcomeText"></p>
+          <div class="live-call-outcome-meta" id="liveCallOutcomeMeta"></div>
+          <div class="live-call-outcome-actions">
+            <button type="button" id="liveCallOutcomeOk">OK</button>
+            <button type="button" id="liveCallOutcomeHistory">History</button>
+          </div>
+        </div>
+      </div>
       <div class="live-add-call-modal hidden" id="liveAddCallModal">
         <div class="live-add-call-card">
           <div class="live-group-head"><strong>Add to Call</strong><button type="button" id="liveAddCallClose"><i class="fas fa-times"></i></button></div>
@@ -562,7 +569,7 @@ class LiveChatApp {
     });
     document.getElementById('liveChatInput')?.addEventListener('input', () => {
       this.persistCurrentDraft();
-      this.notifyTyping(true);
+      this.notifyTyping();
       this.syncTypingPulse();
       this.renderThreads();
     });
@@ -579,6 +586,12 @@ class LiveChatApp {
     document.getElementById('liveAcceptCallBtn')?.addEventListener('click', () => this.acceptIncomingCall());
     document.getElementById('liveRejectCallBtn')?.addEventListener('click', () => this.rejectIncomingCall());
     document.getElementById('liveEndCallBtn')?.addEventListener('click', () => this.endCall());
+    document.getElementById('liveCallOutcomeClose')?.addEventListener('click', () => this.closeCallOutcomeModal());
+    document.getElementById('liveCallOutcomeOk')?.addEventListener('click', () => this.closeCallOutcomeModal());
+    document.getElementById('liveCallOutcomeHistory')?.addEventListener('click', () => {
+      this.closeCallOutcomeModal();
+      this.openCallHistory();
+    });
     document.getElementById('liveCameraSelect')?.addEventListener('change', (event) => this.switchCamera(event.target.value));
     document.getElementById('liveSwitchCameraBtn')?.addEventListener('click', () => this.switchFacingCamera());
     document.getElementById('liveCallZoom')?.addEventListener('input', (event) => this.applyCameraZoom(Number(event.target.value || 1)));
@@ -726,10 +739,58 @@ class LiveChatApp {
   }
 
   async fetchJson(url, options = {}) {
-    const response = await fetch(url, { credentials: 'include', cache: 'no-store', ...options });
-    const data = await parseJsonResponse(response);
-    if (!data.success) throw new Error(data.message || 'Live chat request failed.');
-    return data;
+    const { timeoutMs = 0, ...requestOptions } = options;
+    const method = String(requestOptions.method || 'GET').toUpperCase();
+    if (this.csrfToken && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+      const headers = new Headers(requestOptions.headers || {});
+      if (!headers.has('X-CSRF-Token')) {
+        headers.set('X-CSRF-Token', this.csrfToken);
+      }
+      requestOptions.headers = headers;
+    }
+    const timeoutValue = Math.max(0, Number(timeoutMs || 0));
+    let timeoutId = null;
+    let abortController = null;
+    let abortListener = null;
+    const externalSignal = requestOptions.signal;
+    if (timeoutValue > 0) {
+      abortController = new AbortController();
+      if (externalSignal?.aborted) {
+        abortController.abort();
+      } else if (externalSignal) {
+        abortListener = () => abortController.abort();
+        externalSignal.addEventListener('abort', abortListener, { once: true });
+      }
+      requestOptions.signal = abortController.signal;
+      timeoutId = window.setTimeout(() => abortController.abort(), timeoutValue);
+    }
+    try {
+      const response = await fetch(url, { credentials: 'include', cache: 'no-store', ...requestOptions });
+      const data = await parseJsonResponse(response);
+      if (!data.success) throw new Error(data.message || 'Live chat request failed.');
+      return data;
+    } finally {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      if (externalSignal && abortListener) {
+        externalSignal.removeEventListener('abort', abortListener);
+      }
+    }
+  }
+
+  sendBeaconJson(url, payload = {}) {
+    const body = JSON.stringify(payload);
+    if (!body) return Promise.resolve(false);
+    return fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.csrfToken ? { 'X-CSRF-Token': this.csrfToken } : {})
+      },
+      body,
+      credentials: 'include',
+      cache: 'no-store',
+      keepalive: true
+    }).then(() => true).catch(() => false);
   }
 
   threadKey(thread = this.selectedThread) {
@@ -770,6 +831,28 @@ class LiveChatApp {
     const clean = messages.filter((message) => Number(message?.id || 0) > 0).slice(-120);
     this.messageCacheByThread.set(key, clean);
     this.saveStoredMessageCache();
+  }
+
+  removeMessagesFromThreadCache(messageIds = [], key = this.threadKey()) {
+    if (!key) return;
+    const ids = new Set((Array.isArray(messageIds) ? messageIds : [messageIds]).map((id) => Number(id || 0)).filter(Boolean));
+    if (!ids.size) return;
+    const cached = this.messageCacheByThread.get(key) || [];
+    if (!cached.length) return;
+    this.rememberThreadMessages(key, cached.filter((message) => !ids.has(Number(message.id || 0))));
+  }
+
+  markMessagesDeletedInThreadCache(messageIds = [], key = this.threadKey()) {
+    if (!key) return;
+    const ids = new Set((Array.isArray(messageIds) ? messageIds : [messageIds]).map((id) => Number(id || 0)).filter(Boolean));
+    if (!ids.size) return;
+    const cached = this.messageCacheByThread.get(key) || [];
+    if (!cached.length) return;
+    this.rememberThreadMessages(key, cached.map((message) => (
+      ids.has(Number(message.id || 0))
+        ? { ...message, isDeleted: true, text: '', fileName: '', filePath: '', mimeType: '', canEdit: false, reactionEmoji: '' }
+        : message
+    )));
   }
 
   draftStorageKey() {
@@ -831,6 +914,7 @@ class LiveChatApp {
   async loadUsers() {
     try {
       const data = await this.fetchJson(API.bootstrap);
+      this.csrfToken = String(data.csrfToken || this.csrfToken || '');
       const previousUserId = this.currentUserId;
       this.currentUserId = String(data.currentUserId || this.currentUserId);
       this.currentUserName = String(data.currentUserName || this.currentUserName || 'You');
@@ -845,6 +929,7 @@ class LiveChatApp {
       this.messageSettings = { ...this.messageSettings, ...(data.messageSettings || {}) };
       this.callSettings = { ...this.callSettings, ...(data.callSettings || {}) };
       this.featureSettings = { ...this.featureSettings, ...(data.featureSettings || {}) };
+      this.preloadMessageNotificationSound();
       this.lastBootstrapAt = Date.now();
       this.applyFeatureSettings();
       this.unreadCountsReady = true;
@@ -903,9 +988,10 @@ class LiveChatApp {
       const active = this.threadKey() === `${thread.type}:${thread.id}`;
       const typingActive = this.isThreadTyping(thread);
       const draft = this.featureSettings.draftsEnabled ? (this.drafts[`${thread.type}:${thread.id}`]?.text || '') : '';
+      const showDraftBadge = Boolean(draft && !active);
       const subtitle = typingActive
         ? '<b class="live-typing-list-label">Typing <span><i></i><i></i><i></i></span></b>'
-        : (draft ? '<b class="live-draft-badge">Draft</b>' : escapeHtml(thread.subtitle));
+        : (showDraftBadge ? '<b class="live-draft-badge">Draft</b>' : escapeHtml(thread.subtitle));
       return `
         <button type="button" class="live-chat-user ${active ? 'active' : ''}" data-thread-type="${thread.type}" data-thread-id="${escapeHtml(thread.id)}">
           <span class="presence-dot ${thread.isOnline ? 'online' : ''}"></span>
@@ -953,6 +1039,10 @@ class LiveChatApp {
 
   liveChatPollMs(key, fallback, min, max) {
     return Math.max(min, Math.min(max, Number(this.featureSettings?.[key] || fallback)));
+  }
+
+  idleCallPollMs() {
+    return Math.max(2500, this.liveChatPollMs('callPollMs', 2500, 1000, 10000));
   }
 
   async selectThread(type, id) {
@@ -1011,23 +1101,35 @@ class LiveChatApp {
 
   startPolling() {
     this.stop();
-    this.timers.presence = setInterval(() => this.refreshPresence(), 5000);
-    this.timers.messages = setInterval(() => this.loadMessages(false), this.liveChatPollMs('messagePollMs', 350, 150, 5000));
+    const canPollStaffChat = () => !publicChatConsoleActive() || Boolean(this.activeCall);
+    const contactPollMs = Math.max(3000, Math.min(15000, this.liveChatPollMs('messagePollMs', 1000, 750, 5000) * 5));
+    this.timers.presence = setInterval(() => {
+      if (canPollStaffChat()) this.refreshPresence();
+    }, contactPollMs);
+    this.timers.messages = setInterval(() => {
+      if (canPollStaffChat()) this.loadMessages(false);
+    }, this.liveChatPollMs('messagePollMs', 1000, 750, 5000));
     if (this.featureSettings.readReceiptsEnabled) {
-      this.timers.receipts = setInterval(() => this.syncReceiptsFast(), this.liveChatPollMs('receiptPollMs', 250, 150, 5000));
+      this.timers.receipts = setInterval(() => {
+        if (canPollStaffChat()) this.syncReceiptsFast();
+      }, this.liveChatPollMs('receiptPollMs', 1500, 1000, 5000));
     }
     if (this.featureSettings.audioCallsEnabled || this.featureSettings.videoCallsEnabled) {
-      this.timers.calls = setInterval(() => this.pollCalls(), this.liveChatPollMs('callPollMs', 500, 300, 10000));
+      this.timers.calls = setInterval(() => {
+        if (canPollStaffChat()) this.pollCalls();
+      }, this.idleCallPollMs());
+      window.setTimeout(() => {
+        if (canPollStaffChat()) this.pollCalls();
+      }, Math.min(1200, this.idleCallPollMs()));
     }
-    if (Date.now() - this.lastBootstrapAt > 1200) {
+    if (Date.now() - this.lastBootstrapAt > 1200 && canPollStaffChat()) {
       this.refreshPresence();
     }
-    if (this.featureSettings.audioCallsEnabled || this.featureSettings.videoCallsEnabled) this.pollCalls();
   }
 
   accelerateSignalPolling(durationMs = 8000) {
     this.callFastSignalUntil = Math.max(this.callFastSignalUntil || 0, Date.now() + durationMs);
-    if (this.activeCall && (!this.timers.signals || this.liveChatPollMs('signalPollMs', 350, 150, 5000) > 120)) {
+    if (this.activeCall && (!this.timers.signals || this.signalPollIntervalMs > 90)) {
       this.startSignalPolling();
     }
   }
@@ -1048,6 +1150,15 @@ class LiveChatApp {
     this.messageAbortController?.abort();
     this.messageAbortController = null;
     this.messagePollInFlight = false;
+    this.messagePollStartedAt = 0;
+    this.receiptAbortController?.abort();
+    this.receiptAbortController = null;
+    this.receiptSyncInFlight = false;
+    this.callAbortController?.abort();
+    this.callAbortController = null;
+    this.callPollInFlight = false;
+    this.callPollStartedAt = 0;
+    this.groupSignalPollInFlight = false;
     this.threadRefreshTimers.forEach((timer) => window.clearTimeout(timer));
     this.threadRefreshTimers.clear();
     this.cleanupCall();
@@ -1066,7 +1177,7 @@ class LiveChatApp {
     this.threadRefreshTimers.set(key, timer);
   }
 
-  scheduleContactRefresh(delay = 220) {
+  scheduleContactRefresh(delay = 160) {
     window.clearTimeout(this.contactRefreshTimer);
     this.contactRefreshTimer = window.setTimeout(() => {
       this.contactRefreshTimer = null;
@@ -1074,59 +1185,162 @@ class LiveChatApp {
     }, Math.max(0, Number(delay) || 0));
   }
 
+  normalizeUnreadCount(value) {
+    return Math.max(0, Number(value || 0) || 0);
+  }
+
+  setThreadUnreadCount(type, id, nextCount, { render = true } = {}) {
+    const threadType = String(type || '');
+    const threadId = String(id || '');
+    if (!threadType || !threadId) return;
+    let previousCount = 0;
+    let resolvedCount = 0;
+    let touched = false;
+    const resolveCount = (current) => {
+      previousCount = this.normalizeUnreadCount(current);
+      resolvedCount = this.normalizeUnreadCount(typeof nextCount === 'function' ? nextCount(previousCount) : nextCount);
+      return resolvedCount;
+    };
+
+    if (threadType === 'group') {
+      this.groups = this.groups.map((group) => {
+        if (String(group.groupId) !== threadId) return group;
+        touched = true;
+        const unreadCount = resolveCount(group.unreadCount);
+        return this.normalizeUnreadCount(group.unreadCount) === unreadCount ? group : { ...group, unreadCount };
+      });
+    } else {
+      this.users = this.users.map((user) => {
+        if (String(user.userId) !== threadId) return user;
+        touched = true;
+        const unreadCount = resolveCount(user.unreadCount);
+        return this.normalizeUnreadCount(user.unreadCount) === unreadCount ? user : { ...user, unreadCount };
+      });
+    }
+
+    if (!touched) return;
+    if (this.selectedThread?.type === threadType && String(this.selectedThread.id) === threadId) {
+      this.selectedThread = { ...this.selectedThread, unreadCount: resolvedCount };
+    }
+    this.unreadTotal = this.normalizeUnreadCount(this.unreadTotal - previousCount + resolvedCount);
+    if (render) {
+      this.renderThreads();
+      this.updateStatus();
+    }
+  }
+
+  decrementThreadUnreadCount(type, id, readCount) {
+    const count = this.normalizeUnreadCount(readCount);
+    if (count <= 0) return;
+    this.setThreadUnreadCount(type, id, (current) => Math.max(0, current - count));
+  }
+
+  applyUnreadSnapshot(data = {}) {
+    if (!Object.prototype.hasOwnProperty.call(data, 'unreadTotal')) return false;
+    const unreadUsers = data.unreadUsers || {};
+    const unreadGroups = data.unreadGroups || {};
+    this.users = this.users.map((user) => ({
+      ...user,
+      unreadCount: this.normalizeUnreadCount(unreadUsers[String(user.userId)] || 0)
+    }));
+    this.groups = this.groups.map((group) => ({
+      ...group,
+      unreadCount: this.normalizeUnreadCount(unreadGroups[String(group.groupId)] || 0)
+    }));
+    if (this.selectedThread) {
+      const counts = this.selectedThread.type === 'group' ? unreadGroups : unreadUsers;
+      this.selectedThread = {
+        ...this.selectedThread,
+        unreadCount: this.normalizeUnreadCount(counts[String(this.selectedThread.id)] || 0)
+      };
+    }
+    this.unreadTotal = this.normalizeUnreadCount(data.unreadTotal);
+    this.unreadCountsReady = true;
+    return true;
+  }
+
   async refreshPresence() {
     try {
-      const data = await this.fetchJson(API.bootstrap);
-      this.users = data.users || this.users;
-      this.groups = data.groups || this.groups;
-      const previousUnreadTotal = this.unreadTotal;
-      this.unreadTotal = Number(data.unreadTotal || 0);
-      this.messageSettings = { ...this.messageSettings, ...(data.messageSettings || {}) };
-      this.callSettings = { ...this.callSettings, ...(data.callSettings || {}) };
-      this.featureSettings = { ...this.featureSettings, ...(data.featureSettings || {}) };
-      this.lastBootstrapAt = Date.now();
-      this.applyFeatureSettings();
-      this.unreadCountsReady = true;
+      const data = await this.fetchJson(API.presence, { timeoutMs: 5000 });
+      const presence = data.presence || {};
+      this.users = this.users.map((user) => {
+        const next = presence[user.userId] || null;
+        return next ? { ...user, isOnline: Boolean(next.isOnline), status: next.status || user.status, lastSeen: next.lastSeen || user.lastSeen } : user;
+      });
+      this.applyUnreadSnapshot(data);
       this.renderThreads();
       this.updateStatus();
     } catch (_error) {}
   }
 
+  abortRealtimePolls({ messages = true, receipts = true, calls = false } = {}) {
+    if (messages && this.messageAbortController) {
+      this.messageAbortController.abort();
+      this.messageAbortController = null;
+      this.messagePollInFlight = false;
+      this.messagePollStartedAt = 0;
+    }
+    if (receipts && this.receiptAbortController) {
+      this.receiptAbortController.abort();
+      this.receiptAbortController = null;
+      this.receiptSyncInFlight = false;
+    }
+    if (calls && this.callAbortController) {
+      this.callAbortController.abort();
+      this.callAbortController = null;
+      this.callPollInFlight = false;
+      this.callPollStartedAt = 0;
+    }
+  }
+
   async loadMessages(force = false) {
     if (!this.selectedThread) return;
-    if (this.messagePollInFlight && !force) return;
-    if (!force && document.getElementById('liveChatDock')?.classList.contains('collapsed')) return;
+    const key = this.threadKey();
+    const since = force ? 0 : (this.lastMessageIdByThread[key] || 0);
+    const stalePollMs = since > 0 ? 20000 : 30000;
+    if (this.messagePollInFlight && !force) {
+      if (this.messagePollStartedAt && Date.now() - this.messagePollStartedAt > stalePollMs) {
+        this.messageAbortController?.abort();
+        this.messageAbortController = null;
+        this.messagePollInFlight = false;
+        this.messagePollStartedAt = 0;
+      } else {
+        return;
+      }
+    }
     if (force && this.messageAbortController) {
       this.messageAbortController.abort();
       this.messagePollInFlight = false;
+      this.messagePollStartedAt = 0;
     }
-    const key = this.threadKey();
     const thread = { ...this.selectedThread };
-    const since = force ? 0 : (this.lastMessageIdByThread[key] || 0);
     this.messagePollInFlight = true;
+    this.messagePollStartedAt = Date.now();
     const controller = new AbortController();
     this.messageAbortController = controller;
     try {
       const url = `${API.messages}?peer_type=${encodeURIComponent(thread.type)}&peer_id=${encodeURIComponent(thread.id)}&since_id=${since}`;
-      const data = await this.fetchJson(url, { signal: controller.signal });
+      const data = await this.fetchJson(url, { signal: controller.signal, timeoutMs: since > 0 ? 20000 : 30000 });
       if (!this.selectedThread || this.threadKey() !== key) return;
-      const incoming = (data.messages || []).filter((message) => !message.isDeleted && !message.isOwn && !this.renderedMessageIds.has(Number(message.id || 0)));
-      this.syncMessageReceipts(data.receipts || []);
-      this.applyDeletedMessageUpdates(data.deletedUpdates || []);
-      this.renderTypingIndicator(data.typing || []);
-      this.renderMessages(data.messages || [], force);
-      if (force) {
-        this.rememberThreadMessages(key, data.messages || []);
-      } else if ((data.messages || []).length) {
-        const existing = this.messageCacheByThread.get(key) || [];
-        const byId = new Map(existing.map((message) => [Number(message.id || 0), message]));
-        (data.messages || []).forEach((message) => byId.set(Number(message.id || 0), message));
-        this.rememberThreadMessages(key, Array.from(byId.values()).sort((a, b) => Number(a.id || 0) - Number(b.id || 0)).slice(-120));
-      }
-      this.reportVisibleMessagesRead();
+      this.applyHiddenMessageUpdates(data.hiddenUpdates || []);
+      const messages = data.messages || [];
+      const incoming = messages.filter((message) => !message.isDeleted && !message.isOwn && !this.renderedMessageIds.has(Number(message.id || 0)));
       if (!force && incoming.length > 0) {
         this.playMessageNotification(incoming[incoming.length - 1]);
       }
+      this.syncMessageReceipts(data.receipts || []);
+      this.applyDeletedMessageUpdates(data.deletedUpdates || []);
+      this.renderTypingIndicator(data.typing || []);
+      this.renderMessages(messages, force);
+      if (force) {
+        this.rememberThreadMessages(key, messages);
+      } else if (messages.length) {
+        const existing = this.messageCacheByThread.get(key) || [];
+        const byId = new Map(existing.map((message) => [Number(message.id || 0), message]));
+        messages.forEach((message) => byId.set(Number(message.id || 0), message));
+        this.rememberThreadMessages(key, Array.from(byId.values()).sort((a, b) => Number(a.id || 0) - Number(b.id || 0)).slice(-120));
+      }
+      this.reportVisibleMessagesRead();
       if (incoming.length > 0) {
         this.scheduleContactRefresh();
       }
@@ -1136,6 +1350,7 @@ class LiveChatApp {
       if (this.messageAbortController === controller) {
         this.messageAbortController = null;
         this.messagePollInFlight = false;
+        this.messagePollStartedAt = 0;
       }
     }
   }
@@ -1464,6 +1679,24 @@ class LiveChatApp {
     if (selectionKey) this.selectedMessageIds.delete(selectionKey);
     this.renderSelectionBar();
     this.pruneEmptyDateDividers();
+    this.markMessagesDeletedInThreadCache([id]);
+  }
+
+  applyHiddenMessageUpdates(updates = []) {
+    const ids = (updates || []).map((update) => Number(update.id || 0)).filter(Boolean);
+    if (!ids.length) return;
+    ids.forEach((id) => {
+      const bubble = document.querySelector(`.live-chat-bubble[data-message-id="${id}"]`);
+      if (bubble) {
+        const selectionKey = this.messageSelectionKey(bubble);
+        if (selectionKey) this.selectedMessageIds.delete(selectionKey);
+        bubble.remove();
+      }
+      this.renderedMessageIds.delete(id);
+    });
+    this.removeMessagesFromThreadCache(ids);
+    this.renderSelectionBar();
+    this.pruneEmptyDateDividers();
   }
 
   applyDeletedMessageUpdates(updates = []) {
@@ -1512,21 +1745,26 @@ class LiveChatApp {
 
   async syncReceiptsFast() {
     if (!this.featureSettings.readReceiptsEnabled || !this.selectedThread || this.selectedThread.type === 'group' || this.receiptSyncInFlight) return;
-    if (document.getElementById('liveChatDock')?.classList.contains('collapsed')) return;
+    if (this.messagePollInFlight || this.callPollInFlight) return;
     if (!this.hasPendingReceiptUpdates()) return;
     this.receiptSyncInFlight = true;
+    const controller = new AbortController();
+    this.receiptAbortController = controller;
     try {
       const url = `${API.messages}?peer_type=${encodeURIComponent(this.selectedThread.type)}&peer_id=${encodeURIComponent(this.selectedThread.id)}&receipt_only=1`;
-      const data = await this.fetchJson(url);
+      const data = await this.fetchJson(url, { signal: controller.signal, timeoutMs: 8000 });
       this.syncMessageReceipts(data.receipts || []);
     } catch (_error) {
     } finally {
-      this.receiptSyncInFlight = false;
+      if (this.receiptAbortController === controller) {
+        this.receiptAbortController = null;
+        this.receiptSyncInFlight = false;
+      }
     }
   }
 
   scheduleReceiptBurst() {
-    [120, 300, 650, 1100, 1800, 2800].forEach((delay) => {
+    [80, 180, 350, 700, 1200, 2000].forEach((delay) => {
       window.setTimeout(() => this.syncReceiptsFast(), delay);
     });
   }
@@ -1542,6 +1780,7 @@ class LiveChatApp {
         .map((bubble) => Number(bubble.dataset.messageId || 0))
         .filter((id) => id > 0);
       if (!ids.length) return;
+      const readableThread = this.selectedThread ? { type: this.selectedThread.type, id: this.selectedThread.id } : null;
       try {
         await this.fetchJson(API.action, {
           method: 'POST',
@@ -1555,6 +1794,10 @@ class LiveChatApp {
             bubble.dataset.readAt = new Date().toISOString();
           }
         });
+        if (readableThread && this.selectedThread?.type === readableThread.type && this.selectedThread?.id === readableThread.id) {
+          this.decrementThreadUnreadCount(readableThread.type, readableThread.id, ids.length);
+          this.scheduleContactRefresh(60);
+        }
       } catch (_error) {}
     }, 10);
   }
@@ -1578,15 +1821,25 @@ class LiveChatApp {
       window.clearTimeout(this.typingStopTimer);
       this.typingStopTimer = window.setTimeout(() => this.stopTypingSignal(false), this.liveChatTypingIdleMs());
     }
-    if (this.typingNotifyTimer && now - this.typingNotifyTimer < 700) return;
+    if (!force && this.typingNotifyTimer && now - this.typingNotifyTimer < STAFF_TYPING_NOTIFY_MS) return;
+    if (this.typingRequestInFlight) {
+      this.pendingTypingPulse = true;
+      return;
+    }
     this.typingNotifyTimer = now;
+    this.typingRequestInFlight = true;
     try {
-      await this.fetchJson(API.action, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'typing', peer_type: this.selectedThread.type, peer_id: this.selectedThread.id })
-      });
-    } catch (_error) {}
+      await this.sendBeaconJson(API.action, { action: 'typing', peer_type: this.selectedThread.type, peer_id: this.selectedThread.id });
+    } catch (_error) {
+    } finally {
+      this.typingRequestInFlight = false;
+      if (this.pendingTypingPulse && this.selectedThread && this.lastTypingActivityAt && Date.now() - this.lastTypingActivityAt < this.liveChatTypingIdleMs()) {
+        this.pendingTypingPulse = false;
+        window.setTimeout(() => this.notifyTyping(true, false), 120);
+      } else {
+        this.pendingTypingPulse = false;
+      }
+    }
   }
 
   syncTypingPulse() {
@@ -1603,27 +1856,37 @@ class LiveChatApp {
         return;
       }
       this.notifyTyping(false, false);
-    }, 1800);
+    }, STAFF_TYPING_PULSE_MS);
   }
 
-  async stopTypingSignal(wait = false) {
+  clearTypingTimers() {
     if (this.typingPulseTimer) window.clearInterval(this.typingPulseTimer);
     this.typingPulseTimer = null;
     window.clearTimeout(this.typingStopTimer);
     this.typingStopTimer = null;
+    this.typingNotifyTimer = null;
     this.lastTypingActivityAt = 0;
+    this.pendingTypingPulse = false;
+  }
+
+  async stopTypingSignal(wait = false) {
+    this.clearTypingTimers();
     if (!this.selectedThread) return;
     const payload = {
       action: 'typing_stop',
       peer_type: this.selectedThread.type,
       peer_id: this.selectedThread.id
     };
-    const request = this.fetchJson(API.action, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    }).catch(() => {});
-    if (wait) await request;
+    if (wait) {
+      await this.fetchJson(API.action, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        timeoutMs: 3000
+      }).catch(() => {});
+      return;
+    }
+    this.sendBeaconJson(API.action, payload);
   }
 
   renderTypingIndicator(typing = []) {
@@ -1652,7 +1915,7 @@ class LiveChatApp {
     indicator.innerHTML = `<span></span><span></span><span></span><strong>${escapeHtml(names)} ${typing.length === 1 ? 'is' : 'are'} typing</strong>`;
     indicator.classList.remove('hidden');
     window.clearTimeout(this.typingHideTimer);
-    this.typingHideTimer = window.setTimeout(() => this.hideTypingIndicator(), 1800);
+    this.typingHideTimer = window.setTimeout(() => this.hideTypingIndicator(), STAFF_TYPING_HIDE_MS);
     if (this.autoScrollEnabled) {
       messages.scrollTop = messages.scrollHeight;
     }
@@ -2193,6 +2456,7 @@ class LiveChatApp {
       if (bubble.dataset.deleted === '1') {
         bubble.remove();
         this.renderedMessageIds.delete(messageId);
+        this.removeMessagesFromThreadCache([messageId]);
         this.pruneEmptyDateDividers();
         this.runMessageAction('delete_for_me', messageId).catch(() => this.reloadCurrentThread());
         document.querySelectorAll('.live-message-menu').forEach((menu) => menu.remove());
@@ -2206,6 +2470,7 @@ class LiveChatApp {
       if (!confirmed) return;
       bubble.remove();
       this.renderedMessageIds.delete(messageId);
+      this.removeMessagesFromThreadCache([messageId]);
       this.pruneEmptyDateDividers();
       this.loadUsers().catch(() => {});
       this.runMessageAction('delete_for_me', messageId).catch(() => this.reloadCurrentThread());
@@ -2522,6 +2787,7 @@ class LiveChatApp {
         const messageId = Number(bubble.dataset.messageId || 0);
         bubble.remove();
         this.renderedMessageIds.delete(messageId);
+        this.removeMessagesFromThreadCache([messageId]);
         if (messageId) this.runMessageAction('delete_for_me', messageId).catch(() => this.reloadCurrentThread());
       }
       this.pruneEmptyDateDividers();
@@ -2612,7 +2878,6 @@ class LiveChatApp {
     if (!text) return;
     input.value = '';
     this.clearCurrentDraft();
-    this.stopTypingSignal(false);
     await this.sendPayload({ message_text: text, message_kind: 'text' });
   }
 
@@ -2655,6 +2920,7 @@ class LiveChatApp {
       this.cameraStream = stream;
       if (activeSettings.deviceId) this.selectedVideoDeviceId = activeSettings.deviceId;
       await this.populateAttachmentCameraDevices();
+      document.getElementById('liveChatDock')?.classList.add('attachment-active');
       document.getElementById('liveAttachmentModal')?.classList.remove('hidden', 'image-preview-mode');
       document.getElementById('liveAttachmentModal')?.classList.add('camera-capture-mode');
       document.getElementById('liveAttachmentTitle').textContent = 'Camera Capture';
@@ -2905,6 +3171,7 @@ class LiveChatApp {
   async prepareAttachmentDraft(file, caption = '', fromCamera = false) {
     this.stopCameraStream();
     this.attachmentDraft = { file, caption, url: URL.createObjectURL(file), fromCamera, editedBlob: null };
+    document.getElementById('liveChatDock')?.classList.add('attachment-active');
     document.getElementById('liveAttachmentModal')?.classList.remove('hidden', 'camera-capture-mode');
     document.getElementById('liveAttachmentModal')?.classList.add('image-preview-mode');
     document.getElementById('liveAttachmentTitle').textContent = fromCamera
@@ -2990,6 +3257,7 @@ class LiveChatApp {
     this.attachmentDraft = null;
     document.getElementById('liveAttachmentModal')?.classList.add('hidden');
     document.getElementById('liveAttachmentModal')?.classList.remove('camera-capture-mode', 'image-preview-mode');
+    document.getElementById('liveChatDock')?.classList.remove('attachment-active');
     document.getElementById('liveAttachmentStage').innerHTML = '';
     document.getElementById('liveAttachmentComposerPreview')?.classList.add('hidden');
     document.getElementById('liveAttachmentCaption').value = '';
@@ -3016,6 +3284,7 @@ class LiveChatApp {
     if (draft.url) URL.revokeObjectURL(draft.url);
     document.getElementById('liveAttachmentModal')?.classList.add('hidden');
     document.getElementById('liveAttachmentModal')?.classList.remove('camera-capture-mode', 'image-preview-mode');
+    document.getElementById('liveChatDock')?.classList.remove('attachment-active');
     document.getElementById('liveAttachmentComposerPreview')?.classList.add('hidden');
     await this.sendPayload({ message_kind: 'attachment', message_text: caption, file });
   }
@@ -3243,7 +3512,8 @@ class LiveChatApp {
     const clientNonce = this.makeClientNonce();
     this.failedMessages.set(clientNonce, { message_text, message_kind, file, replyContext });
     this.appendOptimisticMessage({ text: message_text, kind: message_kind, file, clientNonce, replyContext });
-    this.stopTypingSignal(false);
+    this.clearTypingTimers();
+    this.abortRealtimePolls({ messages: true, receipts: true, calls: true });
     const form = new FormData();
     form.append('recipient_type', this.selectedThread.type);
     form.append('recipient_id', this.selectedThread.id);
@@ -3253,7 +3523,7 @@ class LiveChatApp {
     if (replyContext?.id) form.append('reply_to_message_id', String(replyContext.id));
     if (file) form.append('file', file, file.name || `${message_kind}.webm`);
     try {
-      const data = await this.fetchJson(API.send, { method: 'POST', body: form });
+      const data = await this.fetchJson(API.send, { method: 'POST', body: form, timeoutMs: file ? 60000 : 15000 });
       this.replyToMessage = null;
       this.renderReplyPreview();
       if (data.chatMessage) {
@@ -3274,6 +3544,7 @@ class LiveChatApp {
       this.markPendingFailed(clientNonce, error.message || 'Unable to send chat message.');
       showNotice('Live Chat', error.message || 'Unable to send chat message.');
     } finally {
+      this.stopTypingSignal(false);
       this.sending = false;
     }
   }
@@ -3285,6 +3556,9 @@ class LiveChatApp {
     }
     const button = document.getElementById('liveVoiceBtn');
     if (this.recorder?.state === 'recording') {
+      try {
+        this.recorder.requestData?.();
+      } catch (_error) {}
       this.recorder.stop();
       button?.classList.remove('recording');
       return;
@@ -3298,7 +3572,8 @@ class LiveChatApp {
       this.recordingStream = stream;
       this.recordingStartTime = Date.now();
       this.recordedChunks = [];
-      this.recorder = new MediaRecorder(stream);
+      const mimeType = getSupportedVoiceMimeType();
+      this.recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       this.recorder.ondataavailable = (event) => {
         if (event.data?.size) this.recordedChunks.push(event.data);
       };
@@ -3306,21 +3581,55 @@ class LiveChatApp {
         stream.getTracks().forEach((track) => track.stop());
         this.recordingStream = null;
         this.stopRecordingTimer();
-        const blob = new Blob(this.recordedChunks, { type: 'audio/webm' });
-        const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: 'audio/webm' });
+        const chunks = this.recordedChunks.filter((chunk) => chunk?.size > 0);
+        const size = chunks.reduce((total, chunk) => total + Number(chunk.size || 0), 0);
+        if (!size) {
+          this.recorder = null;
+          this.recordedChunks = [];
+          document.getElementById('liveVoiceBtn')?.classList.remove('recording');
+          const draft = document.getElementById('liveVoiceDraft');
+          if (draft) {
+            draft.classList.add('hidden');
+            draft.innerHTML = '';
+          }
+          showNotice('Voice Note', 'No audio was captured. Check your microphone permission and try again.', 'warning');
+          return;
+        }
+        const mimeType = this.voiceRecordingMimeType(chunks);
+        const blob = new Blob(chunks, { type: mimeType });
+        const extension = this.voiceExtensionForMime(mimeType);
+        const file = new File([blob], `voice-note-${Date.now()}.${extension}`, { type: mimeType });
         this.voiceDraft = {
           file,
           url: URL.createObjectURL(blob),
-          duration: Math.max(1, Math.round((Date.now() - this.recordingStartTime) / 1000))
+          duration: Math.max(1, Math.round((Date.now() - this.recordingStartTime) / 1000)),
+          mimeType
         };
+        this.recordedChunks = [];
+        this.recorder = null;
         this.renderVoiceDraft();
       };
-      this.recorder.start();
+      this.recorder.start(250);
       button?.classList.add('recording');
       this.startRecordingTimer();
     } catch (_error) {
       showNotice('Voice Note', 'Microphone access is required to record voice notes.');
     }
+  }
+
+  voiceRecordingMimeType(chunks = []) {
+    const recorderType = String(this.recorder?.mimeType || '').trim();
+    const chunkType = String(chunks.find((chunk) => chunk?.type)?.type || '').trim();
+    return chunkType || recorderType || 'audio/webm';
+  }
+
+  voiceExtensionForMime(mimeType = '') {
+    const clean = String(mimeType || '').toLowerCase();
+    if (clean.includes('ogg')) return 'ogg';
+    if (clean.includes('mp4') || clean.includes('aac')) return 'm4a';
+    if (clean.includes('mpeg') || clean.includes('mp3')) return 'mp3';
+    if (clean.includes('wav')) return 'wav';
+    return 'webm';
   }
 
   startRecordingTimer() {
@@ -3377,7 +3686,9 @@ class LiveChatApp {
     draft.innerHTML = `
       <div class="live-voice-preview">
         <strong><i class="fas fa-microphone-lines"></i> Voice note ${this.formatDuration(this.voiceDraft.duration)}</strong>
-        <audio controls src="${this.voiceDraft.url}"></audio>
+        <audio controls preload="metadata">
+          <source src="${escapeHtml(this.voiceDraft.url)}" type="${escapeHtml(this.voiceDraft.mimeType || this.voiceDraft.file?.type || 'audio/webm')}">
+        </audio>
       </div>
       <div class="live-voice-actions">
         <button type="button" id="liveSendVoiceDraft"><i class="fas fa-paper-plane"></i> Send</button>
@@ -3385,6 +3696,7 @@ class LiveChatApp {
         <button type="button" id="liveDeleteVoiceDraft"><i class="fas fa-trash"></i> Delete</button>
       </div>
     `;
+    draft.querySelector('audio')?.load?.();
     document.getElementById('liveSendVoiceDraft')?.addEventListener('click', () => this.sendVoiceDraft(), { once: true });
     document.getElementById('liveRedoVoiceDraft')?.addEventListener('click', () => this.redoVoiceDraft(), { once: true });
     document.getElementById('liveDeleteVoiceDraft')?.addEventListener('click', () => this.clearVoiceDraft(), { once: true });
@@ -3578,6 +3890,7 @@ class LiveChatApp {
       return;
     }
     try {
+      this.abortRealtimePolls({ messages: true, receipts: true, calls: true });
       this.showCallModal(`Calling ${this.selectedThread.name}`, 'Checking availability...', callType, false);
       let response;
       try {
@@ -3593,13 +3906,13 @@ class LiveChatApp {
         this.showCallModal(`Calling ${this.selectedThread.name}`, 'Recipient offline', callType, false);
         showNotice('Recipient Offline', response.message || `${this.selectedThread.name} is offline. A missed call record has been added.`, 'info');
         await this.loadMessages(true).catch(() => {});
-        window.setTimeout(() => this.cleanupCall(), 1200);
+        window.setTimeout(() => this.finishCall(response.call || this.activeCall, 'missed', 'offline', { reloadMessages: false }), 800);
         return;
       }
       this.activeCall = response.call;
       this.lastSignalId = 0;
       this.pendingIceCandidates = [];
-      this.callFastSignalUntil = Date.now() + 15000;
+      this.callFastSignalUntil = Date.now() + 20000;
       this.playOutgoingRing();
       this.startCallTimeout('outgoing');
       this.showCallModal(`Calling ${this.selectedThread.name}`, 'Preparing media...', callType, false);
@@ -3612,12 +3925,13 @@ class LiveChatApp {
       this.startSignalPolling();
     } catch (error) {
       showNotice('Call Failed', error.message || 'Unable to start call.');
-      this.cleanupCall();
+      this.finishCall(this.activeCall || { callType, peerName: this.selectedThread?.name || 'Recipient' }, 'failed', 'start_failed', { reloadMessages: false });
     }
   }
 
   async startGroupCall(callType = 'audio') {
     try {
+      this.abortRealtimePolls({ messages: true, receipts: true, calls: true });
       const data = await this.fetchJson(`${API.groupManage}?action=members&group_id=${encodeURIComponent(this.selectedThread.id)}`);
       const peers = (data.members || []).filter((member) => member.userId !== this.currentUserId);
       if (!peers.length) {
@@ -3634,7 +3948,7 @@ class LiveChatApp {
         groupId: this.selectedThread.id,
         groupName: this.selectedThread.name
       };
-      this.callFastSignalUntil = Date.now() + 15000;
+      this.callFastSignalUntil = Date.now() + 20000;
       this.lastSignalId = 0;
       this.pendingIceCandidates = [];
       this.configureCallMediaElements();
@@ -3651,7 +3965,7 @@ class LiveChatApp {
       if (!this.groupCallSessions.size) {
         showNotice('Group Call', 'No group member is currently online. Missed call records were added.', 'info');
         await this.loadMessages(true).catch(() => {});
-        window.setTimeout(() => this.cleanupCall(), 1200);
+        window.setTimeout(() => this.finishCall(this.activeCall, 'missed', 'offline', { reloadMessages: false }), 800);
         return;
       }
       this.playOutgoingRing();
@@ -3660,7 +3974,7 @@ class LiveChatApp {
       showNotice('Group Call', `Calling ${peers.length} group member${peers.length === 1 ? '' : 's'}.`, 'info');
     } catch (error) {
       showNotice('Group Call', error.message || 'Unable to start group call.');
-      this.cleanupCall();
+      this.finishCall(this.activeCall || { callType, peerName: this.selectedThread?.name || 'Group' }, 'failed', 'start_failed', { reloadMessages: false });
     }
   }
 
@@ -3690,17 +4004,19 @@ class LiveChatApp {
   }
 
   async startCallToPeer(peer, callType, title) {
+    this.abortRealtimePolls({ messages: true, receipts: true, calls: true });
     const response = await this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.START, callee_id: peer.userId, call_type: callType });
     if (response.offline) {
       this.showCallModal(`Calling ${title || peer.userName}`, 'Recipient offline', callType, false);
       showNotice('Recipient Offline', response.message || `${peer.userName || 'The recipient'} is offline. A missed call record has been added.`, 'info');
       await this.loadMessages(true).catch(() => {});
-      window.setTimeout(() => this.cleanupCall(), 1200);
+      window.setTimeout(() => this.finishCall(response.call || { callType, peerName: title || peer.userName }, 'missed', 'offline', { reloadMessages: false }), 800);
       return;
     }
     this.activeCall = response.call;
     this.lastSignalId = 0;
     this.pendingIceCandidates = [];
+    this.callFastSignalUntil = Date.now() + 20000;
     await this.preparePeerConnection(callType);
     await this.broadcastLocalMicState().catch(() => {});
     const offer = await this.peerConnection.createOffer();
@@ -3713,14 +4029,31 @@ class LiveChatApp {
   }
 
   async pollCalls() {
+    if (publicChatConsoleActive() && !this.activeCall) return;
+    if (this.callPollInFlight) {
+      if (!this.callPollStartedAt || Date.now() - this.callPollStartedAt <= 15000) return;
+      this.callAbortController?.abort();
+      this.callAbortController = null;
+      this.callPollInFlight = false;
+      this.callPollStartedAt = 0;
+    }
+    this.callPollInFlight = true;
+    this.callPollStartedAt = Date.now();
+    this.lastCallPollAt = this.callPollStartedAt;
+    const controller = new AbortController();
+    this.callAbortController = controller;
     try {
-      const data = await this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.POLL }, 'GET');
+      const data = await this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.POLL }, 'GET', { signal: controller.signal });
       if (this.activeCall) {
         if (this.activeCall.isGroupCall) return;
         const currentCall = (data.calls || []).find((call) => call.callId === this.activeCall.callId);
         if (currentCall) {
           this.activeCall = { ...this.activeCall, ...currentCall };
           this.syncVideoParticipantLabels();
+          if (this.isTerminalCallStatus(currentCall.status)) {
+            this.finishCall(currentCall, currentCall.status, currentCall.status);
+            return;
+          }
           if (currentCall.status === 'accepted') {
             this.stopIncomingRing();
             this.stopOutgoingRing();
@@ -3734,8 +4067,8 @@ class LiveChatApp {
             }
           }
         } else {
-          showNotice('Call Ended', this.activeCall.status === 'ringing' ? 'The call was not answered in time or was declined.' : 'The call partner ended the call.', 'info');
-          this.cleanupCall();
+          const status = this.activeCall.status === 'ringing' ? 'missed' : 'ended';
+          this.finishCall(this.activeCall, status, 'disconnected');
         }
         return;
       }
@@ -3743,17 +4076,133 @@ class LiveChatApp {
       if (incoming) {
         this.activeCall = incoming;
         this.lastSignalId = 0;
+        this.pendingIceCandidates = [];
+        this.callFastSignalUntil = Date.now() + 20000;
         this.playIncomingRing();
         this.showIncomingCallNotification(incoming);
         this.showCallModal(`${incoming.callerName} is calling`, `${incoming.callType} call`, incoming.callType, true);
         this.startCallTimeout('incoming');
       }
-    } catch (_error) {}
+    } catch (_error) {
+    } finally {
+      if (this.callAbortController === controller) {
+        this.callAbortController = null;
+        this.callPollInFlight = false;
+        this.callPollStartedAt = 0;
+      }
+    }
+  }
+
+  isTerminalCallStatus(status = '') {
+    return ['rejected', 'ended', 'missed', 'failed'].includes(String(status || '').toLowerCase());
+  }
+
+  buildCallOutcome(call = this.activeCall, status = '', reason = '') {
+    const snapshot = { ...(call || {}) };
+    const finalStatus = String(status || snapshot.status || 'ended').toLowerCase();
+    const finalReason = String(reason || finalStatus || '').toLowerCase();
+    const connected = finalStatus === 'ended' && (
+      snapshot.status === 'accepted'
+      || Boolean(snapshot.answeredAt)
+      || Boolean(this.callStartedAt)
+    );
+    const startedAt = Date.parse(String(snapshot.answeredAt || '')) || this.callStartedAt || 0;
+    const endedAt = Date.parse(String(snapshot.endedAt || snapshot.updatedAt || '')) || Date.now();
+    const durationSeconds = connected && startedAt && endedAt > startedAt
+      ? Math.max(1, Math.round((endedAt - startedAt) / 1000))
+      : 0;
+    const isCaller = String(snapshot.callerId || '') === String(this.currentUserId || '');
+    const peerName = isCaller
+      ? (snapshot.calleeName || snapshot.peerName || this.selectedThread?.name || 'Recipient')
+      : (snapshot.callerName || snapshot.peerName || this.selectedThread?.name || 'Caller');
+    return {
+      ...snapshot,
+      status: finalStatus,
+      reason: finalReason,
+      successful: connected,
+      peerName,
+      callType: String(snapshot.callType || 'audio').toLowerCase() === 'video' ? 'video' : 'audio',
+      durationSeconds,
+      endedAt: snapshot.endedAt || new Date().toISOString()
+    };
+  }
+
+  finishCall(call = this.activeCall, status = '', reason = '', options = {}) {
+    const outcome = this.buildCallOutcome(call, status, reason);
+    this.cleanupCall();
+    if (!options.silent) this.showCallOutcomeModal(outcome);
+    if (options.reloadMessages !== false) this.loadMessages(true).catch(() => {});
+  }
+
+  showCallOutcomeModal(outcome = {}) {
+    const modal = document.getElementById('liveCallOutcomeModal');
+    if (!modal) return;
+    const key = outcome.callId ? `${outcome.callId}:${outcome.status}:${outcome.reason}` : '';
+    if (key && this.callOutcomeKeys.has(key)) return;
+    if (key) {
+      this.callOutcomeKeys.add(key);
+      if (this.callOutcomeKeys.size > 80) this.callOutcomeKeys = new Set(Array.from(this.callOutcomeKeys).slice(-40));
+    }
+    const icon = document.getElementById('liveCallOutcomeIcon');
+    const title = document.getElementById('liveCallOutcomeTitle');
+    const text = document.getElementById('liveCallOutcomeText');
+    const meta = document.getElementById('liveCallOutcomeMeta');
+    const success = Boolean(outcome.successful);
+    const callTypeLabel = `${outcome.callType === 'video' ? 'Video' : 'Audio'} call`;
+    const durationText = outcome.durationSeconds > 0 ? this.formatDuration(outcome.durationSeconds) : '';
+    const labels = {
+      rejected: 'Call rejected',
+      missed: outcome.reason === 'timeout' || outcome.reason === 'unanswered' ? 'Call timed out' : 'Call missed',
+      failed: 'Call failed',
+      ended: success ? 'Call completed' : 'Call ended'
+    };
+    modal.classList.toggle('success', success);
+    modal.classList.toggle('failure', !success);
+    if (icon) {
+      icon.innerHTML = success
+        ? '<i class="fas fa-phone"></i>'
+        : '<i class="fas fa-phone-slash"></i>';
+    }
+    if (title) title.textContent = labels[outcome.status] || (success ? 'Call completed' : 'Call failed');
+    if (text) {
+      text.textContent = success
+        ? `${callTypeLabel} with ${outcome.peerName || 'the participant'} ended successfully.`
+        : `${callTypeLabel} with ${outcome.peerName || 'the participant'} did not connect.`;
+    }
+    if (meta) {
+      meta.innerHTML = `
+        <span>${escapeHtml(callTypeLabel)}</span>
+        <span>${escapeHtml(outcome.peerName || 'Participant')}</span>
+        <span>${durationText ? `Duration ${escapeHtml(durationText)}` : escapeHtml(this.callFailureLabel(outcome))}</span>
+      `;
+    }
+    document.getElementById('liveChatDock')?.classList.add('call-outcome-active');
+    modal.classList.remove('hidden');
+  }
+
+  callFailureLabel(outcome = {}) {
+    if (outcome.status === 'rejected' || outcome.reason === 'rejected') return 'Rejected';
+    if (outcome.reason === 'timeout' || outcome.reason === 'unanswered') return 'Timed out';
+    if (outcome.reason === 'accept_failed') return 'Connection failed';
+    if (outcome.reason === 'connection_lost') return 'Connection lost';
+    if (outcome.reason === 'connection_failed') return 'Connection failed';
+    if (outcome.reason === 'start_failed') return 'Start failed';
+    if (outcome.reason === 'offline') return 'Recipient offline';
+    if (outcome.reason === 'cancelled') return 'Cancelled';
+    return 'Not connected';
+  }
+
+  closeCallOutcomeModal() {
+    document.getElementById('liveCallOutcomeModal')?.classList.add('hidden');
+    document.getElementById('liveChatDock')?.classList.remove('call-outcome-active');
   }
 
   showCallModal(title, status, callType = 'audio', incoming = false) {
     const modal = document.getElementById('liveCallModal');
-    document.getElementById('liveChatDock')?.classList.add('call-active');
+    const dock = document.getElementById('liveChatDock');
+    this.closeCallOutcomeModal();
+    dock?.classList.remove('collapsed');
+    dock?.classList.add('call-active');
     modal?.classList.remove('hidden', 'audio-only');
     if (callType === 'audio') modal?.classList.add('audio-only');
     document.getElementById('liveCallTitle').textContent = title;
@@ -3788,10 +4237,14 @@ class LiveChatApp {
       document.getElementById('liveEndCallBtn')?.classList.remove('hidden');
       acceptButton && (acceptButton.disabled = true);
       rejectButton && (rejectButton.disabled = true);
-      const updatePromise = this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.UPDATE, call_id: this.activeCall.callId, status: 'accepted' }).catch(() => {});
+      const updateResult = await this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.UPDATE, call_id: this.activeCall.callId, status: 'accepted' });
+      if (updateResult.closed) {
+        this.finishCall(this.activeCall, updateResult.status || 'missed', updateResult.status || 'closed');
+        return;
+      }
       this.activeCall.status = 'accepted';
-      this.callFastSignalUntil = Date.now() + 15000;
-      const acceptedAt = new Date().toISOString();
+      this.callFastSignalUntil = Date.now() + 20000;
+      const acceptedAt = updateResult.acceptedAt || new Date().toISOString();
       this.activeCall.answeredAt = acceptedAt;
       this.startCallTimer(acceptedAt);
       const acceptSignalPromise = this.sendSignal('call_accept', { acceptedAt }).catch(() => {});
@@ -3799,11 +4252,12 @@ class LiveChatApp {
       await this.preparePeerConnection(this.activeCall.callType, { captureLocalVideo: !this.deferIncomingVideoCapture });
       await this.broadcastLocalMicState().catch(() => {});
       this.startSignalPolling();
-      await Promise.allSettled([updatePromise, acceptSignalPromise]);
+      await Promise.allSettled([acceptSignalPromise]);
     } catch (error) {
+      const failedCall = this.activeCall ? { ...this.activeCall, status: 'failed' } : null;
       await this.sendSignal('hangup', { reason: 'accept_failed' }).catch(() => {});
       showNotice('Call Failed', error.message || 'Unable to accept call.');
-      this.cleanupCall();
+      this.finishCall(failedCall, 'failed', 'accept_failed', { reloadMessages: false });
     } finally {
       acceptButton && (acceptButton.disabled = false);
       rejectButton && (rejectButton.disabled = false);
@@ -3819,8 +4273,9 @@ class LiveChatApp {
     this.accelerateSignalPolling(5000);
     const signalPromise = call ? this.sendSignal('hangup', { reason: 'rejected' }).catch(() => {}) : Promise.resolve();
     const updatePromise = call ? this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.UPDATE, call_id: call.callId, status: 'rejected' }).catch(() => {}) : Promise.resolve();
-    this.cleanupCall();
+    this.finishCall(call, 'rejected', 'rejected', { reloadMessages: false });
     await Promise.allSettled([signalPromise, updatePromise]);
+    this.loadMessages(true).catch(() => {});
   }
 
   async endCall() {
@@ -3832,19 +4287,24 @@ class LiveChatApp {
       this.accelerateSignalPolling(5000);
       const signalPromises = sessions.map((session) => this.sendSignalForCall(session.call, 'hangup', { reason: 'ended' }).catch(() => {}));
       const updatePromises = sessions.map((session) => this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.UPDATE, call_id: session.call.callId, status: 'ended' }).catch(() => {}));
-      this.cleanupCall();
+      this.finishCall(this.activeCall, this.callStartedAt ? 'ended' : 'missed', this.callStartedAt ? 'ended' : 'cancelled', { reloadMessages: false });
       await Promise.allSettled([...signalPromises, ...updatePromises]);
+      this.loadMessages(true).catch(() => {});
       return;
     }
     const call = this.activeCall;
     const sessions = Array.from(this.groupCallSessions.values());
     this.accelerateSignalPolling(5000);
-    const signalPromise = call ? this.sendSignal('hangup', { reason: 'ended' }).catch(() => {}) : Promise.resolve();
-    const updatePromise = call ? this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.UPDATE, call_id: call.callId, status: 'ended' }).catch(() => {}) : Promise.resolve();
+    const wasConnected = Boolean(this.callStartedAt || call?.answeredAt || call?.status === 'accepted');
+    const finalStatus = wasConnected ? 'ended' : 'missed';
+    const finalReason = wasConnected ? 'ended' : 'cancelled';
+    const signalPromise = call ? this.sendSignal('hangup', { reason: finalReason }).catch(() => {}) : Promise.resolve();
+    const updatePromise = call ? this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.UPDATE, call_id: call.callId, status: finalStatus }).catch(() => {}) : Promise.resolve();
     const extraSignals = sessions.map((session) => this.sendSignalForCall(session.call, 'hangup', { reason: 'ended' }).catch(() => {}));
-    const extraUpdates = sessions.map((session) => this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.UPDATE, call_id: session.call.callId, status: 'ended' }).catch(() => {}));
-    this.cleanupCall();
+    const extraUpdates = sessions.map((session) => this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.UPDATE, call_id: session.call.callId, status: finalStatus }).catch(() => {}));
+    this.finishCall(call, finalStatus, finalReason, { reloadMessages: false });
     await Promise.allSettled([signalPromise, updatePromise, ...extraSignals, ...extraUpdates]);
+    this.loadMessages(true).catch(() => {});
   }
 
   playIncomingRing() {
@@ -3854,7 +4314,8 @@ class LiveChatApp {
       this.incomingRing,
       this.callSettings.incomingSoundPath || 'audio/notification.mp3',
       this.callSettings.incomingVolume,
-      this.callSettings.incomingRepeatCount
+      this.callSettings.incomingRepeatCount,
+      'incoming'
     );
   }
 
@@ -3864,14 +4325,16 @@ class LiveChatApp {
       this.outgoingRing,
       this.callSettings.outgoingSoundPath || this.callSettings.incomingSoundPath || 'audio/notification.mp3',
       this.callSettings.outgoingVolume,
-      this.callSettings.outgoingRepeatCount
+      this.callSettings.outgoingRepeatCount,
+      'outgoing'
     );
   }
 
-  playRepeatingCallSound(existingAudio, path, volumePercent = 80, repeatCount = 0) {
+  playRepeatingCallSound(existingAudio, path, volumePercent = 80, repeatCount = 0, tone = '') {
     try {
       const source = new URL(path || 'audio/notification.mp3', APP_ROOT).href;
       const audio = existingAudio?.src === source ? existingAudio : new Audio(source);
+      if (tone) audio.dataset.liveCallTone = tone;
       audio.loop = Number(repeatCount || 0) === 0;
       audio.volume = Math.max(0, Math.min(1, Number(volumePercent || 0) / 100));
       audio.dataset.playCount = '0';
@@ -3888,6 +4351,7 @@ class LiveChatApp {
       audio.currentTime = 0;
       audio.dataset.playCount = '1';
       audio.play().catch(() => {});
+      this.callSoundElements.add(audio);
       return audio;
     } catch (_error) {
       return existingAudio || null;
@@ -3897,15 +4361,54 @@ class LiveChatApp {
   playMessageNotification(message = {}) {
     if (this.activeCall?.status === 'accepted') return;
     if (this.messageSettings.messageSoundEnabled) {
-      this.playRepeatingCallSound(
-        null,
-        this.messageSettings.messageSoundPath || 'audio/notification.mp3',
-        this.messageSettings.messageVolume,
-        this.messageSettings.messageRepeatCount || 1
-      );
+      const repeatCount = Number(this.messageSettings.messageRepeatCount || 1);
+      if (repeatCount <= 1) {
+        this.playPreloadedMessageSound();
+      } else {
+        this.playRepeatingCallSound(
+          null,
+          this.messageSettings.messageSoundPath || 'audio/notification.mp3',
+          this.messageSettings.messageVolume,
+          repeatCount
+        );
+      }
     }
     if (this.messageSettings.desktopAlertsEnabled) {
       this.showMessageNotification(message);
+    }
+  }
+
+  preloadMessageNotificationSound() {
+    if (!this.messageSettings.messageSoundEnabled) return;
+    try {
+      const source = new URL(this.messageSettings.messageSoundPath || 'audio/notification.mp3', APP_ROOT).href;
+      if (this.messageNotificationAudio && this.messageNotificationAudioSrc === source) return;
+      const audio = new Audio(source);
+      audio.preload = 'auto';
+      audio.volume = Math.max(0, Math.min(1, Number(this.messageSettings.messageVolume || 70) / 100));
+      audio.load?.();
+      this.messageNotificationAudio = audio;
+      this.messageNotificationAudioSrc = source;
+    } catch (_error) {
+      this.messageNotificationAudio = null;
+      this.messageNotificationAudioSrc = '';
+    }
+  }
+
+  playPreloadedMessageSound() {
+    this.preloadMessageNotificationSound();
+    const audio = this.messageNotificationAudio;
+    if (!audio) {
+      this.playRepeatingCallSound(null, this.messageSettings.messageSoundPath || 'audio/notification.mp3', this.messageSettings.messageVolume, 1);
+      return;
+    }
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.volume = Math.max(0, Math.min(1, Number(this.messageSettings.messageVolume || 70) / 100));
+      audio.play().catch(() => {});
+    } catch (_error) {
+      this.playRepeatingCallSound(null, this.messageSettings.messageSoundPath || 'audio/notification.mp3', this.messageSettings.messageVolume, 1);
     }
   }
 
@@ -4001,21 +4504,26 @@ class LiveChatApp {
   }
 
   stopIncomingRing() {
-    if (!this.incomingRing) return;
-    this.incomingRing.onended = null;
-    this.incomingRing.loop = false;
-    this.incomingRing.pause();
-    this.incomingRing.currentTime = 0;
+    this.stopCallTone('incoming');
     this.incomingRing = null;
   }
 
   stopOutgoingRing() {
-    if (!this.outgoingRing) return;
-    this.outgoingRing.onended = null;
-    this.outgoingRing.loop = false;
-    this.outgoingRing.pause();
-    this.outgoingRing.currentTime = 0;
+    this.stopCallTone('outgoing');
     this.outgoingRing = null;
+  }
+
+  stopCallTone(tone) {
+    this.callSoundElements.forEach((audio) => {
+      if (tone && audio?.dataset?.liveCallTone !== tone) return;
+      try {
+        audio.onended = null;
+        audio.loop = false;
+        audio.pause();
+        audio.currentTime = 0;
+      } catch (_error) {}
+      this.callSoundElements.delete(audio);
+    });
   }
 
   startCallTimeout(direction = 'outgoing') {
@@ -4040,13 +4548,13 @@ class LiveChatApp {
         this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.UPDATE, call_id: session.call.callId, status: 'missed' }).catch(() => {})
       ]));
       showNotice('Group Call', 'The group call was not answered in time.', 'info');
-      this.cleanupCall();
+      this.finishCall(this.activeCall, 'missed', 'timeout');
       return;
     }
     await this.sendSignal('hangup', { reason: 'unanswered' }).catch(() => {});
     await this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.UPDATE, call_id: this.activeCall.callId, status: 'missed' }).catch(() => {});
     showNotice(direction === 'incoming' ? 'Missed Call' : 'Call Ended', 'The call was not answered in time.', 'info');
-    this.cleanupCall();
+    this.finishCall(this.activeCall, 'missed', 'timeout');
   }
 
   getCallAudioConstraints() {
@@ -4222,7 +4730,11 @@ class LiveChatApp {
 
   createPeerConnection() {
     return new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' }
+      ],
       bundlePolicy: 'max-bundle',
       rtcpMuxPolicy: 'require',
       iceCandidatePoolSize: 4
@@ -4473,7 +4985,7 @@ class LiveChatApp {
       if (!this.activeCall || this.peerConnection !== pc) return;
       if (['failed', 'disconnected'].includes(pc.connectionState)) {
         this.showCallConnectionNotice('Call connection could not be restored', 'disconnected');
-        this.cleanupCall();
+        this.finishCall(this.activeCall, 'failed', this.callStartedAt ? 'connection_lost' : 'connection_failed', { reloadMessages: false });
       }
     }, timeoutMs);
   }
@@ -4487,7 +4999,7 @@ class LiveChatApp {
       if (!this.activeCall || this.peerConnection !== pc) return;
       await pc.setLocalDescription(offer);
       await this.sendSignal('offer', offer);
-      this.callFastSignalUntil = Date.now() + 10000;
+      this.accelerateSignalPolling(10000);
     } catch (_error) {
       this.scheduleCallConnectionRecovery(pc, 'Trying to reconnect...', 45000);
     } finally {
@@ -4556,7 +5068,7 @@ class LiveChatApp {
       if (this.groupCallSessions.get(session.call.callId) !== session) return;
       await pc.setLocalDescription(offer);
       await this.sendSignalForCall(session.call, 'offer', offer);
-      this.callFastSignalUntil = Date.now() + 10000;
+      this.accelerateSignalPolling(10000);
     } catch (_error) {
       window.clearTimeout(session.recoveryTimer);
       session.recoveryTimer = window.setTimeout(() => {
@@ -4601,7 +5113,7 @@ class LiveChatApp {
       this.startSpeechMonitor(this.remoteStream, this.getActivePeerId(), () => document.querySelector('.live-remote-video-tile'));
     };
     pc.onicecandidate = (event) => {
-      if (event.candidate) this.sendSignal('ice', event.candidate.toJSON ? event.candidate.toJSON() : event.candidate).catch(() => {});
+      if (event.candidate) this.queueIceCandidate(event.candidate);
     };
     pc.onconnectionstatechange = () => {
       this.handlePeerConnectionState(pc);
@@ -4609,7 +5121,7 @@ class LiveChatApp {
     pc.oniceconnectionstatechange = () => {
       this.handlePeerConnectionState(pc);
     };
-    await this.populateCameraDevices();
+    this.populateCameraDevices().catch(() => {});
     this.applyCameraZoom(this.cameraZoom);
   }
 
@@ -5227,8 +5739,9 @@ class LiveChatApp {
   startSignalPolling() {
     if (this.timers.signals) clearInterval(this.timers.signals);
     const interval = Date.now() < this.callFastSignalUntil
-      ? 90
-      : Math.min(this.liveChatPollMs('signalPollMs', 350, 150, 5000), 250);
+      ? 250
+      : Math.min(this.liveChatPollMs('signalPollMs', 350, 200, 5000), 500);
+    this.signalPollIntervalMs = interval;
     const poll = () => {
       if (this.activeCall && !this.activeCall.isGroupCall) this.pollSignals();
       if (this.activeCall?.isGroupCall || this.groupCallSessions.size > 0) this.pollGroupSignals();
@@ -5241,17 +5754,22 @@ class LiveChatApp {
   }
 
   async pollGroupSignals() {
-    if (!this.activeCall?.isGroupCall) return;
-    const sessions = Array.from(this.groupCallSessions.values());
-    await Promise.all(sessions.map(async (session) => {
-      try {
-        const data = await this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.SIGNALS, call_id: session.call.callId, after_id: session.lastSignalId || 0 }, 'GET');
-        for (const signal of data.signals || []) {
-          session.lastSignalId = Math.max(session.lastSignalId || 0, Number(signal.signalId || 0));
-          await this.handleGroupSignal(session, signal);
-        }
-      } catch (_error) {}
-    }));
+    if ((!this.activeCall?.isGroupCall && this.groupCallSessions.size === 0) || this.groupSignalPollInFlight) return;
+    this.groupSignalPollInFlight = true;
+    try {
+      const sessions = Array.from(this.groupCallSessions.values());
+      await Promise.all(sessions.map(async (session) => {
+        try {
+          const data = await this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.SIGNALS, call_id: session.call.callId, after_id: session.lastSignalId || 0 }, 'GET');
+          for (const signal of data.signals || []) {
+            session.lastSignalId = Math.max(session.lastSignalId || 0, Number(signal.signalId || 0));
+            await this.handleGroupSignal(session, signal);
+          }
+        } catch (_error) {}
+      }));
+    } finally {
+      this.groupSignalPollInFlight = false;
+    }
   }
 
   async handleGroupSignal(session, signal) {
@@ -5291,7 +5809,7 @@ class LiveChatApp {
     if (signal.signalType === 'answer') {
       await session.peerConnection.setRemoteDescription(new RTCSessionDescription(signal.payload));
       await this.flushGroupPendingIceCandidates(session);
-      this.callFastSignalUntil = Date.now() + 6000;
+      this.accelerateSignalPolling(6000);
       session.call.status = 'accepted';
       session.call.answeredAt = session.call.answeredAt || new Date().toISOString();
       session.status = 'connected';
@@ -5302,7 +5820,7 @@ class LiveChatApp {
       return;
     }
     if (signal.signalType === 'offer') {
-      this.callFastSignalUntil = Date.now() + 10000;
+      this.accelerateSignalPolling(10000);
       await session.peerConnection.setRemoteDescription(new RTCSessionDescription(signal.payload));
       await this.flushGroupPendingIceCandidates(session);
       const answer = await session.peerConnection.createAnswer();
@@ -5335,12 +5853,21 @@ class LiveChatApp {
 
   async pollSignals() {
     if (!this.activeCall || this.signalPollInFlight) return;
+    const callId = this.activeCall.callId;
     this.signalPollInFlight = true;
     try {
-      const data = await this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.SIGNALS, call_id: this.activeCall.callId, after_id: this.lastSignalId }, 'GET');
+      const data = await this.postCall({ action: LIVE_CHAT_CALL_API_ACTIONS.SIGNALS, call_id: callId, after_id: this.lastSignalId }, 'GET');
+      if (!this.activeCall || this.activeCall.callId !== callId) return;
+      if (data.call && data.call.callId === callId) {
+        this.activeCall = { ...this.activeCall, ...data.call };
+      }
       for (const signal of data.signals || []) {
+        if (!this.activeCall || this.activeCall.callId !== callId) break;
         this.lastSignalId = Math.max(this.lastSignalId, Number(signal.signalId || 0));
         await this.handleSignal(signal);
+      }
+      if (this.activeCall?.callId === callId && data.call && this.isTerminalCallStatus(data.call.status)) {
+        this.finishCall(data.call, data.call.status, data.call.status);
       }
     } catch (_error) {
     } finally {
@@ -5350,9 +5877,15 @@ class LiveChatApp {
 
   async handleSignal(signal) {
     if (!this.activeCall) return;
+    if (signal.callId && signal.callId !== this.activeCall.callId) return;
+    if (this.isTerminalCallStatus(this.activeCall.status) && signal.signalType !== 'hangup') return;
     if (signal.signalType === 'hangup') {
+      const reason = String(signal.payload?.reason || 'ended').toLowerCase();
+      const status = reason === 'rejected'
+        ? 'rejected'
+        : (reason === 'unanswered' || reason === 'timeout' || reason === 'cancelled' ? 'missed' : (this.callStartedAt || this.activeCall.status === 'accepted' ? 'ended' : 'missed'));
       this.showCallConnectionNotice('Call partner disconnected', 'disconnected');
-      this.cleanupCall();
+      this.finishCall({ ...this.activeCall, endedAt: new Date().toISOString() }, status, reason);
       return;
     }
     if (signal.signalType === 'mic_state') {
@@ -5364,6 +5897,8 @@ class LiveChatApp {
       return;
     }
     if (signal.signalType === 'peer_connected') {
+      this.stopOutgoingRing();
+      this.clearCallTimeout();
       this.showCallConnectionNotice('Call partner connected', 'connected');
       return;
     }
@@ -5377,9 +5912,11 @@ class LiveChatApp {
       this.stopIncomingRing();
       this.stopOutgoingRing();
       this.clearCallTimeout();
+      this.clearCallConnectionRecoveryTimer();
       this.startCallTimer(this.activeCall.answeredAt);
       const status = document.getElementById('liveCallStatus');
       if (status && status.textContent !== 'Connected') status.textContent = 'Connecting...';
+      this.accelerateSignalPolling(10000);
       return;
     }
     if (signal.signalType === 'video_request') {
@@ -5399,7 +5936,7 @@ class LiveChatApp {
       return;
     }
     if (signal.signalType === 'offer') {
-      this.callFastSignalUntil = Date.now() + 10000;
+      this.accelerateSignalPolling(10000);
       if (this.activeCall.callType === 'video' && !this.deferIncomingVideoCapture) await this.addVideoToCurrentCall(false);
       if (!this.peerConnection) await this.preparePeerConnection(this.activeCall.callType, { captureLocalVideo: !this.deferIncomingVideoCapture });
       await this.peerConnection.setRemoteDescription(new RTCSessionDescription(signal.payload));
@@ -5423,7 +5960,7 @@ class LiveChatApp {
     if (signal.signalType === 'answer' && this.peerConnection) {
       await this.peerConnection.setRemoteDescription(new RTCSessionDescription(signal.payload));
       await this.flushPendingIceCandidates();
-      this.callFastSignalUntil = Date.now() + 6000;
+      this.accelerateSignalPolling(6000);
       this.activeCall.status = 'accepted';
       this.activeCall.answeredAt = this.activeCall.answeredAt || new Date().toISOString();
       this.stopIncomingRing();
@@ -5436,7 +5973,43 @@ class LiveChatApp {
       return;
     }
     if (signal.signalType === 'ice' && this.peerConnection && signal.payload) {
-      await this.addIceCandidateSafely(signal.payload);
+      await this.addIceCandidatesFromSignal(signal.payload);
+    }
+  }
+
+  queueIceCandidate(candidate) {
+    if (!candidate || !this.activeCall) return;
+    const payload = candidate.toJSON ? candidate.toJSON() : candidate;
+    this.iceCandidateQueue.push(payload);
+    if (this.iceCandidateQueue.length >= 6) {
+      this.flushQueuedIceCandidates().catch(() => {});
+      return;
+    }
+    if (!this.iceFlushTimer) {
+      this.iceFlushTimer = window.setTimeout(() => {
+        this.iceFlushTimer = null;
+        this.flushQueuedIceCandidates().catch(() => {});
+      }, 160);
+    }
+  }
+
+  async flushQueuedIceCandidates() {
+    if (this.iceFlushTimer) {
+      window.clearTimeout(this.iceFlushTimer);
+      this.iceFlushTimer = null;
+    }
+    if (!this.activeCall || !this.iceCandidateQueue.length) return;
+    const candidates = this.iceCandidateQueue.splice(0);
+    const payload = candidates.length === 1 ? candidates[0] : { candidates };
+    await this.sendSignal('ice', payload).catch(() => {});
+  }
+
+  async addIceCandidatesFromSignal(payload) {
+    const candidates = Array.isArray(payload?.candidates)
+      ? payload.candidates
+      : (Array.isArray(payload) ? payload : [payload]);
+    for (const candidate of candidates) {
+      await this.addIceCandidateSafely(candidate);
     }
   }
 
@@ -5523,9 +6096,15 @@ class LiveChatApp {
     this.videoUpgradeConsentOverlay = null;
   }
 
-  async postCall(payload, method = 'POST') {
+  async postCall(payload, method = 'POST', extraOptions = {}) {
     const url = method === 'GET' ? `${API.call}?${new URLSearchParams(payload)}` : API.call;
-    const options = method === 'GET' ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) };
+    const action = String(payload?.action || '');
+    const timeoutMs = action === LIVE_CHAT_CALL_API_ACTIONS.POLL
+      ? 15000
+      : (action === LIVE_CHAT_CALL_API_ACTIONS.SIGNALS ? 15000 : 15000);
+    const options = method === 'GET'
+      ? { timeoutMs, ...extraOptions }
+      : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), timeoutMs, ...extraOptions };
     return this.fetchJson(url, options);
   }
 
@@ -5538,6 +6117,11 @@ class LiveChatApp {
     this.callRestartInFlight = false;
     if (this.timers.signals) clearInterval(this.timers.signals);
     this.timers.signals = null;
+    this.signalPollIntervalMs = 0;
+    this.groupSignalPollInFlight = false;
+    if (this.iceFlushTimer) window.clearTimeout(this.iceFlushTimer);
+    this.iceFlushTimer = null;
+    this.iceCandidateQueue = [];
     this.stopIncomingRing();
     this.stopOutgoingRing();
     this.clearCallTimeout();

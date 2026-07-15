@@ -101,7 +101,8 @@ CREATE TABLE IF NOT EXISTS public_chat_agents (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (agent_id),
     UNIQUE KEY uniq_public_chat_agent_user (user_id),
-    KEY idx_public_chat_agent_status (agent_status, is_enabled)
+    KEY idx_public_chat_agent_status (agent_status, is_enabled),
+    KEY idx_public_chat_agent_live (is_enabled, can_handle_public_chat, availability_status, last_seen_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS public_chat_assignments (

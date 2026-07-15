@@ -13,6 +13,7 @@ try {
     $userId = liveChatRequireStaff($conn);
     liveChatEnsureTables($conn);
     liveChatTouchPresence($conn, $userId);
+    liveChatReleaseSessionLock();
 
     if (!liveChatFeatureEnabled($conn, 'live_chat_polls_enabled', true)) {
         throw new RuntimeException('Polls are currently disabled.');

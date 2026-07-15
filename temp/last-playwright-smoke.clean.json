@@ -1,0 +1,1677 @@
+{
+  "marker": "CODEX_BROWSER_SMOKE_20260714144941",
+  "baseUrl": "http://localhost/PROJECTS/PensionApp",
+  "fakeMedia": true,
+  "staff": {
+    "login": {
+      "a": {
+        "success": true,
+        "userId": "d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7",
+        "userName": "Patrick Etomet",
+        "role": "admin"
+      },
+      "b": {
+        "success": true,
+        "userId": "81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3",
+        "userName": "Julius Onyango",
+        "role": "clerk"
+      }
+    },
+    "threadReady": {
+      "a": {
+        "selectedThread": {
+          "type": "user",
+          "id": "81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3",
+          "name": "Julius Onyango",
+          "subtitle": "Clerk - online",
+          "photo": "images/default-user.png",
+          "isOnline": true,
+          "unreadCount": 0
+        },
+        "key": "user:81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3",
+        "hasCsrfToken": true,
+        "inputDisabled": false,
+        "sendDisabled": false,
+        "messagePollInFlight": true,
+        "messagePollStartedAgoMs": 803,
+        "lastMessageId": 156,
+        "hasLastMessageKey": true,
+        "renderedCount": 46,
+        "bubbleCount": 46,
+        "lastBubbleText": "Call ended video call with Julius Onyango - 00:08 02:47 PM",
+        "emptyText": "",
+        "notice": []
+      },
+      "b": {
+        "selectedThread": {
+          "type": "user",
+          "id": "d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7",
+          "name": "Patrick Etomet",
+          "subtitle": "Administrator",
+          "photo": "../uploads/profiles/68fa805a6c744.jpg",
+          "isOnline": false,
+          "unreadCount": 0
+        },
+        "key": "user:d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7",
+        "hasCsrfToken": true,
+        "inputDisabled": false,
+        "sendDisabled": false,
+        "messagePollInFlight": false,
+        "messagePollStartedAgoMs": 0,
+        "lastMessageId": 156,
+        "hasLastMessageKey": true,
+        "renderedCount": 55,
+        "bubbleCount": 55,
+        "lastBubbleText": "Call ended video call with Patrick Etomet - 00:08 02:47 PM",
+        "emptyText": "",
+        "notice": []
+      }
+    },
+    "typingIndicator": {
+      "ok": true,
+      "ms": 5516
+    },
+    "preSendState": {
+      "selectedThread": {
+        "type": "user",
+        "id": "81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3",
+        "name": "Julius Onyango",
+        "subtitle": "Clerk - online",
+        "photo": "images/default-user.png",
+        "isOnline": true,
+        "unreadCount": 0
+      },
+      "inputValue": "CODEX_BROWSER_SMOKE_20260714144941 staff text 1784029850687",
+      "sendDisabled": false,
+      "voiceDisabled": false,
+      "dockClass": "live-chat-dock",
+      "notice": []
+    },
+    "sendApiMs": 9737,
+    "sendApiStatus": 200,
+    "sendApiError": "",
+    "postSendState": {
+      "sending": false,
+      "inputValue": "",
+      "pendingCount": 0,
+      "ownBubbleCount": 47,
+      "lastOwnText": "\n      \n      \n      \n      CODEX_BROWSER_SMOKE_20260714144941 staff text 1784029850687\n      \n      \n      02:51 PM✓\n      \n    ",
+      "notice": []
+    },
+    "textDeliveryMs": 11434,
+    "receiptStatus": "sent",
+    "voice": {
+      "ok": true,
+      "ms": 128300,
+      "draft": {
+        "size": 18393,
+        "type": "audio/webm;codecs=opus",
+        "duration": 2
+      },
+      "preview": {
+        "ok": true,
+        "readyState": 4,
+        "duration": 1.56,
+        "currentTime": 0.072792
+      },
+      "receivedPreview": {
+        "ok": true,
+        "readyState": 4,
+        "duration": 1.44,
+        "currentTime": 0.255708
+      }
+    }
+  },
+  "public": {},
+  "browserErrors": {
+    "a": {
+      "console": [],
+      "pageErrors": [],
+      "requestFailures": [
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/get_public_settings.php",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/get_public_settings.php",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=156",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=157",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&receipt_only=1",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=157",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        }
+      ],
+      "httpErrors": [],
+      "apiRequests": [
+        {
+          "at": 1784029787700,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/public_chat_bootstrap.php"
+        },
+        {
+          "at": 1784029787727,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/login.php"
+        },
+        {
+          "at": 1784029799994,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/public_chat_bootstrap.php"
+        },
+        {
+          "at": 1784029801194,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_bootstrap.php"
+        },
+        {
+          "at": 1784029808494,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/public_chat_availability.php"
+        },
+        {
+          "at": 1784029813816,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/get_csrf_token.php"
+        },
+        {
+          "at": 1784029814484,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029814709,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=0"
+        },
+        {
+          "at": 1784029828333,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=156"
+        },
+        {
+          "at": 1784029828423,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029831180,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=156"
+        },
+        {
+          "at": 1784029833182,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029836180,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=156"
+        },
+        {
+          "at": 1784029838184,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029840180,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=156"
+        },
+        {
+          "at": 1784029840680,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029843184,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php"
+        },
+        {
+          "at": 1784029844180,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=156"
+        },
+        {
+          "at": 1784029845395,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_action.php"
+        },
+        {
+          "at": 1784029845719,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029850184,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=156"
+        },
+        {
+          "at": 1784029850285,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_action.php"
+        },
+        {
+          "at": 1784029850864,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029851699,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_send.php"
+        },
+        {
+          "at": 1784029852184,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=156"
+        },
+        {
+          "at": 1784029853186,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029860955,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_action.php"
+        },
+        {
+          "at": 1784029861602,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&receipt_only=1"
+        },
+        {
+          "at": 1784029862186,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=157"
+        },
+        {
+          "at": 1784029863205,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029866823,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_send.php"
+        },
+        {
+          "at": 1784029867386,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=157"
+        },
+        {
+          "at": 1784029868186,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029873187,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php"
+        },
+        {
+          "at": 1784029876538,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_action.php"
+        },
+        {
+          "at": 1784029878222,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029888191,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784029895837,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029902204,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784029903192,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php"
+        },
+        {
+          "at": 1784029911227,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029913309,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784029928209,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029933190,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php"
+        },
+        {
+          "at": 1784029934204,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784029943215,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029947195,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784029952190,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784029953198,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029961197,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784029963230,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php"
+        },
+        {
+          "at": 1784029970681,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029979181,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784029980693,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029990196,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784029990694,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029991259,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784029991741,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&receipt_only=1"
+        },
+        {
+          "at": 1784029992215,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784029993192,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php"
+        },
+        {
+          "at": 1784029993192,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029998181,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784030000207,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=signals&call_id=call_01f43e8c4e1d1c13b694da566bf5abc7&after_id=0"
+        },
+        {
+          "at": 1784030000207,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030003242,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784030006392,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784030010111,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030010111,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030010197,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030010197,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=signals&call_id=call_01f43e8c4e1d1c13b694da566bf5abc7&after_id=1751"
+        },
+        {
+          "at": 1784030012865,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030012865,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030014193,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784030015692,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784030020819,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=0"
+        },
+        {
+          "at": 1784030023182,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php"
+        },
+        {
+          "at": 1784030025337,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=159"
+        },
+        {
+          "at": 1784030025821,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        }
+      ],
+      "apiResponses": [
+        {
+          "at": 1784029791279,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/public_chat_bootstrap.php"
+        },
+        {
+          "at": 1784029791624,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/login.php"
+        },
+        {
+          "at": 1784029803451,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/public_chat_bootstrap.php"
+        },
+        {
+          "at": 1784029813134,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_bootstrap.php"
+        },
+        {
+          "at": 1784029814365,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/public_chat_availability.php"
+        },
+        {
+          "at": 1784029827002,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/get_csrf_token.php"
+        },
+        {
+          "at": 1784029827063,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029827165,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=0"
+        },
+        {
+          "at": 1784029830809,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=156"
+        },
+        {
+          "at": 1784029831127,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029835744,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029835782,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=156"
+        },
+        {
+          "at": 1784029840018,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=156"
+        },
+        {
+          "at": 1784029840064,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029843204,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029843296,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=156"
+        },
+        {
+          "at": 1784029844665,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php"
+        },
+        {
+          "at": 1784029849944,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=156"
+        },
+        {
+          "at": 1784029850156,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_action.php"
+        },
+        {
+          "at": 1784029850198,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029855713,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_action.php"
+        },
+        {
+          "at": 1784029860752,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029860881,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_send.php"
+        },
+        {
+          "at": 1784029861247,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=156"
+        },
+        {
+          "at": 1784029870731,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_action.php"
+        },
+        {
+          "at": 1784029876472,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_send.php"
+        },
+        {
+          "at": 1784029877368,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029894821,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_action.php"
+        },
+        {
+          "at": 1784029901992,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784029909521,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029913136,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784029946830,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784029950912,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029951880,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784029960901,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784029978466,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029979032,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784029989409,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029989734,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784029996929,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&receipt_only=1"
+        },
+        {
+          "at": 1784029997150,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784029997662,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784030001434,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784030006129,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784030009900,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030009927,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=signals&call_id=call_01f43e8c4e1d1c13b694da566bf5abc7&after_id=0"
+        },
+        {
+          "at": 1784030013423,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784030013615,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=158"
+        },
+        {
+          "at": 1784030015884,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030016215,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030016229,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030017610,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=signals&call_id=call_01f43e8c4e1d1c13b694da566bf5abc7&after_id=1751"
+        },
+        {
+          "at": 1784030019004,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030020813,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030023364,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784030024900,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=0"
+        },
+        {
+          "at": 1784030026010,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php"
+        },
+        {
+          "at": 1784030027682,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784030027802,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=81c65b1e0ce3ae0955d9cac657880c2dd1116e37749c02ae1601ae594c5c72e3&since_id=159"
+        }
+      ]
+    },
+    "b": {
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "pageErrors": [],
+      "requestFailures": [
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/get_public_settings.php",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/get_public_settings.php",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/public_chat_bootstrap.php",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=157",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=157",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=157",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=157",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=157",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=157",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php",
+          "method": "POST",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=159",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        }
+      ],
+      "httpErrors": [],
+      "apiRequests": [
+        {
+          "at": 1784029792207,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/public_chat_bootstrap.php"
+        },
+        {
+          "at": 1784029792241,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/login.php"
+        },
+        {
+          "at": 1784029800049,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/public_chat_bootstrap.php"
+        },
+        {
+          "at": 1784029801080,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_bootstrap.php"
+        },
+        {
+          "at": 1784029811060,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029817366,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029824849,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029827777,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029828949,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/get_csrf_token.php"
+        },
+        {
+          "at": 1784029829502,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=0"
+        },
+        {
+          "at": 1784029832353,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029839848,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php"
+        },
+        {
+          "at": 1784029843935,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_bootstrap.php"
+        },
+        {
+          "at": 1784029843936,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=156"
+        },
+        {
+          "at": 1784029844849,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029846860,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=156"
+        },
+        {
+          "at": 1784029850869,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=156"
+        },
+        {
+          "at": 1784029852353,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029854864,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=156"
+        },
+        {
+          "at": 1784029857350,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029857854,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=156"
+        },
+        {
+          "at": 1784029862356,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029862669,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_action.php"
+        },
+        {
+          "at": 1784029862757,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_bootstrap.php"
+        },
+        {
+          "at": 1784029862958,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=157"
+        },
+        {
+          "at": 1784029869866,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php"
+        },
+        {
+          "at": 1784029877372,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029882868,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=157"
+        },
+        {
+          "at": 1784029894869,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029899859,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php"
+        },
+        {
+          "at": 1784029902870,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=157"
+        },
+        {
+          "at": 1784029909941,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029923872,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=157"
+        },
+        {
+          "at": 1784029924874,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029929860,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php"
+        },
+        {
+          "at": 1784029942375,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029943875,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=157"
+        },
+        {
+          "at": 1784029957363,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029959857,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php"
+        },
+        {
+          "at": 1784029963864,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=157"
+        },
+        {
+          "at": 1784029974865,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029983866,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=157"
+        },
+        {
+          "at": 1784029989866,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php"
+        },
+        {
+          "at": 1784029989866,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029998897,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784029999142,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_action.php"
+        },
+        {
+          "at": 1784029999950,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_bootstrap.php"
+        },
+        {
+          "at": 1784030000134,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=158"
+        },
+        {
+          "at": 1784030000134,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784030003682,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030010235,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=signals&call_id=call_01f43e8c4e1d1c13b694da566bf5abc7&after_id=0"
+        },
+        {
+          "at": 1784030010235,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030013152,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=158"
+        },
+        {
+          "at": 1784030014906,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784030020280,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030020479,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_presence.php"
+        },
+        {
+          "at": 1784030020498,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=158"
+        },
+        {
+          "at": 1784030020701,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030020985,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030032357,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784030034649,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030034649,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030034952,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=159"
+        },
+        {
+          "at": 1784030034981,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_action.php"
+        },
+        {
+          "at": 1784030035035,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_bootstrap.php"
+        },
+        {
+          "at": 1784030036853,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=0"
+        },
+        {
+          "at": 1784030037348,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784030039116,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=159"
+        },
+        {
+          "at": 1784030039138,
+          "method": "POST",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_action.php"
+        },
+        {
+          "at": 1784030039848,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784030041845,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=159"
+        },
+        {
+          "at": 1784030042352,
+          "method": "GET",
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        }
+      ],
+      "apiResponses": [
+        {
+          "at": 1784029795594,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/public_chat_bootstrap.php"
+        },
+        {
+          "at": 1784029796815,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/login.php"
+        },
+        {
+          "at": 1784029809783,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_bootstrap.php"
+        },
+        {
+          "at": 1784029816602,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029824554,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029827653,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029830719,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029832046,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/get_csrf_token.php"
+        },
+        {
+          "at": 1784029843251,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029843301,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=0"
+        },
+        {
+          "at": 1784029846451,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=156"
+        },
+        {
+          "at": 1784029847784,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_bootstrap.php"
+        },
+        {
+          "at": 1784029850472,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029850652,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=156"
+        },
+        {
+          "at": 1784029854296,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=156"
+        },
+        {
+          "at": 1784029856850,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029857798,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=156"
+        },
+        {
+          "at": 1784029862180,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029862506,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=156"
+        },
+        {
+          "at": 1784029910008,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_action.php"
+        },
+        {
+          "at": 1784029912056,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_bootstrap.php"
+        },
+        {
+          "at": 1784029989529,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029998252,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784029999062,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=157"
+        },
+        {
+          "at": 1784030003428,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030012043,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_action.php"
+        },
+        {
+          "at": 1784030012293,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=158"
+        },
+        {
+          "at": 1784030013243,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_bootstrap.php"
+        },
+        {
+          "at": 1784030014034,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784030017786,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030018665,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=signals&call_id=call_01f43e8c4e1d1c13b694da566bf5abc7&after_id=0"
+        },
+        {
+          "at": 1784030019608,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030019633,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=158"
+        },
+        {
+          "at": 1784030034621,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030034662,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030034737,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=158"
+        },
+        {
+          "at": 1784030036770,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030036802,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784030036953,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php"
+        },
+        {
+          "at": 1784030038716,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=0"
+        },
+        {
+          "at": 1784030039253,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_bootstrap.php"
+        },
+        {
+          "at": 1784030039366,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784030039480,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_action.php"
+        },
+        {
+          "at": 1784030040549,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_action.php"
+        },
+        {
+          "at": 1784030041267,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        },
+        {
+          "at": 1784030041279,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=159"
+        },
+        {
+          "at": 1784030043012,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_messages.php?peer_type=user&peer_id=d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7&since_id=159"
+        },
+        {
+          "at": 1784030043310,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll"
+        }
+      ]
+    }
+  },
+  "ok": false,
+  "error": "page.waitForFunction: Timeout 15000ms exceeded."
+}

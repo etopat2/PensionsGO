@@ -1,0 +1,1119 @@
+/* AUTHENTICATION MODAL STYLES
+   For login, logout, and other authentication-related modals */
+
+/* Auth Modal Overlay */
+.auth-modal-overlay {
+  position: fixed;
+  inset: 0;
+  min-height: 100dvh;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  background: rgba(0, 0, 0, 0.58);
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: var(--z-modal-layer, 12000);
+  isolation: isolate;
+  box-sizing: border-box;
+}
+
+/* Compact Auth Modal Container */
+.auth-modal {
+  background: var(--card-bg);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  position: relative;
+  z-index: 1;
+  max-width: 420px;
+  width: min(420px, 100%);
+  margin: auto;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  animation: authModalSlideIn 0.2s ease-out;
+  max-height: min(90vh, calc(100dvh - 2rem));
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes authModalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-15px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Compact Auth Modal Header */
+.auth-modal-header {
+  background: linear-gradient(135deg, var(--primary-maroon) 0%, var(--primary-blue) 100%);
+  color: white;
+  padding: 1rem 3.95rem 1rem 1.25rem;
+  text-align: center;
+  border-bottom: 2px solid var(--primary-gold);
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.auth-modal-header h3 {
+  margin: 0 auto;
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.auth-modal-header .app-modal-close-affordance {
+  position: absolute;
+  top: 0.76rem;
+  right: 0.9rem;
+  margin-left: 0;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  font-size: 1.18rem;
+  line-height: 1;
+}
+
+/* Compact Auth Modal Body */
+.auth-modal-body {
+  padding: 1.25rem;
+  text-align: center;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.auth-modal-body p {
+  margin: 0;
+  color: var(--text-color);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+/* Compact Auth Modal Footer */
+.auth-modal-footer {
+  padding: 0 1.25rem 1.25rem;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  background: color-mix(in srgb, var(--card-bg) 95%, var(--menu-bg-dark) 5%);
+  border-top: 1px solid var(--border-color);
+}
+
+/* Dual buttons layout for confirmation modals */
+.auth-modal-footer.dual-buttons {
+  justify-content: space-between;
+}
+
+.auth-modal-footer.dual-buttons .auth-btn {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Compact Auth Buttons */
+.auth-btn {
+  padding: 0.5rem 1.25rem;
+  border: none;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 80px;
+}
+
+.auth-btn-primary {
+  background: var(--primary-gold);
+  color: var(--primary-blue);
+}
+
+.auth-btn-primary:hover {
+  background: var(--primary-gold-light);
+  transform: translateY(-1px);
+}
+
+.auth-btn-danger {
+  background: var(--primary-maroon);
+  color: white;
+}
+
+.auth-btn-danger:hover {
+  background: var(--primary-maroon-dark);
+  transform: translateY(-1px);
+}
+
+.auth-btn-secondary {
+  background: var(--border-color);
+  color: var(--text-color);
+}
+
+.auth-btn-secondary:hover {
+  background: var(--muted-color);
+  color: white;
+  transform: translateY(-1px);
+}
+
+/* Auth Overlay (Loading) */
+.auth-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 4000;
+  color: white;
+  backdrop-filter: blur(8px);
+}
+
+.auth-overlay p {
+  margin-top: 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* Auth Spinner */
+.auth-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: var(--primary-gold);
+  animation: authSpin 1s ease-in-out infinite;
+}
+
+@keyframes authSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Login Success Modal */
+.login-success-modal .auth-modal-header {
+  background: linear-gradient(135deg, var(--success-color) 0%, var(--primary-blue) 100%);
+}
+
+.login-success-modal .auth-modal-body {
+  padding: 1.5rem 1.25rem;
+}
+
+.login-success-icon {
+  font-size: 2.5rem;
+  color: var(--success-color);
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+/* Login Error Modal */
+.login-error-modal .auth-modal-header {
+  background: linear-gradient(135deg, var(--error-color) 0%, var(--primary-maroon) 100%);
+}
+
+.login-error-modal .auth-modal-body {
+  padding: 1.5rem 1.25rem;
+}
+
+.login-error-icon {
+  font-size: 2.5rem;
+  color: var(--error-color);
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+/* Login Info Modal */
+.login-info-modal .auth-modal-header {
+  background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-maroon) 100%);
+}
+
+.login-info-modal .auth-modal-body {
+  padding: 1.5rem 1.25rem;
+}
+
+.login-info-icon {
+  font-size: 2.5rem;
+  color: var(--primary-blue);
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+/* Single Device Login Modal Styles*/
+/* Login Confirm Modal (Single Device Warning) */
+.login-confirm-modal .auth-modal {
+  max-width: 420px;
+}
+
+.login-confirm-modal .auth-modal-header {
+  background: linear-gradient(135deg, var(--warning-color) 0%, var(--primary-maroon) 100%);
+}
+
+.login-confirm-modal .auth-modal-body {
+  padding: 1.5rem 1.25rem;
+  text-align: left;
+}
+
+.login-warning-icon {
+  font-size: 3rem;
+  text-align: center;
+  margin-bottom: 1rem;
+  display: block;
+  color: var(--warning-color);
+}
+
+.modal-note {
+  font-size: 0.85rem;
+  color: var(--muted-color);
+  font-style: italic;
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  border-left: 3px solid var(--warning-color);
+}
+
+/* Compact No Changes Modal */
+.no-changes-modal .auth-modal-body {
+  padding: 1.5rem 1.25rem;
+}
+
+.no-changes-icon {
+  font-size: 2.5rem;
+  color: var(--muted-color);
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+/* Login Form Styles */
+.login-form-container {
+  max-width: 400px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px var(--shadow-medium);
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.login-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.login-form-group label {
+  font-weight: 600;
+  color: var(--label-color);
+  font-size: 0.95rem;
+}
+
+.login-form-group input {
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--input-border);
+  border-radius: 6px;
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.login-form-group input:focus {
+  outline: none;
+  border-color: var(--primary-gold);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+}
+
+.login-submit-btn {
+  background: linear-gradient(135deg, var(--primary-maroon) 0%, var(--primary-blue) 100%);
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 1rem;
+}
+
+.login-submit-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(139, 0, 0, 0.3);
+}
+
+.login-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.login-banner {
+  margin: 0.75rem 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--divider-color);
+  background: rgba(0, 51, 102, 0.08);
+  color: var(--text-color);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.login-banner.hidden {
+  display: none;
+}
+
+/* SESSION OVERLAY STYLES (Enhanced for Better Visibility) */
+
+.session-overlay {
+  position: fixed;
+  inset: 0;
+  min-height: 100dvh;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  background: rgba(0, 0, 0, 0.85);
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  z-index: var(--z-session-overlay, 2147483647);
+  isolation: isolate;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-sizing: border-box;
+}
+
+html.session-state-modal-open,
+body.session-state-modal-open {
+  overflow: hidden !important;
+}
+
+body.session-state-modal-open .document-viewer-frame,
+body.session-state-modal-open .document-viewer-frame-wrap,
+body.session-state-modal-open iframe:not(.session-modal-preserve),
+body.session-state-modal-open object,
+body.session-state-modal-open embed {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.session-overlay,
+.session-warning-overlay,
+.inactivity-warning {
+  position: fixed !important;
+  inset: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+  align-items: center !important;
+  justify-items: center !important;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100vw;
+  padding: clamp(1rem, 3vw, 1.5rem) !important;
+  overflow: auto !important;
+  overscroll-behavior: contain;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  z-index: var(--z-session-overlay, 2147483647) !important;
+  isolation: isolate;
+}
+
+.session-overlay-content,
+.session-warning-modal,
+.warning-content {
+  width: min(100%, 480px);
+  max-height: min(88vh, calc(100dvh - 2rem));
+  margin: auto;
+  overflow-y: auto;
+  position: relative !important;
+  z-index: 1 !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.session-overlay-static .session-overlay-content,
+.session-overlay-static .session-warning-modal,
+.session-overlay-static .warning-content {
+  animation: none !important;
+  transform: translateY(0) scale(1) !important;
+}
+
+.session-overlay-content {
+  background: var(--card-bg);
+  border-radius: 12px;
+  position: relative;
+  z-index: 1;
+  padding: 2.5rem;
+  max-width: 480px;
+  width: min(480px, 100%);
+  margin: auto;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  animation: sessionModalSlideIn 0.3s ease-out;
+  max-height: min(88vh, calc(100dvh - 2rem));
+  overflow-y: auto;
+}
+
+@keyframes sessionModalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.session-overlay-content .session-icon {
+  font-size: 4rem;
+  margin-bottom: 1.5rem;
+  display: block;
+}
+
+/* 🔥 Better heading colors with high contrast */
+.session-overlay-content h2 {
+  color: var(--primary-maroon);
+  margin-bottom: 1rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+/* Specific colors for different session overlay types */
+.session-overlay[data-type="device-conflict"] h2 {
+  color: #d32f2f; /* Deep red for device conflicts */
+  background: linear-gradient(135deg, #d32f2f, #b71c1c);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.session-overlay[data-type="session-expired"] h2 {
+  color: #ff6f00; /* Amber for session expiry */
+  background: linear-gradient(135deg, #ff6f00, #e65100);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.session-overlay[data-type="access-denied"] h2 {
+  color: #7b1fa2; /* Purple for access denied */
+  background: linear-gradient(135deg, #7b1fa2, #4a148c);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 🔥 Better paragraph text with improved contrast */
+.session-overlay-content p {
+  color: var(--text-color);
+  line-height: 1.6;
+  margin-bottom: 2rem;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+/* Force dark text in light mode and light text in dark mode for better readability */
+[data-theme="light"] .session-overlay-content p {
+  color: #2d3748 !important; /* Dark gray for light mode */
+}
+
+[data-theme="dark"] .session-overlay-content p {
+  color: #e2e8f0 !important; /* Light gray for dark mode */
+}
+
+.session-overlay-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.session-btn {
+  padding: 0.75rem 2rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 120px;
+  font-size: 1rem;
+  border: 2px solid transparent;
+}
+
+.session-btn-primary {
+  background: var(--primary-maroon);
+  color: white;
+  box-shadow: 0 4px 12px rgba(139, 0, 0, 0.3);
+}
+
+.session-btn-primary:hover {
+  background: var(--primary-maroon-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(139, 0, 0, 0.4);
+}
+
+.session-btn:focus {
+  outline: none;
+  border-color: var(--primary-gold);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.3);
+}
+
+/* Session expired blur effect */
+html.session-expired-blur,
+body.session-expired-blur {
+  filter: none !important;
+  pointer-events: auto !important;
+  transition: none;
+}
+
+/* 🔥 Specific styling for device conflict overlay */
+.session-overlay.device-conflict .session-overlay-content {
+  border-top: 4px solid #d32f2f;
+}
+
+.session-overlay.device-conflict .session-icon {
+  color: #d32f2f;
+}
+
+/* 🔥 Specific styling for session expired overlay */
+.session-overlay.session-expired .session-overlay-content {
+  border-top: 4px solid #ff6f00;
+}
+
+.session-overlay.session-expired .session-icon {
+  color: #ff6f00;
+}
+
+/* 🔥 Specific styling for access denied overlay */
+.session-overlay.access-denied .session-overlay-content {
+  border-top: 4px solid #7b1fa2;
+}
+
+.session-overlay.access-denied .session-icon {
+  color: #7b1fa2;
+}
+
+/* Responsive Auth Styles */
+@media (max-width: 768px) {
+  .auth-modal {
+    width: 95%;
+    margin: 1rem;
+  }
+
+  .auth-modal-header {
+    padding: 1rem 1.25rem;
+  }
+
+  .auth-modal-header h3 {
+    font-size: 1.1rem;
+  }
+
+  .auth-modal-body {
+    padding: 1.25rem;
+  }
+
+  .auth-modal-footer {
+    padding: 0 1.25rem 1.25rem;
+    flex-direction: column;
+  }
+
+  .auth-modal-footer.dual-buttons {
+    flex-direction: column;
+  }
+
+  .auth-modal-footer.dual-buttons .auth-btn {
+    width: 100%;
+  }
+
+  .auth-btn {
+    width: 100%;
+    min-width: auto;
+  }
+
+  .login-form-container {
+    margin: 1rem;
+    padding: 1.5rem;
+  }
+
+  /* Single Device Modal Mobile Adjustments */
+  .login-confirm-modal .auth-modal {
+    max-width: 350px;
+  }
+
+  .login-confirm-modal .auth-modal-body {
+    padding: 1.25rem;
+  }
+
+  .login-warning-icon {
+    font-size: 2.5rem;
+  }
+
+  /* 🔥 Mobile session overlay adjustments */
+  .session-overlay-content {
+    padding: 2rem 1.5rem;
+    margin: 1rem;
+  }
+
+  .session-overlay-content .session-icon {
+    font-size: 3rem;
+  }
+
+  .session-overlay-content h2 {
+    font-size: 1.5rem;
+  }
+
+  .session-overlay-content p {
+    font-size: 1rem;
+  }
+
+  .session-overlay-buttons {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .session-btn {
+    width: 100%;
+    max-width: 200px;
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-modal {
+    max-width: 280px;
+  }
+
+  .auth-modal-header {
+    padding: 0.75rem 1rem;
+  }
+
+  .auth-modal-header h3 {
+    font-size: 1rem;
+  }
+
+  .auth-modal-body {
+    padding: 1rem;
+  }
+
+  .auth-modal-body p {
+    font-size: 0.85rem;
+  }
+
+  .login-success-icon,
+  .login-error-icon,
+  .login-info-icon,
+  .no-changes-icon {
+    font-size: 2rem;
+  }
+
+  .login-warning-icon {
+    font-size: 2rem;
+  }
+
+  .modal-note {
+    font-size: 0.8rem;
+    padding: 0.5rem;
+  }
+
+  /* Single Device Modal Small Screen Adjustments */
+  .login-confirm-modal .auth-modal {
+    max-width: 300px;
+  }
+
+  /* 🔥 Small screen session overlay adjustments */
+  .session-overlay-content {
+    padding: 1.5rem 1rem;
+  }
+
+  .session-overlay-content .session-icon {
+    font-size: 2.5rem;
+  }
+
+  .session-overlay-content h2 {
+    font-size: 1.3rem;
+  }
+
+  .session-overlay-content p {
+    font-size: 0.95rem;
+    margin-bottom: 1.5rem;
+  }
+}
+
+/* Message Box Styles (for backward compatibility) */
+.message {
+  padding: 1rem 1.5rem;
+  border-radius: 6px;
+  margin: 1rem 0;
+  font-weight: 600;
+  border-left: 4px solid transparent;
+}
+
+.message.success {
+  background: rgba(40, 167, 69, 0.1);
+  color: var(--success-color);
+  border-left-color: var(--success-color);
+}
+
+.message.error {
+  background: rgba(220, 53, 69, 0.1);
+  color: var(--error-color);
+  border-left-color: var(--error-color);
+}
+
+.message.info {
+  background: rgba(0, 51, 102, 0.1);
+  color: var(--primary-blue);
+  border-left-color: var(--primary-blue);
+}
+
+.message.warning {
+  background: rgba(255, 193, 7, 0.1);
+  color: var(--warning-color);
+  border-left-color: var(--warning-color);
+}
+
+/* Button focus states for accessibility */
+.auth-btn:focus {
+  outline: 2px solid var(--primary-gold);
+  outline-offset: 2px;
+}
+
+.auth-btn:active {
+  transform: translateY(0);
+}
+
+/* 🔥 High contrast fallbacks for older browsers */
+.session-overlay-content h2 {
+  /* Fallback for browsers that don't support background-clip */
+  color: #8b0000 !important;
+}
+
+[data-theme="dark"] .session-overlay-content h2 {
+  color: #ff6b6b !important;
+}
+
+.session-overlay-content p {
+  /* Fallback for browsers that don't support CSS variables */
+  color: #333 !important;
+}
+
+[data-theme="dark"] .session-overlay-content p {
+  color: #f8f9fa !important;
+}
+
+.session-overlay,
+.session-warning-overlay,
+.inactivity-warning {
+  --session-modal-accent: var(--primary-maroon);
+  --session-modal-accent-dark: var(--primary-maroon-dark);
+  --session-modal-accent-soft: color-mix(in srgb, var(--primary-maroon) 12%, #fff 88%);
+  --session-modal-header-text: #fffaf2;
+  --session-modal-body-bg: linear-gradient(180deg, #fffdfa 0%, #f8f1e9 100%);
+}
+
+.session-overlay[data-type="session-expired"],
+.session-overlay.session-expired {
+  --session-modal-accent: #b45309;
+  --session-modal-accent-dark: #7c2d12;
+  --session-modal-accent-soft: #fff7ed;
+}
+
+.session-warning-overlay,
+.inactivity-warning {
+  --session-modal-accent: #d97706;
+  --session-modal-accent-dark: #92400e;
+  --session-modal-accent-soft: #fffbeb;
+}
+
+.session-overlay[data-type="device-conflict"],
+.session-overlay.device-conflict {
+  --session-modal-accent: #b91c1c;
+  --session-modal-accent-dark: #7f1d1d;
+  --session-modal-accent-soft: #fef2f2;
+}
+
+.session-overlay[data-type="access-denied"],
+.session-overlay.access-denied {
+  --session-modal-accent: #6d28d9;
+  --session-modal-accent-dark: #4c1d95;
+  --session-modal-accent-soft: #f5f3ff;
+}
+
+.session-overlay-content,
+.session-warning-modal,
+.warning-content {
+  padding: 0 !important;
+  overflow: hidden;
+  background: var(--session-modal-body-bg) !important;
+}
+
+.session-modal-header {
+  display: grid;
+  justify-items: center;
+  gap: 0.65rem;
+  padding: 1.45rem 1.5rem 1.25rem;
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.2), transparent 30%),
+    linear-gradient(135deg, var(--session-modal-accent) 0%, var(--session-modal-accent-dark) 100%);
+  color: var(--session-modal-header-text);
+  border-bottom: 1px solid color-mix(in srgb, var(--session-modal-accent-dark) 74%, #fff 26%);
+  text-align: center;
+}
+
+.session-modal-body {
+  display: grid;
+  gap: 1.25rem;
+  padding: 1.3rem 1.45rem 1.45rem;
+  background: var(--session-modal-body-bg);
+  text-align: center;
+}
+
+.session-modal-header .session-icon,
+.session-modal-header .warning-icon {
+  display: grid;
+  place-items: center;
+  width: 4.25rem;
+  height: 4.25rem;
+  margin: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--session-modal-accent) !important;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 12px 24px rgba(20, 12, 10, 0.18);
+  font-size: 2.45rem;
+  line-height: 1;
+  animation: none;
+}
+
+.session-modal-header .session-warning-icon {
+  position: relative;
+  width: 4.25rem;
+  height: 4.25rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #111;
+  clip-path: none;
+  animation: none;
+  filter: drop-shadow(0 12px 18px rgba(20, 12, 10, 0.18));
+}
+
+.session-modal-header .session-warning-icon::before,
+.session-modal-header .session-warning-icon::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(50% 4%, 96% 92%, 4% 92%);
+}
+
+.session-modal-header .session-warning-icon::before {
+  background: #000;
+}
+
+.session-modal-header .session-warning-icon::after {
+  inset: 0.2rem;
+  background: #facc15;
+}
+
+.session-modal-header .session-warning-icon span {
+  position: absolute;
+  left: 50%;
+  top: 59%;
+  transform: translate(-50%, -50%);
+  color: #000;
+  font-size: 2.35rem;
+  font-weight: 1000;
+  line-height: 1;
+  z-index: 1;
+}
+
+.session-modal-header h2,
+.session-modal-header h3 {
+  margin: 0 !important;
+  color: var(--session-modal-header-text) !important;
+  -webkit-text-fill-color: currentColor !important;
+  background: none !important;
+  font-size: clamp(1.25rem, 1rem + 1vw, 1.65rem);
+  line-height: 1.22;
+  font-weight: 800;
+}
+
+.session-modal-body p {
+  margin: 0 !important;
+  padding: 0.85rem 0.95rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--session-modal-accent) 18%, var(--border-color) 82%);
+  background: color-mix(in srgb, var(--session-modal-accent-soft) 72%, #fff 28%);
+  color: color-mix(in srgb, var(--heading-color) 82%, var(--session-modal-accent-dark) 18%) !important;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.session-overlay-buttons,
+.warning-actions {
+  margin-top: 0;
+}
+
+.session-overlay-buttons .session-btn-primary,
+.warning-actions .warning-btn.primary,
+.session-warning-overlay .btn-primary,
+.inactivity-warning .btn-primary {
+  background: linear-gradient(135deg, var(--session-modal-accent) 0%, var(--session-modal-accent-dark) 100%) !important;
+  color: #fffaf2 !important;
+  box-shadow: 0 12px 22px color-mix(in srgb, var(--session-modal-accent) 24%, transparent);
+}
+
+/* 2026 Auth And Confirmation Modal Refinement */
+.auth-modal-overlay {
+  background: rgba(35, 20, 17, 0.56);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.auth-modal {
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 88%, #fff 12%);
+  box-shadow: 0 28px 56px rgba(41, 26, 19, 0.24);
+  background: linear-gradient(180deg, var(--card-bg), var(--surface-soft));
+}
+
+.auth-modal-header {
+  background:
+    radial-gradient(circle at top right, rgba(210, 163, 52, 0.22), transparent 26%),
+    linear-gradient(135deg, var(--primary-maroon-dark) 0%, var(--primary-maroon) 58%, color-mix(in srgb, var(--primary-maroon-light) 72%, var(--primary-maroon) 28%) 100%);
+  border-bottom: 1px solid rgba(210, 163, 52, 0.46);
+  padding: 1.02rem 4.05rem 1rem 1.2rem;
+}
+
+.auth-modal-header h3 {
+  font-size: 1.08rem;
+  font-weight: 800;
+}
+
+.auth-modal-body {
+  padding: 1.18rem 1.2rem 1rem;
+}
+
+.auth-modal-body p {
+  color: var(--text-color);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.auth-modal-footer {
+  padding: 0.95rem 1.2rem 1.2rem;
+  gap: 0.65rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(248, 243, 237, 0.96));
+}
+
+.auth-btn {
+  min-height: var(--button-height-md);
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font-weight: 800;
+  font-size: 0.86rem;
+  letter-spacing: 0.01em;
+}
+
+.auth-btn-primary {
+  background: linear-gradient(135deg, var(--primary-gold-light) 0%, var(--primary-gold) 100%);
+  color: var(--primary-maroon-dark);
+  border-color: color-mix(in srgb, var(--primary-gold-dark) 54%, transparent 46%);
+  box-shadow: 0 12px 22px rgba(210, 163, 52, 0.18);
+}
+
+.auth-btn-primary:hover {
+  background: linear-gradient(135deg, #f4d887 0%, color-mix(in srgb, var(--primary-gold) 92%, #fff 8%) 100%);
+  color: var(--primary-maroon-dark);
+}
+
+.auth-btn-danger {
+  background: linear-gradient(135deg, var(--primary-maroon) 0%, var(--primary-maroon-dark) 100%);
+  border-color: color-mix(in srgb, var(--primary-maroon) 70%, transparent 30%);
+  box-shadow: 0 12px 22px rgba(109, 17, 22, 0.18);
+}
+
+.auth-btn-danger:hover {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary-maroon) 94%, #000 6%) 0%, var(--primary-maroon-dark) 100%);
+}
+
+.auth-btn-secondary {
+  background: linear-gradient(180deg, var(--card-bg), var(--surface-soft));
+  color: var(--heading-color);
+  border-color: color-mix(in srgb, var(--border-color) 72%, var(--primary-maroon) 28%);
+}
+
+.auth-btn-secondary:hover {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--card-bg) 92%, var(--surface-soft) 8%), color-mix(in srgb, var(--surface-soft) 90%, var(--surface-muted) 10%));
+  color: var(--heading-color);
+}
+
+.login-success-modal .auth-modal-header,
+.login-info-modal .auth-modal-header {
+  background:
+    radial-gradient(circle at top right, rgba(210, 163, 52, 0.2), transparent 24%),
+    linear-gradient(135deg, var(--primary-maroon-dark) 0%, var(--primary-maroon) 58%, color-mix(in srgb, var(--primary-maroon-light) 72%, var(--primary-maroon) 28%) 100%);
+}
+
+.login-error-modal .auth-modal-header {
+  background:
+    radial-gradient(circle at top right, rgba(225, 109, 98, 0.18), transparent 24%),
+    linear-gradient(135deg, color-mix(in srgb, var(--error-color) 82%, var(--primary-maroon) 18%) 0%, var(--primary-maroon-dark) 100%);
+}
+
+@media (max-width: 768px) {
+  .auth-modal {
+    border-radius: 18px;
+  }
+
+  .auth-modal-header {
+    padding: 0.95rem 3.9rem 0.92rem 1rem;
+  }
+
+  .auth-modal-body {
+    padding: 1rem 1rem 0.92rem;
+  }
+
+  .auth-modal-footer {
+    padding: 0.88rem 1rem 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .session-modal-header {
+    padding: 1.15rem 1rem 1rem;
+  }
+
+  .session-modal-body {
+    padding: 1rem;
+  }
+
+  .session-modal-header .session-icon,
+  .session-modal-header .warning-icon {
+    width: 3.45rem;
+    height: 3.45rem;
+    font-size: 2rem;
+  }
+
+  .session-modal-header .session-warning-icon span {
+    font-size: 1.9rem;
+  }
+}
+

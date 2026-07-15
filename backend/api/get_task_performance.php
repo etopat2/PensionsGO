@@ -1,12 +1,16 @@
 <?php
 header('Content-Type: application/json');
+$workflowPerformanceOutputLevel = ob_get_level();
+ob_start();
 require_once __DIR__ . '/../config.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+try {
 if (!isset($_SESSION['userId'])) {
+    ob_clean();
     echo json_encode(['success' => false, 'message' => 'Authentication required']);
     exit;
 }
@@ -14,6 +18,7 @@ if (!isset($_SESSION['userId'])) {
 $role = $_SESSION['userRole'] ?? '';
 $normalizedRole = normalizeWorkflowRoleKey($role);
 if (!in_array($normalizedRole, ['super_admin', 'admin', 'oc_pen'], true)) {
+    ob_clean();
     echo json_encode(['success' => false, 'message' => 'Access denied']);
     exit;
 }
@@ -248,6 +253,7 @@ if (!empty($roles)) {
     }
 }
 
+ob_clean();
 echo json_encode([
     'success' => true,
     'summary' => $summary,
@@ -256,6 +262,19 @@ echo json_encode([
     'process_summary' => $processSummary,
     'process_trends' => $processTrends
 ]);
+} catch (Throwable $error) {
+    error_log('Workflow performance API error: ' . $error->getMessage());
+    if (ob_get_level() > $workflowPerformanceOutputLevel) {
+        ob_clean();
+    }
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Unable to load workflow performance metrics.'
+    ]);
+}
 
-$conn->close();
+if (isset($conn) && $conn instanceof mysqli) {
+    $conn->close();
+}
 ?>

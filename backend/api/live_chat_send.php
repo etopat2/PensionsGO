@@ -1,54 +1,11 @@
 <?php
 require_once __DIR__ . '/live_chat_common.php';
-require_once __DIR__ . '/../runtime_admin_tools.php';
-
-function liveChatStoreUpload(mysqli $conn, array $file, string $prefix): array
-{
-    $uploadDir = realpath(__DIR__ . '/../uploads') ?: (__DIR__ . '/../uploads');
-    $chatDir = $uploadDir . DIRECTORY_SEPARATOR . 'live_chat';
-    ensureUploadDirectoryGuard($chatDir);
-
-    $allowedExtensions = $prefix === 'voice'
-        ? ['mp3', 'wav', 'ogg', 'm4a', 'webm']
-        : ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'mp3', 'wav', 'ogg', 'm4a', 'webm', 'mp4', 'mov'];
-    $allowedMimes = $prefix === 'voice'
-        ? ['audio/', 'video/webm', 'application/ogg']
-        : ['image/', 'audio/', 'video/', 'application/pdf', 'application/msword', 'application/vnd.', 'text/plain', 'text/csv'];
-    $validated = assertUploadedFileIsSafe($conn, $file, $allowedExtensions, $allowedMimes, ucfirst($prefix) . ' upload');
-
-    $scanResult = runVirusScanOnFile($conn, (string)$validated['tmp_name'], [
-        'storage_context' => 'live_chat_' . $prefix,
-        'file_name' => (string)$validated['original_name'],
-        'file_path' => null,
-        'mime_type' => (string)$validated['mime_type'],
-        'scanned_by' => $_SESSION['userId'] ?? null,
-        'scanned_by_name' => $_SESSION['userName'] ?? null,
-        'scanned_by_role' => $_SESSION['userRole'] ?? null
-    ]);
-    if (($scanResult['enabled'] ?? true) && in_array(($scanResult['status'] ?? ''), ['infected', 'suspicious', 'error'], true)) {
-        $reason = trim((string)($scanResult['findings'] ?? 'Attachment failed the configured virus scan.'));
-        throw new RuntimeException($reason !== '' ? $reason : 'Attachment failed the configured virus scan.');
-    }
-
-    $safe = sanitizeUploadedFileName((string)$validated['original_name'], 'upload.' . (string)$validated['extension']);
-    $stored = $prefix . '_' . time() . '_' . bin2hex(random_bytes(8)) . '_' . $safe;
-    $target = $chatDir . DIRECTORY_SEPARATOR . $stored;
-    if (!move_uploaded_file((string)$validated['tmp_name'], $target)) {
-        throw new RuntimeException('Unable to store uploaded file.');
-    }
-
-    return [
-        'file_name' => (string)$validated['original_name'],
-        'file_path' => 'uploads/live_chat/' . $stored,
-        'file_size' => filesize($target) ?: (int)$validated['file_size'],
-        'mime_type' => (string)$validated['mime_type']
-    ];
-}
 
 try {
     $userId = liveChatRequireStaff($conn);
     liveChatEnsureTables($conn);
     liveChatTouchPresence($conn, $userId);
+    liveChatReleaseSessionLock();
 
     $recipientId = trim((string)($_POST['recipient_id'] ?? ''));
     $recipientType = trim((string)($_POST['recipient_type'] ?? 'user'));
@@ -135,7 +92,7 @@ try {
             SELECT m.message_text, m.file_name, u.userName
             FROM tb_live_chat_messages m
             LEFT JOIN tb_users u ON u.userId = m.sender_id
-            WHERE m.id = ?
+            WHERE m.chat_message_id = ?
             LIMIT 1
         ");
         if ($replyStmt) {

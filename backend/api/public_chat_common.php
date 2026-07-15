@@ -5,12 +5,28 @@ ini_set('display_errors', '0');
 error_reporting(E_ALL);
 
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/chat_shared_common.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
+$publicChatScriptName = basename((string)($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'] ?? ''));
+$publicChatReadAndCloseSession = in_array($publicChatScriptName, [
+    'public_chat_agent.php',
+    'public_chat_poll.php',
+    'public_chat_send.php',
+    'public_chat_typing.php',
+    'public_chat_upload.php',
+    'public_chat_feedback.php',
+    'public_chat_end.php'
+], true);
+
 if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+    if ($publicChatReadAndCloseSession) {
+        session_start(['read_and_close' => true]);
+    } else {
+        session_start();
+    }
 }
 
 const PUBLIC_CHAT_CATEGORIES = [
@@ -28,33 +44,21 @@ const PUBLIC_CHAT_CATEGORIES = [
     'Technical support'
 ];
 
+const PUBLIC_CHAT_SCHEMA_VERSION = '20260714c';
+
 function publicChatJson(array $payload, int $status = 200): void
 {
-    http_response_code($status);
-    echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-    exit;
+    chatSharedJson($payload, $status);
 }
 
 function publicChatClean(?string $value, int $max = 255): string
 {
-    $value = trim((string)$value);
-    $value = preg_replace('/\s+/', ' ', $value) ?? '';
-    if (function_exists('mb_substr')) {
-        return mb_substr($value, 0, $max);
-    }
-    return substr($value, 0, $max);
+    return chatSharedClean($value, $max);
 }
 
 function publicChatCleanMessage(?string $value, int $max = 2000): string
 {
-    $value = trim((string)$value);
-    $value = preg_replace("/\r\n?/", "\n", $value) ?? '';
-    $value = preg_replace("/[ \t]+/", ' ', $value) ?? '';
-    $value = preg_replace("/\n{4,}/", "\n\n\n", $value) ?? '';
-    if (function_exists('mb_substr')) {
-        return mb_substr($value, 0, $max);
-    }
-    return substr($value, 0, $max);
+    return chatSharedCleanMessage($value, $max);
 }
 
 function publicChatClientIp(): string
@@ -119,10 +123,40 @@ function publicChatTypingRows(mysqli $conn, int $sessionId, string $peerType): a
     ], $rows);
 }
 
+function publicChatSchemaReady(mysqli $conn): bool
+{
+    $version = $conn->real_escape_string(PUBLIC_CHAT_SCHEMA_VERSION);
+    $result = $conn->query("SELECT setting_value FROM tb_app_settings WHERE setting_key = 'public_chat_schema_version' LIMIT 1");
+    if (!$result) {
+        return false;
+    }
+    $row = $result->fetch_assoc();
+    $result->close();
+    return hash_equals($version, (string)($row['setting_value'] ?? ''));
+}
+
+function publicChatMarkSchemaReady(mysqli $conn): void
+{
+    if (function_exists('setAppSetting')) {
+        setAppSetting($conn, 'public_chat_schema_version', PUBLIC_CHAT_SCHEMA_VERSION);
+        return;
+    }
+    $version = $conn->real_escape_string(PUBLIC_CHAT_SCHEMA_VERSION);
+    $conn->query("
+        INSERT INTO tb_app_settings (setting_key, setting_value)
+        VALUES ('public_chat_schema_version', '{$version}')
+        ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = NOW()
+    ");
+}
+
 function publicChatEnsureTables(mysqli $conn): void
 {
     static $ready = false;
     if ($ready) {
+        return;
+    }
+    if (publicChatSchemaReady($conn)) {
+        $ready = true;
         return;
     }
 
@@ -156,15 +190,36 @@ function publicChatEnsureTables(mysqli $conn): void
         'public_chat_consent_text' => 'I consent to UPS PensionsGo using these details to respond to this support request.',
         'public_chat_working_hours' => '08:00-17:00',
         'public_chat_max_active_chats_per_agent' => '5',
-        'public_chat_allowed_attachment_types' => 'pdf,jpg,jpeg,png,doc,docx',
+        'public_chat_allowed_attachment_types' => 'pdf,doc,docx,xls,xlsx,csv,txt,jpg,jpeg,png,gif,webp,mp3,wav,ogg,m4a,webm,mp4,mov',
         'public_chat_max_attachment_size_mb' => '5',
         'public_chat_transcript_enabled' => '1',
         'public_chat_feedback_enabled' => '1',
         'public_chat_rate_limit_start_per_10min' => '5',
         'public_chat_rate_limit_messages_per_5min' => '20',
         'public_chat_max_message_length' => '2000',
-        'public_chat_poll_interval_ms' => '2500'
+        'public_chat_poll_interval_ms' => '1000',
+        'public_chat_voice_scan_enabled' => '0'
     ];
+    if (function_exists('ensureAppSettingsTable')) {
+        ensureAppSettingsTable($conn);
+    }
+    $expandedAttachmentTypes = $defaults['public_chat_allowed_attachment_types'];
+    $attachmentDefaultStmt = $conn->prepare("
+        UPDATE tb_app_settings
+        SET setting_value = ?, updated_at = NOW()
+        WHERE setting_key = 'public_chat_allowed_attachment_types'
+          AND setting_value IN ('pdf,jpg,jpeg,png,doc,docx', 'pdf,doc,docx,jpg,jpeg,png')
+    ");
+    if ($attachmentDefaultStmt) {
+        $attachmentDefaultStmt->bind_param('s', $expandedAttachmentTypes);
+        $attachmentDefaultStmt->execute();
+        $attachmentDefaultStmt->close();
+    }
+    $pollDefaultStmt = $conn->prepare("UPDATE tb_app_settings SET setting_value = '1000', updated_at = NOW() WHERE setting_key = 'public_chat_poll_interval_ms' AND setting_value IN ('150', '250', '350', '900')");
+    if ($pollDefaultStmt) {
+        $pollDefaultStmt->execute();
+        $pollDefaultStmt->close();
+    }
     foreach ($defaults as $key => $value) {
         if (getAppSetting($conn, $key) === null) {
             setAppSetting($conn, $key, $value);
@@ -238,58 +293,27 @@ function publicChatEnsureTables(mysqli $conn): void
     ");
     publicChatAddIndexIfMissing($conn, 'public_chat_messages', 'idx_public_chat_messages_delivery', 'session_id, sender_type, delivered_at, message_id');
     publicChatAddIndexIfMissing($conn, 'public_chat_messages', 'idx_public_chat_messages_read', 'session_id, sender_type, is_read, message_id');
+    publicChatAddIndexIfMissing($conn, 'public_chat_messages', 'idx_public_chat_messages_session_id', 'session_id, message_id, deleted_at');
+    publicChatAddIndexIfMissing($conn, 'public_chat_sessions', 'idx_public_chat_live_status', 'status, closed_at, assigned_agent_id, created_at');
+    publicChatAddIndexIfMissing($conn, 'public_chat_agents', 'idx_public_chat_agent_live', 'is_enabled, can_handle_public_chat, availability_status, last_seen_at');
+    publicChatMarkSchemaReady($conn);
 
     $ready = true;
 }
 
 function publicChatAddColumnIfMissing(mysqli $conn, string $table, string $column, string $definition): void
 {
-    $table = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
-    $column = preg_replace('/[^a-zA-Z0-9_]/', '', $column);
-    if ($table === '' || $column === '') {
-        return;
-    }
-    $result = $conn->query("SHOW COLUMNS FROM `{$table}` LIKE '{$column}'");
-    if ($result && $result->num_rows > 0) {
-        return;
-    }
-    $conn->query("ALTER TABLE `{$table}` ADD COLUMN {$definition}");
+    chatSharedAddColumnIfMissing($conn, $table, $column, $definition);
 }
 
 function publicChatAddIndexIfMissing(mysqli $conn, string $table, string $index, string $columns): void
 {
-    $table = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
-    $index = preg_replace('/[^a-zA-Z0-9_]/', '', $index);
-    if ($table === '' || $index === '') {
-        return;
-    }
-    $stmt = $conn->prepare("
-        SELECT COUNT(*) AS total
-        FROM information_schema.STATISTICS
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = ?
-          AND INDEX_NAME = ?
-    ");
-    if (!$stmt) {
-        return;
-    }
-    $stmt->bind_param('ss', $table, $index);
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-    if ((int)($row['total'] ?? 0) === 0) {
-        $conn->query("ALTER TABLE `{$table}` ADD INDEX `{$index}` ({$columns})");
-    }
+    chatSharedAddIndexIfMissing($conn, $table, $index, $columns);
 }
 
 function publicChatJsonInput(): array
 {
-    $raw = file_get_contents('php://input');
-    if (!$raw) {
-        return [];
-    }
-    $data = json_decode($raw, true);
-    return is_array($data) ? $data : [];
+    return chatSharedJsonInput();
 }
 
 function publicChatLoadSession(mysqli $conn, int $sessionId): array
@@ -311,13 +335,16 @@ function publicChatLoadSession(mysqli $conn, int $sessionId): array
     return $session;
 }
 
-function publicChatResolveActor(mysqli $conn, int $sessionId, string $token, bool $asAgent, bool $allowUnassignedAgent = false): array
+function publicChatResolveActor(mysqli $conn, int $sessionId, string $token, bool $asAgent, bool $allowUnassignedAgent = false, bool $allowLinkedRecordAccess = false): array
 {
     if ($asAgent) {
         $agentId = publicChatRequireAgent($conn);
         $agentProfile = publicChatAgentProfile($conn, $agentId);
         $session = publicChatLoadSession($conn, $sessionId);
-        publicChatRequireAgentSessionAccess($session, $agentId, $agentProfile, $allowUnassignedAgent, 'You are not permitted to access this public chat.');
+        if (!publicChatAgentCanAccessSession($session, $agentId, $agentProfile, $allowUnassignedAgent)
+            && (!$allowLinkedRecordAccess || !publicChatAgentHasLinkedRecordAccess($conn, $sessionId, $agentId))) {
+            publicChatJson(['success' => false, 'message' => 'You are not permitted to access this public chat.'], 403);
+        }
         return [
             'session' => $session,
             'profile' => $agentProfile,
@@ -424,6 +451,36 @@ function publicChatMarkSeen(mysqli $conn, int $sessionId, string $viewerType): v
     }
 }
 
+function publicChatReceiptRows(mysqli $conn, int $sessionId, string $viewerType): array
+{
+    $senderType = $viewerType === 'agent' ? 'agent' : 'visitor';
+    $stmt = $conn->prepare("
+        SELECT message_id, delivered_at, is_read, read_at
+        FROM public_chat_messages
+        WHERE session_id = ?
+          AND sender_type = ?
+          AND is_internal = 0
+          AND deleted_at IS NULL
+        ORDER BY message_id DESC
+        LIMIT 150
+    ");
+    if (!$stmt) {
+        return [];
+    }
+    $stmt->bind_param('is', $sessionId, $senderType);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return array_map(static fn($row) => [
+        'id' => (int)($row['message_id'] ?? 0),
+        'message_id' => (int)($row['message_id'] ?? 0),
+        'delivered_at' => $row['delivered_at'] ?? null,
+        'is_read' => (int)($row['is_read'] ?? 0) === 1,
+        'read_at' => $row['read_at'] ?? null,
+        'receiptStatus' => !empty($row['read_at']) ? 'read' : (!empty($row['delivered_at']) ? 'delivered' : 'sent')
+    ], $rows);
+}
+
 function publicChatSettingBool(mysqli $conn, string $key, bool $default = true): bool
 {
     publicChatEnsureTables($conn);
@@ -439,27 +496,80 @@ function publicChatSettingInt(mysqli $conn, string $key, int $default, int $min,
 function publicChatSettings(mysqli $conn): array
 {
     publicChatEnsureTables($conn);
+    $defaults = [
+        'public_chat_enabled' => '1',
+        'public_chat_public_pages_enabled' => '1',
+        'public_chat_home_enabled' => '1',
+        'public_chat_about_enabled' => '1',
+        'public_chat_faq_enabled' => '1',
+        'public_chat_podcast_enabled' => '1',
+        'public_chat_feedback_page_enabled' => '1',
+        'public_chat_terms_enabled' => '1',
+        'public_chat_pensioner_portal_enabled' => '1',
+        'public_chat_attachments_enabled' => '0',
+        'public_chat_poll_interval_ms' => '1000',
+        'public_chat_max_message_length' => '2000',
+        'public_chat_offline_message' => 'Public live support is currently unavailable. Please leave a message and the pensions team will follow up.',
+        'public_chat_welcome_text' => 'Welcome to UPS PensionsGo public support. How can we help?',
+        'public_chat_consent_text' => 'I consent to UPS PensionsGo using these details to respond to this support request.',
+        'public_chat_working_hours' => '08:00-17:00',
+        'public_chat_feedback_enabled' => '1',
+        'public_chat_transcript_enabled' => '1',
+        'public_chat_allowed_attachment_types' => 'pdf,doc,docx,xls,xlsx,csv,txt,jpg,jpeg,png,gif,webp,mp3,wav,ogg,m4a,webm,mp4,mov',
+        'public_chat_max_attachment_size_mb' => '5'
+    ];
+    $values = $defaults;
+    $keys = array_keys($defaults);
+    $placeholders = implode(',', array_fill(0, count($keys), '?'));
+    $stmt = $conn->prepare("SELECT setting_key, setting_value FROM tb_app_settings WHERE setting_key IN ($placeholders)");
+    if ($stmt) {
+        $types = str_repeat('s', count($keys));
+        $refs = [$types];
+        foreach ($keys as $i => $key) {
+            $refs[] = &$keys[$i];
+        }
+        call_user_func_array([$stmt, 'bind_param'], $refs);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($result && ($row = $result->fetch_assoc())) {
+            $key = (string)($row['setting_key'] ?? '');
+            if (array_key_exists($key, $values)) {
+                $values[$key] = (string)($row['setting_value'] ?? '');
+            }
+        }
+        $stmt->close();
+    }
+    $bool = static function (string $key, bool $default) use ($values): bool {
+        $raw = $values[$key] ?? ($default ? '1' : '0');
+        $flag = filter_var($raw, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        return $flag === null ? $raw === '1' : (bool)$flag;
+    };
+    $int = static function (string $key, int $default, int $min, int $max) use ($values): int {
+        $raw = $values[$key] ?? (string)$default;
+        $value = is_numeric($raw) ? (int)$raw : $default;
+        return max($min, min($max, $value));
+    };
     return [
-        'enabled' => publicChatSettingBool($conn, 'public_chat_enabled', true),
-        'publicPagesEnabled' => publicChatSettingBool($conn, 'public_chat_public_pages_enabled', true),
-        'homeEnabled' => publicChatSettingBool($conn, 'public_chat_home_enabled', true),
-        'aboutEnabled' => publicChatSettingBool($conn, 'public_chat_about_enabled', true),
-        'faqEnabled' => publicChatSettingBool($conn, 'public_chat_faq_enabled', true),
-        'podcastEnabled' => publicChatSettingBool($conn, 'public_chat_podcast_enabled', true),
-        'feedbackPageEnabled' => publicChatSettingBool($conn, 'public_chat_feedback_page_enabled', true),
-        'termsEnabled' => publicChatSettingBool($conn, 'public_chat_terms_enabled', true),
-        'pensionerPortalEnabled' => publicChatSettingBool($conn, 'public_chat_pensioner_portal_enabled', true),
-        'attachmentsEnabled' => publicChatSettingBool($conn, 'public_chat_attachments_enabled', false),
-        'pollIntervalMs' => publicChatSettingInt($conn, 'public_chat_poll_interval_ms', 2500, 800, 15000),
-        'maxMessageLength' => publicChatSettingInt($conn, 'public_chat_max_message_length', 2000, 250, 5000),
-        'offlineMessage' => getAppSettingString($conn, 'public_chat_offline_message', 'Public live support is currently unavailable. Please leave a message and the pensions team will follow up.'),
-        'welcomeText' => getAppSettingString($conn, 'public_chat_welcome_text', 'Welcome to UPS PensionsGo public support. How can we help?'),
-        'consentText' => getAppSettingString($conn, 'public_chat_consent_text', 'I consent to UPS PensionsGo using these details to respond to this support request.'),
-        'workingHours' => getAppSettingString($conn, 'public_chat_working_hours', '08:00-17:00'),
-        'feedbackEnabled' => publicChatSettingBool($conn, 'public_chat_feedback_enabled', true),
-        'transcriptEnabled' => publicChatSettingBool($conn, 'public_chat_transcript_enabled', true),
-        'allowedAttachmentTypes' => getAppSettingString($conn, 'public_chat_allowed_attachment_types', 'pdf,jpg,jpeg,png,doc,docx'),
-        'maxAttachmentSizeMb' => publicChatSettingInt($conn, 'public_chat_max_attachment_size_mb', 5, 1, 25),
+        'enabled' => $bool('public_chat_enabled', true),
+        'publicPagesEnabled' => $bool('public_chat_public_pages_enabled', true),
+        'homeEnabled' => $bool('public_chat_home_enabled', true),
+        'aboutEnabled' => $bool('public_chat_about_enabled', true),
+        'faqEnabled' => $bool('public_chat_faq_enabled', true),
+        'podcastEnabled' => $bool('public_chat_podcast_enabled', true),
+        'feedbackPageEnabled' => $bool('public_chat_feedback_page_enabled', true),
+        'termsEnabled' => $bool('public_chat_terms_enabled', true),
+        'pensionerPortalEnabled' => $bool('public_chat_pensioner_portal_enabled', true),
+        'attachmentsEnabled' => $bool('public_chat_attachments_enabled', false),
+        'pollIntervalMs' => $int('public_chat_poll_interval_ms', 1000, 1000, 5000),
+        'maxMessageLength' => $int('public_chat_max_message_length', 2000, 250, 5000),
+        'offlineMessage' => $values['public_chat_offline_message'],
+        'welcomeText' => $values['public_chat_welcome_text'],
+        'consentText' => $values['public_chat_consent_text'],
+        'workingHours' => $values['public_chat_working_hours'],
+        'feedbackEnabled' => $bool('public_chat_feedback_enabled', true),
+        'transcriptEnabled' => $bool('public_chat_transcript_enabled', true),
+        'allowedAttachmentTypes' => $values['public_chat_allowed_attachment_types'],
+        'maxAttachmentSizeMb' => $int('public_chat_max_attachment_size_mb', 5, 1, 25),
         'categories' => PUBLIC_CHAT_CATEGORIES
     ];
 }
@@ -470,6 +580,13 @@ function publicChatCsrfToken(): string
         $_SESSION['public_chat_csrf_token'] = bin2hex(random_bytes(24));
     }
     return (string)$_SESSION['public_chat_csrf_token'];
+}
+
+function publicChatReleaseSessionLock(): void
+{
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        @session_write_close();
+    }
 }
 
 function publicChatRequireCsrf(?string $token): void
@@ -630,9 +747,9 @@ function publicChatRequireCapability(mysqli $conn, string $capability, string $m
     }
 }
 
-function publicChatAvailability(mysqli $conn): array
+function publicChatAvailability(mysqli $conn, ?array $settings = null): array
 {
-    $settings = publicChatSettings($conn);
+    $settings = $settings ?? publicChatSettings($conn);
     $availableAgents = $settings['enabled'] ? publicChatAvailableAgents($conn) : 0;
     $payload = [
         'enabled' => (bool)$settings['enabled'],
@@ -654,46 +771,85 @@ function publicChatAvailability(mysqli $conn): array
 
 function publicChatAttachmentIsPreviewable(string $mime, string $fileName): bool
 {
-    $mime = strtolower(trim($mime));
-    $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-    if (str_starts_with($mime, 'image/') || str_starts_with($mime, 'audio/') || str_starts_with($mime, 'video/')) {
-        return true;
-    }
-    if (in_array($mime, ['application/pdf', 'text/plain', 'text/csv'], true)) {
-        return true;
-    }
-    return in_array($ext, ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'txt', 'csv', 'docx', 'mp3', 'wav', 'ogg', 'webm', 'm4a'], true);
+    return chatSharedAttachmentIsPreviewable($mime, $fileName);
 }
 
 function publicChatPlaybackMime(string $mime, string $fileName): string
 {
-    $mime = strtolower(trim($mime));
-    $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-    if ($ext === 'docx' && ($mime === '' || $mime === 'application/octet-stream' || $mime === 'application/zip')) {
-        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    return chatSharedPlaybackMime($mime, $fileName);
+}
+
+function publicChatStoreUpload(mysqli $conn, array $file, string $kind, int $sessionId, string $senderType, ?string $senderId, string $senderName): array
+{
+    $isVoice = $kind === 'voice';
+    $staffAttachmentAllowed = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'mp3', 'wav', 'ogg', 'm4a', 'webm', 'mp4', 'mov'];
+    $allowedRaw = getAppSettingString($conn, 'public_chat_allowed_attachment_types', implode(',', $staffAttachmentAllowed));
+    $allowed = array_values(array_unique(array_merge(
+        array_filter(array_map(static fn($item) => strtolower(trim($item)), explode(',', $allowedRaw))),
+        $staffAttachmentAllowed
+    )));
+    $voiceAllowed = ['webm', 'ogg', 'mp3', 'wav', 'm4a', 'mp4'];
+    if ($isVoice) {
+        $allowed = array_values(array_unique(array_merge($allowed, $voiceAllowed)));
     }
-    if ($ext === 'doc' && ($mime === '' || $mime === 'application/octet-stream')) {
-        return 'application/msword';
-    }
-    if ($ext === 'webm' && ($mime === '' || str_starts_with($mime, 'audio/') || str_starts_with($mime, 'video/') || $mime === 'application/octet-stream')) {
-        return 'audio/webm';
-    }
-    if ($ext === 'ogg' && ($mime === '' || $mime === 'application/octet-stream')) {
-        return 'audio/ogg';
-    }
-    if ($ext === 'mp3' && ($mime === '' || $mime === 'application/octet-stream')) {
-        return 'audio/mpeg';
-    }
-    if ($ext === 'm4a' && ($mime === '' || $mime === 'application/octet-stream' || $mime === 'audio/x-m4a' || $mime === 'video/mp4')) {
-        return 'audio/mp4';
-    }
-    if ($ext === 'mp4' && ($mime === '' || $mime === 'application/octet-stream')) {
-        return 'audio/mp4';
-    }
-    if ($ext === 'wav' && ($mime === '' || $mime === 'application/octet-stream')) {
-        return 'audio/wav';
-    }
-    return $mime ?: 'application/octet-stream';
+
+    $allowedMimes = $isVoice
+        ? ['audio/', 'video/', 'application/ogg', 'application/octet-stream']
+        : ['image/', 'audio/', 'video/', 'application/ogg', 'application/pdf', 'application/msword', 'application/vnd.', 'application/zip', 'text/plain', 'text/csv', 'application/octet-stream'];
+    $maxMb = publicChatSettingInt($conn, 'public_chat_max_attachment_size_mb', 5, 1, 25);
+
+    $upload = chatSharedStoreUpload($conn, $file, [
+        'storage_dir' => 'public_chat',
+        'prefix' => ($isVoice ? 'public_chat_voice_' : 'public_chat_') . $sessionId,
+        'allowed_extensions' => $allowed,
+        'allowed_mimes' => $allowedMimes,
+        'label' => $isVoice ? 'Voice note' : 'Attachment',
+        'storage_context' => 'public_chat_' . ($isVoice ? 'voice' : 'attachment'),
+        'max_bytes' => $maxMb * 1024 * 1024,
+        'max_bytes_message' => 'Attachment must be ' . $maxMb . ' MB or smaller.',
+        'scan_setting_key' => $isVoice ? 'public_chat_voice_scan_enabled' : 'attachment_scan_enabled',
+        'scanned_by' => $senderId,
+        'scanned_by_name' => $senderName,
+        'scanned_by_role' => $senderType,
+        'content_validator' => static function (array $validated) use ($isVoice): void {
+            $extension = strtolower((string)($validated['extension'] ?? ''));
+            $tmpPath = (string)($validated['tmp_name'] ?? '');
+            $lowerMime = strtolower((string)($validated['mime_type'] ?? 'application/octet-stream'));
+
+            if ($extension === 'docx') {
+                if (!class_exists('ZipArchive')) {
+                    throw new RuntimeException('DOCX preview support is not enabled on this server.');
+                }
+                $zip = new ZipArchive();
+                $opened = $zip->open($tmpPath);
+                if ($opened !== true || $zip->locateName('word/document.xml') === false || $zip->locateName('[Content_Types].xml') === false) {
+                    if ($opened === true) {
+                        $zip->close();
+                    }
+                    throw new RuntimeException('DOCX file is not a valid Word document.');
+                }
+                $zip->close();
+            } elseif ($extension === 'doc') {
+                $handle = fopen($tmpPath, 'rb');
+                $signature = $handle ? fread($handle, 8) : '';
+                if ($handle) {
+                    fclose($handle);
+                }
+                if ($signature !== "\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1") {
+                    throw new RuntimeException('DOC file is not a valid Word document.');
+                }
+            } elseif (!$isVoice && in_array($extension, ['jpg', 'jpeg', 'png'], true) && !str_starts_with($lowerMime, 'image/')) {
+                throw new RuntimeException('Image attachment content is not valid.');
+            } elseif (!$isVoice && $extension === 'pdf' && $lowerMime !== 'application/pdf') {
+                throw new RuntimeException('PDF attachment content is not valid.');
+            } elseif ($isVoice && !str_starts_with($lowerMime, 'audio/') && !str_starts_with($lowerMime, 'video/') && $lowerMime !== 'application/octet-stream') {
+                throw new RuntimeException('Voice note content is not valid.');
+            }
+        }
+    ]);
+
+    $upload['mime_type'] = publicChatPlaybackMime((string)($upload['mime_type'] ?? ''), (string)($upload['file_name'] ?? ''));
+    return $upload;
 }
 
 function publicChatMediaTokenSecret(): string
@@ -823,7 +979,7 @@ function publicChatAttachMessageFiles(mysqli $conn, array $messages, bool $asAge
             'mime_type' => $mime,
             'uploaded_by_type' => (string)($row['uploaded_by_type'] ?? ''),
             'created_at' => (string)($row['created_at'] ?? ''),
-            'is_voice' => str_starts_with(strtolower($mime), 'audio/') || str_starts_with(strtolower($mime), 'video/') || in_array(strtolower(pathinfo($fileName, PATHINFO_EXTENSION)), ['webm', 'ogg', 'mp3', 'wav', 'm4a'], true),
+            'is_voice' => str_starts_with(strtolower($mime), 'audio/') || in_array(strtolower(pathinfo($fileName, PATHINFO_EXTENSION)), ['webm', 'ogg', 'mp3', 'wav', 'm4a'], true),
             'previewable' => publicChatAttachmentIsPreviewable($mime, $fileName),
             'view_url' => $viewUrl,
             'preview_url' => $previewUrl,
@@ -832,6 +988,12 @@ function publicChatAttachMessageFiles(mysqli $conn, array $messages, bool $asAge
     }
     foreach ($messages as &$message) {
         $message['attachments'] = $byMessage[(int)($message['message_id'] ?? 0)] ?? [];
+        if (($message['message_kind'] ?? 'text') === 'voice') {
+            foreach ($message['attachments'] as &$attachment) {
+                $attachment['is_voice'] = true;
+            }
+            unset($attachment);
+        }
         if (!empty($message['attachments']) && (($message['message_kind'] ?? 'text') === 'text')) {
             $message['message_kind'] = !empty($message['attachments'][0]['is_voice']) ? 'voice' : 'attachment';
         }
@@ -905,7 +1067,49 @@ function publicChatAgentCanAccessSession(array $session, string $agentId, array 
     if (!$allowUnassigned) {
         return false;
     }
-    return in_array((string)($session['status'] ?? ''), ['waiting', 'active', 'assigned'], true);
+    $status = (string)($session['status'] ?? '');
+    if (in_array($status, ['waiting', 'active', 'assigned'], true)) {
+        return true;
+    }
+    return $status === 'closed' && stripos((string)($session['close_reason'] ?? ''), 'Offline message') === 0;
+}
+
+function publicChatAgentHasLinkedRecordAccess(mysqli $conn, int $sessionId, string $agentId): bool
+{
+    if ($sessionId <= 0 || $agentId === '') {
+        return false;
+    }
+    $ticketStmt = $conn->prepare("
+        SELECT 1
+        FROM public_chat_tickets
+        WHERE session_id = ?
+          AND (created_by = ? OR assigned_to = ?)
+        LIMIT 1
+    ");
+    if ($ticketStmt) {
+        $ticketStmt->bind_param('iss', $sessionId, $agentId, $agentId);
+        $ticketStmt->execute();
+        $hasTicket = (bool)$ticketStmt->get_result()->fetch_assoc();
+        $ticketStmt->close();
+        if ($hasTicket) {
+            return true;
+        }
+    }
+    $escalationStmt = $conn->prepare("
+        SELECT 1
+        FROM public_chat_escalations
+        WHERE session_id = ?
+          AND (escalated_by = ? OR escalated_to = ?)
+        LIMIT 1
+    ");
+    if (!$escalationStmt) {
+        return false;
+    }
+    $escalationStmt->bind_param('iss', $sessionId, $agentId, $agentId);
+    $escalationStmt->execute();
+    $hasEscalation = (bool)$escalationStmt->get_result()->fetch_assoc();
+    $escalationStmt->close();
+    return $hasEscalation;
 }
 
 function publicChatRequireAgentSessionAccess(array $session, string $agentId, array $agentProfile, bool $allowUnassigned = false, string $message = 'This chat is assigned to another handler.'): void

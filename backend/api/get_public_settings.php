@@ -9,6 +9,9 @@ header('Content-Type: application/json; charset=UTF-8');
 try {
     require_once __DIR__ . '/../config.php';
     require_once __DIR__ . '/../notification_sound_library.php';
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        @session_write_close();
+    }
 
     $defaults = [
         'app_name' => 'PensionsGo',

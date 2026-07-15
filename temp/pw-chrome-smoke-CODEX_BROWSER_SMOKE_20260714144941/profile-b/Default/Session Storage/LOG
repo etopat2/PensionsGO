@@ -1,0 +1,11 @@
+2026/07/14-14:49:46.610 947c Creating DB C:\xampp\htdocs\PROJECTS\PensionApp\temp\pw-chrome-smoke-CODEX_BROWSER_SMOKE_20260714144941\profile-b\Default\Session Storage since it was missing.
+2026/07/14-14:49:46.661 947c Reusing MANIFEST C:\xampp\htdocs\PROJECTS\PensionApp\temp\pw-chrome-smoke-CODEX_BROWSER_SMOKE_20260714144941\profile-b\Default\Session Storage/MANIFEST-000001
+2026/07/14-14:51:52.243 5cbc Level-0 table #5: started
+2026/07/14-14:51:52.626 5cbc Level-0 table #5: 12709 bytes OK
+2026/07/14-14:51:52.744 5cbc Delete type=0 #3
+2026/07/14-14:53:23.881 5cbc Level-0 table #7: started
+2026/07/14-14:53:23.937 5cbc Level-0 table #7: 12030 bytes OK
+2026/07/14-14:53:24.118 5cbc Delete type=0 #4
+2026/07/14-14:53:59.865 5cbc Level-0 table #9: started
+2026/07/14-14:53:59.880 5cbc Level-0 table #9: 12194 bytes OK
+2026/07/14-14:53:59.888 5cbc Delete type=0 #6

@@ -96,10 +96,15 @@ try {
     $identifierRaw = isset($_POST['email']) ? trim($_POST['email']) : '';
     $password = isset($_POST['password']) ? trim($_POST['password']) : '';
 
-    if (empty($identifierRaw) || empty($password)) {
-        throw new Exception('Missing credentials. Please provide both email/phone and password.', 400);
+    if (empty($identifierRaw) && empty($password)) {
+        throw new Exception('Missing credentials. Please enter your email/phone number and password.', 400);
     }
-
+    if (empty($identifierRaw)) {
+        throw new Exception('Missing email or phone number. Please enter your registered email or phone number.', 400);
+    }
+    if (empty($password)) {
+        throw new Exception('Missing password. Please enter your password.', 400);
+    }
     $requestIp = function_exists('getClientIP') ? getClientIP() : ($_SERVER['REMOTE_ADDR'] ?? '');
     $ipAttemptLimit = max(10, (int)(function_exists('getAppSettingInt') ? getAppSettingInt($conn, 'login_ip_attempt_limit', 20) : 20));
     $ipLockoutMinutes = max(5, (int)(function_exists('getAppSettingInt') ? getAppSettingInt($conn, 'login_ip_lockout_minutes', 15) : 15));
@@ -183,7 +188,8 @@ try {
                 'details' => "Failed login attempt for unknown account: {$identifierRaw}"
             ]);
         }
-        throw new Exception('Invalid credentials. User not found.', 401);
+        $identifierLabel = $isEmail ? 'email address' : 'phone number';
+        throw new Exception("No account was found for that {$identifierLabel}. Please check it and try again.", 401);
     }
 
     if ((int)($user['is_active'] ?? 1) !== 1) {
@@ -221,7 +227,7 @@ try {
                 'details' => "Failed login attempt for: {$identifierRaw}"
             ]);
         }
-        throw new Exception('Invalid credentials. Please check your email/phone and password.', 401);
+        throw new Exception('Incorrect password for this account. Please check your password and try again.', 401);
     }
 
     // 

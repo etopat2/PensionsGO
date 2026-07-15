@@ -1,0 +1,933 @@
+body.layout-authenticated .pensioner-board-main {
+  width: min(1380px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 1.25rem 0 6.5rem;
+}
+
+.pensioner-hero,
+.pensioner-panel,
+.pensioner-summary-card,
+.pensioner-feedback-card {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--card-bg) 96%, transparent), color-mix(in srgb, var(--card-bg) 88%, var(--primary-gold-light) 12%));
+  border: 1px solid color-mix(in srgb, var(--border-color) 78%, var(--primary-gold) 22%);
+  box-shadow: 0 14px 34px var(--shadow-light);
+}
+
+.pensioner-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  border-radius: 24px;
+  margin-bottom: 1.2rem;
+}
+
+.pensioner-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary-gold) 18%, transparent);
+  color: var(--primary-maroon);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pensioner-hero h1 {
+  margin: 0.75rem 0 0.55rem;
+  color: var(--heading-color);
+  font-size: clamp(1.65rem, 2.6vw, 2.6rem);
+  line-height: 1.15;
+}
+
+.pensioner-hero p,
+.pensioner-panel-head p,
+.pensioner-feedback-card p,
+.pensioner-step-card p {
+  margin: 0;
+  color: var(--muted-color);
+  line-height: 1.6;
+}
+
+#pensionerHeroMeta strong {
+  font-weight: 800;
+  color: var(--heading-color);
+}
+
+.pensioner-hero-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.pensioner-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.85rem 1.15rem;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  background: linear-gradient(135deg, var(--primary-maroon) 0%, var(--primary-blue) 100%);
+  color: #fff;
+  text-decoration: none;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+}
+
+.pensioner-action-btn.secondary {
+  background: color-mix(in srgb, var(--card-bg) 80%, var(--primary-gold) 20%);
+  color: var(--heading-color);
+  border-color: color-mix(in srgb, var(--primary-gold) 32%, var(--border-color) 68%);
+}
+
+.pensioner-action-btn:hover,
+.pensioner-action-btn:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px var(--shadow-medium);
+}
+
+.pensioner-feedback {
+  display: grid;
+  gap: 0.85rem;
+  margin-bottom: 1.15rem;
+}
+
+.pensioner-feedback-card {
+  border-radius: 18px;
+  padding: 1rem 1.1rem;
+}
+
+.pensioner-feedback-card strong {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--heading-color);
+}
+
+.pensioner-feedback-card.warning {
+  border-left: 4px solid var(--warning-color);
+}
+
+.pensioner-feedback-card.info {
+  border-left: 4px solid var(--info-color);
+}
+
+.pensioner-feedback-card.error,
+.pensioner-feedback-card.danger {
+  border-left: 4px solid var(--error-color);
+}
+
+.pensioner-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.pensioner-summary-card {
+  border-radius: 18px;
+  padding: 1rem 1.1rem;
+}
+
+.pensioner-summary-label,
+.pensioner-mini-label,
+.pensioner-detail-item span,
+.pensioner-metric-card span,
+.pensioner-claim-stat span,
+.pensioner-claim-grid span {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted-color);
+}
+
+.pensioner-summary-value,
+.pensioner-status-highlight strong,
+.pensioner-detail-item strong,
+.pensioner-metric-card strong,
+.pensioner-claim-stat strong,
+.pensioner-claim-grid strong,
+.pensioner-document-stat strong {
+  display: block;
+  margin-top: 0.45rem;
+  color: var(--heading-color);
+}
+
+.pensioner-summary-value {
+  font-size: clamp(1.25rem, 2vw, 1.8rem);
+  line-height: 1.15;
+}
+
+.pensioner-summary-note {
+  display: block;
+  margin-top: 0.55rem;
+  color: var(--muted-color);
+  line-height: 1.55;
+}
+
+.pensioner-summary-note.emphasis {
+  padding: 0.72rem 0.85rem;
+  border-radius: 14px;
+  border: 1px solid transparent;
+}
+
+.pensioner-summary-note.info,
+.pensioner-detail-item.advisory.info {
+  background: color-mix(in srgb, var(--card-bg) 80%, var(--info-color) 20%);
+  border-color: color-mix(in srgb, var(--info-color) 36%, var(--border-color) 64%);
+  color: color-mix(in srgb, var(--text-color) 88%, var(--info-color) 12%);
+}
+
+.pensioner-summary-note.warning,
+.pensioner-detail-item.advisory.warning {
+  background: color-mix(in srgb, var(--card-bg) 76%, var(--warning-color) 24%);
+  border-color: color-mix(in srgb, var(--warning-color) 38%, var(--border-color) 62%);
+  color: color-mix(in srgb, var(--text-color) 86%, var(--warning-color) 14%);
+}
+
+.pensioner-summary-note.danger,
+.pensioner-detail-item.advisory.danger {
+  background: color-mix(in srgb, var(--card-bg) 74%, var(--error-color) 26%);
+  border-color: color-mix(in srgb, var(--error-color) 42%, var(--border-color) 58%);
+  color: color-mix(in srgb, var(--text-color) 84%, var(--error-color) 16%);
+}
+
+.pensioner-summary-note.success,
+.pensioner-detail-item.advisory.success {
+  background: color-mix(in srgb, var(--card-bg) 80%, var(--success-color) 20%);
+  border-color: color-mix(in srgb, var(--success-color) 36%, var(--border-color) 64%);
+  color: color-mix(in srgb, var(--text-color) 86%, var(--success-color) 14%);
+}
+
+.pensioner-summary-value.success,
+.pensioner-status-pill.success {
+  color: var(--success-color);
+}
+
+.pensioner-summary-value.warning,
+.pensioner-status-pill.warning {
+  color: var(--warning-color);
+}
+
+.pensioner-summary-value.info,
+.pensioner-status-pill.info {
+  color: var(--info-color);
+}
+
+.pensioner-summary-value.danger,
+.pensioner-status-pill.danger {
+  color: var(--error-color);
+}
+
+.pensioner-summary-value.neutral,
+.pensioner-status-pill.neutral {
+  color: var(--muted-color);
+}
+
+.pensioner-board-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 1.2rem;
+  align-items: start;
+  margin-bottom: 1.2rem;
+}
+
+.pensioner-board-layout.lower {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pensioner-stack {
+  display: grid;
+  gap: 1.2rem;
+}
+
+.pensioner-panel {
+  border-radius: 24px;
+  padding: 1.2rem;
+}
+
+.pensioner-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.pensioner-panel-head h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+  color: var(--heading-color);
+}
+
+.pensioner-profile-shell {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.pensioner-profile-hero {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.pensioner-avatar-wrap {
+  flex: 0 0 auto;
+}
+
+.pensioner-avatar {
+  width: 84px;
+  height: 84px;
+  border-radius: 22px;
+  object-fit: cover;
+  border: 3px solid color-mix(in srgb, var(--primary-gold) 36%, transparent);
+  background: color-mix(in srgb, var(--card-bg) 82%, var(--primary-blue) 18%);
+}
+
+.pensioner-profile-meta h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.32rem;
+  color: var(--heading-color);
+}
+
+.pensioner-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.pensioner-chip,
+.pensioner-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 32px;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--primary-gold) 28%, var(--border-color) 72%);
+  background: color-mix(in srgb, var(--card-bg) 82%, var(--primary-gold-light) 18%);
+  color: var(--heading-color);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.pensioner-detail-grid,
+.pensioner-benefits-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.pensioner-detail-item,
+.pensioner-metric-card,
+.pensioner-claim-stat,
+.pensioner-step-card,
+.pensioner-document-stat,
+.pensioner-status-highlight {
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--card-bg) 84%, var(--primary-blue) 16%);
+  border: 1px solid color-mix(in srgb, var(--border-color) 74%, var(--primary-blue) 26%);
+}
+
+.pensioner-detail-item,
+.pensioner-metric-card,
+.pensioner-document-stat,
+.pensioner-status-highlight {
+  padding: 0.95rem 1rem;
+}
+
+.pensioner-detail-item strong,
+.pensioner-metric-card strong {
+  font-size: 1rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.pensioner-detail-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.pensioner-detail-item.advisory strong {
+  line-height: 1.6;
+}
+
+.pensioner-status-highlight {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.pensioner-step-list,
+.pensioner-claims-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.pensioner-step-card {
+  padding: 0.95rem 1rem;
+}
+
+.pensioner-step-head,
+.pensioner-claim-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.pensioner-step-card strong,
+.pensioner-claim-head strong {
+  color: var(--heading-color);
+}
+
+.pensioner-step-card small {
+  display: block;
+  margin-top: 0.65rem;
+  color: var(--muted-color);
+}
+
+.pensioner-claims-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.pensioner-claim-card {
+  border-radius: 18px;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--card-bg) 82%, var(--primary-gold-light) 18%);
+  border: 1px solid color-mix(in srgb, var(--border-color) 74%, var(--primary-gold) 26%);
+}
+
+.pensioner-claim-stat {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  min-height: 118px;
+}
+
+.pensioner-claim-head span {
+  color: var(--muted-color);
+  font-size: 0.88rem;
+}
+
+.pensioner-claim-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.pensioner-document-stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.pensioner-document-stat strong {
+  font-size: 2rem;
+  color: var(--primary-maroon);
+}
+
+.pensioner-empty-state {
+  padding: 1rem;
+  border-radius: 16px;
+  color: var(--muted-color);
+  background: color-mix(in srgb, var(--card-bg) 84%, var(--primary-blue) 16%);
+  border: 1px dashed color-mix(in srgb, var(--border-color) 72%, var(--primary-blue) 28%);
+}
+
+.pensioner-profile-tools {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.pensioner-action-btn.slim {
+  min-height: 40px;
+  padding: 0.72rem 1rem;
+}
+
+.pensioner-profile-edit-form {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem 1.15rem 1.2rem;
+}
+
+.pensioner-profile-edit-head h4 {
+  margin: 0 0 0.25rem;
+  color: var(--heading-color);
+  font-size: 1rem;
+}
+
+.pensioner-profile-edit-head p {
+  margin: 0;
+  color: var(--muted-color);
+}
+
+.pensioner-profile-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.pensioner-form-field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.pensioner-form-field span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted-color);
+}
+
+.pensioner-form-field input {
+  width: 100%;
+  min-height: 46px;
+  padding: 0.8rem 0.92rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 76%, var(--primary-blue) 24%);
+  background: color-mix(in srgb, var(--card-bg) 94%, transparent);
+  color: var(--text-color);
+  font: inherit;
+}
+
+.pensioner-form-field input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--primary-gold) 48%, var(--primary-blue) 52%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-gold) 20%, transparent);
+}
+
+.pensioner-profile-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.pensioner-profile-edit-overlay[hidden] {
+  display: none;
+}
+
+.pensioner-profile-edit-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 15120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(7, 14, 24, 0.68);
+  backdrop-filter: blur(12px);
+}
+
+.pensioner-profile-edit-modal {
+  width: min(780px, calc(100vw - 2rem));
+  max-height: min(90vh, 860px);
+  overflow: auto;
+  border-radius: 24px;
+  background: var(--card-bg);
+  border: 1px solid color-mix(in srgb, var(--border-color) 72%, var(--primary-gold) 28%);
+  box-shadow: 0 30px 64px var(--shadow-dark);
+}
+
+.pensioner-profile-edit-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 74%, var(--primary-blue) 26%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--card-bg) 96%, transparent), color-mix(in srgb, var(--card-bg) 90%, var(--primary-blue) 10%));
+}
+
+.pensioner-profile-edit-modal-head h3 {
+  margin: 0 0 0.3rem;
+  color: var(--heading-color);
+}
+
+.pensioner-profile-edit-modal-head p {
+  margin: 0;
+  color: var(--muted-color);
+}
+
+.pensioner-documents-list {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.pensioner-document-card {
+  display: grid;
+  gap: 0.65rem;
+  padding: 1rem;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--card-bg) 84%, var(--primary-blue) 16%);
+  border: 1px solid color-mix(in srgb, var(--border-color) 74%, var(--primary-blue) 26%);
+}
+
+.pensioner-document-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.pensioner-document-card-head strong {
+  color: var(--heading-color);
+  line-height: 1.45;
+}
+
+.pensioner-document-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  color: var(--muted-color);
+  font-size: 0.9rem;
+}
+
+.pensioner-document-actions {
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 1100px) {
+  .pensioner-summary-grid,
+  .pensioner-board-layout,
+  .pensioner-board-layout.lower {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pensioner-board-layout,
+  .pensioner-board-layout.lower {
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 768px) {
+  body.layout-authenticated .pensioner-board-main {
+    width: min(100% - 1rem, 100%);
+    padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
+  }
+
+  .pensioner-hero,
+  .pensioner-status-highlight,
+  .pensioner-summary-grid,
+  .pensioner-board-layout,
+  .pensioner-board-layout.lower,
+  .pensioner-detail-grid,
+  .pensioner-benefits-grid,
+  .pensioner-claims-summary,
+  .pensioner-claim-grid,
+  .pensioner-profile-edit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pensioner-hero,
+  .pensioner-profile-hero,
+  .pensioner-document-stat {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pensioner-panel,
+  .pensioner-summary-card,
+  .pensioner-hero {
+    border-radius: 20px;
+  }
+
+  .pensioner-action-btn {
+    width: 100%;
+  }
+
+  .pensioner-document-actions {
+    width: 100%;
+  }
+}
+
+
+.pensioner-module-launchpad {
+  margin-bottom: 1.2rem;
+}
+
+.pensioner-launch-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.pensioner-launch-card {
+  display: grid;
+  gap: 0.45rem;
+  padding: 1rem 1.05rem;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 74%, var(--primary-gold) 26%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--card-bg) 96%, transparent), color-mix(in srgb, var(--card-bg) 86%, var(--primary-blue) 14%));
+  color: var(--text-color);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 14px 34px var(--shadow-light);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.pensioner-launch-card strong {
+  color: var(--heading-color);
+  font-size: 1rem;
+}
+
+.pensioner-launch-card span {
+  color: var(--muted-color);
+  line-height: 1.55;
+}
+
+.pensioner-launch-card:hover,
+.pensioner-launch-card:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 40px var(--shadow-medium);
+  border-color: color-mix(in srgb, var(--primary-gold) 44%, var(--border-color) 56%);
+}
+
+.pensioner-modal-overlay[hidden] {
+  display: none;
+}
+
+.pensioner-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 15050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(8, 16, 28, 0.55);
+  backdrop-filter: blur(10px);
+}
+
+.pensioner-modal-panel {
+  width: min(1120px, calc(100vw - 2rem));
+  max-height: min(90vh, 960px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 28px;
+  overflow: hidden;
+  background: var(--card-bg);
+  border: 1px solid color-mix(in srgb, var(--border-color) 74%, var(--primary-gold) 26%);
+  box-shadow: 0 24px 50px var(--shadow-dark);
+}
+
+.pensioner-modal-header,
+.pensioner-modal-footer {
+  flex: 0 0 auto;
+  padding: 1rem 1.2rem;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--card-bg) 96%, transparent), color-mix(in srgb, var(--card-bg) 90%, var(--primary-blue) 10%));
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 78%, var(--primary-blue) 22%);
+}
+
+.pensioner-modal-footer {
+  border-top: 1px solid color-mix(in srgb, var(--border-color) 78%, var(--primary-blue) 22%);
+  border-bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.pensioner-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.pensioner-modal-header h2 {
+  margin: 0 0 0.35rem;
+  color: var(--heading-color);
+}
+
+.pensioner-modal-close {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 74%, var(--primary-gold) 26%);
+  background: color-mix(in srgb, var(--card-bg) 84%, var(--primary-gold-light) 16%);
+  color: var(--heading-color);
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+
+.pensioner-modal-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.95rem 1.2rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 78%, var(--primary-blue) 22%);
+  background: color-mix(in srgb, var(--card-bg) 92%, var(--primary-blue) 8%);
+}
+
+.pensioner-tab-btn {
+  min-height: 38px;
+  padding: 0.65rem 0.95rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--primary-gold) 28%, var(--border-color) 72%);
+  background: color-mix(in srgb, var(--card-bg) 84%, var(--primary-gold-light) 16%);
+  color: var(--heading-color);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pensioner-tab-btn.active {
+  background: linear-gradient(135deg, var(--primary-maroon) 0%, var(--primary-blue) 100%);
+  border-color: transparent;
+  color: #fff;
+}
+
+.pensioner-mobile-tab-nav {
+  display: none;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 78%, var(--primary-blue) 22%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--card-bg) 96%, transparent), color-mix(in srgb, var(--card-bg) 90%, var(--primary-gold-light) 10%));
+}
+
+.pensioner-mobile-tab-btn {
+  min-height: 42px;
+  padding: 0.75rem 0.95rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--primary-gold) 28%, var(--border-color) 72%);
+  background: color-mix(in srgb, var(--card-bg) 86%, var(--primary-gold-light) 14%);
+  color: var(--heading-color);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pensioner-mobile-tab-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pensioner-mobile-tab-select-wrap {
+  display: grid;
+  gap: 0.28rem;
+  flex: 1 1 auto;
+}
+
+.pensioner-mobile-tab-select-wrap span {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted-color);
+}
+
+.pensioner-mobile-tab-select-wrap select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0.7rem 0.82rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 76%, var(--primary-blue) 24%);
+  background: color-mix(in srgb, var(--card-bg) 94%, transparent);
+  color: var(--text-color);
+  font: inherit;
+}
+
+.pensioner-mobile-tab-select-wrap select:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--primary-gold) 48%, var(--primary-blue) 52%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-gold) 20%, transparent);
+}
+
+.pensioner-modal-body {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 1.2rem;
+}
+
+.pensioner-tab-panel {
+  display: none;
+}
+
+.pensioner-tab-panel.active {
+  display: block;
+}
+
+.pensioner-modal-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (max-width: 1100px) {
+  .pensioner-launch-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .pensioner-launch-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pensioner-modal-overlay {
+    align-items: flex-start;
+    padding: 0.5rem;
+  }
+
+  .pensioner-modal-panel {
+    width: calc(100vw - 1rem);
+    min-height: calc(100vh - 1rem);
+    max-height: calc(100vh - 1rem);
+    border-radius: 22px;
+  }
+
+  .pensioner-profile-edit-modal {
+    width: calc(100vw - 1rem);
+    max-height: 92vh;
+    border-radius: 20px;
+  }
+
+  .pensioner-modal-header,
+  .pensioner-modal-footer {
+    padding: 0.9rem 1rem;
+  }
+
+  .pensioner-modal-header {
+    align-items: flex-start;
+  }
+
+  .pensioner-modal-header h2 {
+    font-size: 1.08rem;
+  }
+
+  .pensioner-modal-header p {
+    font-size: 0.92rem;
+    line-height: 1.5;
+  }
+
+  .pensioner-modal-tabs {
+    display: none;
+  }
+
+  .pensioner-mobile-tab-nav {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  .pensioner-modal-body {
+    padding: 1rem;
+  }
+}

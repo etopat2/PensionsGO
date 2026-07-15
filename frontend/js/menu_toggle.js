@@ -28,6 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // === Hide menu when clicking outside (mobile) ===
   document.addEventListener("click", (e) => {
+    if (!menuToggle || !navLinks) return;
     if (!menuToggle.contains(e.target) && !navLinks.contains(e.target)) {
       navLinks.classList.remove("show");
       menuToggle.classList.remove("open");

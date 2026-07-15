@@ -17,22 +17,8 @@ if ($role === 'pensioner') {
     exit;
 }
 
-if (function_exists('ensureFileMovementTables')) {
-    ensureFileMovementTables($conn);
-}
-if (function_exists('ensureFileRegistryPerformanceIndexes')) {
-    ensureFileRegistryPerformanceIndexes($conn);
-}
-if (function_exists('ensureStaffDuePerformanceIndexes')) {
-    ensureStaffDuePerformanceIndexes($conn);
-}
-if (function_exists('maybeReconcileAllActivePayrollCycles')) {
-    try {
-        maybeReconcileAllActivePayrollCycles($conn);
-    } catch (Throwable $syncError) {
-        error_log('fetch_file_registry payroll reconciliation failed: ' . $syncError->getMessage());
-    }
-}
+// Read endpoints must remain read-only and latency-sensitive. Schema migrations,
+// index provisioning, and payroll reconciliation run in setup/maintenance flows.
 
 $search = trim((string)($_GET['search'] ?? ''));
 $boxNumber = trim((string)($_GET['box_number'] ?? ''));
@@ -105,7 +91,7 @@ if ($payType !== '' && in_array($payType, ['Pensioner', 'One-off Payment'], true
     $types .= 's';
 }
 
-$countJoinSql = " LEFT JOIN tb_staffdue sd ON sd.regNo = fr.regNo ";
+$countJoinSql = $search !== '' ? " LEFT JOIN tb_staffdue sd ON sd.regNo = fr.regNo " : "";
 
 $countSql = "
     SELECT COUNT(*) AS total
@@ -159,7 +145,10 @@ $dataSql = "
             WHEN LOWER(TRIM(COALESCE(fr.livingStatus, ''))) = 'deceased'
               OR LOWER(REPLACE(REPLACE(REPLACE(COALESCE(fr.payType, ''), '-', ''), ' ', ''), '_', '')) IN ('oneoffpayment','oneoff','oneoffpayout','oneoffpay','gratuityonly')
                 THEN 'Exempt'
-            WHEN lcs.submission_id IS NOT NULL THEN 'Submitted'
+            WHEN EXISTS (
+                SELECT 1 FROM tb_life_certificate_submissions lcs
+                WHERE lcs.regNo = fr.regNo AND lcs.submission_year = YEAR(CURDATE())
+            ) THEN 'Submitted'
             ELSE 'Not Submitted'
         END AS lifeCertificateStatus,
         fr.timeStamp,
@@ -167,9 +156,6 @@ $dataSql = "
         COALESCE(fr.telNo, sd.telNo) AS phone
     FROM tb_fileregistry fr
     LEFT JOIN tb_staffdue sd ON sd.regNo = fr.regNo
-    LEFT JOIN tb_life_certificate_submissions lcs
-      ON lcs.regNo = fr.regNo
-     AND lcs.submission_year = YEAR(CURDATE())
     {$where}
     ORDER BY {$orderBy}
     LIMIT ? OFFSET ?

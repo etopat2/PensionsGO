@@ -6,8 +6,13 @@ if (sessionStorage.getItem('isLoggedIn') !== 'true') {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  const DEFAULT_USER_PASSWORD = 'Prisons123';
   const form = document.getElementById('registerForm');
   const submitBtn = form.querySelector('button[type="submit"]');
+  const passwordInput = document.getElementById('userPassword');
+  if (passwordInput && !passwordInput.value) {
+    passwordInput.value = DEFAULT_USER_PASSWORD;
+  }
 
   const titles = [
     'Mr.',
@@ -176,6 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (response.ok && data.success) {
         showMessage(`✅ ${data.message}<br>Reference Code: <strong>${data.referenceCode}</strong>`, 'success');
         form.reset();
+        if (passwordInput) passwordInput.value = DEFAULT_USER_PASSWORD;
       } else {
         showMessage(`❌ ${data.message || 'Server error occurred.'}`, 'error');
       }

@@ -250,16 +250,16 @@ function summaryReportPdfBlocks(array $report): array
         $blocks[] = ['style' => 'section', 'text' => 'Decision Support Metrics'];
         $blocks[] = [
             'style' => 'grid_header',
-            'cells' => ['Metric', 'Current Value', 'Operational Meaning'],
-            'widths' => [24, 16, 40],
-            'aligns' => ['left', 'right', 'left']
+            'cells' => ['S/N', 'Metric', 'Current Value', 'Operational Meaning'],
+            'widths' => [8, 22, 16, 34],
+            'aligns' => ['center', 'left', 'right', 'left']
         ];
-        foreach ($report['metricsTable'] as $item) {
+        foreach ($report['metricsTable'] as $index => $item) {
             $blocks[] = [
                 'style' => 'grid_row',
-                'cells' => [$item['metric'], $item['value'], $item['note']],
-                'widths' => [24, 16, 40],
-                'aligns' => ['left', 'right', 'left']
+                'cells' => [(string)($index + 1), $item['metric'], $item['value'], $item['note']],
+                'widths' => [8, 22, 16, 34],
+                'aligns' => ['center', 'left', 'right', 'left']
             ];
         }
     }

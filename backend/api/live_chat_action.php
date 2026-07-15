@@ -4,7 +4,7 @@ require_once __DIR__ . '/live_chat_common.php';
 try {
     $userId = liveChatRequireStaff($conn);
     liveChatEnsureTables($conn);
-    liveChatTouchPresence($conn, $userId);
+    liveChatReleaseSessionLock();
 
     $data = liveChatJsonInput();
     $action = trim((string)($data['action'] ?? ''));

@@ -17,10 +17,16 @@ if (!isset($_SESSION['userId'], $_SESSION['userRole'])) {
     exit;
 }
 
+$token = getSessionCsrfToken();
+$issuedAt = (int)($_SESSION['csrf_token_created_at'] ?? time());
+if (session_status() === PHP_SESSION_ACTIVE) {
+    @session_write_close();
+}
+
 echo json_encode([
     'success' => true,
-    'token' => getSessionCsrfToken(),
-    'issuedAt' => (int)($_SESSION['csrf_token_created_at'] ?? time())
+    'token' => $token,
+    'issuedAt' => $issuedAt
 ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
 $conn->close();

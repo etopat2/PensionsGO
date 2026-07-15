@@ -10,6 +10,7 @@ if (!is_array($input)) {
 }
 $action = publicChatClean($input['action'] ?? 'list', 40);
 $agentProfile = publicChatAgentProfile($conn, $agentId);
+publicChatReleaseSessionLock();
 
 function publicChatAgentSession(mysqli $conn, int $sessionId): array
 {
@@ -32,12 +33,19 @@ if ($action === 'list') {
     $where = "WHERE 1=1";
     $types = '';
     $params = [];
-    if ($status !== '' && in_array($status, ['waiting', 'active', 'assigned', 'escalated', 'closed'], true)) {
+    if ($status === 'offline') {
+        $where .= " AND pcs.status = 'closed' AND pcs.close_reason LIKE 'Offline message%'";
+    } elseif ($status === 'waiting') {
+        $where .= " AND pcs.status = 'waiting' AND pcs.closed_at IS NULL AND (pcs.assigned_agent_id IS NULL OR pcs.assigned_agent_id = '')";
+    } elseif ($status !== '' && in_array($status, ['waiting', 'active', 'assigned', 'escalated', 'closed'], true)) {
         $where .= " AND pcs.status = ?";
         $types .= 's';
         $params[] = $status;
+        if ($status !== 'closed') {
+            $where .= " AND pcs.closed_at IS NULL";
+        }
     } else {
-        $where .= " AND pcs.status <> 'closed'";
+        $where .= " AND pcs.status <> 'closed' AND pcs.closed_at IS NULL";
     }
     if (empty($agentProfile['can_view_all_chats'])) {
         $where .= " AND (pcs.assigned_agent_id IS NULL OR pcs.assigned_agent_id = ?)";
@@ -47,10 +55,9 @@ if ($action === 'list') {
     $sql = "
         SELECT pcs.session_id, pcs.chat_reference, pcs.visitor_name, pcs.phone_number, pcs.email, pcs.force_number,
                pcs.pensioner_number, pcs.district, pcs.location, pcs.inquiry_category, pcs.source_page, pcs.status,
-               pcs.priority, pcs.assigned_agent_id, pcs.close_reason, pcs.created_at, pcs.started_at, pcs.closed_at,
+               pcs.priority, pcs.assigned_agent_id, pcs.close_reason, pcs.subject, pcs.created_at, pcs.started_at, pcs.closed_at,
                tu.userName AS assigned_agent_name,
-               (SELECT COUNT(*) FROM public_chat_messages m WHERE m.session_id = pcs.session_id) AS message_count,
-               (SELECT MAX(m.created_at) FROM public_chat_messages m WHERE m.session_id = pcs.session_id) AS last_message_at
+               (SELECT m.created_at FROM public_chat_messages m WHERE m.session_id = pcs.session_id ORDER BY m.message_id DESC LIMIT 1) AS last_message_at
         FROM public_chat_sessions pcs
         LEFT JOIN tb_users tu ON tu.userId = pcs.assigned_agent_id
         $where
@@ -58,6 +65,9 @@ if ($action === 'list') {
         LIMIT 100
     ";
     $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        publicChatJson(['success' => false, 'message' => 'Unable to load chats.'], 500);
+    }
     if ($types !== '') {
         $refs = [$types];
         foreach ($params as $i => $value) {
@@ -74,7 +84,10 @@ if ($action === 'list') {
 if ($action === 'detail') {
     $sessionId = (int)($input['session_id'] ?? 0);
     $session = publicChatAgentSession($conn, $sessionId);
-    publicChatRequireAgentSessionAccess($session, $agentId, $agentProfile, true, 'You are not permitted to view this chat.');
+    if (!publicChatAgentCanAccessSession($session, $agentId, $agentProfile, true)
+        && !publicChatAgentHasLinkedRecordAccess($conn, $sessionId, $agentId)) {
+        publicChatJson(['success' => false, 'message' => 'You are not permitted to view this chat.'], 403);
+    }
     publicChatMarkSeen($conn, $sessionId, 'agent');
     $messages = publicChatFetchMessages($conn, $sessionId, 0, 'agent');
     $messages = publicChatAttachMessageFiles($conn, $messages, true);
@@ -90,6 +103,7 @@ if ($action === 'detail') {
         'success' => true,
         'session' => $session,
         'messages' => $messages,
+        'receipts' => publicChatReceiptRows($conn, $sessionId, 'agent'),
         'notes' => $notes,
         'pensionerContext' => is_array($context) ? $context : null,
         'canReply' => publicChatAgentCanAccessSession($session, $agentId, $agentProfile, false) && ($session['status'] ?? '') !== 'closed',
@@ -502,19 +516,42 @@ if ($action === 'delete_canned') {
 }
 
 if ($action === 'tickets') {
-    publicChatRequireCapability($conn, 'can_view_all_chats', 'You are not permitted to view public chat tickets.');
-    $result = $conn->query("
-        SELECT t.ticket_reference, t.ticket_type, t.status, t.subject, t.description,
-               t.resolution_notes, t.created_at, t.closed_at,
+    $where = '';
+    $types = '';
+    $params = [];
+    if (empty($agentProfile['can_view_all_chats']) && empty($agentProfile['is_system'])) {
+        $where = "WHERE s.assigned_agent_id = ? OR t.assigned_to = ? OR t.created_by = ?";
+        $types = 'sss';
+        $params = [$agentId, $agentId, $agentId];
+    }
+    $sql = "
+        SELECT t.ticket_id, t.session_id, t.ticket_reference, t.ticket_type, t.status, t.priority, t.subject, t.description,
+               t.resolution_notes, t.created_by, t.assigned_to, t.created_at, t.closed_at,
                s.chat_reference, s.visitor_name, s.inquiry_category,
                COALESCE(u.userName, 'Unassigned') AS assigned_name
         FROM public_chat_tickets t
         JOIN public_chat_sessions s ON s.session_id = t.session_id
         LEFT JOIN tb_users u ON u.userId = t.assigned_to
+        $where
         ORDER BY t.created_at DESC
         LIMIT 200
-    ");
-    publicChatJson(['success' => true, 'tickets' => $result ? $result->fetch_all(MYSQLI_ASSOC) : []]);
+    ";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        publicChatJson(['success' => false, 'message' => 'Unable to load tickets.'], 500);
+    }
+    if ($types !== '') {
+        $refs = [$types];
+        foreach ($params as $i => $value) {
+            $refs[] = &$params[$i];
+        }
+        call_user_func_array([$stmt, 'bind_param'], $refs);
+    }
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $tickets = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    $stmt->close();
+    publicChatJson(['success' => true, 'tickets' => $tickets]);
 }
 
 if ($action === 'update_ticket') {
@@ -536,20 +573,43 @@ if ($action === 'update_ticket') {
 }
 
 if ($action === 'escalations') {
-    publicChatRequireCapability($conn, 'can_view_all_chats', 'You are not permitted to view escalations.');
-    $result = $conn->query("
-        SELECT e.reason, e.priority, e.resolution_deadline, e.escalation_time, e.created_at, e.outcome,
-               s.chat_reference, s.visitor_name,
+    $where = '';
+    $types = '';
+    $params = [];
+    if (empty($agentProfile['can_view_all_chats']) && empty($agentProfile['is_system'])) {
+        $where = "WHERE s.assigned_agent_id = ? OR e.escalated_by = ? OR e.escalated_to = ?";
+        $types = 'sss';
+        $params = [$agentId, $agentId, $agentId];
+    }
+    $sql = "
+        SELECT e.escalation_id, e.session_id, e.reason, e.priority, e.status, e.resolution_deadline, e.escalation_time, e.created_at, e.outcome,
+               s.chat_reference, s.visitor_name, s.inquiry_category,
                COALESCE(u.userName, 'Staff') AS escalated_by_name,
                COALESCE(tu.userName, 'Supervisor') AS escalated_to_name
         FROM public_chat_escalations e
         JOIN public_chat_sessions s ON s.session_id = e.session_id
         LEFT JOIN tb_users u ON u.userId = e.escalated_by
         LEFT JOIN tb_users tu ON tu.userId = e.escalated_to
+        $where
         ORDER BY e.created_at DESC
         LIMIT 200
-    ");
-    publicChatJson(['success' => true, 'escalations' => $result ? $result->fetch_all(MYSQLI_ASSOC) : []]);
+    ";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        publicChatJson(['success' => false, 'message' => 'Unable to load escalations.'], 500);
+    }
+    if ($types !== '') {
+        $refs = [$types];
+        foreach ($params as $i => $value) {
+            $refs[] = &$params[$i];
+        }
+        call_user_func_array([$stmt, 'bind_param'], $refs);
+    }
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $escalations = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    $stmt->close();
+    publicChatJson(['success' => true, 'escalations' => $escalations]);
 }
 
 if ($action === 'audit') {

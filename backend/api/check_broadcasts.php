@@ -15,7 +15,14 @@ if (!isset($_SESSION['userId'])) {
     exit;
 }
 
-if (!currentUserCanAccessMessagingModule()) {
+$userId = (string)$_SESSION['userId'];
+$userRole = (string)($_SESSION['userRole'] ?? '');
+$canAccessMessaging = currentUserCanAccessMessagingModule();
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
+
+if (!$canAccessMessaging) {
     echo json_encode([
         'success' => true,
         'has_new' => false,
@@ -25,9 +32,6 @@ if (!currentUserCanAccessMessagingModule()) {
 }
 
 try {
-    $userId = $_SESSION['userId'];
-    $userRole = $_SESSION['userRole'] ?? '';
-
     $stmt = $conn->prepare("
         SELECT 
             bm.broadcast_id,

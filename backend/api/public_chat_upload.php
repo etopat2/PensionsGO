@@ -22,6 +22,7 @@ if ($asAgent) {
     publicChatRateLimit($conn, 'upload', 6, 600);
     $actor = publicChatResolveActor($conn, $sessionId, $token, false, false);
 }
+publicChatReleaseSessionLock();
 $session = $actor['session'];
 $senderType = (string)$actor['sender_type'];
 $senderId = $actor['sender_id'];
@@ -30,104 +31,19 @@ if (($session['status'] ?? '') === 'closed') {
     publicChatJson(['success' => false, 'message' => 'This chat has been closed.'], 409);
 }
 
-$file = $_FILES['attachment'];
-if (!empty($file['error'])) {
-    publicChatJson(['success' => false, 'message' => 'Attachment upload failed.'], 400);
+$upload = null;
+try {
+    $upload = publicChatStoreUpload($conn, $_FILES['attachment'], $uploadKind, $sessionId, $senderType, $senderId, $senderName);
+} catch (Throwable $e) {
+    $message = $e->getMessage() ?: 'Unable to store attachment.';
+    $status = preg_match('/store|storage|prepare upload/i', $message) ? 500 : 400;
+    publicChatJson(['success' => false, 'message' => $message], $status);
 }
 
-$maxBytes = publicChatSettingInt($conn, 'public_chat_max_attachment_size_mb', 5, 1, 25) * 1024 * 1024;
-if ((int)($file['size'] ?? 0) <= 0 || (int)$file['size'] > $maxBytes) {
-    publicChatJson(['success' => false, 'message' => 'Attachment must be 5 MB or smaller.'], 400);
-}
-
-$originalName = basename((string)($file['name'] ?? 'attachment'));
-$extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
-$allowedRaw = getAppSettingString($conn, 'public_chat_allowed_attachment_types', 'pdf,jpg,jpeg,png,doc,docx');
-$allowed = array_values(array_filter(array_map(static fn($item) => strtolower(trim($item)), explode(',', $allowedRaw))));
-$voiceAllowed = ['webm', 'ogg', 'mp3', 'wav', 'm4a', 'mp4'];
-if ($isVoice) {
-    $allowed = array_values(array_unique(array_merge($allowed, $voiceAllowed)));
-}
-if (!in_array($extension, $allowed, true)) {
-    publicChatJson(['success' => false, 'message' => 'Attachment type is not allowed.'], 400);
-}
-
-$tmpPath = (string)($file['tmp_name'] ?? '');
-if ($tmpPath === '' || !is_uploaded_file($tmpPath)) {
-    publicChatJson(['success' => false, 'message' => 'Attachment upload is not valid.'], 400);
-}
-$nameParts = array_map('strtolower', array_filter(explode('.', $originalName)));
-foreach ($nameParts as $part) {
-    if (function_exists('getDangerousUploadExtensions') && in_array($part, getDangerousUploadExtensions(), true)) {
-        publicChatJson(['success' => false, 'message' => 'Attachment type is not safe.'], 400);
-    }
-}
-
-$detectedMime = 'application/octet-stream';
-if (class_exists('finfo')) {
-    $finfo = new finfo(FILEINFO_MIME_TYPE);
-    $detected = (string)$finfo->file($tmpPath);
-    if ($detected !== '') {
-        $detectedMime = $detected;
-    }
-} elseif (function_exists('mime_content_type')) {
-    $detected = (string)@mime_content_type($tmpPath);
-    if ($detected !== '') {
-        $detectedMime = $detected;
-    }
-}
-
-$lowerMime = strtolower($detectedMime);
-if ($extension === 'docx') {
-    if (!class_exists('ZipArchive')) {
-        publicChatJson(['success' => false, 'message' => 'DOCX preview support is not enabled on this server.'], 400);
-    }
-    $zip = new ZipArchive();
-    $opened = $zip->open($tmpPath);
-    if ($opened !== true || $zip->locateName('word/document.xml') === false || $zip->locateName('[Content_Types].xml') === false) {
-        if ($opened === true) {
-            $zip->close();
-        }
-        publicChatJson(['success' => false, 'message' => 'DOCX file is not a valid Word document.'], 400);
-    }
-    $zip->close();
-} elseif ($extension === 'doc') {
-    $handle = fopen($tmpPath, 'rb');
-    $signature = $handle ? fread($handle, 8) : '';
-    if ($handle) {
-        fclose($handle);
-    }
-    if ($signature !== "\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1") {
-        publicChatJson(['success' => false, 'message' => 'DOC file is not a valid Word document.'], 400);
-    }
-} elseif (!$isVoice && in_array($extension, ['jpg', 'jpeg', 'png'], true) && !str_starts_with($lowerMime, 'image/')) {
-    publicChatJson(['success' => false, 'message' => 'Image attachment content is not valid.'], 400);
-} elseif (!$isVoice && $extension === 'pdf' && $lowerMime !== 'application/pdf') {
-    publicChatJson(['success' => false, 'message' => 'PDF attachment content is not valid.'], 400);
-} elseif ($isVoice && !str_starts_with($lowerMime, 'audio/') && !str_starts_with($lowerMime, 'video/') && $lowerMime !== 'application/octet-stream') {
-    publicChatJson(['success' => false, 'message' => 'Voice note content is not valid.'], 400);
-}
-
-$uploadDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'public_chat';
-if (!is_dir($uploadDir)) {
-    mkdir($uploadDir, 0755, true);
-}
-$safeName = ($isVoice ? 'public_chat_voice_' : 'public_chat_') . $sessionId . '_' . bin2hex(random_bytes(8)) . '.' . $extension;
-$target = $uploadDir . DIRECTORY_SEPARATOR . $safeName;
-if (!move_uploaded_file((string)$file['tmp_name'], $target)) {
-    publicChatJson(['success' => false, 'message' => 'Unable to store attachment.'], 500);
-}
-
-$relativePath = 'uploads/public_chat/' . $safeName;
-$clientMime = publicChatClean((string)($file['type'] ?? ''), 120);
-$detectedMime = publicChatClean($detectedMime, 120);
-$mime = $isVoice && preg_match('/^(audio|video)\//i', $clientMime)
-    ? $clientMime
-    : ($detectedMime !== '' && stripos($detectedMime, 'octet-stream') === false ? $detectedMime : ($clientMime ?: $detectedMime));
-if ($isVoice) {
-    $mime = publicChatPlaybackMime($mime, $originalName);
-}
-$size = (int)$file['size'];
+$originalName = (string)$upload['file_name'];
+$relativePath = (string)$upload['file_path'];
+$mime = (string)$upload['mime_type'];
+$size = (int)$upload['file_size'];
 $messageKind = $isVoice ? 'voice' : 'attachment';
 $messageText = $isVoice ? 'Voice note' : 'Attachment uploaded';
 
@@ -156,7 +72,9 @@ try {
     $conn->commit();
 } catch (Throwable $e) {
     $conn->rollback();
-    @unlink($target);
+    if (!empty($upload['absolute_path'])) {
+        @unlink((string)$upload['absolute_path']);
+    }
     publicChatJson(['success' => false, 'message' => 'Unable to save attachment.'], 500);
 }
 
@@ -168,7 +86,12 @@ $message = [[
     'message_text' => $messageText,
     'message_kind' => $messageKind,
     'is_internal' => 0,
-    'created_at' => date('Y-m-d H:i:s')
+    'created_at' => date('Y-m-d H:i:s'),
+    'delivered_at' => null,
+    'is_read' => false,
+    'read_at' => null,
+    'receiptStatus' => 'sent',
+    'isOwn' => true
 ]];
 $message = publicChatAttachMessageFiles($conn, $message, $asAgent, $asAgent ? null : $token);
 publicChatJson(['success' => true, 'attachment_id' => $attachmentId, 'message_id' => $messageId, 'message' => $message[0] ?? null]);

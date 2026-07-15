@@ -25,6 +25,11 @@ $stmt = $conn->prepare("
     SELECT
         m.movement_id,
         m.regNo,
+        m.file_type,
+        m.source_registry,
+        m.destination_registry,
+        m.movement_direction,
+        m.parent_movement_id,
         m.from_office,
         m.to_office,
         m.reason,

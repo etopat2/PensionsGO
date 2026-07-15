@@ -232,32 +232,48 @@ function deliverPensionsGoExport(url, options = {}) {
 function buildPensionsGoPrintDocument({ title = 'PensionsGo Export', meta = '', columns = [], rows = [] } = {}) {
   const safeColumns = Array.from(columns || []).map((column) => String(column ?? ''));
   const safeRows = Array.from(rows || []);
+  const hasSerialColumn = safeColumns.some((column) => /^s\s*\/?\s*n$/i.test(column.trim()));
+  const tableColumns = hasSerialColumn ? safeColumns : ['S/N', ...safeColumns];
   return `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
   <title>${escapeExportHtml(title)}</title>
   <style>
-    @page { margin: 14mm; }
+    @page { margin: 14mm 14mm 18mm; }
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: Tahoma, Arial, sans-serif; font-size: 12pt; color: #1f2937; background: #fff; }
+    body { margin: 0; padding-bottom: 24px; font-family: Tahoma, Arial, sans-serif; font-size: 12pt; color: #1f2937; background: #fff; }
     h1 { margin: 0 0 3px; color: #741a2d; font-size: 12pt; line-height: 1.25; }
     p { margin: 0 0 5px; color: #475569; font-size: 12pt; line-height: 1.25; }
     table { width: 100%; border-collapse: collapse; table-layout: auto; }
     thead tr { background: #741a2d; color: #fff; }
     th, td { border: 1px solid #b44556; padding: 5px; text-align: left; vertical-align: middle; line-height: 1.2; white-space: normal; overflow-wrap: normal; word-break: normal; }
     th { font-weight: 700; border-top: 2px solid #d6a64a; border-bottom: 2px solid #d6a64a; }
+    th:first-child, td:first-child { width: 42px; text-align: center; }
     tbody tr:nth-child(even) td { background: #fffdf8; }
     tbody tr:nth-child(odd) td { background: #fff8eb; }
+    .pgo-print-footer {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border-top: 1px solid #d6a64a;
+      padding-top: 6px;
+      color: #475569;
+      font-size: 9pt;
+      text-align: center;
+      background: #fff;
+    }
   </style>
 </head>
 <body>
   <h1>${escapeExportHtml(title)}</h1>
   ${meta ? `<p>${escapeExportHtml(meta)}</p>` : ''}
   <table>
-    <thead><tr>${safeColumns.map((column) => `<th>${escapeExportHtml(column)}</th>`).join('')}</tr></thead>
-    <tbody>${safeRows.map((row) => `<tr>${safeColumns.map((column) => `<td>${escapeExportHtml(row?.[column] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody>
+    <thead><tr>${tableColumns.map((column) => `<th>${escapeExportHtml(column)}</th>`).join('')}</tr></thead>
+    <tbody>${safeRows.map((row, index) => `<tr>${hasSerialColumn ? '' : `<td>${index + 1}</td>`}${safeColumns.map((column) => `<td>${escapeExportHtml(row?.[column] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody>
   </table>
+  <footer class="pgo-print-footer">Exported from UPSPensionsGo</footer>
 </body>
 </html>`;
 }
@@ -955,14 +971,172 @@ window.PensionsGoTextCase = {
   }
 };
 
+let passwordVisibilityObserver = null;
+let passwordVisibilityResetBound = false;
+
+const PASSWORD_VISIBILITY_SELECTOR = 'input[type="password"]:not([data-password-visibility-enhanced])';
+
+function passwordVisibilityIcon(isVisible = false) {
+  if (isVisible) {
+    return `
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M3 3l18 18"></path>
+        <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"></path>
+        <path d="M9.9 4.2A9.8 9.8 0 0 1 12 4c5.5 0 9 5 9 5s-1 1.5-2.8 2.9"></path>
+        <path d="M6.6 6.6C4.3 8.1 3 10 3 10s3.5 5 9 5c1.2 0 2.3-.2 3.3-.6"></path>
+      </svg>
+    `;
+  }
+
+  return `
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"></path>
+      <circle cx="12" cy="12" r="2.6"></circle>
+    </svg>
+  `;
+}
+
+function setPasswordVisibility(input, visible) {
+  if (!(input instanceof HTMLInputElement)) {
+    return;
+  }
+
+  const button = input.closest('.password-visibility-wrapper')?.querySelector('.password-visibility-toggle');
+  try {
+    input.type = visible ? 'text' : 'password';
+  } catch (_error) {
+    return;
+  }
+
+  if (button) {
+    button.setAttribute('aria-pressed', String(visible));
+    button.setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
+    button.title = visible ? 'Hide password' : 'Show password';
+    button.innerHTML = passwordVisibilityIcon(visible);
+  }
+}
+
+function enhancePasswordVisibilityInput(input) {
+  if (!(input instanceof HTMLInputElement) || input.dataset.passwordVisibilityEnhanced === '1') {
+    return input;
+  }
+
+  input.dataset.passwordVisibilityEnhanced = '1';
+  input.autocapitalize = 'off';
+  input.spellcheck = false;
+  if (!input.hasAttribute('autocorrect')) {
+    input.setAttribute('autocorrect', 'off');
+  }
+
+  const wrapper = document.createElement('span');
+  wrapper.className = 'password-visibility-wrapper';
+  input.parentNode?.insertBefore(wrapper, input);
+  wrapper.appendChild(input);
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'password-visibility-toggle';
+  button.setAttribute('aria-label', 'Show password');
+  button.setAttribute('aria-pressed', 'false');
+  button.title = 'Show password';
+  button.innerHTML = passwordVisibilityIcon(false);
+
+  button.addEventListener('click', () => {
+    const nextVisible = input.type === 'password';
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    setPasswordVisibility(input, nextVisible);
+    input.focus({ preventScroll: true });
+    if (typeof start === 'number' && typeof end === 'number') {
+      try {
+        input.setSelectionRange(start, end);
+      } catch (_error) {
+        // Some input states do not allow selection restoration.
+      }
+    }
+  });
+
+  wrapper.appendChild(button);
+  return input;
+}
+
+function scanPasswordVisibilityInputs(root = document) {
+  if (!root) {
+    return;
+  }
+
+  if (root instanceof HTMLInputElement && root.matches(PASSWORD_VISIBILITY_SELECTOR)) {
+    enhancePasswordVisibilityInput(root);
+    return;
+  }
+
+  if (!(root instanceof Element || root instanceof Document || root instanceof DocumentFragment)) {
+    return;
+  }
+
+  root.querySelectorAll?.(PASSWORD_VISIBILITY_SELECTOR).forEach((input) => {
+    enhancePasswordVisibilityInput(input);
+  });
+}
+
+function initPasswordVisibilityEnhancements() {
+  scanPasswordVisibilityInputs(document);
+
+  if (!passwordVisibilityResetBound) {
+    passwordVisibilityResetBound = true;
+    document.addEventListener('reset', (event) => {
+      const form = event.target;
+      if (!(form instanceof HTMLFormElement)) {
+        return;
+      }
+      window.setTimeout(() => {
+        form.querySelectorAll('input[data-password-visibility-enhanced="1"]').forEach((input) => {
+          setPasswordVisibility(input, false);
+        });
+      }, 0);
+    }, true);
+  }
+
+  if (passwordVisibilityObserver || !document.documentElement) {
+    return;
+  }
+
+  passwordVisibilityObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        scanPasswordVisibilityInputs(node);
+      });
+    });
+  });
+
+  passwordVisibilityObserver.observe(document.documentElement, {
+    childList: true,
+    subtree: true
+  });
+}
+
+window.PensionsGoPasswordVisibility = {
+  scan(root = document) {
+    scanPasswordVisibilityInputs(root);
+  },
+  mask(input) {
+    setPasswordVisibility(input, false);
+  },
+  show(input) {
+    setPasswordVisibility(input, true);
+  }
+};
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     initMoneyInputEnhancements();
     initTextCaseEnhancements();
+    initPasswordVisibilityEnhancements();
   }, { once: true });
 } else {
   initMoneyInputEnhancements();
   initTextCaseEnhancements();
+  initPasswordVisibilityEnhancements();
 }
 
 function normalizeNationalIdValue(value) {
@@ -3146,7 +3320,7 @@ class SessionManager {
     }
     
     // Throttle keep-alive requests
-    if (window.lastKeepAlive && (Date.now() - window.lastKeepAlive < 2000)) {
+    if (window.lastKeepAlive && (Date.now() - window.lastKeepAlive < 15000)) {
       return;
     }
     window.lastKeepAlive = Date.now();
@@ -3691,7 +3865,7 @@ class SessionManager {
       this.checkForBroadcasts();
       
       // Then check every 5 seconds for near-instant delivery
-      this.broadcastInterval = setInterval(() => this.checkForBroadcasts(), 5000);
+      this.broadcastInterval = setInterval(() => this.checkForBroadcasts(), 15000);
 
       // Also check when the tab becomes active
       document.addEventListener('visibilitychange', () => {
@@ -4948,8 +5122,10 @@ async function loadFooterWithCoordination(isAuthenticated = false) {
 
 function scheduleLiveChatInitialization(sessionState = {}) {
   const currentPage = (window.location.pathname.split('/').pop() || '').toLowerCase();
-  const role = String(sessionState.userRole || sessionState.role || localStorage.getItem('userRole') || '').toLowerCase();
-  if (currentPage === 'pensioner_board.html' || role === 'pensioner') {
+  const role = String(sessionState.userRole || sessionState.role || localStorage.getItem('userRole') || '').toLowerCase().replace(/[\s-]+/g, '_');
+  const effectiveRole = String(sessionState.userRoleEffective || sessionState.roleEffective || localStorage.getItem('userRoleEffective') || '').toLowerCase().replace(/[\s-]+/g, '_');
+  const disabledRoles = new Set(['pensioner', 'super_admin', 'superadministrator', 'system_administrator']);
+  if (currentPage === 'pensioner_board.html' || disabledRoles.has(role) || disabledRoles.has(effectiveRole)) {
     document.getElementById('liveChatDock')?.remove();
     return;
   }
@@ -4961,8 +5137,12 @@ function scheduleLiveChatInitialization(sessionState = {}) {
 
   const startLiveChat = async () => {
     try {
-      const { initLiveChat } = await import('./modules/live_chat.js?v=20260609d');
-      await initLiveChat({ userId: sessionState.userId || '' });
+      const { initLiveChat } = await import('./modules/live_chat.js?v=20260714r');
+      await initLiveChat({
+        userId: sessionState.userId || '',
+        userRole: sessionState.userRole || sessionState.role || localStorage.getItem('userRole') || '',
+        userRoleEffective: sessionState.userRoleEffective || sessionState.roleEffective || localStorage.getItem('userRoleEffective') || ''
+      });
     } catch (error) {
       console.warn('Live chat initialization failed:', error.message || error);
       window.__pensionsgoLiveChatInitScheduled = false;

@@ -139,12 +139,17 @@ if ($recentRes) {
     }
 }
 
+$byFileType = [];
+$typeResult = $conn->query("SELECT COALESCE(file_type,'pension') AS file_type, COALESCE(source_registry,'unspecified') AS source_registry, COUNT(*) AS total, SUM(returned_at IS NULL) AS open_count, ROUND(AVG(TIMESTAMPDIFF(HOUR,moved_at,COALESCE(returned_at,NOW()))),1) AS average_hours FROM tb_file_movements GROUP BY file_type, source_registry ORDER BY total DESC");
+if ($typeResult) while ($row = $typeResult->fetch_assoc()) { $row['details_url'] = 'file_tracking.html?file_type=' . rawurlencode($row['file_type']) . '&source_registry=' . rawurlencode($row['source_registry']); $byFileType[] = $row; }
+
 echo json_encode([
     'success' => true,
     'summary' => $summary,
     'by_office' => $byOffice,
     'open_custody' => $openCustody,
-    'recent_movements' => $recentMovements
+    'recent_movements' => $recentMovements,
+    'by_file_type_and_source' => $byFileType
 ]);
 
 $conn->close();

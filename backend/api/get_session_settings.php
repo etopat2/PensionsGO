@@ -21,6 +21,9 @@ header('Content-Type: application/json; charset=UTF-8');
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
 
 $timeoutMinutesRaw = function_exists('getAppSetting') ? getAppSetting($conn, 'session_timeout_minutes') : null;
 $graceMinutesRaw = function_exists('getAppSetting') ? getAppSetting($conn, 'grace_period_minutes') : null;

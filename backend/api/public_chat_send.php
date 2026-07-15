@@ -27,6 +27,7 @@ if ($asAgent) {
     publicChatRateLimit($conn, 'message', publicChatSettingInt($conn, 'public_chat_rate_limit_messages_per_5min', 20, 1, 120), 300);
     $actor = publicChatResolveActor($conn, $sessionId, $token, false, false);
 }
+publicChatReleaseSessionLock();
 $session = $actor['session'];
 $senderType = (string)$actor['sender_type'];
 $senderId = $actor['sender_id'];

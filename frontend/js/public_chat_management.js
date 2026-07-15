@@ -1,5 +1,11 @@
 (function () {
+  const SCRIPT_URL = document.currentScript?.src || new URL("js/public_chat_management.js", location.href).href;
   const api = (path) => `../backend/api/${path}`;
+  const moduleUrl = (path) => new URL(path, SCRIPT_URL).href;
+  const PUBLIC_CHAT_AGENT_ASSET_VERSION = "20260714x";
+  const PUBLIC_CHAT_ICON_STYLE_ID = "pensionsgo-public-chat-icons-css";
+  const PUBLIC_CHAT_ATTACHMENT_ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png,.gif,.webp,.mp3,.wav,.ogg,.m4a,.webm,.mp4,.mov,image/*,audio/*,video/*";
+  let publicChatUseFallbackIcons = false;
   const consoleViews = [
     ["queue", "Chat Queue"],
     ["active", "Active Chats"],
@@ -21,11 +27,16 @@
     listTimer: null,
     typingTimer: null,
     typingStopTimer: null,
+    typingPulseTimer: null,
+    typingHideTimer: null,
     notificationTimer: null,
+    statsLoading: false,
+    lastStatsLoadedAt: 0,
     lastConsoleListHtml: "",
     lastDetailMessagesHtml: "",
     lastDetailMessageId: 0,
     notifiedChats: new Set(JSON.parse(localStorage.getItem("pensionsgo_public_chat_notified") || "[]")),
+    notifiedMessages: new Set(),
     actionResolver: null,
     transferAgents: [],
     sendingReply: false,
@@ -39,10 +50,59 @@
     voiceTimer: null,
     voiceDraft: null,
     detailPolling: false,
-    listPolling: false
+    detailLoading: false,
+    detailRequestId: 0,
+    listPolling: false,
+    workspaceLoading: false,
+    workspaceReloadQueued: null,
+    listPausedUntil: 0,
+    listRequestId: 0,
+    newChatPolling: false,
+    availabilityPolling: false,
+    lastAvailabilityRefresh: 0,
+    appCsrfToken: ""
   };
+  let publicChatNotificationAudio = null;
+  let publicChatNotificationAudioUrl = "";
+
+  let chatShared = null;
+  async function loadChatSharedHelpers() {
+    if (chatShared) return chatShared;
+    try {
+      chatShared = await import(moduleUrl(`modules/chat_shared.js?v=${PUBLIC_CHAT_AGENT_ASSET_VERSION}`));
+    } catch (_error) {
+      chatShared = {};
+    }
+    return chatShared;
+  }
+
+  function markPublicChatFallbackIcons() {
+    publicChatUseFallbackIcons = true;
+    document.getElementById("publicChatConsoleModal")?.classList.add("public-chat-fallback-icons");
+  }
+
+  function ensurePublicChatIconStylesheet() {
+    if (document.getElementById(PUBLIC_CHAT_ICON_STYLE_ID) || document.querySelector('link[href*="font-awesome"],link[href*="fontawesome"]')) return;
+    const csp = document.querySelector('meta[http-equiv="Content-Security-Policy" i]')?.content || "";
+    const stylePolicy = csp.match(/(?:^|;)\s*style-src\s+([^;]+)/i)?.[1] || "";
+    const allowsExternalStyles = !stylePolicy
+      || /\*/.test(stylePolicy)
+      || /\bhttps:\b/i.test(stylePolicy)
+      || /cdnjs\.cloudflare\.com/i.test(stylePolicy);
+    if (!allowsExternalStyles) {
+      markPublicChatFallbackIcons();
+      return;
+    }
+    const link = document.createElement("link");
+    link.id = PUBLIC_CHAT_ICON_STYLE_ID;
+    link.rel = "stylesheet";
+    link.href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css";
+    link.onerror = markPublicChatFallbackIcons;
+    document.head.appendChild(link);
+  }
 
   function escapeHtml(value) {
+    if (chatShared?.escapeHtml) return chatShared.escapeHtml(value);
     return String(value ?? "").replace(/[&<>"']/g, (char) => ({
       "&": "&amp;",
       "<": "&lt;",
@@ -53,23 +113,109 @@
   }
 
   function formatText(value) {
+    if (chatShared?.formatText) return chatShared.formatText(value);
     return escapeHtml(value).replace(/\n/g, "<br>");
   }
 
-  async function fetchJson(path, payload = null, method = "POST") {
-    const options = { credentials: "include", cache: "no-store" };
+  async function fetchJsonRequest(url, options = {}) {
+    if (chatShared?.fetchJson) return chatShared.fetchJson(url, options);
+    const { timeoutMs = 0, ...requestOptions } = options;
+    const timeoutValue = Math.max(0, Number(timeoutMs || 0));
+    let timeoutId = null;
+    let abortController = null;
+    if (timeoutValue > 0) {
+      abortController = new AbortController();
+      requestOptions.signal = abortController.signal;
+      timeoutId = setTimeout(() => abortController.abort(), timeoutValue);
+    }
+    let response;
+    try {
+      response = await fetch(url, requestOptions);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+    const data = await response.json().catch(() => ({ success: false, message: "The server returned an unreadable response." }));
+    if (!response.ok && data && data.success !== true) {
+      data.message = data.message || "The request could not be completed.";
+    }
+    return data;
+  }
+
+  async function refreshAppCsrfToken(force = false) {
+    if (state.appCsrfToken && !force) return state.appCsrfToken;
+    const data = await fetchJsonRequest(api("get_csrf_token.php"), { credentials: "include", cache: "no-store" }).catch(() => null);
+    if (data?.success && data.token) {
+      state.appCsrfToken = data.token;
+      return state.appCsrfToken;
+    }
+    return "";
+  }
+
+  function isPublicChatEndpoint(path) {
+    try {
+      return /\/public_chat_[^/]+\.php$/i.test(new URL(api(path), location.href).pathname);
+    } catch (_) {
+      return /^public_chat_[^/?#]+\.php/i.test(String(path || ""));
+    }
+  }
+
+  async function fetchJson(path, payload = null, method = "POST", retryCsrf = true, requestConfig = {}) {
+    const options = {
+      credentials: "include",
+      cache: "no-store",
+      timeoutMs: requestConfig.timeoutMs || (method === "GET" ? 12000 : 15000)
+    };
     let url = api(path);
     if (method === "GET") {
       url += payload ? `?${new URLSearchParams(payload).toString()}` : "";
     } else {
       options.method = method;
       options.headers = { "Content-Type": "application/json" };
+      if (!isPublicChatEndpoint(path)) {
+        const token = await refreshAppCsrfToken(false);
+        if (token) options.headers["X-CSRF-Token"] = token;
+      }
       options.body = JSON.stringify(payload || {});
     }
-    const response = await fetch(url, options);
-    const data = await response.json().catch(() => ({ success: false, message: "The server returned an unreadable response." }));
-    if (!response.ok && data && data.success !== true) {
-      data.message = data.message || "The request could not be completed.";
+    const data = await fetchJsonRequest(url, options);
+    if (
+      retryCsrf &&
+      method !== "GET" &&
+      !isPublicChatEndpoint(path) &&
+      data?.success === false &&
+      /security token validation failed/i.test(String(data.message || ""))
+    ) {
+      const token = await refreshAppCsrfToken(true);
+      if (token) {
+        options.headers["X-CSRF-Token"] = token;
+        return fetchJson(path, payload, method, false, requestConfig);
+      }
+    }
+    return data;
+  }
+
+  async function fetchFormData(path, form, retryCsrf = true) {
+    const headers = {};
+    if (!isPublicChatEndpoint(path)) {
+      const token = await refreshAppCsrfToken(false);
+      if (token) headers["X-CSRF-Token"] = token;
+    }
+    const data = await fetchJsonRequest(api(path), {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      headers,
+      body: form,
+      timeoutMs: 60000
+    });
+    if (
+      retryCsrf &&
+      !isPublicChatEndpoint(path) &&
+      data?.success === false &&
+      /security token validation failed/i.test(String(data.message || ""))
+    ) {
+      const freshToken = await refreshAppCsrfToken(true);
+      if (freshToken) return fetchFormData(path, form, false);
     }
     return data;
   }
@@ -97,11 +243,20 @@
     button.setAttribute("aria-pressed", String(state.agentOnline));
   }
 
+  function isPublicChatConsoleOpen() {
+    return document.getElementById("publicChatConsoleModal")?.classList.contains("open") === true;
+  }
+
+  function isStaffChatActive() {
+    const dock = document.getElementById("liveChatDock");
+    return Boolean(dock && !dock.classList.contains("collapsed"));
+  }
+
   function statusForView(view = state.consoleView) {
     if (view === "queue") return "waiting";
     if (view === "active") return "active";
     if (view === "assigned") return "assigned";
-    if (view === "offline") return "closed";
+    if (view === "offline") return "offline";
     return "";
   }
 
@@ -118,12 +273,14 @@
   function renderDashboardShell() {
     const mount = document.getElementById("publicChatDashboardMount");
     if (!mount) return;
+    ensurePublicChatIconStylesheet();
+    primePublicChatNotificationSound();
     mount.innerHTML = `
       <div class="public-chat-dashboard-toolbar">
         <button type="button" class="btn-action" id="publicChatOpenConsoleBtn">Chat Console</button>
       </div>
       <div class="analytics-stat-grid public-chat-dashboard-stats" id="publicChatDashboardStats"></div>
-      <div class="dashboard-data-modal public-chat-console-modal" id="publicChatConsoleModal" aria-hidden="true">
+      <div class="dashboard-data-modal public-chat-console-modal${publicChatUseFallbackIcons ? " public-chat-fallback-icons" : ""}" id="publicChatConsoleModal" aria-hidden="true">
         <div class="dashboard-data-modal-backdrop" data-public-chat-console-close="1"></div>
         <div class="dashboard-data-modal-panel public-chat-console-panel" role="dialog" aria-modal="true" aria-labelledby="publicChatConsoleTitle">
           <div class="dashboard-data-modal-header">
@@ -145,37 +302,51 @@
                 </div>
                 <div id="publicChatConsoleList" class="public-chat-dashboard-list"></div>
               </div>
-              <section class="public-chat-console-detail">
-                <div class="analytics-panel-header">
-                  <h3 id="publicChatDashboardDetailTitle">Conversation</h3>
-                  <p id="publicChatDashboardDetailMeta">Select a chat to view visitor details and transcript.</p>
-                </div>
-                <div class="public-chat-dashboard-actions">
-                  <button type="button" class="btn-action btn-secondary" id="publicChatDashboardAcceptBtn" disabled>Accept</button>
-                  <button type="button" class="btn-action btn-secondary" id="publicChatDashboardTransferBtn" disabled>Transfer</button>
-                  <button type="button" class="btn-action btn-secondary" id="publicChatDashboardPensionerBtn" hidden disabled>Pensioner Reference</button>
-                  <button type="button" class="btn-action btn-secondary" id="publicChatDashboardEscalateBtn" disabled>Escalate</button>
-                  <button type="button" class="btn-action btn-secondary" id="publicChatDashboardTicketBtn" disabled>Create Ticket</button>
-                  <button type="button" class="btn-action btn-danger" id="publicChatDashboardCloseBtn" disabled>Close</button>
-                </div>
-                <div class="public-chat-dashboard-visitor" id="publicChatDashboardVisitor"></div>
-                <div class="chat-oversight-thread public-chat-dashboard-thread" id="publicChatDashboardMessages"></div>
-                <div class="public-chat-peer-typing" id="publicChatDashboardTyping" hidden><span></span><span></span><span></span><strong>Visitor is typing</strong></div>
-                <form id="publicChatDashboardReplyForm" class="public-chat-dashboard-form">
-                  <div class="public-chat-dashboard-voice-draft" id="publicChatDashboardVoiceDraft" hidden></div>
-                  <div class="public-chat-dashboard-composer">
-                    <textarea id="publicChatDashboardReplyText" rows="3" placeholder="Reply to visitor" disabled></textarea>
-                    <button type="button" class="public-chat-dashboard-composer-icon attach" id="publicChatDashboardAttachBtn" title="Attach file" aria-label="Attach file" disabled>+</button>
-                    <button type="button" class="public-chat-dashboard-composer-icon voice" id="publicChatDashboardVoiceBtn" title="Record voice note" aria-label="Record voice note" disabled><span class="public-chat-mic-icon" aria-hidden="true"></span></button>
+              <section class="public-chat-console-detail" id="publicChatConsoleDetailPanel" aria-hidden="false">
+                <div class="public-chat-console-detail-top">
+                  <div class="analytics-panel-header public-chat-detail-header">
+                    <div class="public-chat-detail-heading">
+                      <h3 id="publicChatDashboardDetailTitle">Conversation</h3>
+                      <p id="publicChatDashboardDetailMeta">Select a chat to view visitor details and transcript.</p>
+                    </div>
+                    <div class="public-chat-dashboard-visitor" id="publicChatDashboardVisitor"></div>
+                    <button type="button" class="dashboard-data-modal-close public-chat-detail-close" id="publicChatDashboardDetailCloseBtn" aria-label="Close conversation window" title="Close conversation window">Close</button>
                   </div>
-                  <input type="file" id="publicChatDashboardAttachment" hidden accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
-                  <button type="submit" class="btn-action" id="publicChatDashboardSendBtn" disabled>Send Reply</button>
+                  <div class="public-chat-dashboard-actions">
+                    <button type="button" class="btn-action btn-secondary" id="publicChatDashboardAcceptBtn" disabled>Accept</button>
+                    <button type="button" class="btn-action btn-secondary" id="publicChatDashboardTransferBtn" disabled>Transfer</button>
+                    <button type="button" class="btn-action btn-secondary" id="publicChatDashboardPensionerBtn" hidden disabled>Pensioner Reference</button>
+                    <button type="button" class="btn-action btn-secondary" id="publicChatDashboardEscalateBtn" disabled>Escalate</button>
+                    <button type="button" class="btn-action btn-secondary" id="publicChatDashboardTicketBtn" disabled>Create Ticket</button>
+                    <button type="button" class="btn-action btn-secondary" id="publicChatDashboardNoteModalBtn" disabled>Internal Note</button>
+                    <button type="button" class="btn-action btn-danger" id="publicChatDashboardCloseBtn" disabled>Close Chat</button>
+                  </div>
+                </div>
+                <div class="public-chat-dashboard-message-zone">
+                  <div class="chat-oversight-thread public-chat-dashboard-thread" id="publicChatDashboardMessages"></div>
+                  <div class="live-typing-indicator public-chat-peer-typing" id="publicChatDashboardTyping" hidden><span></span><span></span><span></span><strong>Visitor is typing</strong></div>
+                  <div class="public-chat-dashboard-notes" id="publicChatDashboardNotes"></div>
+                </div>
+                <div class="public-chat-dashboard-reply-dock">
+                <form id="publicChatDashboardReplyForm" class="public-chat-dashboard-form public-chat-dashboard-reply-form">
+                  <div class="public-chat-dashboard-voice-draft live-voice-draft" id="publicChatDashboardVoiceDraft" hidden></div>
+                  <div class="public-chat-dashboard-composer">
+                    <div class="public-chat-dashboard-input-shell">
+                      <div class="attachment-picker public-chat-attachment-picker public-chat-dashboard-attachment-picker hidden" id="publicChatDashboardAttachmentPicker">
+                        <button type="button" data-accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt" data-label="Document"><i class="fas fa-file-alt"></i> Document</button>
+                        <button type="button" data-accept="image/*,video/*" data-label="Photos & Videos"><i class="fas fa-photo-video"></i> Photos & Videos</button>
+                        <button type="button" data-accept="image/*" data-capture="environment" data-label="Camera"><i class="fas fa-camera"></i> Camera</button>
+                        <button type="button" data-accept="audio/*" data-label="Audio"><i class="fas fa-music"></i> Audio</button>
+                      </div>
+                      <textarea id="publicChatDashboardReplyText" rows="1" placeholder="Reply to visitor" disabled></textarea>
+                      <button type="button" class="public-chat-dashboard-composer-icon attach" id="publicChatDashboardAttachBtn" title="Attachments" aria-label="Attachments" disabled><i class="fas fa-plus" aria-hidden="true"></i></button>
+                      <button type="button" class="public-chat-dashboard-composer-icon voice" id="publicChatDashboardVoiceBtn" title="Record voice note" aria-label="Record voice note" disabled><i class="fas fa-microphone" aria-hidden="true"></i></button>
+                    </div>
+                    <button type="submit" class="btn-action" id="publicChatDashboardSendBtn" disabled>Send</button>
+                  </div>
+                  <input type="file" id="publicChatDashboardAttachment" hidden accept="${PUBLIC_CHAT_ATTACHMENT_ACCEPT}">
                 </form>
-                <form id="publicChatDashboardNoteForm" class="public-chat-dashboard-form">
-                  <textarea id="publicChatDashboardNoteText" rows="2" placeholder="Internal note" disabled></textarea>
-                  <button type="submit" class="btn-action btn-secondary" id="publicChatDashboardNoteBtn" disabled>Add Note</button>
-                </form>
-                <div class="public-chat-dashboard-notes" id="publicChatDashboardNotes"></div>
+                </div>
               </section>
             </main>
           </div>
@@ -230,6 +401,27 @@
           </form>
         </div>
       </div>
+      <div class="dashboard-data-modal public-chat-note-modal" id="publicChatDashboardNoteModal" aria-hidden="true">
+        <div class="dashboard-data-modal-backdrop" data-public-chat-note-close="1"></div>
+        <div class="dashboard-data-modal-panel public-chat-action-panel" role="dialog" aria-modal="true" aria-labelledby="publicChatDashboardNoteTitle">
+          <form id="publicChatDashboardNoteForm" class="public-chat-dashboard-form public-chat-dashboard-note-form">
+            <div class="dashboard-data-modal-header">
+              <div>
+                <p class="dashboard-data-modal-eyebrow">Internal Handling Note</p>
+                <h3 id="publicChatDashboardNoteTitle">Add Note</h3>
+              </div>
+              <button type="button" class="dashboard-data-modal-close" data-public-chat-note-close="1">Close</button>
+            </div>
+            <div class="dashboard-data-modal-body">
+              <textarea id="publicChatDashboardNoteText" rows="5" placeholder="Internal note" disabled></textarea>
+            </div>
+            <div class="dashboard-data-modal-footer">
+              <button type="button" class="btn-action btn-secondary" data-public-chat-note-close="1">Cancel</button>
+              <button type="submit" class="btn-action" id="publicChatDashboardNoteBtn" disabled>Add Note</button>
+            </div>
+          </form>
+        </div>
+      </div>
       <div class="dashboard-data-modal public-chat-document-modal" id="publicChatDocumentModal" aria-hidden="true">
         <div class="dashboard-data-modal-backdrop" data-public-chat-document-close="1"></div>
         <div class="dashboard-data-modal-panel public-chat-document-panel" role="dialog" aria-modal="true" aria-labelledby="publicChatDocumentTitle">
@@ -255,20 +447,27 @@
       const canned = event.target.closest("[data-public-chat-canned-body]");
       if (canned) {
         const reply = document.getElementById("publicChatDashboardReplyText");
-        if (reply) reply.value = canned.dataset.publicChatCannedBody || "";
+        if (reply) {
+          reply.value = canned.dataset.publicChatCannedBody || "";
+          resizeDashboardReplyTextarea(reply);
+        }
       }
     });
     document.querySelectorAll("[data-public-chat-console-view]").forEach((button) => {
       button.addEventListener("click", () => {
-        state.consoleView = button.dataset.publicChatConsoleView || "queue";
-        state.selectedId = null;
-        state.selected = null;
-        state.selectedCanReply = false;
-        cleanupAgentVoiceDraft();
+        const nextView = button.dataset.publicChatConsoleView || "queue";
+        const preserveDetail = nextView === "canned";
+        state.consoleView = nextView;
+        if (!preserveDetail) {
+          state.selectedId = null;
+          state.selected = null;
+          state.selectedCanReply = false;
+          cleanupAgentVoiceDraft();
+        }
         state.lastConsoleListHtml = "";
         renderConsoleSidebarState();
-        resetDetail();
-        loadConsoleWorkspace({ silent: false });
+        if (!preserveDetail) resetDetail();
+        loadConsoleWorkspace({ silent: false, force: true });
       });
     });
     document.querySelectorAll("[data-public-chat-console-close]").forEach((button) => button.addEventListener("click", closeConsole));
@@ -278,32 +477,94 @@
     document.getElementById("publicChatDashboardTransferBtn")?.addEventListener("click", () => runConsoleAction("transfer"));
     document.getElementById("publicChatDashboardEscalateBtn")?.addEventListener("click", () => runConsoleAction("escalate"));
     document.getElementById("publicChatDashboardTicketBtn")?.addEventListener("click", () => runConsoleAction("ticket"));
+    document.getElementById("publicChatDashboardNoteModalBtn")?.addEventListener("click", openNoteModal);
     document.getElementById("publicChatDashboardCloseBtn")?.addEventListener("click", () => runConsoleAction("close"));
+    document.getElementById("publicChatDashboardDetailCloseBtn")?.addEventListener("click", closeDetailPanel);
     document.getElementById("publicChatDashboardPensionerBtn")?.addEventListener("click", showPensionerReference);
     document.getElementById("publicChatDashboardReplyForm")?.addEventListener("submit", sendReply);
     document.getElementById("publicChatDashboardNoteForm")?.addEventListener("submit", addNote);
-    document.getElementById("publicChatDashboardReplyText")?.addEventListener("input", notifyTyping);
-    document.getElementById("publicChatDashboardReplyText")?.addEventListener("blur", () => stopTyping(false));
-    document.getElementById("publicChatDashboardAttachBtn")?.addEventListener("click", () => document.getElementById("publicChatDashboardAttachment")?.click());
+    const dashboardReplyText = document.getElementById("publicChatDashboardReplyText");
+    dashboardReplyText?.addEventListener("input", handleReplyInput);
+    dashboardReplyText?.addEventListener("keydown", handleReplyKeydown);
+    dashboardReplyText?.addEventListener("blur", () => stopTyping(false));
+    resizeDashboardReplyTextarea(dashboardReplyText);
+    document.getElementById("publicChatConsoleModal")?.addEventListener("click", handleConsoleClick);
+    document.getElementById("publicChatDashboardAttachBtn")?.addEventListener("click", toggleAttachmentPicker);
+    document.getElementById("publicChatDashboardAttachmentPicker")?.addEventListener("click", handleAttachmentPicker);
     document.getElementById("publicChatDashboardAttachment")?.addEventListener("change", uploadAgentAttachment);
     document.getElementById("publicChatDashboardVoiceBtn")?.addEventListener("click", toggleAgentVoiceRecording);
     document.getElementById("publicChatActionForm")?.addEventListener("submit", submitActionModal);
     document.getElementById("publicChatActionSubmitBtn")?.addEventListener("click", handleActionModalSubmitClick);
     document.querySelectorAll("[data-public-chat-action-cancel]").forEach((button) => button.addEventListener("click", closeActionModal));
     document.querySelectorAll("[data-public-chat-document-close]").forEach((button) => button.addEventListener("click", closeDocumentViewer));
+    document.querySelectorAll("[data-public-chat-note-close]").forEach((button) => button.addEventListener("click", closeNoteModal));
     document.getElementById("publicChatDashboardMessages")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-public-chat-view-attachment]");
       if (button) openDocumentViewer(button.dataset.publicChatViewAttachment, button.dataset.publicChatDownloadAttachment, button.dataset.publicChatAttachmentName, button.dataset.publicChatAttachmentMime);
     });
+    document.addEventListener("click", closeTransientConsolePopups);
   }
 
-  async function loadStats() {
+  function hideAttachmentPicker() {
+    document.getElementById("publicChatDashboardAttachmentPicker")?.classList.add("hidden");
+  }
+
+  function toggleAttachmentPicker(event) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    const picker = document.getElementById("publicChatDashboardAttachmentPicker");
+    if (!picker) return;
+    picker.classList.toggle("hidden");
+  }
+
+  function handleAttachmentPicker(event) {
+    const button = event.target instanceof Element ? event.target.closest("button[data-accept]") : null;
+    if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const input = document.getElementById("publicChatDashboardAttachment");
+    if (!input) return;
+    input.accept = button.dataset.accept || PUBLIC_CHAT_ATTACHMENT_ACCEPT;
+    if (button.dataset.capture) {
+      input.setAttribute("capture", button.dataset.capture);
+    } else {
+      input.removeAttribute("capture");
+    }
+    input.dataset.label = button.dataset.label || "Attachment";
+    hideAttachmentPicker();
+    input.click();
+  }
+
+  function closeTransientConsolePopups(event) {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest?.(".public-chat-dashboard-composer")) return;
+    hideAttachmentPicker();
+  }
+
+  function handleConsoleClick(event) {
+    const mediaButton = event.target instanceof Element ? event.target.closest(".live-media-open[data-media-url]") : null;
+    if (!mediaButton) return;
+    event.preventDefault();
+    openDocumentViewer(
+      mediaButton.dataset.mediaUrl || "",
+      mediaButton.dataset.mediaDownload || mediaButton.dataset.mediaUrl || "",
+      mediaButton.dataset.mediaName || "Attachment",
+      mediaButton.dataset.mediaMime || (mediaButton.dataset.mediaType === "video" ? "video/*" : "image/*")
+    );
+  }
+
+  async function loadStats(options = {}) {
     const grid = document.getElementById("publicChatDashboardStats");
     if (!grid) return;
+    if (state.statsLoading) return;
+    const force = options.force === true;
+    if (!force && state.stats && Date.now() - state.lastStatsLoadedAt < 30000) return;
+    state.statsLoading = true;
     try {
       const data = await fetchJson("public_chat_agent.php", { action: "stats" }, "GET");
       if (!data.success) throw new Error(data.message || "Stats unavailable");
       state.stats = data.stats || {};
+      state.lastStatsLoadedAt = Date.now();
       const s = state.stats;
       grid.innerHTML = [
         metricCard("today", "Chats Today", s.totalToday || 0, "Today's records"),
@@ -319,27 +580,37 @@
         card.addEventListener("click", () => openAnalyticsModal(card.dataset.publicChatAnalytics));
       });
     } catch (error) {
-      grid.innerHTML = `<div class="dashboard-empty-message">Public chat reports are restricted for this account.</div>`;
+      if (!state.stats) {
+        grid.innerHTML = `<div class="dashboard-empty-message">Public chat reports are restricted for this account.</div>`;
+      }
+    } finally {
+      state.statsLoading = false;
     }
   }
 
   async function refreshAgentAvailability() {
     const data = await fetchJson("public_chat_availability.php", null, "GET").catch(() => null);
-    if (data?.success) updateAvailabilityButton(data.availability);
+    if (data?.success) {
+      if (data.appCsrfToken) state.appCsrfToken = data.appCsrfToken;
+      updateAvailabilityButton(data.availability);
+    }
   }
 
   function openConsole() {
     const modal = document.getElementById("publicChatConsoleModal");
+    window.__publicChatConsoleOpen = true;
+    window.PensionsGoLiveChat?.instance?.abortRealtimePolls?.({ messages: true, receipts: true, calls: true });
     modal?.classList.add("open");
     modal?.setAttribute("aria-hidden", "false");
     if (state.agentOnline) fetchJson("public_chat_agent.php", { action: "heartbeat" }).catch(() => {});
     state.lastConsoleListHtml = "";
-    loadConsoleWorkspace({ silent: false });
+    loadConsoleWorkspace({ silent: false, force: true });
     startListPolling();
   }
 
   function closeConsole() {
     const modal = document.getElementById("publicChatConsoleModal");
+    window.__publicChatConsoleOpen = false;
     modal?.classList.remove("open");
     modal?.setAttribute("aria-hidden", "true");
     clearInterval(state.detailTimer);
@@ -380,63 +651,141 @@
     if (!normalizedId) return;
     if (normalizeSessionId(state.selectedId) !== normalizedId) cleanupAgentVoiceDraft();
     state.selectedId = normalizedId;
+    state.detailLoading = true;
+    state.listPausedUntil = Date.now() + 6000;
+    state.listRequestId += 1;
     state.lastDetailMessagesHtml = "";
     state.lastDetailMessageId = 0;
     state.selectedCanReply = false;
     markSelectedConsoleRow(normalizedId);
+    openDetailPanel();
+    document.getElementById("publicChatDashboardDetailTitle").textContent = "Loading conversation";
+    document.getElementById("publicChatDashboardDetailMeta").textContent = "Fetching transcript and visitor details...";
+    document.getElementById("publicChatDashboardMessages").innerHTML = `<div class="dashboard-empty-message">Loading messages...</div>`;
+    document.getElementById("publicChatDashboardVisitor").innerHTML = "";
+    document.getElementById("publicChatDashboardNotes").innerHTML = "";
+    setDetailEnabled(false, false);
+    const acceptBtn = document.getElementById("publicChatDashboardAcceptBtn");
+    if (acceptBtn && state.consoleView === "queue") {
+      acceptBtn.disabled = false;
+    }
     loadDetail(normalizedId).catch((error) => showActionError(error.message || "Unable to load selected chat."));
+  }
+
+  function openDetailPanel() {
+    const panel = document.getElementById("publicChatConsoleDetailPanel");
+    if (!panel) return;
+    panel.closest(".public-chat-console-workspace")?.classList.remove("detail-closed");
+    panel.classList.add("open");
+    panel.setAttribute("aria-hidden", "false");
+  }
+
+  function closeDetailPanel() {
+    const panel = document.getElementById("publicChatConsoleDetailPanel");
+    panel?.closest(".public-chat-console-workspace")?.classList.add("detail-closed");
+    panel?.classList.remove("open");
+    panel?.setAttribute("aria-hidden", "true");
   }
 
   function sessionRow(item) {
     const active = normalizeSessionId(item.session_id) === normalizeSessionId(state.selectedId) ? " active" : "";
+    const subject = String(item.subject || "").trim();
+    const summary = `${item.visitor_name || "Visitor"} - ${item.inquiry_category || "General inquiry"}${subject ? ` - ${subject}` : ""}`;
     return `
       <button type="button" class="public-chat-dashboard-row${active}" data-public-chat-session="${escapeHtml(item.session_id)}" aria-selected="${active ? "true" : "false"}">
         <strong>${escapeHtml(item.chat_reference || "Public chat")}</strong>
-        <span>${escapeHtml(item.visitor_name || "Visitor")} - ${escapeHtml(item.inquiry_category || "General inquiry")}</span>
+        <span>${escapeHtml(summary)}</span>
         <small>${escapeHtml(item.district || "No district")} - ${escapeHtml(item.status || "waiting")} - ${escapeHtml(item.last_message_at || item.created_at || "")}</small>
       </button>
     `;
   }
 
   async function loadConsoleWorkspace(options = {}) {
+    if (state.workspaceLoading) {
+      state.workspaceReloadQueued = {
+        silent: state.workspaceReloadQueued ? state.workspaceReloadQueued.silent && options.silent === true : options.silent === true
+      };
+      if (options.force === true) {
+        state.listRequestId += 1;
+      }
+      return;
+    }
+    state.workspaceLoading = true;
     const silent = options.silent === true;
+    const view = state.consoleView;
+    const requestId = ++state.listRequestId;
+    const isCurrentRequest = () => requestId === state.listRequestId && state.consoleView === view;
     const title = document.getElementById("publicChatConsoleListTitle");
     const help = document.getElementById("publicChatConsoleListHelp");
     const list = document.getElementById("publicChatConsoleList");
-    if (!list) return;
-    const label = consoleViews.find(([key]) => key === state.consoleView)?.[1] || "Chat Queue";
-    if (title) title.textContent = label;
-    if (help) help.textContent = state.consoleView === "offline" ? "Offline public support requests and follow-up messages." : "Select a record to continue handling it.";
-    if (!silent) {
-      list.innerHTML = `<div class="dashboard-empty-message">Loading ${escapeHtml(label.toLowerCase())}...</div>`;
-    }
+    try {
+      if (!list) return;
+      const label = consoleViews.find(([key]) => key === view)?.[1] || "Chat Queue";
+      if (title) title.textContent = label;
+      if (help) {
+        help.textContent = ({
+          queue: "Waiting public support correspondences.",
+          active: "Chats currently in live conversation.",
+          assigned: "Accepted chats waiting for first response.",
+          offline: "Offline public support requests submitted for follow-up.",
+          tickets: "Follow-up tickets linked to public chat transcripts.",
+          escalations: "Escalated public chats requiring supervisory attention.",
+          canned: "Reusable replies. Select a conversation, then click a response to use it."
+        })[view] || "Select a record to continue handling it.";
+      }
+      if (!silent) {
+        list.innerHTML = `<div class="dashboard-empty-message">Loading ${escapeHtml(label.toLowerCase())}...</div>`;
+      }
 
-    if (state.consoleView === "tickets") {
-      const data = await fetchJson("public_chat_agent.php", { action: "tickets" }, "GET");
-      updateConsoleList(data.success ? renderRecords(data.tickets || [], ["ticket_reference", "status", "subject", "visitor_name"]) : `<div class="dashboard-empty-message">${escapeHtml(data.message || "Unable to load tickets.")}</div>`);
-      return;
-    }
-    if (state.consoleView === "escalations") {
-      const data = await fetchJson("public_chat_agent.php", { action: "escalations" }, "GET");
-      updateConsoleList(data.success ? renderRecords(data.escalations || [], ["chat_reference", "priority", "reason", "escalated_by_name"]) : `<div class="dashboard-empty-message">${escapeHtml(data.message || "Unable to load escalations.")}</div>`);
-      return;
-    }
-    if (state.consoleView === "canned") {
-      const data = await fetchJson("public_chat_agent.php", { action: "canned" }, "GET");
-      updateConsoleList(data.success ? renderCannedResponses(data.responses || []) : `<div class="dashboard-empty-message">${escapeHtml(data.message || "Unable to load canned responses.")}</div>`);
-      return;
-    }
+      if (view === "tickets") {
+        const data = await fetchJson("public_chat_agent.php", { action: "tickets" }, "GET", true, { timeoutMs: 8000 });
+        if (!isCurrentRequest()) return;
+        updateConsoleList(data.success ? renderLinkedRecords(data.tickets || [], {
+          kind: "ticket",
+          title: "ticket_reference",
+          status: "status",
+          summary: "subject",
+          meta: (row) => `${row.visitor_name || "Visitor"} - ${row.chat_reference || ""} - ${row.created_at || ""}`
+        }) : `<div class="dashboard-empty-message">${escapeHtml(data.message || "Unable to load tickets.")}</div>`);
+        return;
+      }
+      if (view === "escalations") {
+        const data = await fetchJson("public_chat_agent.php", { action: "escalations" }, "GET", true, { timeoutMs: 8000 });
+        if (!isCurrentRequest()) return;
+        updateConsoleList(data.success ? renderLinkedRecords(data.escalations || [], {
+          kind: "escalation",
+          title: "chat_reference",
+          status: "priority",
+          summary: "reason",
+          meta: (row) => `${row.status || "open"} - ${row.escalated_by_name || "Staff"} to ${row.escalated_to_name || "Supervisor"}`
+        }) : `<div class="dashboard-empty-message">${escapeHtml(data.message || "Unable to load escalations.")}</div>`);
+        return;
+      }
+      if (view === "canned") {
+        const data = await fetchJson("public_chat_agent.php", { action: "canned" }, "GET", true, { timeoutMs: 8000 });
+        if (!isCurrentRequest()) return;
+        updateConsoleList(data.success ? renderCannedResponses(data.responses || []) : `<div class="dashboard-empty-message">${escapeHtml(data.message || "Unable to load canned responses.")}</div>`);
+        return;
+      }
 
-    const data = await fetchJson("public_chat_agent.php", { action: "list", status: statusForView() }, "GET");
-    if (!data.success) {
-      updateConsoleList(`<div class="dashboard-empty-message">${escapeHtml(data.message || "Unable to load chats.")}</div>`);
-      return;
+      const data = await fetchJson("public_chat_agent.php", { action: "list", status: statusForView(view) }, "GET", true, { timeoutMs: 30000 });
+      if (state.consoleView !== view) return;
+      if (!data.success) {
+        if (isCurrentRequest() && !silent && !state.lastConsoleListHtml) {
+          updateConsoleList(`<div class="dashboard-empty-message">${escapeHtml(data.message || "Unable to load chats.")}</div>`);
+        }
+        return;
+      }
+      const sessions = data.sessions || [];
+      updateConsoleList(sessions.length ? sessions.map(sessionRow).join("") : `<div class="dashboard-empty-message">No records found.</div>`);
+    } finally {
+      state.workspaceLoading = false;
+      const queued = state.workspaceReloadQueued;
+      state.workspaceReloadQueued = null;
+      if (queued && isPublicChatConsoleOpen()) {
+        window.setTimeout(() => loadConsoleWorkspace({ silent: queued.silent, force: true }).catch(() => {}), 0);
+      }
     }
-    let sessions = data.sessions || [];
-    if (state.consoleView === "offline") {
-      sessions = sessions.filter((item) => String(item.close_reason || "").includes("Offline") || item.status === "closed");
-    }
-    updateConsoleList(sessions.length ? sessions.map(sessionRow).join("") : `<div class="dashboard-empty-message">No records found.</div>`);
   }
 
   function updateConsoleList(html) {
@@ -457,6 +806,20 @@
     `).join("") : `<div class="dashboard-empty-message">No records found.</div>`;
   }
 
+  function renderLinkedRecords(rows, config = {}) {
+    return rows.length ? rows.map((row) => {
+      const sessionId = normalizeSessionId(row.session_id);
+      const status = String(row[config.status] || "").trim();
+      return `
+        <button type="button" class="public-chat-dashboard-row as-linked-record ${sessionId ? "" : "as-record"}" ${sessionId ? `data-public-chat-session="${escapeHtml(sessionId)}"` : ""} data-public-chat-record-kind="${escapeHtml(config.kind || "record")}">
+          <strong>${escapeHtml(row[config.title] || row.chat_reference || "Record")}${status ? ` <em>${escapeHtml(status)}</em>` : ""}</strong>
+          <span>${escapeHtml(row[config.summary] || "")}</span>
+          <small>${escapeHtml(typeof config.meta === "function" ? config.meta(row) : (row.created_at || ""))}</small>
+        </button>
+      `;
+    }).join("") : `<div class="dashboard-empty-message">No records found.</div>`;
+  }
+
   function renderCannedResponses(rows) {
     return rows.length ? rows.map((row) => `
       <button type="button" class="public-chat-dashboard-row" data-public-chat-canned="${escapeHtml(row.response_id)}" data-public-chat-canned-body="${escapeHtml(row.body || "")}">
@@ -468,6 +831,7 @@
   }
 
   function resetDetail() {
+    closeDetailPanel();
     document.getElementById("publicChatDashboardDetailTitle").textContent = "Conversation";
     document.getElementById("publicChatDashboardDetailMeta").textContent = "Select a chat to view visitor details and transcript.";
     document.getElementById("publicChatDashboardVisitor").innerHTML = "";
@@ -485,7 +849,7 @@
   }
 
   function setDetailEnabled(enabled, canReply = enabled) {
-    ["AcceptBtn", "TransferBtn", "EscalateBtn", "TicketBtn", "CloseBtn", "NoteText", "NoteBtn"].forEach((suffix) => {
+    ["AcceptBtn", "TransferBtn", "EscalateBtn", "TicketBtn", "NoteModalBtn", "CloseBtn", "NoteText", "NoteBtn"].forEach((suffix) => {
       const el = document.getElementById(`publicChatDashboard${suffix}`);
       if (el) el.disabled = !enabled;
     });
@@ -501,57 +865,75 @@
     const refreshList = options.refreshList !== false;
     const restartPolling = options.restartPolling !== false;
     const requestedId = normalizedId;
-    const data = await fetchJson("public_chat_agent.php", { action: "detail", session_id: requestedId }, "GET");
-    if (!data.success) {
-      if (normalizeSessionId(state.selectedId) === requestedId) {
-        resetDetail();
-        showActionError(data.message || "Unable to load selected chat.");
+    const detailRequestId = ++state.detailRequestId;
+    state.detailLoading = true;
+    state.listPausedUntil = Date.now() + 6000;
+    try {
+      const data = await fetchJson("public_chat_agent.php", { action: "detail", session_id: requestedId }, "GET", true, { timeoutMs: 20000 });
+      if (detailRequestId !== state.detailRequestId) return;
+      if (!data.success) {
+        if (normalizeSessionId(state.selectedId) === requestedId) {
+          resetDetail();
+          showActionError(data.message || "Unable to load selected chat.");
+        }
+        return;
       }
-      return;
+      if (normalizeSessionId(state.selectedId) !== requestedId) return;
+      if (String(state.selected?.session?.session_id || "") !== requestedId) {
+        state.lastDetailMessagesHtml = "";
+        state.lastDetailMessageId = 0;
+      }
+      state.selectedId = requestedId;
+      state.selected = data;
+      state.selectedCanReply = Boolean(data.canReply);
+      markSelectedConsoleRow(requestedId);
+      const session = data.session || {};
+      document.getElementById("publicChatDashboardDetailTitle").textContent = session.chat_reference || "Conversation";
+      document.getElementById("publicChatDashboardDetailMeta").textContent = `${session.visitor_name || "Visitor"} - ${session.inquiry_category || "General inquiry"} - ${session.district || "No district"}`;
+      document.getElementById("publicChatDashboardVisitor").innerHTML = `
+        <span><strong>Phone:</strong> ${escapeHtml(session.phone_number || "N/A")}</span>
+        <span><strong>Email:</strong> ${escapeHtml(session.email || "N/A")}</span>
+        <span><strong>Force No:</strong> ${escapeHtml(session.force_number || "N/A")}</span>
+        <span><strong>Pensioner No:</strong> ${escapeHtml(session.pensioner_number || "N/A")}</span>
+        <span><strong>Source:</strong> ${escapeHtml(session.source_page || "N/A")}</span>
+        <span><strong>Priority:</strong> ${escapeHtml(session.priority || "normal")}</span>
+      `;
+      renderDashboardMessages(data.messages || [], { replace: true });
+      syncDashboardReceipts(data.receipts || []);
+      (data.messages || []).forEach((msg) => {
+        const id = Number(msg.message_id || 0);
+        if (id > 0 && msg.sender_type === "visitor") {
+          state.notifiedMessages.add(`${requestedId}:${id}`);
+        }
+      });
+      document.getElementById("publicChatDashboardNotes").innerHTML = (data.notes || []).map((note) => `
+        <div class="public-chat-dashboard-note"><strong>${escapeHtml(note.agent_name || "Staff")}</strong><p>${escapeHtml(note.note_text || "")}</p><small>${escapeHtml(note.created_at || "")}</small></div>
+      `).join("");
+      renderDashboardTyping(data.typing || []);
+      const hasPensioner = Boolean(data.pensionerContext && data.pensionerContext.matched);
+      const refBtn = document.getElementById("publicChatDashboardPensionerBtn");
+      if (refBtn) {
+        refBtn.hidden = !hasPensioner;
+        refBtn.disabled = !hasPensioner;
+      }
+      setDetailEnabled(session.status !== "closed", state.selectedCanReply);
+      if (refreshList) window.setTimeout(() => loadConsoleWorkspace({ silent: true, force: true }).catch(() => {}), 300);
+      if (restartPolling) startDetailPolling();
+    } finally {
+      if (detailRequestId === state.detailRequestId) {
+        state.detailLoading = false;
+        state.listPausedUntil = Date.now() + 1000;
+      }
     }
-    if (normalizeSessionId(state.selectedId) !== requestedId) return;
-    if (String(state.selected?.session?.session_id || "") !== requestedId) {
-      state.lastDetailMessagesHtml = "";
-      state.lastDetailMessageId = 0;
-    }
-    state.selectedId = requestedId;
-    state.selected = data;
-    state.selectedCanReply = Boolean(data.canReply);
-    markSelectedConsoleRow(requestedId);
-    const session = data.session || {};
-    document.getElementById("publicChatDashboardDetailTitle").textContent = session.chat_reference || "Conversation";
-    document.getElementById("publicChatDashboardDetailMeta").textContent = `${session.visitor_name || "Visitor"} - ${session.inquiry_category || "General inquiry"} - ${session.district || "No district"}`;
-    document.getElementById("publicChatDashboardVisitor").innerHTML = `
-      <span><strong>Phone:</strong> ${escapeHtml(session.phone_number || "N/A")}</span>
-      <span><strong>Email:</strong> ${escapeHtml(session.email || "N/A")}</span>
-      <span><strong>Force No:</strong> ${escapeHtml(session.force_number || "N/A")}</span>
-      <span><strong>Pensioner No:</strong> ${escapeHtml(session.pensioner_number || "N/A")}</span>
-      <span><strong>Source:</strong> ${escapeHtml(session.source_page || "N/A")}</span>
-      <span><strong>Priority:</strong> ${escapeHtml(session.priority || "normal")}</span>
-    `;
-    renderDashboardMessages(data.messages || [], { replace: true });
-    document.getElementById("publicChatDashboardNotes").innerHTML = (data.notes || []).map((note) => `
-      <div class="public-chat-dashboard-note"><strong>${escapeHtml(note.agent_name || "Staff")}</strong><p>${escapeHtml(note.note_text || "")}</p><small>${escapeHtml(note.created_at || "")}</small></div>
-    `).join("");
-    renderDashboardTyping(data.typing || []);
-    const hasPensioner = Boolean(data.pensionerContext && data.pensionerContext.matched);
-    const refBtn = document.getElementById("publicChatDashboardPensionerBtn");
-    if (refBtn) {
-      refBtn.hidden = !hasPensioner;
-      refBtn.disabled = !hasPensioner;
-    }
-    setDetailEnabled(session.status !== "closed", state.selectedCanReply);
-    if (refreshList) loadConsoleWorkspace({ silent: true });
-    if (restartPolling) startDetailPolling();
   }
 
   function startDetailPolling() {
     clearInterval(state.detailTimer);
     state.detailTimer = setInterval(() => {
       const consoleOpen = document.getElementById("publicChatConsoleModal")?.classList.contains("open");
-      if (!state.selectedId || !consoleOpen || document.hidden || state.sendingReply) return;
+      if (!state.selectedId || !consoleOpen) return;
       pollDetailMessages().catch(() => {});
-    }, 1200);
+    }, 800);
   }
 
   async function pollDetailMessages() {
@@ -570,8 +952,20 @@
       }
       if (normalizeSessionId(state.selectedId) !== selectedId) return;
       state.selectedCanReply = Boolean(data.canReply);
+      const incomingMessages = (data.messages || []).filter((msg) => {
+        const id = Number(msg.message_id || 0);
+        const key = `${selectedId}:${id}`;
+        if (id <= 0 || msg.sender_type !== "visitor" || state.notifiedMessages.has(key)) return false;
+        state.notifiedMessages.add(key);
+        return true;
+      });
+      syncDashboardReceipts(data.receipts || []);
       renderDashboardMessages(data.messages || [], { replace: false });
       renderDashboardTyping(data.typing || []);
+      if (incomingMessages.length) {
+        scrollDashboardMessagesToLatest();
+        showPublicChatMessageNotification(incomingMessages[incomingMessages.length - 1], state.selected?.session || data.session || {});
+      }
       if (data.session?.status === "closed") {
         state.selectedCanReply = false;
         setDetailEnabled(false, false);
@@ -587,7 +981,8 @@
     clearInterval(state.listTimer);
     state.listTimer = setInterval(() => {
       const consoleOpen = document.getElementById("publicChatConsoleModal")?.classList.contains("open");
-      if (!consoleOpen || document.hidden) return;
+      if (!consoleOpen) return;
+      if (state.detailLoading || Date.now() < state.listPausedUntil) return;
       if (state.listPolling) return;
       state.listPolling = true;
       loadConsoleWorkspace({ silent: true }).catch(() => {}).finally(() => {
@@ -604,19 +999,19 @@
       return false;
     }
     await loadDetail(state.selectedId);
-    await loadStats();
+    loadStats().catch(() => {});
     return true;
   }
 
   async function runConsoleAction(action) {
-    if (!state.selectedId) return;
+    if (!state.selectedId) return false;
     const selectedSubject = state.selected?.session?.subject || "Public chat follow-up";
     if (action === "transfer" && !state.transferAgents.length) {
       const data = await fetchJson("public_chat_agent.php", { action: "transfer_agents" }, "GET").catch(() => null);
       state.transferAgents = data?.success ? (data.agents || []) : [];
       if (!state.transferAgents.length) {
         showActionError(data?.message || "No enabled public chat handlers are available for transfer.");
-        return;
+        return false;
       }
     }
     const configs = {
@@ -667,12 +1062,13 @@
       }
     };
     const values = await openActionModal(configs[action]);
-    if (!values) return;
+    if (!values) return false;
     const ok = await sessionAction(action, values);
     if (ok) {
       closeActionModal();
       showToast(`${configs[action].submitText || "Action"} completed.`, "success");
     }
+    return ok;
   }
 
   function openActionModal(config) {
@@ -749,6 +1145,20 @@
     }
   }
 
+  function openNoteModal() {
+    if (!state.selectedId) return;
+    const modal = document.getElementById("publicChatDashboardNoteModal");
+    modal?.classList.add("open");
+    modal?.setAttribute("aria-hidden", "false");
+    window.setTimeout(() => document.getElementById("publicChatDashboardNoteText")?.focus(), 40);
+  }
+
+  function closeNoteModal() {
+    const modal = document.getElementById("publicChatDashboardNoteModal");
+    modal?.classList.remove("open");
+    modal?.setAttribute("aria-hidden", "true");
+  }
+
   function showActionError(message) {
     const modal = document.getElementById("publicChatActionModal");
     const error = document.getElementById("publicChatActionError");
@@ -771,10 +1181,37 @@
   }
 
   function createClientNonce(prefix = "agent") {
+    if (chatShared?.createClientNonce) return chatShared.createClientNonce(prefix);
     const random = window.crypto?.getRandomValues
       ? Array.from(window.crypto.getRandomValues(new Uint32Array(2))).map((part) => part.toString(36)).join("")
       : Math.random().toString(36).slice(2);
     return `${prefix}-${Date.now().toString(36)}-${random}`.slice(0, 80);
+  }
+
+  function staffTypingTiming(key, fallback) {
+    return Number(chatShared?.[key] || fallback);
+  }
+
+  function resizeDashboardReplyTextarea(textarea = document.getElementById("publicChatDashboardReplyText")) {
+    if (!textarea) return;
+    const styles = window.getComputedStyle(textarea);
+    const lineHeight = Number.parseFloat(styles.lineHeight) || 20;
+    const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
+    const paddingBottom = Number.parseFloat(styles.paddingBottom) || 0;
+    const borderTop = Number.parseFloat(styles.borderTopWidth) || 0;
+    const borderBottom = Number.parseFloat(styles.borderBottomWidth) || 0;
+    const chrome = paddingTop + paddingBottom + borderTop + borderBottom;
+    const minHeight = Math.ceil(lineHeight + chrome);
+    const maxHeight = Math.ceil((lineHeight * 4) + chrome);
+    textarea.style.height = `${minHeight}px`;
+    const nextHeight = Math.min(maxHeight, Math.max(minHeight, textarea.scrollHeight));
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight + 1 ? "auto" : "hidden";
+  }
+
+  function handleReplyInput(event) {
+    resizeDashboardReplyTextarea(event.currentTarget);
+    notifyTyping();
   }
 
   async function sendReply(event) {
@@ -787,7 +1224,8 @@
     const clientNonce = createClientNonce("agent");
     const pendingNode = appendDashboardMessage({ sender_type: "agent", sender_name: "You", message_text: message, client_nonce: clientNonce, created_at: "Sending..." }, true);
     text.value = "";
-    await stopTyping(true);
+    resizeDashboardReplyTextarea(text);
+    stopTyping(false);
     state.sendingReply = true;
     const data = await fetchJson("public_chat_send.php", { session_id: state.selectedId, message, as_agent: true, client_nonce: clientNonce }).catch((error) => ({ success: false, message: error.message || "Unable to send reply." }));
     state.sendingReply = false;
@@ -797,21 +1235,50 @@
       const status = pendingNode?.querySelector("small");
       if (status) status.textContent = "Not sent";
       if (text) text.value = message;
+      resizeDashboardReplyTextarea(text);
       if (sendBtn) sendBtn.disabled = !state.selectedCanReply;
       return;
     }
     if (sendBtn) sendBtn.disabled = !state.selectedCanReply;
     if (data.message) renderDashboardMessages([data.message], { replace: false });
     const messageId = Number(data.message_id || 0);
-    if (messageId > 0 && pendingNode) {
+    if (messageId > 0 && pendingNode && pendingNode.classList.contains("pending")) {
       pendingNode.dataset.messageId = String(messageId);
       pendingNode.classList.remove("pending");
+      pendingNode.dataset.receiptStatus = "sent";
       const status = pendingNode.querySelector("small");
-      if (status) status.textContent = "You - Sent";
+      if (status) {
+        status.dataset.baseMeta = "You";
+        status.textContent = "You - Sent";
+      }
       state.lastDetailMessageId = Math.max(state.lastDetailMessageId || 0, messageId);
     }
-    showToast("Reply sent.", "success");
-    pollDetailMessages().catch(() => {});
+    window.setTimeout(() => pollDetailMessages().catch(() => {}), 250);
+  }
+
+  function handleReplyKeydown(event) {
+    if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+    event.preventDefault();
+    const form = event.currentTarget?.form || document.getElementById("publicChatDashboardReplyForm");
+    if (form?.requestSubmit) {
+      form.requestSubmit();
+    } else {
+      form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    }
+  }
+
+  function scrollDashboardMessagesToLatest() {
+    const wrap = document.getElementById("publicChatDashboardMessages");
+    if (!wrap) return;
+    const scroll = () => {
+      wrap.scrollTop = wrap.scrollHeight;
+      const latest = wrap.lastElementChild;
+      if (latest && !latest.classList.contains("dashboard-empty-message")) {
+        latest.scrollIntoView({ block: "end", inline: "nearest" });
+      }
+    };
+    scroll();
+    window.requestAnimationFrame?.(scroll);
   }
 
   function appendDashboardMessage(msg, pending = false) {
@@ -829,7 +1296,8 @@
           state.lastDetailMessageId = Math.max(state.lastDetailMessageId || 0, id);
         }
         pending.classList.remove("pending", "failed");
-        pending.innerHTML = `${renderDashboardMessageContent(msg)}<small>${escapeHtml(msg.sender_name || msg.sender_type || "")} - ${escapeHtml(msg.created_at || "Sent")}</small>`;
+        pending.dataset.receiptStatus = receiptStatus(msg);
+        pending.innerHTML = `${renderDashboardMessageContent(msg)}<small>${escapeHtml(dashboardMessageMeta(msg, "Sent"))}</small>`;
         return pending;
       }
     }
@@ -837,9 +1305,10 @@
     node.className = `public-chat-dashboard-message ${msg.sender_type === "visitor" ? "visitor" : "agent"}${pending ? " pending" : ""}`;
     if (id > 0) node.dataset.messageId = String(id);
     if (nonce) node.dataset.clientNonce = nonce;
-    node.innerHTML = `${renderDashboardMessageContent(msg)}<small>${escapeHtml(msg.sender_name || msg.sender_type || "")} - ${escapeHtml(msg.created_at || "")}</small>`;
+    node.dataset.receiptStatus = receiptStatus(msg);
+    node.innerHTML = `${renderDashboardMessageContent(msg)}<small>${escapeHtml(dashboardMessageMeta(msg))}</small>`;
     wrap.appendChild(node);
-    wrap.scrollTop = wrap.scrollHeight;
+    scrollDashboardMessagesToLatest();
     if (id > 0) state.lastDetailMessageId = Math.max(state.lastDetailMessageId || 0, id);
     return node;
   }
@@ -876,7 +1345,7 @@
     });
     if (changed) {
       state.lastDetailMessagesHtml = wrap.innerHTML;
-      wrap.scrollTop = wrap.scrollHeight;
+      scrollDashboardMessagesToLatest();
     }
   }
 
@@ -894,62 +1363,95 @@
     form.append("kind", "attachment");
     form.append("attachment", input.files[0]);
     input.value = "";
-    const data = await fetch(api("public_chat_upload.php"), { method: "POST", credentials: "include", body: form })
-      .then((response) => response.json())
+    const data = await fetchFormData("public_chat_upload.php", form)
       .catch((error) => ({ success: false, message: error.message || "Upload failed." }));
     if (!data.success) {
       showActionError(data.message || "Unable to upload attachment.");
       state.uploadingAttachment = false;
       return;
     }
-    showToast("Attachment uploaded.", "success");
     if (data.message) appendDashboardMessage(data.message);
-    pollDetailMessages().catch(() => {});
+    window.setTimeout(() => pollDetailMessages().catch(() => {}), 250);
     state.uploadingAttachment = false;
   }
 
   function formatDuration(seconds) {
+    if (chatShared?.formatDuration) return chatShared.formatDuration(seconds);
     const total = Math.max(0, Number(seconds || 0));
     return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(Math.floor(total % 60)).padStart(2, "0")}`;
   }
 
-  function getSupportedVoiceRecorderType() {
+  function supportedVoiceMimeType() {
+    if (chatShared?.getSupportedVoiceMimeType) return chatShared.getSupportedVoiceMimeType();
     const candidates = [
       "audio/webm;codecs=opus",
-      "audio/ogg;codecs=opus",
       "audio/webm",
-      "audio/ogg",
-      "audio/mp4",
-      "audio/mpeg"
+      "audio/ogg;codecs=opus",
+      "audio/mp4"
     ];
-    if (!window.MediaRecorder?.isTypeSupported) return "";
-    return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+    return candidates.find((type) => window.MediaRecorder?.isTypeSupported?.(type)) || "";
   }
 
-  function voiceExtensionForMime(mimeType) {
+  function voiceCaptureConstraints() {
+    if (chatShared?.staffVoiceCaptureConstraints) return chatShared.staffVoiceCaptureConstraints();
+    return {
+      audio: {
+        echoCancellation: { ideal: true },
+        noiseSuppression: { ideal: true },
+        autoGainControl: { ideal: true },
+        channelCount: { ideal: 1 }
+      }
+    };
+  }
+
+  function hasRecordableAudioTrack(stream) {
+    return stream?.getAudioTracks?.().some((track) => track.readyState === "live" && track.enabled !== false) || false;
+  }
+
+  function normalizeVoiceMimeType(mimeType = "") {
+    if (chatShared?.normalizeVoiceMimeType) return chatShared.normalizeVoiceMimeType(mimeType);
+    const clean = String(mimeType || "").toLowerCase();
+    if (clean.includes("ogg")) return "audio/ogg";
+    if (clean.includes("mp4") || clean.includes("aac") || clean.includes("m4a")) return "audio/mp4";
+    if (clean.includes("mpeg") || clean.includes("mp3")) return "audio/mpeg";
+    if (clean.includes("wav")) return "audio/wav";
+    return "audio/webm";
+  }
+
+  function voiceRecordingMimeType(chunks = []) {
+    const recorderType = String(state.mediaRecorder?.mimeType || "").trim();
+    const chunkType = String(chunks.find((chunk) => chunk?.type)?.type || "").trim();
+    return chunkType || recorderType || "audio/webm";
+  }
+
+  function voiceExtensionForMime(mimeType = "") {
     const clean = String(mimeType || "").toLowerCase();
     if (clean.includes("ogg")) return "ogg";
-    if (clean.includes("mp4")) return "m4a";
+    if (clean.includes("mp4") || clean.includes("aac")) return "m4a";
     if (clean.includes("mpeg") || clean.includes("mp3")) return "mp3";
     if (clean.includes("wav")) return "wav";
     return "webm";
   }
 
-  function createVoiceFile(chunks, startedAt, fallbackType = "") {
-    const type = fallbackType || chunks.find((chunk) => chunk?.type)?.type || "audio/webm";
-    const blob = new Blob(chunks, { type });
-    const extension = voiceExtensionForMime(type);
+  function createVoiceFile(chunks, startedAt) {
+    const mimeType = normalizeVoiceMimeType(voiceRecordingMimeType(chunks));
+    const extension = voiceExtensionForMime(mimeType);
+    const blob = new Blob(chunks, { type: mimeType });
     return {
       blob,
-      file: new File([blob], `voice-note-${Date.now()}.${extension}`, { type }),
+      file: new File([blob], `voice-note-${Date.now()}.${extension}`, { type: mimeType }),
       url: URL.createObjectURL(blob),
-      duration: Math.max(1, Math.round((Date.now() - startedAt) / 1000))
+      duration: Math.max(1, Math.round((Date.now() - startedAt) / 1000)),
+      mimeType
     };
   }
 
   async function toggleAgentVoiceRecording() {
     const btn = document.getElementById("publicChatDashboardVoiceBtn");
     if (state.mediaRecorder?.state === "recording") {
+      try {
+        state.mediaRecorder.requestData?.();
+      } catch (_) {}
       state.mediaRecorder.stop();
       btn?.classList.remove("recording");
       btn?.setAttribute("aria-pressed", "false");
@@ -965,24 +1467,15 @@
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          channelCount: 1
-        }
-      });
-      const audioTrack = stream.getAudioTracks?.()[0];
-      if (!audioTrack || audioTrack.readyState === "ended") {
+      const stream = await navigator.mediaDevices.getUserMedia(voiceCaptureConstraints());
+      if (!hasRecordableAudioTrack(stream)) {
         stream.getTracks().forEach((track) => track.stop());
-        showActionError("No active microphone was found.");
-        return;
+        throw new Error("No active microphone track was returned.");
       }
       state.recordingStream = stream;
       state.voiceChunks = [];
       state.voiceStartedAt = Date.now();
-      const mimeType = getSupportedVoiceRecorderType();
+      const mimeType = supportedVoiceMimeType();
       state.mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       state.mediaRecorder.ondataavailable = (event) => {
         if (event.data?.size) state.voiceChunks.push(event.data);
@@ -991,28 +1484,38 @@
         stream.getTracks().forEach((track) => track.stop());
         state.recordingStream = null;
         stopAgentRecordingTimer();
-        if (!state.voiceChunks.length) {
+        const chunks = state.voiceChunks.filter((chunk) => chunk?.size > 0);
+        const size = chunks.reduce((total, chunk) => total + Number(chunk.size || 0), 0);
+        if (!size) {
+          state.voiceChunks = [];
           state.mediaRecorder = null;
-          showActionError("No audio was captured. Check microphone permissions and try again.");
+          btn?.classList.remove("recording");
+          btn?.setAttribute("aria-pressed", "false");
+          const draftNode = document.getElementById("publicChatDashboardVoiceDraft");
+          if (draftNode) {
+            draftNode.hidden = true;
+            draftNode.innerHTML = "";
+          }
+          showActionError("No audio was captured. Check your microphone permission and try again.");
           return;
         }
-        const draft = createVoiceFile(state.voiceChunks, state.voiceStartedAt, state.mediaRecorder?.mimeType || mimeType);
+        const draft = createVoiceFile(chunks, state.voiceStartedAt);
         state.voiceChunks = [];
         state.voiceDraft = {
           file: draft.file,
           url: draft.url,
           duration: draft.duration,
-          mimeType: draft.file.type
+          mimeType: draft.mimeType
         };
         state.mediaRecorder = null;
         renderAgentVoiceDraft();
       };
-      state.mediaRecorder.start(250);
+      state.mediaRecorder.start(200);
       btn?.classList.add("recording");
       btn?.setAttribute("aria-pressed", "true");
       startAgentRecordingTimer();
-    } catch (_) {
-      showActionError("Unable to access the microphone.");
+    } catch (error) {
+      showActionError(error?.name === "NotAllowedError" ? "Microphone permission is required to record voice notes." : "Unable to access the microphone.");
     }
   }
 
@@ -1024,12 +1527,12 @@
     const render = () => {
       const elapsed = Math.max(0, Math.floor((Date.now() - state.voiceStartedAt) / 1000));
       draft.innerHTML = `
-        <div class="public-chat-voice-preview public-chat-recording-preview">
-          <div class="public-chat-recording-status"><span></span><strong>Recording ${formatDuration(elapsed)}</strong></div>
+        <div class="live-voice-preview live-recording-preview public-chat-voice-preview public-chat-recording-preview">
+          <div class="live-recording-status public-chat-recording-status"><span></span><strong>Recording ${formatDuration(elapsed)}</strong></div>
         </div>
-        <div class="public-chat-voice-actions">
-          <button type="button" class="btn-action" id="publicChatDashboardStopRecording">Stop</button>
-          <button type="button" class="btn-action btn-secondary" id="publicChatDashboardCancelRecording">Cancel</button>
+        <div class="live-voice-actions public-chat-voice-actions">
+          <button type="button" class="btn-action" id="publicChatDashboardStopRecording"><i class="fas fa-stop"></i> Stop</button>
+          <button type="button" class="btn-action btn-secondary" id="publicChatDashboardCancelRecording"><i class="fas fa-trash"></i> Cancel</button>
         </div>
       `;
       document.getElementById("publicChatDashboardStopRecording")?.addEventListener("click", toggleAgentVoiceRecording, { once: true });
@@ -1068,16 +1571,19 @@
     if (!draft || !state.voiceDraft) return;
     draft.hidden = false;
     draft.innerHTML = `
-      <div class="public-chat-voice-preview">
-        <strong>Voice note ${formatDuration(state.voiceDraft.duration)}</strong>
-        <audio controls src="${escapeHtml(state.voiceDraft.url)}"></audio>
+      <div class="live-voice-preview public-chat-voice-preview">
+        <strong><i class="fas fa-microphone-lines"></i> Voice note ${formatDuration(state.voiceDraft.duration)}</strong>
+        <audio controls preload="metadata">
+          <source src="${escapeHtml(state.voiceDraft.url)}" type="${escapeHtml(state.voiceDraft.mimeType || state.voiceDraft.file?.type || "audio/webm")}">
+        </audio>
       </div>
-      <div class="public-chat-voice-actions">
-        <button type="button" class="btn-action" id="publicChatDashboardSendVoiceDraft">Send</button>
-        <button type="button" class="btn-action btn-secondary" id="publicChatDashboardRedoVoiceDraft">Re-record</button>
-        <button type="button" class="btn-action btn-secondary" id="publicChatDashboardDeleteVoiceDraft">Delete</button>
+      <div class="live-voice-actions public-chat-voice-actions">
+        <button type="button" class="btn-action" id="publicChatDashboardSendVoiceDraft"><i class="fas fa-paper-plane"></i> Send</button>
+        <button type="button" class="btn-action btn-secondary" id="publicChatDashboardRedoVoiceDraft"><i class="fas fa-rotate-right"></i> Re-record</button>
+        <button type="button" class="btn-action btn-secondary" id="publicChatDashboardDeleteVoiceDraft"><i class="fas fa-trash"></i> Delete</button>
       </div>
     `;
+    draft.querySelector("audio")?.load?.();
     document.getElementById("publicChatDashboardSendVoiceDraft")?.addEventListener("click", sendAgentVoiceDraft, { once: true });
     document.getElementById("publicChatDashboardRedoVoiceDraft")?.addEventListener("click", redoAgentVoiceDraft, { once: true });
     document.getElementById("publicChatDashboardDeleteVoiceDraft")?.addEventListener("click", clearAgentVoiceDraft, { once: true });
@@ -1086,13 +1592,17 @@
   async function sendAgentVoiceDraft() {
     if (!state.voiceDraft || !state.selectedId || !state.selectedCanReply || state.sendingVoice) return;
     state.sendingVoice = true;
+    const sendButton = document.getElementById("publicChatDashboardSendVoiceDraft");
+    if (sendButton) {
+      sendButton.disabled = true;
+      sendButton.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Sending`;
+    }
     const form = new FormData();
     form.append("session_id", state.selectedId);
     form.append("as_agent", "1");
     form.append("kind", "voice");
-    form.append("attachment", state.voiceDraft.file, state.voiceDraft.file.name || "voice-note.webm");
-    const data = await fetch(api("public_chat_upload.php"), { method: "POST", credentials: "include", body: form })
-      .then((response) => response.json())
+    form.append("attachment", state.voiceDraft.file, state.voiceDraft.file.name || `voice-note.${voiceExtensionForMime(state.voiceDraft.mimeType || state.voiceDraft.file?.type || "audio/webm")}`);
+    const data = await fetchFormData("public_chat_upload.php", form)
       .catch((error) => ({ success: false, message: error.message || "Unable to send voice note." }));
     if (!data.success) {
       showActionError(data.message || "Unable to send voice note.");
@@ -1100,10 +1610,9 @@
       state.sendingVoice = false;
       return;
     }
-    showToast("Voice note sent.", "success");
     clearAgentVoiceDraft();
     if (data.message) appendDashboardMessage(data.message);
-    pollDetailMessages().catch(() => {});
+    window.setTimeout(() => pollDetailMessages().catch(() => {}), 250);
     state.sendingVoice = false;
   }
 
@@ -1128,6 +1637,7 @@
   }
 
   function formatFileSize(bytes) {
+    if (chatShared?.formatFileSize) return chatShared.formatFileSize(bytes);
     const size = Number(bytes || 0);
     if (!size) return "";
     if (size < 1024) return `${size} B`;
@@ -1135,34 +1645,61 @@
     return `${Math.round(size / 104857.6) / 10} MB`;
   }
 
-  function renderDashboardAttachment(att) {
+  function renderDashboardAttachment(att, message = {}) {
     const name = escapeHtml(att.file_name || "Attachment");
     const size = formatFileSize(att.file_size);
-    const url = `../backend/api/${att.preview_url || att.view_url || ""}`;
-    const download = `../backend/api/${att.download_url || att.view_url || ""}`;
-    if (att.is_voice) {
+    const previewPath = att.preview_url || att.view_url || "";
+    const downloadPath = att.download_url || att.view_url || previewPath;
+    const url = previewPath ? `../backend/api/${previewPath}` : "";
+    const download = downloadPath ? `../backend/api/${downloadPath}` : url;
+    const kind = chatShared?.attachmentMediaKind?.(att, message) || (att.is_voice ? "voice" : "file");
+    const escapedUrl = escapeHtml(url);
+    const escapedDownload = escapeHtml(download || url);
+    const downloadLink = download
+      ? `<a class="live-file-download" href="${escapedDownload}" download="${name}"><i class="fas fa-download"></i> Download</a>`
+      : "";
+    if (kind === "voice" || kind === "audio") {
       const mime = escapeHtml(att.mime_type || "audio/webm");
-      const mediaTag = String(att.mime_type || "").toLowerCase().startsWith("video/")
-        ? `<video controls preload="metadata"><source src="${escapeHtml(url)}" type="${mime}"></video>`
-        : `<audio controls preload="metadata"><source src="${escapeHtml(url)}" type="${mime}"></audio>`;
       return `
-        <div class="public-chat-dashboard-attachment voice">
-          <div><strong>Voice note</strong><span>${name}${size ? ` - ${escapeHtml(size)}` : ""}</span></div>
-          ${mediaTag}
-          <div class="public-chat-dashboard-attachment-actions">
-            <a href="${escapeHtml(url)}" target="_blank" rel="noopener">Open</a>
-            <a href="${escapeHtml(download)}" target="_blank" rel="noopener">Download</a>
-          </div>
+        <div class="live-thread-voice-note">
+          <span class="live-thread-voice-icon"><i class="fas fa-microphone-lines" aria-hidden="true"></i></span>
+          <audio controls preload="metadata">
+            <source src="${escapedUrl}" type="${mime}">
+          </audio>
+          ${download ? `<a class="live-thread-voice-download" href="${escapedDownload}" download="${name}" title="Download voice note"><i class="fas fa-download" aria-hidden="true"></i></a>` : ""}
+        </div>
+      `;
+    }
+    if (kind === "image") {
+      return `
+        <figure class="live-file-preview-message">
+          <button type="button" class="live-media-open" data-media-type="image" data-media-url="${escapedUrl}" data-media-download="${escapedDownload}" data-media-name="${name}" data-media-mime="${escapeHtml(att.mime_type || "image/*")}" title="Open photo">
+            <img src="${escapedUrl}" alt="${name}" loading="lazy" decoding="async">
+          </button>
+          <figcaption>${name}${size ? ` - ${escapeHtml(size)}` : ""}</figcaption>
+          ${downloadLink}
+        </figure>
+      `;
+    }
+    if (kind === "video") {
+      const mime = escapeHtml(att.mime_type || "video/webm");
+      return `
+        <div class="live-file-preview-message">
+          <button type="button" class="live-media-open video" data-media-type="video" data-media-url="${escapedUrl}" data-media-download="${escapedDownload}" data-media-name="${name}" data-media-mime="${mime}" title="Open video">
+            <video preload="metadata" muted playsinline>
+              <source src="${escapedUrl}" type="${mime}">
+            </video>
+            <i class="fas fa-video"></i>
+          </button>
+          <span>${name}${size ? ` - ${escapeHtml(size)}` : ""}</span>
+          ${downloadLink}
         </div>
       `;
     }
     return `
-      <div class="public-chat-dashboard-attachment">
-        <div><strong>${name}</strong><span>${escapeHtml(att.mime_type || "File")}${size ? ` - ${escapeHtml(size)}` : ""}</span></div>
-        <div class="public-chat-dashboard-attachment-actions">
-          <button type="button" data-public-chat-view-attachment="${escapeHtml(url)}" data-public-chat-download-attachment="${escapeHtml(download)}" data-public-chat-attachment-name="${name}" data-public-chat-attachment-mime="${escapeHtml(att.mime_type || "")}">View</button>
-          <a href="${escapeHtml(download)}" target="_blank" rel="noopener">Download</a>
-        </div>
+      <div class="live-file-preview-message compact">
+        <a href="${escapedUrl}" target="_blank" rel="noopener"><i class="fas fa-paperclip" aria-hidden="true"></i> ${name}${size ? ` - ${escapeHtml(size)}` : ""}</a>
+        ${downloadLink}
       </div>
     `;
   }
@@ -1170,9 +1707,48 @@
   function renderDashboardMessageContent(msg) {
     const attachments = Array.isArray(msg.attachments) ? msg.attachments : [];
     const text = String(msg.message_text || "").trim();
-    const attachmentHtml = attachments.map(renderDashboardAttachment).join("");
+    const attachmentHtml = attachments.map((att) => renderDashboardAttachment(att, msg)).join("");
     const showText = text && text !== "Attachment uploaded" && text !== "Voice note";
     return `${showText ? `<div>${formatText(text)}</div>` : ""}${attachmentHtml || (!showText ? `<div>${formatText(text || "Message")}</div>` : "")}`;
+  }
+
+  function receiptStatus(message = {}) {
+    return String(message.receiptStatus || message.receipt_status || (message.read_at ? "read" : (message.delivered_at ? "delivered" : "sent")) || "sent").toLowerCase();
+  }
+
+  function receiptLabel(status = "sent") {
+    const normalized = String(status || "sent").toLowerCase();
+    if (normalized === "read") return "Read";
+    if (normalized === "delivered") return "Delivered";
+    if (normalized === "sending") return "Sending";
+    if (normalized === "failed") return "Not sent";
+    return "Sent";
+  }
+
+  function dashboardMessageMeta(message = {}, fallbackTime = "") {
+    const own = message.sender_type === "agent";
+    const sender = own ? "You" : (message.sender_name || message.sender_type || "Visitor");
+    const when = message.created_at || fallbackTime || "";
+    const status = own ? ` - ${receiptLabel(receiptStatus(message))}` : "";
+    return `${sender} - ${when}${status}`;
+  }
+
+  function syncDashboardReceipts(receipts = []) {
+    const wrap = document.getElementById("publicChatDashboardMessages");
+    if (!wrap || !Array.isArray(receipts)) return;
+    receipts.forEach((receipt) => {
+      const id = Number(receipt.message_id || receipt.id || 0);
+      if (id <= 0) return;
+      const node = wrap.querySelector(`.public-chat-dashboard-message.agent[data-message-id="${id}"]`);
+      if (!node || node.classList.contains("pending") || node.classList.contains("failed")) return;
+      const status = receiptStatus(receipt);
+      node.dataset.receiptStatus = status;
+      const small = node.querySelector("small");
+      if (!small) return;
+      const base = small.dataset.baseMeta || small.textContent.replace(/\s-\s(?:Sent|Delivered|Read|Not sent|Sending)$/i, "");
+      small.dataset.baseMeta = base;
+      small.textContent = `${base} - ${receiptLabel(status)}`;
+    });
   }
 
   function openDocumentViewer(url, downloadUrl, name, mime) {
@@ -1206,17 +1782,35 @@
     modal?.setAttribute("aria-hidden", "true");
   }
 
-  async function notifyTyping() {
+  async function notifyTyping(touchActivity = true) {
     if (!state.selectedId) return;
     const now = Date.now();
-    clearTimeout(state.typingStopTimer);
-    state.typingStopTimer = setTimeout(() => stopTyping(false), 1200);
-    if (state.typingTimer && now - state.typingTimer < 250) return;
+    if (touchActivity) {
+      clearTimeout(state.typingStopTimer);
+      state.typingStopTimer = setTimeout(() => stopTyping(false), staffTypingTiming("STAFF_TYPING_IDLE_MS", 5000));
+    }
+    if (state.typingTimer && now - state.typingTimer < staffTypingTiming("STAFF_TYPING_NOTIFY_MS", 250)) return;
     state.typingTimer = now;
     await fetchJson("public_chat_typing.php", { session_id: state.selectedId, as_agent: true, typing: true }).catch(() => {});
+    syncTypingPulse();
+  }
+
+  function syncTypingPulse() {
+    if (!state.selectedId || (state.typingStopTimer === null && !state.typingPulseTimer)) return;
+    if (state.typingPulseTimer) return;
+    state.typingPulseTimer = setInterval(() => {
+      if (!state.selectedId) {
+        if (state.typingPulseTimer) clearInterval(state.typingPulseTimer);
+        state.typingPulseTimer = null;
+        return;
+      }
+      notifyTyping(false);
+    }, staffTypingTiming("STAFF_TYPING_PULSE_MS", 1000));
   }
 
   async function stopTyping(wait) {
+    if (state.typingPulseTimer) clearInterval(state.typingPulseTimer);
+    state.typingPulseTimer = null;
     clearTimeout(state.typingStopTimer);
     state.typingStopTimer = null;
     if (!state.selectedId) return;
@@ -1234,6 +1828,8 @@
     const names = typing.map((item) => item.name || "Visitor").slice(0, 2).join(", ");
     indicator.querySelector("strong").textContent = `${names} ${typing.length === 1 ? "is" : "are"} typing`;
     indicator.hidden = false;
+    clearTimeout(state.typingHideTimer);
+    state.typingHideTimer = setTimeout(hideDashboardTyping, staffTypingTiming("STAFF_TYPING_HIDE_MS", 1200));
   }
 
   function hideDashboardTyping() {
@@ -1253,6 +1849,7 @@
     }
     text.value = "";
     await loadDetail(state.selectedId);
+    closeNoteModal();
     showToast("Internal note added.", "success");
   }
 
@@ -1468,9 +2065,19 @@
     return sections || `<div class="dashboard-empty-message">No analytics breakdown available.</div>`;
   }
 
-  async function loadAll() {
+  async function loadAll(options = {}) {
     if (!state.allowed) return;
-    await loadStats();
+    if (options.force === true || isPublicChatConsoleOpen()) {
+      await loadStats({ force: options.force === true });
+    }
+  }
+
+  function refreshPublicChatDashboard() {
+    if (isPublicChatConsoleOpen()) {
+      state.lastConsoleListHtml = "";
+      loadConsoleWorkspace({ silent: false, force: true }).catch(() => {});
+    }
+    loadAll({ force: true }).catch(() => {});
   }
 
   function startHeartbeat() {
@@ -1478,7 +2085,7 @@
     state.heartbeatTimer = setInterval(() => {
       const sectionActive = document.getElementById("publicChatSection")?.classList.contains("active");
       const consoleOpen = document.getElementById("publicChatConsoleModal")?.classList.contains("open");
-      if (!state.allowed || document.hidden || !sectionActive || !consoleOpen) return;
+      if (!state.allowed || !sectionActive || !consoleOpen) return;
       fetchJson("public_chat_agent.php", { action: "heartbeat" }).catch(() => {});
       refreshAgentAvailability();
     }, 20000);
@@ -1486,41 +2093,74 @@
 
   function startNewChatNotifications() {
     clearInterval(state.notificationTimer);
-    state.notificationTimer = setInterval(checkForNewPublicChats, 2500);
-    checkForNewPublicChats();
+    state.notificationTimer = setInterval(checkForNewPublicChats, 5000);
+    window.setTimeout(() => checkForNewPublicChats().catch(() => {}), 750);
   }
 
   async function checkForNewPublicChats() {
-    if (!state.allowed || document.hidden) return;
-    const availability = await fetchJson("public_chat_availability.php", null, "GET").catch(() => null);
-    if (!availability?.success) return;
-    updateAvailabilityButton(availability.availability);
-    if (!availability.availability?.agent?.online) return;
-    const data = await fetchJson("public_chat_agent.php", { action: "list", status: "waiting" }, "GET").catch(() => null);
-    if (!data?.success) return;
-    (data.sessions || []).forEach((chat) => {
-      const id = String(chat.session_id || "");
-      if (!id || state.notifiedChats.has(id)) return;
-      state.notifiedChats.add(id);
-      showPublicChatNotification(chat);
-    });
-    localStorage.setItem("pensionsgo_public_chat_notified", JSON.stringify(Array.from(state.notifiedChats).slice(-80)));
+    if (!state.allowed) return;
+    const consoleOpen = isPublicChatConsoleOpen();
+    if (!consoleOpen && isStaffChatActive()) return;
+    if (consoleOpen) {
+      if (state.consoleView === "queue" && !state.detailLoading && Date.now() >= state.listPausedUntil) {
+        loadConsoleWorkspace({ silent: true }).catch(() => {});
+      }
+      return;
+    }
+    const now = Date.now();
+    if (!state.availabilityPolling && now - state.lastAvailabilityRefresh > 30000) {
+      state.availabilityPolling = true;
+      state.lastAvailabilityRefresh = now;
+      fetchJson("public_chat_availability.php", null, "GET")
+        .then((availability) => {
+          if (availability?.success) {
+            if (availability.appCsrfToken) state.appCsrfToken = availability.appCsrfToken;
+            updateAvailabilityButton(availability.availability);
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          state.availabilityPolling = false;
+        });
+    }
+    if (!state.agentOnline || state.newChatPolling) return;
+    state.newChatPolling = true;
+    try {
+      const data = await fetchJson("public_chat_agent.php", { action: "list", status: "waiting" }, "GET", true, { timeoutMs: 8000 }).catch(() => null);
+      if (!data?.success) return;
+      if (consoleOpen && state.consoleView === "queue") {
+        const sessions = data.sessions || [];
+        updateConsoleList(sessions.length ? sessions.map(sessionRow).join("") : `<div class="dashboard-empty-message">No records found.</div>`);
+      }
+      (data.sessions || []).forEach((chat) => {
+        const id = String(chat.session_id || "");
+        if (!id || state.notifiedChats.has(id)) return;
+        state.notifiedChats.add(id);
+        showPublicChatNotification(chat);
+      });
+      localStorage.setItem("pensionsgo_public_chat_notified", JSON.stringify(Array.from(state.notifiedChats).slice(-80)));
+    } finally {
+      state.newChatPolling = false;
+    }
   }
 
-  function showPublicChatNotification(chat) {
+  function showPublicChatNotification(chat, options = {}) {
     document.querySelector(".global-broadcast-overlay.public-chat-new-overlay")?.remove();
+    const title = options.title || "New Public Live Chat";
+    const body = options.body || `${chat.visitor_name || "Visitor"} needs help with ${chat.inquiry_category || "General inquiry"}.`;
+    const meta = options.meta || `${chat.district || "Detected location"} - ${chat.created_at || ""}`;
     const modal = document.createElement("div");
     modal.className = "global-broadcast-overlay public-chat-new-overlay";
     modal.innerHTML = `
       <div class="broadcast-popup public-chat-notification-popup">
         <div class="broadcast-header">
-          <h3>New Public Live Chat</h3>
+          <h3>${escapeHtml(title)}</h3>
           <button type="button" class="broadcast-close" aria-label="Close">&times;</button>
         </div>
         <div class="broadcast-body">
           <h4>${escapeHtml(chat.chat_reference || "Public support request")}</h4>
-          <p>${escapeHtml(chat.visitor_name || "Visitor")} needs help with ${escapeHtml(chat.inquiry_category || "General inquiry")}.</p>
-          <small>${escapeHtml(chat.district || "Detected location")} - ${escapeHtml(chat.created_at || "")}</small>
+          <p>${escapeHtml(body)}</p>
+          <small>${escapeHtml(meta)}</small>
         </div>
         <div class="broadcast-actions">
           <button type="button" class="broadcast-btn secondary" data-public-chat-dismiss>Later</button>
@@ -1543,6 +2183,21 @@
     });
   }
 
+  function showPublicChatMessageNotification(message, session) {
+    showPublicChatNotification({
+      session_id: session.session_id || state.selectedId,
+      chat_reference: session.chat_reference || "Public chat",
+      visitor_name: session.visitor_name || message.sender_name || "Visitor",
+      inquiry_category: session.inquiry_category || "Message",
+      district: session.district || "",
+      created_at: message.created_at || ""
+    }, {
+      title: "New Public Chat Message",
+      body: `${message.sender_name || session.visitor_name || "Visitor"} sent a new message.`,
+      meta: message.message_text ? String(message.message_text).slice(0, 140) : (message.created_at || "")
+    });
+  }
+
   function resolveClientAssetUrl(path) {
     const value = String(path || "").trim();
     if (!value) return "";
@@ -1554,11 +2209,11 @@
 
   function playPublicChatNotificationSound() {
     try {
-      if (window.AppSettingsManager?.isBroadcastSoundEnabled && !window.AppSettingsManager.isBroadcastSoundEnabled()) return;
-      const soundPath = window.AppSettingsManager?.getBroadcastSoundPath?.() || "audio/notification.mp3";
       const volume = window.AppSettingsManager?.getBroadcastSoundVolume?.() ?? 0.85;
       const repeats = window.AppSettingsManager?.getBroadcastSoundRepeatCount?.() ?? 1;
-      const audio = new Audio(resolveClientAssetUrl(soundPath));
+      const source = primePublicChatNotificationSound();
+      const audio = source ? source.cloneNode(true) : null;
+      if (!audio) return;
       audio.preload = "auto";
       audio.volume = Math.max(0, Math.min(1, Number(volume)));
       let played = 0;
@@ -1573,10 +2228,24 @@
     } catch (_) {}
   }
 
+  function primePublicChatNotificationSound() {
+    if (window.AppSettingsManager?.isBroadcastSoundEnabled && !window.AppSettingsManager.isBroadcastSoundEnabled()) return null;
+    const soundPath = window.AppSettingsManager?.getBroadcastSoundPath?.() || "audio/notification.mp3";
+    const url = resolveClientAssetUrl(soundPath);
+    if (publicChatNotificationAudio && publicChatNotificationAudioUrl === url) return publicChatNotificationAudio;
+    publicChatNotificationAudioUrl = url;
+    publicChatNotificationAudio = new Audio(url);
+    publicChatNotificationAudio.preload = "auto";
+    publicChatNotificationAudio.load?.();
+    return publicChatNotificationAudio;
+  }
+
   document.addEventListener("DOMContentLoaded", async () => {
     const mount = document.getElementById("publicChatDashboardMount");
     try {
+      await loadChatSharedHelpers();
       const data = await fetchJson("public_chat_bootstrap.php", null, "GET");
+      if (data.appCsrfToken) state.appCsrfToken = data.appCsrfToken;
       state.allowed = Boolean(data.success && data.agent && data.agent.canManage);
       if (!state.allowed) {
         const notice = document.getElementById("publicChatDashboardAccessNotice");
@@ -1586,16 +2255,27 @@
       if (mount) {
         revealDashboardEntry();
         renderDashboardShell();
-        document.getElementById("publicChatRefreshDashboardBtn")?.addEventListener("click", loadAll);
+        document.getElementById("publicChatRefreshDashboardBtn")?.addEventListener("click", refreshPublicChatDashboard);
         document.getElementById("publicChatAvailabilityBtn")?.addEventListener("click", async () => {
+          const button = document.getElementById("publicChatAvailabilityBtn");
           const nextStatus = state.agentOnline ? "offline" : "online";
-          const data = await fetchJson("public_chat_agent.php", { action: "status", agent_status: nextStatus });
-          if (data.success) updateAvailabilityButton(data.availability);
-          if (nextStatus === "online") fetchJson("public_chat_agent.php", { action: "heartbeat" }).catch(() => {});
+          const previousOnline = state.agentOnline;
+          if (button) {
+            button.disabled = true;
+            button.textContent = nextStatus === "online" ? "Setting Online..." : "Setting Offline...";
+          }
+          const data = await fetchJson("public_chat_agent.php", { action: "status", agent_status: nextStatus }).catch((error) => ({ success: false, message: error.message || "Unable to update status." }));
+          if (data.success) {
+            updateAvailabilityButton(data.availability);
+            if (nextStatus === "online") fetchJson("public_chat_agent.php", { action: "heartbeat" }).catch(() => {});
+          } else {
+            updateAvailabilityButton({ agent: { online: previousOnline, status: previousOnline ? "online" : "offline" } });
+            showToast(data.message || "Unable to update public chat status.", "error");
+          }
+          if (button) button.disabled = false;
         });
         updateAvailabilityButton(data.availability);
         await loadAll();
-        await refreshAgentAvailability();
         startHeartbeat();
       }
       startNewChatNotifications();

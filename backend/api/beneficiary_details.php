@@ -1,0 +1,16 @@
+<?php
+header('Content-Type: application/json; charset=utf-8');
+require_once __DIR__ . '/../config.php';
+if (!isset($_SESSION['userId']) || ($_SESSION['userRole'] ?? '') === 'pensioner') { http_response_code(403); echo json_encode(['success'=>false,'message'=>'Access denied']); exit; }
+ensurePensionBeneficiaryTables($conn);
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $ipps=trim((string)($_GET['deceased_ipps_no']??'')); $staffId=(int)($_GET['staffdue_id']??0);
+    if($ipps===''&&$staffId<1){echo json_encode(['success'=>false,'message'=>'Deceased IPPS number or staff reference is required.']);exit;}
+    $stmt=$conn->prepare('SELECT * FROM tb_pension_beneficiaries WHERE (deceased_ipps_no=? OR deceased_staffdue_id=?) AND is_active=1 ORDER BY is_primary DESC, beneficiary_id');
+    $stmt->bind_param('si',$ipps,$staffId);$stmt->execute();echo json_encode(['success'=>true,'records'=>$stmt->get_result()->fetch_all(MYSQLI_ASSOC)]);exit;
+}
+$p=json_decode(file_get_contents('php://input'),true)?:[];$id=(int)($p['beneficiary_id']??0);
+$required=['deceased_ipps_no','first_name','last_name','beneficiary_nin'];foreach($required as $f){if(trim((string)($p[$f]??''))===''){echo json_encode(['success'=>false,'message'=>ucwords(str_replace('_',' ',$f)).' is required.']);exit;}}
+$staffId=(int)($p['deceased_staffdue_id']??0);if($staffId>0){$s=$conn->prepare('SELECT ippsNo,computerNo,retirementType,livingStatus FROM tb_staffdue WHERE id=? LIMIT 1');$s->bind_param('i',$staffId);$s->execute();$officer=$s->get_result()->fetch_assoc();$s->close();if(!$officer){echo json_encode(['success'=>false,'message'=>'Related deceased officer was not found.']);exit;}$officerIpps=trim((string)($officer['ippsNo']?:$officer['computerNo']));if($officerIpps!==''&&strcasecmp($officerIpps,trim((string)$p['deceased_ipps_no']))!==0){echo json_encode(['success'=>false,'message'=>'Deceased IPPS number does not match the selected officer.']);exit;}}
+$sql='INSERT INTO tb_pension_beneficiaries (deceased_staffdue_id,deceased_ipps_no,beneficiary_type,first_name,middle_name,last_name,beneficiary_nin,beneficiary_ipps_no,beneficiary_supplier_no,telephone,email,relationship_to_deceased,administration_reference,earning_start_date,earning_end_date,is_primary,notes,created_by,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())';
+$stmt=$conn->prepare($sql);$type=trim((string)($p['beneficiary_type']??'administrator'));$middle=trim((string)($p['middle_name']??''));$bIpps=trim((string)($p['beneficiary_ipps_no']??''));$supplier=trim((string)($p['beneficiary_supplier_no']??''));$tel=trim((string)($p['telephone']??''));$email=trim((string)($p['email']??''));$relationship=trim((string)($p['relationship_to_deceased']??''));$adminRef=trim((string)($p['administration_reference']??''));$start=trim((string)($p['earning_start_date']??''));$end=trim((string)($p['earning_end_date']??''));$primary=!empty($p['is_primary'])?1:0;$notes=trim((string)($p['notes']??''));$stmt->bind_param('issssssssssssssiss',$staffId,$p['deceased_ipps_no'],$type,$p['first_name'],$middle,$p['last_name'],$p['beneficiary_nin'],$bIpps,$supplier,$tel,$email,$relationship,$adminRef,$start,$end,$primary,$notes,$_SESSION['userId']);$ok=$stmt->execute();echo json_encode(['success'=>$ok,'message'=>$ok?'Beneficiary linked to deceased officer.':$stmt->error,'beneficiary_id'=>$ok?$conn->insert_id:null]);

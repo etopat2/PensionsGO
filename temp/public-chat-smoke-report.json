@@ -1,0 +1,124 @@
+{
+  "marker": "CODEX_PUBLIC_CHAT_FIX_20260714_28",
+  "baseUrl": "http://localhost/PROJECTS/PensionApp",
+  "fakeMedia": true,
+  "public": {},
+  "browserErrors": {
+    "agent": {
+      "console": [],
+      "pageErrors": [],
+      "requestFailures": [
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/get_public_settings.php",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/get_public_settings.php",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/live_chat_call.php?action=poll",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/public_chat_agent.php",
+          "method": "POST",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/public_chat_agent.php",
+          "method": "POST",
+          "error": "net::ERR_ABORTED"
+        }
+      ],
+      "httpErrors": [],
+      "apiResponses": [
+        {
+          "at": 1784038474408,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/public_chat_bootstrap.php"
+        },
+        {
+          "at": 1784038475550,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/login.php"
+        },
+        {
+          "at": 1784038477999,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/public_chat_bootstrap.php"
+        },
+        {
+          "at": 1784038481979,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/get_csrf_token.php"
+        },
+        {
+          "at": 1784038482481,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/public_chat_availability.php"
+        },
+        {
+          "at": 1784038483714,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/public_chat_agent.php"
+        }
+      ]
+    },
+    "visitor": {
+      "console": [
+        {
+          "type": "warning",
+          "text": "Session validation failed: session_validation_timeout"
+        }
+      ],
+      "pageErrors": [],
+      "requestFailures": [
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/get_public_settings.php",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/check_session.php",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        }
+      ],
+      "httpErrors": [],
+      "apiResponses": [
+        {
+          "at": 1784038490866,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/public_chat_bootstrap.php"
+        },
+        {
+          "at": 1784038505119,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/public_chat_availability.php"
+        },
+        {
+          "at": 1784038506234,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/public_chat_availability.php"
+        },
+        {
+          "at": 1784038512384,
+          "status": 200,
+          "url": "http://localhost/PROJECTS/PensionApp/backend/api/public_chat_availability.php"
+        }
+      ]
+    }
+  },
+  "login": {
+    "success": true,
+    "userId": "d5babc6bd2089bcab5496aaf7dcba60d7315c2dec0f3da1fe85262f9654acac7",
+    "userName": "Patrick Etomet",
+    "role": "admin"
+  },
+  "ok": false,
+  "error": "page.waitForSelector: Timeout 12000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#publicChatStartForm') to be visible\u001b[22m\n"
+}

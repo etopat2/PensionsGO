@@ -134,6 +134,7 @@ try {
         'live_chat_add_participants_enabled' => '1',
         'live_chat_attachments_enabled' => '1',
         'live_chat_voice_notes_enabled' => '1',
+        'live_chat_voice_scan_enabled' => '0',
         'live_chat_polls_enabled' => '1',
         'live_chat_typing_presence_enabled' => '1',
         'live_chat_read_receipts_enabled' => '1',
@@ -142,9 +143,9 @@ try {
         'live_chat_admin_delete_enabled' => '1',
         'live_chat_edit_window_minutes' => '5',
         'live_chat_typing_idle_seconds' => '5',
-        'live_chat_message_poll_ms' => '350',
-        'live_chat_receipt_poll_ms' => '250',
-        'live_chat_call_poll_ms' => '500',
+        'live_chat_message_poll_ms' => '1000',
+        'live_chat_receipt_poll_ms' => '1500',
+        'live_chat_call_poll_ms' => '1000',
         'live_chat_signal_poll_ms' => '350',
         'public_chat_enabled' => '1',
         'public_chat_public_pages_enabled' => '1',
@@ -158,13 +159,13 @@ try {
         'public_chat_feedback_page_enabled' => '1',
         'public_chat_terms_enabled' => '1',
         'public_chat_max_message_length' => '2000',
-        'public_chat_poll_interval_ms' => '2500',
+        'public_chat_poll_interval_ms' => '1000',
         'public_chat_offline_message' => 'Public live support is currently unavailable. Please leave a message and the pensions team will follow up.',
         'public_chat_welcome_text' => 'Welcome to UPS PensionsGo public support. How can we help?',
         'public_chat_consent_text' => 'I consent to UPS PensionsGo using these details to respond to this support request.',
         'public_chat_working_hours' => '08:00-17:00',
         'public_chat_max_active_chats_per_agent' => '5',
-        'public_chat_allowed_attachment_types' => 'pdf,jpg,jpeg,png,doc,docx',
+        'public_chat_allowed_attachment_types' => 'pdf,doc,docx,xls,xlsx,csv,txt,jpg,jpeg,png,gif,webp,mp3,wav,ogg,m4a,webm,mp4,mov',
         'public_chat_max_attachment_size_mb' => '5',
         'public_chat_transcript_enabled' => '1',
         'public_chat_feedback_enabled' => '1',
@@ -319,6 +320,7 @@ try {
         'live_chat_add_participants_enabled',
         'live_chat_attachments_enabled',
         'live_chat_voice_notes_enabled',
+        'live_chat_voice_scan_enabled',
         'live_chat_polls_enabled',
         'live_chat_typing_presence_enabled',
         'live_chat_read_receipts_enabled',
@@ -577,6 +579,7 @@ try {
         'live_chat_add_participants_enabled' => 'Live chat add participants',
         'live_chat_attachments_enabled' => 'Live chat attachments',
         'live_chat_voice_notes_enabled' => 'Live chat voice notes',
+        'live_chat_voice_scan_enabled' => 'Live chat voice scan',
         'live_chat_polls_enabled' => 'Live chat polls',
         'live_chat_typing_presence_enabled' => 'Live chat typing presence',
         'live_chat_read_receipts_enabled' => 'Live chat read receipts',
@@ -757,14 +760,18 @@ try {
                 $value = max(1, min(60, $value));
             } elseif ($key === 'live_chat_typing_idle_seconds') {
                 $value = max(2, min(30, $value));
-            } elseif (in_array($key, ['live_chat_message_poll_ms', 'live_chat_receipt_poll_ms', 'live_chat_signal_poll_ms'], true)) {
-                $value = max(150, min(5000, $value));
+            } elseif ($key === 'live_chat_message_poll_ms') {
+                $value = max(750, min(5000, $value));
+            } elseif ($key === 'live_chat_receipt_poll_ms') {
+                $value = max(1000, min(5000, $value));
+            } elseif ($key === 'live_chat_signal_poll_ms') {
+                $value = max(200, min(5000, $value));
             } elseif ($key === 'live_chat_call_poll_ms') {
-                $value = max(300, min(10000, $value));
+                $value = max(750, min(10000, $value));
             } elseif ($key === 'public_chat_max_message_length') {
                 $value = max(250, min(5000, $value));
             } elseif ($key === 'public_chat_poll_interval_ms') {
-                $value = max(800, min(15000, $value));
+                $value = max(1000, min(5000, $value));
             } elseif ($key === 'public_chat_max_active_chats_per_agent') {
                 $value = max(1, min(50, $value));
             } elseif ($key === 'public_chat_max_attachment_size_mb') {

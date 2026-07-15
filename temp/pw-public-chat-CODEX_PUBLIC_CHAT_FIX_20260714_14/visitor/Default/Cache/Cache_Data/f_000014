@@ -1,0 +1,1225 @@
+/* HEADER STYLES - Professional Design with Better Visibility */
+
+@import url("color-variables.css");
+
+.header-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--header-bg);
+  color: var(--header-text);
+  padding: 0.5rem 1.5rem;
+  box-shadow: 0 6px 20px var(--shadow-dark);
+  position: relative;
+  z-index: 1000;
+  border-bottom: 3.5px solid var(--header-border);
+}
+
+.menu-and-title {
+  display: flex;
+  align-items: center;
+  gap: 3rem;
+  position: relative;
+  flex: 1;
+}
+
+.menu-and-title h1 {
+  font-size: 1.7rem;
+  margin: 0;
+  font-weight: 800;
+  color: var(--header-text);
+  text-shadow: var(--text-glow);
+  letter-spacing: 0.5px;
+  animation: gentleGlow 2s ease-in-out infinite;
+}
+
+.menu-icon {
+  font-size: 1.5rem;
+  justify-content: center;
+  width: 3rem;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--header-border);
+  color: var(--primary-gold);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 0.5rem;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.menu-icon:hover {
+  background: var(--hover-bg-gold);
+  color: var(--primary-blue);
+  transform: scale(1.1);
+  border-color: var(--primary-gold);
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  position: relative;
+}
+
+/* Compact Mobile Layout*/
+@media (max-width: 768px) {
+  .header-wrapper {
+    flex-direction: row;
+    align-items: center;
+    padding: 0.5rem 0.5rem;
+    min-height: 60px;
+  }
+
+  .menu-and-title {
+    width: auto;
+    justify-content: flex-start;
+    margin-bottom: 0;
+    flex: 1;
+  }
+
+  .menu-and-title h1 {
+    font-size: 1.4rem;
+    text-align: center;
+    flex: 1;
+    margin: 0 auto;
+    padding: 0 0.5rem;
+  }
+
+  .header-right {
+    width: auto;
+    justify-content: flex-end;
+    gap: 0.2rem;
+    flex-shrink: 0;
+  }
+
+  /* Remove background from user profile on mobile */
+  .user-profile {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Hide profile name and dropdown arrow on mobile */
+  .user-profile .profile-dropdown-toggle span {
+    display: none !important;
+  }
+
+  .user-profile .profile-dropdown-toggle {
+    gap: 0;
+    padding: 0;
+    background: transparent;
+  }
+
+  /* Larger profile picture on mobile */
+  .profile-picture {
+    width: 50px !important;
+    height: 50px !important;
+    margin-right: 0;
+    border: 3px solid var(--primary-gold) !important;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  /* Remove hover effects that would show background */
+  .user-profile:hover {
+    background: transparent !important;
+    transform: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Keep picture hover effect */
+  .user-profile:hover .profile-picture {
+    border-color: var(--primary-blue) !important;
+    transform: scale(1.1) !important;
+    box-shadow: 0 4px 12px rgba(0, 51, 102, 0.4) !important;
+  }
+
+  /* Smaller theme toggle on mobile */
+  .theme-toggle {
+    font-size: 1.1rem;
+    padding: 0.3rem;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Ensure all elements stay in one line with proper touch targets */
+  .menu-icon {
+    font-size: 1.3rem;
+    padding: 0.4rem;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  /* Compact Mobile Dropdown Menu*/
+  .dropdown-menu {
+    position: fixed;
+    top: 60px;
+    left: 0.5rem;
+    right: 0.5rem;
+    width: auto;
+    padding: 0.3rem 0 !important;
+    z-index: 1002 !important;
+  }
+
+  /* Ultra-compact dropdown list items */
+  .dropdown-menu li {
+    margin: 0.08rem 0.4rem !important;
+    border-radius: 5px;
+    justify-content: center;
+  }
+
+  .dropdown-menu a {
+    padding: 7px 10px !important;
+    font-size: 1rem !important;
+    line-height: 1.2 !important;
+    border-left-width: 2px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  .dropdown-menu hr {
+    margin: 0.25rem 0.6rem !important;
+    height: 0.5px !important;
+  }
+
+  /* Compact Profile Dropdown*/
+  .profile-dropdown {
+    position: fixed;
+    top: 65px;
+    right: 0.5rem;
+    left: auto;
+    width: 130px;
+    padding: 0.3rem 0 !important;
+    z-index: 1002 !important;
+  }
+
+  .profile-dropdown li {
+    margin: 0.08rem 0.4rem !important;
+    border-radius: 5px;
+  }
+
+  .profile-dropdown a {
+    padding: 8px 10px !important;
+    font-size: 1rem !important;
+    line-height: 1.2 !important;
+    border-right-width: 2px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-wrapper {
+    padding: 0.4rem 0.3rem;
+  }
+
+  .menu-and-title h1 {
+    font-size: 1.2rem;
+    padding: 0 0.3rem;
+  }
+
+  .menu-icon {
+    font-size: 1.2rem;
+    padding: 0.3rem;
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  .theme-toggle {
+    font-size: 1rem;
+    padding: 0.25rem;
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  /* Slightly smaller but still prominent profile picture on very small screens */
+  .profile-picture {
+    width: 44px !important;
+    height: 44px !important;
+    border: 2.5px solid var(--primary-gold) !important;
+  }
+
+  .user-profile {
+    padding: 0 !important;
+  }
+
+  /* Even More Compact On Smaller Screens*/
+  .dropdown-menu {
+    left: 0.25rem;
+    right: 0.25rem;
+    max-width: calc(100vw - 0.5rem);
+    padding: 0.2rem 0 !important;
+  }
+
+  .dropdown-menu li {
+    margin: 0.06rem 0.3rem !important;
+  }
+
+  .dropdown-menu a {
+    padding: 12px 8px !important;
+    font-size: 0.82rem !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  .dropdown-menu hr {
+    margin: 0.2rem 0.5rem !important;
+  }
+
+  .profile-dropdown {
+    right: 0.25rem;
+    width: 140px;
+    padding: 0.2rem 0 !important;
+  }
+
+  .profile-dropdown li {
+    margin: 0.06rem 0.3rem !important;
+  }
+
+  .profile-dropdown a {
+    padding: 12px 8px !important;
+    font-size: 0.78rem !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+}
+
+/* Extra small devices */
+@media (max-width: 360px) {
+  .header-wrapper {
+    padding: 0.3rem 0.5rem;
+  }
+
+  .menu-and-title h1 {
+    font-size: 1.1rem;
+  }
+
+  .menu-icon {
+    font-size: 1.1rem;
+    padding: 0.25rem;
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  .theme-toggle {
+    font-size: 0.9rem;
+    padding: 0.2rem;
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  /* Maintain good size even on smallest screens */
+  .profile-picture {
+    width: 44px !important;
+    height: 44px !important;
+    border: 2px solid var(--primary-gold) !important;
+  }
+
+  /* Ultra Compact On Smallest Screens*/
+  .dropdown-menu {
+    padding: 0.15rem 0 !important;
+  }
+
+  .dropdown-menu li {
+    margin: 0.05rem 0.25rem !important;
+  }
+
+  .dropdown-menu a {
+    padding: 12px 7px !important;
+    font-size: 0.8rem !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  .dropdown-menu hr {
+    margin: 0.15rem 0.4rem !important;
+  }
+
+  .profile-dropdown {
+    width: 140px;
+    padding: 0.5rem 0 !important;
+  }
+
+  .profile-dropdown li {
+    margin: 0.5rem 0.5rem !important;
+  }
+
+  .profile-dropdown a {
+    padding: 12px 7px !important;
+    font-size: 0.8rem !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+}
+
+/* Ensure Single Line Layout*/
+/* Prevent wrapping on all screen sizes */
+.header-wrapper {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.menu-and-title,
+.header-right {
+  flex-shrink: 0;
+}
+
+.menu-and-title h1 {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Compact user profile dropdown toggle */
+.profile-dropdown-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+/* PROFESSIONAL DROPDOWN MENU (Desktop) */
+
+.dropdown-menu {
+  background: var(--menu-bg);
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 230px;
+  padding: 1rem 0;
+  z-index: 1001;
+  box-shadow: var(--menu-shadow);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  display: none;
+}
+
+.dropdown-menu.visible {
+  display: block;
+  animation: slideDown 0.2s ease-out;
+}
+
+.dropdown-menu.hidden {
+  display: none;
+}
+
+.dropdown-menu ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.dropdown-menu li {
+  margin: 0 0.5rem;
+  border-radius: 6px;
+  overflow: hidden;
+  transition: all 0.25s ease;
+  background: var(--menu-bg);
+}
+
+.dropdown-menu li:hover {
+  background: var(--menu-item-hover);
+  transform: translateX(3px);
+}
+
+.dropdown-menu a {
+  display: block;
+  padding: 4px 12px;
+  color: var(--text-color);
+  text-decoration: none;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: all 0.25s ease;
+  background: transparent;
+  line-height: 1.3;
+  border-left: 3px solid transparent;
+  border-radius: 6px;
+}
+
+.dropdown-menu a:hover {
+  color: var(--hover-text);
+  background: var(--menu-item-hover);
+  border-left-color: var(--primary-gold);
+  transform: translateX(3px);
+}
+
+.dropdown-menu a.active {
+  background: var(--menu-item-active);
+  color: var(--hover-text);
+  border-left-color: var(--primary-gold);
+  font-weight: 600;
+}
+
+.dropdown-menu hr {
+  border: none;
+  height: 1px;
+  background: var(--divider-color);
+  margin: 0.4rem 0.8rem;
+  border-radius: 1px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    var(--divider-color) 20%, 
+    var(--primary-gold) 50%, 
+    var(--divider-color) 80%, 
+    transparent 100%);
+}
+
+/* PROFESSIONAL PROFILE DROPDOWN (Desktop) */
+
+.user-profile {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  position: relative;
+  border: 1px solid var(--header-border);
+}
+
+.user-profile:hover {
+  background: var(--hover-bg-gold);
+  color: var(--primary-blue);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.25);
+}
+
+.profile-picture {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 6px;
+  border: 2px solid var(--primary-gold);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
+}
+
+.user-profile:hover .profile-picture {
+  border-color: var(--primary-blue);
+  transform: scale(1.05);
+}
+
+.profile-dropdown-toggle {
+  background: none;
+  border: none;
+  color: var(--primary-gold);
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.user-profile:hover .profile-dropdown-toggle {
+  color: var(--primary-blue);
+}
+
+.profile-dropdown {
+  position: absolute;
+  top: 110%;
+  right: 0;
+  padding: 0.5rem 0;
+  background: var(--menu-bg);
+  box-shadow: var(--menu-shadow);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  z-index: 1001;
+  min-width: 160px;
+  display: none;
+}
+
+.profile-dropdown.visible {
+  display: block;
+  animation: slideDown 0.2s ease-out;
+}
+
+.profile-dropdown.hidden {
+  display: none;
+}
+
+.profile-dropdown ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.profile-dropdown li {
+  margin: 0.1rem 0.5rem;
+  border-radius: 6px;
+  overflow: hidden;
+  transition: all 0.25s ease;
+  background: var(--menu-bg);
+}
+
+.profile-dropdown li:hover {
+  background: var(--menu-item-hover);
+  transform: translateX(-2px);
+}
+
+.profile-dropdown a {
+  display: block;
+  padding: 5px 12px;
+  text-decoration: none;
+  color: var(--text-color);
+  font-size: 1rem;
+  font-weight: 500;
+  transition: all 0.25s ease;
+  background: transparent;
+  line-height: 1.3;
+  border-right: 3px solid transparent;
+  border-radius: 6px;
+}
+
+.profile-dropdown a:hover {
+  color: var(--hover-text) !important;
+  background: var(--menu-item-hover);
+  border-right-color: var(--primary-gold);
+  transform: translateX(-2px);
+}
+
+.profile-dropdown a.active {
+  background: var(--menu-item-active);
+  color: var(--hover-text);
+  border-right-color: var(--primary-gold);
+  font-weight: 600;
+}
+
+/* Animations*/
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes gentleGlow {
+  0%, 100% {
+    text-shadow: 0 0 10px rgba(212, 175, 55, 0.7), 0 0 20px rgba(212, 175, 55, 0.5), 0 0 30px rgba(212, 175, 55, 0.3);
+  }
+  50% {
+    text-shadow: 0 0 15px rgba(212, 175, 55, 0.8), 0 0 25px rgba(212, 175, 55, 0.6), 0 0 35px rgba(212, 175, 55, 0.4);
+  }
+}
+
+/* Accessibility And Focus Management*/
+/* Focus styles for accessibility */
+.menu-icon:focus,
+/* .theme-toggle:focus, */
+.profile-dropdown-toggle:focus,
+.dropdown-menu a:focus,
+.profile-dropdown a:focus {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+/* Message And Task Bubble Styling*/
+.messages-link {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.message-bubble {
+  background: var(--primary-maroon);
+  color: white;
+  border-radius: 10px;
+  padding: 2px 6px;
+  font-size: 0.7rem;
+  font-weight: bold;
+  min-width: 18px;
+  text-align: center;
+  margin-left: 8px;
+}
+
+.message-bubble.hidden {
+  display: none;
+}
+
+.task-bubble {
+  background: var(--primary-blue);
+  color: white;
+  border-radius: 10px;
+  padding: 2px 6px;
+  font-size: 0.7rem;
+  font-weight: bold;
+  min-width: 18px;
+  text-align: center;
+  margin-left: 8px;
+}
+
+.task-bubble.hidden {
+  display: none;
+}
+
+/* Mobile message and task bubbles */
+@media (max-width: 768px) {
+  .message-bubble,
+  .task-bubble {
+    font-size: 0.65rem;
+    padding: 1px 5px;
+    min-width: 16px;
+  }
+}
+
+/* Utility Classes*/
+/* Ensure hidden class works properly */
+.hidden {
+  display: none !important;
+}
+
+/* Smooth transitions for showing/hiding menu items */
+.dropdown-menu li,
+.profile-dropdown li {
+  transition: all 0.3s ease;
+}
+
+/* When items are hidden, they should collapse smoothly */
+.dropdown-menu li.hidden,
+.profile-dropdown li.hidden {
+  opacity: 0;
+  height: 0;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  border: none;
+  transform: scaleY(0);
+}
+
+/* Mobile Dropdown Overlay For Better Ux - Fixed Version*/
+/* Mobile Overlay Fix - Ensures Menu Items Are Clickable*/
+/* Only make the overlay background clickable, not the entire area */
+.dropdown-overlay::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* Only this pseudo-element is clickable, not the overlay itself */
+  pointer-events: auto;
+  /* Ensure it doesn't block menu interactions */
+  z-index: -1;
+}
+
+/* CRITICAL: Ensure menus are ABOVE the overlay and clickable */
+.dropdown-menu,
+.profile-dropdown {
+  z-index: 1002 !important;
+  pointer-events: auto !important;
+}
+
+/* CRITICAL: Ensure menu items are clickable */
+.dropdown-menu a,
+.profile-dropdown a,
+.dropdown-menu li,
+.profile-dropdown li {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Remove any blur effects that might interfere */
+body.dropdown-open main,
+body.dropdown-open header,
+body.dropdown-open footer,
+body.dropdown-open .main-wrapper {
+  filter: none !important;
+  pointer-events: auto !important;
+  user-select: auto !important;
+}
+
+/* Prevent body scroll when modal is open */
+body.modal-open
+ {
+  overflow: hidden;
+}
+
+/* Mobile animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* High-contrast mode for better mobile visibility */
+@media (max-width: 768px) and (prefers-contrast: high) {
+  .dropdown-menu,
+  .profile-dropdown {
+    border-width: 2px;
+  }
+  
+  .dropdown-menu a,
+  .profile-dropdown a {
+    font-weight: 600;
+  }
+}
+
+/* Touch Device Optimizations*/
+/* Improve touch feedback for all interactive elements */
+.menu-icon:active,
+.theme-toggle:active,
+.profile-picture:active,
+.dropdown-menu a:active,
+.profile-dropdown a:active {
+  transform: scale(0.95);
+  transition: transform 0.1s ease;
+}
+
+/* Ensure proper cursor for all interactive elements */
+.menu-icon,
+.theme-toggle,
+.profile-picture,
+.dropdown-menu a,
+.profile-dropdown a,
+.profile-dropdown-toggle {
+  cursor: pointer;
+}
+
+/* High Contrast Mode Support*/
+@media (prefers-contrast: high) {
+  .header-wrapper {
+    border-bottom-width: 4px;
+  }
+  
+  .dropdown-menu,
+  .profile-dropdown {
+    border-width: 2px;
+  }
+  
+  .menu-icon {
+    border-width: 2px;
+  }
+}
+
+/* Reduced Motion Support*/
+@media (prefers-reduced-motion: reduce) {
+  .menu-and-title h1 {
+    animation: none;
+  }
+  
+  .dropdown-menu.visible,
+  .profile-dropdown.visible {
+    animation: none;
+  }
+  
+  .menu-icon,
+  .theme-toggle,
+  .user-profile,
+  .dropdown-menu li,
+  .profile-dropdown li,
+  .dropdown-menu a,
+  .profile-dropdown a {
+    transition: none;
+  }
+}
+
+/* Critical Fixes For Menu Functionality*/
+/* Ensure visibility classes work properly */
+.dropdown-menu.visible,
+.profile-dropdown.visible {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+}
+
+.dropdown-menu.hidden,
+.profile-dropdown.hidden {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+/* Force pointer events for interactive elements */
+.menu-icon,
+.theme-toggle,
+.user-profile,
+.profile-dropdown-toggle,
+.profile-picture {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+}
+
+/* Ensure user profile area is clickable */
+.user-profile {
+  pointer-events: auto !important;
+}
+
+.user-profile * {
+  pointer-events: auto !important;
+}
+
+/* Prevent any interference from other styles */
+header * {
+  box-sizing: border-box;
+}
+
+/* Ensure no other styles are hiding our elements */
+#menuToggle,
+#userProfile,
+#profileDropdownToggle,
+#profilePicture {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Desktop Hover Behavior Fixes*/
+@media (min-width: 769px) {
+  /* Ensure hover works for desktop */
+  .menu-and-title:hover .dropdown-menu:not(.hidden),
+  .header-right:hover .profile-dropdown:not(.hidden) {
+    display: block !important;
+  }
+  
+  /* Smooth hover transitions */
+  .dropdown-menu {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+  
+  .profile-dropdown {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+}
+
+/* Touch Device Fixes For Desktop Touch Screens*/
+/* Ensure touch works on desktop touch devices */
+@media (hover: none) and (pointer: coarse) {
+  .menu-icon:active,
+  .theme-toggle:active,
+  .user-profile:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
+  }
+  
+  /* Override hover effects for touch devices */
+  .dropdown-menu li:hover,
+  .profile-dropdown li:hover,
+  .dropdown-menu a:hover,
+  .profile-dropdown a:hover {
+    background: transparent;
+    transform: none;
+  }
+  
+  /* Active state for touch feedback */
+  .dropdown-menu li:active,
+  .profile-dropdown li:active,
+  .dropdown-menu a:active,
+  .profile-dropdown a:active {
+    background: var(--menu-item-hover);
+    transform: translateX(3px);
+  }
+}
+
+/* Z-index Management For Proper Stacking*/
+#mainHeader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 3000 !important;
+}
+
+.header-wrapper {
+  z-index: 3001;
+}
+
+.dropdown-menu {
+  z-index: 3002;
+}
+
+.profile-dropdown {
+  z-index: 3002;
+}
+
+.dropdown-overlay {
+  z-index: 3001;
+}
+
+/* Ensure modals are properly stacked */
+.logout-modal-overlay:not(.workflow-modal-overlay) {
+  z-index: var(--z-modal-layer, 12000);
+}
+
+.session-overlay,
+.session-warning-overlay,
+.inactivity-warning {
+  z-index: var(--z-session-overlay, 2147483647) !important;
+}
+
+.logout-overlay {
+  z-index: 10001;
+}
+
+/* Fallback Styles For Javascript Failure*/
+/* Ensure menus are accessible even if JavaScript fails */
+.no-js .dropdown-menu,
+.no-js .profile-dropdown {
+  display: none;
+}
+
+.no-js .menu-icon:hover + .dropdown-menu,
+.no-js .menu-icon:focus + .dropdown-menu,
+.no-js .user-profile:hover + .profile-dropdown,
+.no-js .user-profile:focus + .profile-dropdown {
+  display: block;
+}
+
+/* Accessibility Enhancements*/
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .dropdown-menu,
+  .profile-dropdown {
+    border: 2px solid var(--border-color);
+  }
+  
+  .dropdown-menu a,
+  .profile-dropdown a {
+    font-weight: 600;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-menu.visible,
+  .profile-dropdown.visible {
+    animation: none;
+  }
+  
+  .menu-icon,
+  .theme-toggle,
+  .user-profile {
+    transition: none;
+  }
+}
+
+/* Print Styles*/
+@media print {
+  .dropdown-menu,
+  .profile-dropdown,
+  .dropdown-overlay {
+    display: none !important;
+  }
+}
+
+/* 2026 Professional Navigation Refinement */
+body.layout-authenticated .header-wrapper {
+  padding: 0.72rem 1.15rem;
+  background:
+    radial-gradient(circle at top right, rgba(210, 163, 52, 0.2), transparent 24%),
+    linear-gradient(135deg, var(--primary-maroon) 0%, var(--primary-blue) 100%);
+  border-bottom: 2px solid rgba(210, 163, 52, 0.78);
+  box-shadow: 0 16px 32px rgba(41, 26, 19, 0.28);
+}
+
+.menu-and-title {
+  gap: 1rem;
+  min-width: 0;
+}
+
+.menu-and-title h1 {
+  font-size: clamp(1.15rem, 1vw + 1rem, 1.52rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-shadow: none;
+  animation: none;
+}
+
+.menu-icon,
+.theme-toggle {
+  width: 2.85rem;
+  min-width: 2.85rem;
+  min-height: 2.85rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: var(--primary-gold-light);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.14);
+}
+
+.menu-icon:hover,
+.theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fffaf2;
+  transform: translateY(-1px);
+  box-shadow: 0 14px 24px rgba(0, 0, 0, 0.2);
+}
+
+.header-right {
+  gap: 0.65rem;
+}
+
+.user-profile {
+  border-radius: 16px;
+  padding: 0.34rem 0.58rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 12px 22px rgba(0, 0, 0, 0.1);
+}
+
+.user-profile:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fffaf2;
+  transform: translateY(-1px);
+  box-shadow: 0 16px 28px rgba(0, 0, 0, 0.16);
+}
+
+.profile-picture {
+  width: 44px;
+  height: 44px;
+  margin-right: 0.55rem;
+  border: 2px solid rgba(210, 163, 52, 0.92);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+}
+
+.user-profile:hover .profile-picture {
+  border-color: #fff1cb;
+  transform: scale(1.03);
+}
+
+.profile-dropdown-toggle {
+  color: #fff9ef;
+  font-size: 0.86rem;
+  font-weight: 700;
+  padding: 0.2rem 0.28rem;
+}
+
+.dropdown-menu,
+.profile-dropdown {
+  background: rgba(255, 253, 249, 0.98);
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 86%, #fff 14%);
+  box-shadow: 0 24px 44px rgba(41, 26, 19, 0.2);
+  padding: 0.32rem;
+}
+
+.dropdown-menu {
+  width: min(260px, calc(100vw - 1rem));
+}
+
+.profile-dropdown {
+  min-width: 190px;
+}
+
+.dropdown-menu li,
+.profile-dropdown li {
+  margin: 0;
+  border-radius: 12px;
+}
+
+.dropdown-menu li:hover,
+.profile-dropdown li:hover {
+  background: transparent;
+  transform: none;
+}
+
+.dropdown-menu a,
+.profile-dropdown a {
+  padding: 0.46rem 0.82rem;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  line-height: 1.2;
+  border-left: none;
+  border-right: none;
+}
+
+.dropdown-menu a:hover,
+.profile-dropdown a:hover {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary-maroon) 92%, #000 8%), color-mix(in srgb, var(--primary-maroon-light) 80%, var(--primary-maroon) 20%));
+  color: #fffaf2 !important;
+  border-left-color: transparent;
+  border-right-color: transparent;
+  transform: none;
+}
+
+.dropdown-menu a.active,
+.profile-dropdown a.active {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary-maroon) 94%, #000 6%), color-mix(in srgb, var(--primary-maroon-light) 84%, var(--primary-maroon) 16%));
+  color: #fffaf2;
+  border-left-color: transparent;
+  border-right-color: transparent;
+  box-shadow: inset 0 0 0 1px rgba(255, 241, 203, 0.14);
+}
+
+.dropdown-menu hr {
+  margin: 0.4rem 0.3rem;
+  background: linear-gradient(90deg, transparent 0%, rgba(109, 17, 22, 0.14) 18%, rgba(210, 163, 52, 0.5) 50%, rgba(109, 17, 22, 0.14) 82%, transparent 100%);
+}
+
+@media (max-width: 768px) {
+  body.layout-authenticated .header-wrapper {
+    padding: 0.65rem 0.7rem;
+    min-height: 64px;
+  }
+
+  .menu-and-title h1 {
+    font-size: 1.22rem;
+  }
+
+  .header-right {
+    gap: 0.35rem;
+  }
+
+  .menu-icon,
+  .theme-toggle {
+    width: 2.7rem;
+    min-width: 2.7rem;
+    min-height: 2.7rem;
+  }
+
+  .dropdown-menu,
+  .profile-dropdown {
+    border-radius: 16px;
+    padding: 0.28rem;
+  }
+
+  .dropdown-menu a,
+  .profile-dropdown a {
+    padding: 0.5rem 0.78rem !important;
+    font-size: 0.88rem !important;
+  }
+}
+

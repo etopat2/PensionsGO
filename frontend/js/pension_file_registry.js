@@ -2044,6 +2044,7 @@ async function initPensionFileRegistryController() {
     }
   }
 
+  let lastRegistryRenderSignature = "";
   function applyRegistryPayload(data) {
     populateSelectOptions(boxNumberFilter, data.boxNumberOptions || [], "All Box Numbers");
 
@@ -2053,10 +2054,14 @@ async function initPensionFileRegistryController() {
     updateSummary(totalRecords, currentPage, totalPages);
 
     if (!Array.isArray(data.records) || !data.records.length) {
+      lastRegistryRenderSignature = "empty:" + currentPage + ":" + totalRecords;
       grid.innerHTML = '<div class="app-state-message app-state-neutral">No pension registry records found.</div>';
       return;
     }
 
+    const signature = JSON.stringify([currentPage, totalRecords, data.records]);
+    if (signature === lastRegistryRenderSignature) return;
+    lastRegistryRenderSignature = signature;
     grid.innerHTML = data.records.map((record) => renderCard(record)).join("");
     bindCardActions(data.records);
   }
@@ -2098,6 +2103,7 @@ async function initPensionFileRegistryController() {
         return;
       }
       if (!res.ok || !data.success) {
+        lastRegistryRenderSignature = "";
         grid.innerHTML = `<div class="app-state-message app-state-error">${escapeHtml(data.message || "Unable to load registry records.")}</div>`;
         updateSummary(0, currentPage, 1);
         return;
@@ -2110,6 +2116,7 @@ async function initPensionFileRegistryController() {
         return;
       }
       console.error("Registry load failed:", err);
+      lastRegistryRenderSignature = "";
       updateSummary(0, 1, 1);
       grid.innerHTML = '<div class="app-state-message app-state-error">Unable to load registry records.</div>';
     } finally {
@@ -4027,6 +4034,12 @@ async function initPensionFileRegistryController() {
   bindRegistryEditFieldTracking();
   initEditTabs();
   await loadCards();
+  const refreshVisibleRegistry = () => { if (!document.hidden && !activeCardsController) loadCards(); };
+  window.addEventListener("focus", refreshVisibleRegistry);
+  window.addEventListener("pageshow", refreshVisibleRegistry);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshVisibleRegistry(); });
+  const registryRealtimeTimer = window.setInterval(refreshVisibleRegistry, 30000);
+  window.addEventListener("pagehide", () => window.clearInterval(registryRealtimeTimer), { once: true });
   await restoreViewerReturnContextIfPresent();
 }
 

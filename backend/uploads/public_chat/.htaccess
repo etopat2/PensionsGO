@@ -1,0 +1,5 @@
+Options -Indexes
+<FilesMatch "\.(php|php[0-9]?|phtml|phar|cgi|pl|py|rb|sh|asp|aspx|jsp|js|mjs|html?|shtml|svg)$">
+  Require all denied
+</FilesMatch>
+AddType text/plain .php .php3 .php4 .php5 .php7 .phtml .phar .cgi .pl .py .rb .sh .asp .aspx .jsp

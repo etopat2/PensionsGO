@@ -4,7 +4,7 @@ require_once __DIR__ . '/live_chat_common.php';
 try {
     $userId = liveChatRequireStaff($conn);
     liveChatEnsureTables($conn);
-    liveChatTouchPresence($conn, $userId);
+    liveChatReleaseSessionLock();
 
     $data = $_SERVER['REQUEST_METHOD'] === 'POST' ? liveChatJsonInput() : $_GET;
     $action = (string)($data['action'] ?? 'poll');
@@ -69,14 +69,24 @@ try {
         }
         $callerId = (string)($callRow['caller_id'] ?? '');
         $calleeId = (string)($callRow['callee_id'] ?? '');
+        $currentStatus = (string)($callRow['status'] ?? '');
         if (!in_array((string)$userId, [$callerId, $calleeId], true)) {
             throw new RuntimeException('Invalid call participant.');
         }
         if (in_array($status, ['accepted', 'rejected'], true) && (string)$userId !== $calleeId) {
             throw new RuntimeException('Only the recipient can answer or reject this call.');
         }
-        if ($status === 'missed' && (string)$userId !== $callerId) {
-            throw new RuntimeException('Only the caller can mark this call as missed.');
+        if (in_array($currentStatus, ['rejected', 'ended', 'missed'], true)) {
+            liveChatRespond(['success' => true, 'status' => $currentStatus, 'closed' => true, 'acceptedAt' => null]);
+        }
+        if ($status === 'accepted' && $currentStatus !== 'ringing') {
+            throw new RuntimeException('This call can no longer be accepted.');
+        }
+        if (in_array($status, ['rejected', 'missed'], true) && $currentStatus !== 'ringing') {
+            throw new RuntimeException('This call is no longer ringing.');
+        }
+        if ($status === 'ended' && !in_array($currentStatus, ['ringing', 'accepted'], true)) {
+            throw new RuntimeException('This call has already ended.');
         }
         $stmt = $conn->prepare("
             UPDATE tb_live_chat_calls
@@ -88,10 +98,22 @@ try {
         $stmt->bind_param('ssssss', $status, $status, $status, $callId, $userId, $userId);
         $stmt->execute();
         $stmt->close();
+        $acceptedAt = date('c');
+        if ($status === 'accepted') {
+            liveChatInsertCallSignal($conn, $callId, $calleeId, $callerId, 'call_accept', ['acceptedAt' => $acceptedAt]);
+        } elseif ($status === 'rejected') {
+            liveChatInsertCallSignal($conn, $callId, $calleeId, $callerId, 'hangup', ['reason' => 'rejected']);
+        } elseif ($status === 'missed') {
+            $recipientId = (string)$userId === $callerId ? $calleeId : $callerId;
+            liveChatInsertCallSignal($conn, $callId, (string)$userId, $recipientId, 'hangup', ['reason' => 'unanswered']);
+        } elseif ($status === 'ended') {
+            $recipientId = (string)$userId === $callerId ? $calleeId : $callerId;
+            liveChatInsertCallSignal($conn, $callId, (string)$userId, $recipientId, 'hangup', ['reason' => 'ended']);
+        }
         if (in_array($status, ['rejected', 'ended', 'missed'], true)) {
             liveChatCreateCallThreadRecord($conn, $callId);
         }
-        liveChatRespond(['success' => true]);
+        liveChatRespond(['success' => true, 'acceptedAt' => $status === 'accepted' ? $acceptedAt : null]);
     }
 
     if ($action === 'history') {
@@ -143,18 +165,26 @@ try {
         if ($payloadJson === false || strlen($payloadJson) > 65535) {
             throw new RuntimeException('Call signal payload is invalid or too large.');
         }
-        $callStmt = $conn->prepare("SELECT caller_id, callee_id FROM tb_live_chat_calls WHERE call_id = ? LIMIT 1");
+        $callStmt = $conn->prepare("SELECT call_id, caller_id, callee_id, call_type, status, answered_at, ended_at, updated_at FROM tb_live_chat_calls WHERE call_id = ? LIMIT 1");
         $callStmt->bind_param('s', $callId);
         $callStmt->execute();
         $callRow = $callStmt->get_result()->fetch_assoc();
         $callStmt->close();
         $callerId = (string)($callRow['caller_id'] ?? '');
         $calleeId = (string)($callRow['callee_id'] ?? '');
+        $currentStatus = (string)($callRow['status'] ?? '');
         if (!$callRow || !in_array((string)$userId, [$callerId, $calleeId], true) || !in_array((string)$recipientId, [$callerId, $calleeId], true) || (string)$recipientId === (string)$userId) {
             throw new RuntimeException('Invalid call participant.');
         }
         if ($signalType === 'remote_mute_request' && $callerId !== (string)$userId) {
             throw new RuntimeException('Only the call host can control a participant microphone.');
+        }
+        if (in_array($currentStatus, ['rejected', 'ended', 'missed'], true) && $signalType !== 'hangup') {
+            liveChatRespond([
+                'success' => true,
+                'ignored' => true,
+                'call' => liveChatCallPayload($callRow)
+            ]);
         }
         $stmt = $conn->prepare("INSERT INTO tb_live_chat_signals (call_id, sender_id, recipient_id, signal_type, payload_json) VALUES (?, ?, ?, ?, ?)");
         $stmt->bind_param('sssss', $callId, $userId, $recipientId, $signalType, $payloadJson);
@@ -167,6 +197,22 @@ try {
     if ($action === 'signals') {
         $callId = trim((string)($data['call_id'] ?? ''));
         $afterId = max(0, (int)($data['after_id'] ?? 0));
+        $callStmt = $conn->prepare("
+            SELECT call_id, caller_id, callee_id, call_type, status, answered_at, ended_at, updated_at
+            FROM tb_live_chat_calls
+            WHERE call_id = ? AND (caller_id = ? OR callee_id = ?)
+            LIMIT 1
+        ");
+        if (!$callStmt) {
+            throw new RuntimeException('Unable to load call state.');
+        }
+        $callStmt->bind_param('sss', $callId, $userId, $userId);
+        $callStmt->execute();
+        $callRow = $callStmt->get_result()->fetch_assoc();
+        $callStmt->close();
+        if (!$callRow) {
+            throw new RuntimeException('Call not found.');
+        }
         $stmt = $conn->prepare("
             SELECT signal_id, call_id, sender_id, recipient_id, signal_type, payload_json, created_at
             FROM tb_live_chat_signals
@@ -190,18 +236,21 @@ try {
             ];
         }
         $stmt->close();
-        liveChatRespond(['success' => true, 'signals' => $signals]);
+        liveChatRespond(['success' => true, 'signals' => $signals, 'call' => liveChatCallPayload($callRow)]);
     }
 
     $stmt = $conn->prepare("
-        SELECT c.call_id, c.caller_id, c.callee_id, c.call_type, c.status, c.created_at, c.answered_at, c.updated_at,
+        SELECT c.call_id, c.caller_id, c.callee_id, c.call_type, c.status, c.created_at, c.answered_at, c.ended_at, c.updated_at,
                caller.userName AS caller_name, callee.userName AS callee_name
         FROM tb_live_chat_calls c
         LEFT JOIN tb_users caller ON caller.userId = c.caller_id
         LEFT JOIN tb_users callee ON callee.userId = c.callee_id
         WHERE (c.caller_id = ? OR c.callee_id = ?)
-          AND c.status IN ('ringing','accepted')
-          AND (c.status = 'accepted' OR c.updated_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE))
+          AND (
+            c.status IN ('ringing','accepted')
+            OR (c.status IN ('rejected','ended','missed') AND c.updated_at >= DATE_SUB(NOW(), INTERVAL 2 MINUTE))
+          )
+          AND (c.status <> 'ringing' OR c.updated_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE))
         ORDER BY c.updated_at DESC
         LIMIT 10
     ");
@@ -220,6 +269,7 @@ try {
             'calleeName' => $row['callee_name'] ?? 'Recipient',
             'createdAt' => $row['created_at'],
             'answeredAt' => $row['answered_at'] ?? null,
+            'endedAt' => $row['ended_at'] ?? null,
             'updatedAt' => $row['updated_at']
         ];
     }
@@ -228,6 +278,38 @@ try {
 } catch (Throwable $e) {
     http_response_code(400);
     liveChatRespond(['success' => false, 'message' => $e->getMessage()]);
+}
+
+function liveChatInsertCallSignal(mysqli $conn, string $callId, string $senderId, string $recipientId, string $signalType, array $payload): void
+{
+    if ($callId === '' || $senderId === '' || $recipientId === '' || $senderId === $recipientId) {
+        return;
+    }
+    $payloadJson = json_encode($payload, JSON_UNESCAPED_SLASHES);
+    if ($payloadJson === false || strlen($payloadJson) > 65535) {
+        return;
+    }
+    $stmt = $conn->prepare("INSERT INTO tb_live_chat_signals (call_id, sender_id, recipient_id, signal_type, payload_json) VALUES (?, ?, ?, ?, ?)");
+    if (!$stmt) {
+        return;
+    }
+    $stmt->bind_param('sssss', $callId, $senderId, $recipientId, $signalType, $payloadJson);
+    $stmt->execute();
+    $stmt->close();
+}
+
+function liveChatCallPayload(array $row): array
+{
+    return [
+        'callId' => (string)($row['call_id'] ?? ''),
+        'callerId' => (string)($row['caller_id'] ?? ''),
+        'calleeId' => (string)($row['callee_id'] ?? ''),
+        'callType' => (string)($row['call_type'] ?? 'audio'),
+        'status' => (string)($row['status'] ?? ''),
+        'answeredAt' => $row['answered_at'] ?? null,
+        'endedAt' => $row['ended_at'] ?? null,
+        'updatedAt' => $row['updated_at'] ?? null
+    ];
 }
 
 function liveChatCreateCallThreadRecord(mysqli $conn, string $callId): void

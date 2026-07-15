@@ -5,12 +5,23 @@ ini_set('display_errors', '0');
 error_reporting(E_ALL);
 
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/chat_shared_common.php';
 
 header('Content-Type: application/json');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
+}
+
+function liveChatNormalizeRoleKey($role): string
+{
+    return strtolower((string)preg_replace('/[\s-]+/', '_', trim((string)$role)));
+}
+
+function liveChatRoleIsSuperAdmin($role): bool
+{
+    return in_array(liveChatNormalizeRoleKey($role), ['super_admin', 'superadministrator', 'system_administrator'], true);
 }
 
 function liveChatRequireStaff(mysqli $conn): string
@@ -20,6 +31,18 @@ function liveChatRequireStaff(mysqli $conn): string
         echo json_encode(['success' => false, 'message' => 'Session expired']);
         exit;
     }
+
+    $userId = (string)$_SESSION['userId'];
+    $userRole = (string)($_SESSION['userRole'] ?? '');
+    $effectiveRole = (string)($_SESSION['userRoleEffective'] ?? '');
+
+    if (liveChatRoleIsSuperAdmin($userRole) || liveChatRoleIsSuperAdmin($effectiveRole)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Live chat is disabled for super administrators.']);
+        exit;
+    }
+
+    liveChatReleaseSessionLock();
 
     if (function_exists('currentUserCanAccessMessagingModule') && !currentUserCanAccessMessagingModule()) {
         http_response_code(403);
@@ -33,10 +56,6 @@ function liveChatRequireStaff(mysqli $conn): string
         exit;
     }
 
-    $userId = (string)$_SESSION['userId'];
-    if (session_status() === PHP_SESSION_ACTIVE) {
-        session_write_close();
-    }
     return $userId;
 }
 
@@ -51,10 +70,119 @@ function liveChatSettingInt(mysqli $conn, string $key, int $default, int $min, i
     return max($min, min($max, (int)$value));
 }
 
+function liveChatPromoteRealtimeDefaults(mysqli $conn): void
+{
+    if (function_exists('ensureAppSettingsTable')) {
+        ensureAppSettingsTable($conn);
+    }
+    $defaults = [
+        'live_chat_message_poll_ms' => ['1000', ['150', '350', '400']],
+        'live_chat_receipt_poll_ms' => ['1500', ['150', '250', '400', '650']],
+        'live_chat_call_poll_ms' => ['1000', ['150', '400', '500']],
+        'live_chat_signal_poll_ms' => ['350', ['150', '220']],
+    ];
+    foreach ($defaults as $key => [$newDefault, $legacyValues]) {
+        foreach ($legacyValues as $oldDefault) {
+            $stmt = $conn->prepare('UPDATE tb_app_settings SET setting_value = ?, updated_at = NOW() WHERE setting_key = ? AND setting_value = ?');
+            if (!$stmt) {
+                continue;
+            }
+            $stmt->bind_param('sss', $newDefault, $key, $oldDefault);
+            $stmt->execute();
+            $stmt->close();
+        }
+    }
+    if (function_exists('getAppSetting') && function_exists('setAppSetting') && getAppSetting($conn, 'live_chat_voice_scan_enabled') === null) {
+        setAppSetting($conn, 'live_chat_voice_scan_enabled', '0');
+    }
+}
+
+function liveChatUnreadSnapshot(mysqli $conn, string $userId): array
+{
+    $unreadByUser = [];
+    $directUnreadStmt = $conn->prepare("
+        SELECT m.sender_id, COUNT(*) AS unread_count
+        FROM tb_live_chat_messages m
+        INNER JOIN tb_users u ON u.userId = m.sender_id
+        LEFT JOIN tb_live_chat_message_reads r
+          ON r.chat_message_id = m.chat_message_id AND r.user_id = ?
+        LEFT JOIN tb_live_chat_message_deletions d
+          ON d.chat_message_id = m.chat_message_id AND d.user_id = ?
+        WHERE m.recipient_id = ?
+          AND m.sender_id <> ?
+          AND m.deleted_at IS NULL
+          AND m.admin_deleted_at IS NULL
+          AND m.is_read = 0
+          AND m.read_at IS NULL
+          AND u.userRole NOT IN ('pensioner', 'user')
+          AND LOWER(REPLACE(REPLACE(COALESCE(u.userRole, ''), ' ', '_'), '-', '_')) NOT IN ('super_admin', 'superadministrator', 'system_administrator')
+          AND r.chat_message_id IS NULL
+          AND d.chat_message_id IS NULL
+        GROUP BY m.sender_id
+    ");
+    if ($directUnreadStmt) {
+        $directUnreadStmt->bind_param('ssss', $userId, $userId, $userId, $userId);
+        $directUnreadStmt->execute();
+        $directUnreadResult = $directUnreadStmt->get_result();
+        while ($row = $directUnreadResult->fetch_assoc()) {
+            $unreadByUser[(string)$row['sender_id']] = (int)$row['unread_count'];
+        }
+        $directUnreadStmt->close();
+    }
+
+    $unreadByGroup = [];
+    if (liveChatFeatureEnabled($conn, 'live_chat_group_chats_enabled', true)) {
+        $groupUnreadStmt = $conn->prepare("
+            SELECT m.recipient_id AS group_id, COUNT(*) AS unread_count
+            FROM tb_live_chat_messages m
+            INNER JOIN tb_live_chat_group_members gm
+              ON gm.group_id = m.recipient_id AND gm.user_id = ?
+            LEFT JOIN tb_live_chat_message_reads r
+              ON r.chat_message_id = m.chat_message_id AND r.user_id = ?
+            LEFT JOIN tb_live_chat_message_deletions d
+              ON d.chat_message_id = m.chat_message_id AND d.user_id = ?
+            WHERE m.sender_id <> ?
+              AND m.deleted_at IS NULL
+              AND m.admin_deleted_at IS NULL
+              AND r.chat_message_id IS NULL
+              AND d.chat_message_id IS NULL
+            GROUP BY m.recipient_id
+        ");
+        if ($groupUnreadStmt) {
+            $groupUnreadStmt->bind_param('ssss', $userId, $userId, $userId, $userId);
+            $groupUnreadStmt->execute();
+            $groupUnreadResult = $groupUnreadStmt->get_result();
+            while ($row = $groupUnreadResult->fetch_assoc()) {
+                $unreadByGroup[(string)$row['group_id']] = (int)$row['unread_count'];
+            }
+            $groupUnreadStmt->close();
+        }
+    }
+
+    return [
+        'users' => $unreadByUser,
+        'groups' => $unreadByGroup,
+        'total' => array_sum($unreadByUser) + array_sum($unreadByGroup)
+    ];
+}
+
+function liveChatReleaseSessionLock(): void
+{
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        @session_write_close();
+    }
+}
+
 function liveChatEnsureTables(mysqli $conn): void
 {
-    $schemaMarker = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'live_chat_schema_ready_v10.json';
+    static $ready = false;
+    if ($ready) {
+        return;
+    }
+
+    $schemaMarker = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'live_chat_schema_ready_v11.json';
     if (is_file($schemaMarker)) {
+        $ready = true;
         return;
     }
 
@@ -427,7 +555,20 @@ function liveChatReadCacheMessages(string $peerType, string $userId, string $pee
         )) {
             continue;
         }
-        $message['isOwn'] = (string)($message['senderId'] ?? '') === $userId;
+        $isOwn = (string)($message['senderId'] ?? '') === $userId;
+        $message['isOwn'] = $isOwn;
+        $message['canEdit'] = $isOwn
+            && (string)($message['kind'] ?? '') !== 'call'
+            && empty($message['isDeleted'])
+            && strtotime((string)($message['createdAt'] ?? '')) >= (time() - 300);
+        if ($isOwn) {
+            $message['receiptStatus'] = in_array((string)($message['receiptStatus'] ?? ''), ['sent', 'delivered', 'read'], true)
+                ? (string)$message['receiptStatus']
+                : 'sent';
+        } else {
+            $message['receiptStatus'] = 'received';
+            $message['isRead'] = false;
+        }
         $messages[] = $message;
     }
     return $messages;
@@ -435,48 +576,12 @@ function liveChatReadCacheMessages(string $peerType, string $userId, string $pee
 
 function liveChatAddColumnIfMissing(mysqli $conn, string $tableName, string $columnName, string $definition): void
 {
-    $stmt = $conn->prepare("
-        SELECT COUNT(*) AS total
-        FROM information_schema.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = ?
-          AND COLUMN_NAME = ?
-    ");
-    if (!$stmt) {
-        return;
-    }
-
-    $stmt->bind_param('ss', $tableName, $columnName);
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-
-    if ((int)($row['total'] ?? 0) === 0) {
-        $conn->query("ALTER TABLE `$tableName` ADD COLUMN `$columnName` $definition");
-    }
+    chatSharedAddColumnIfMissing($conn, $tableName, $columnName, "`{$columnName}` {$definition}");
 }
 
 function liveChatAddIndexIfMissing(mysqli $conn, string $tableName, string $indexName, string $columns): void
 {
-    $stmt = $conn->prepare("
-        SELECT COUNT(*) AS total
-        FROM information_schema.STATISTICS
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = ?
-          AND INDEX_NAME = ?
-    ");
-    if (!$stmt) {
-        return;
-    }
-
-    $stmt->bind_param('ss', $tableName, $indexName);
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-
-    if ((int)($row['total'] ?? 0) === 0) {
-        $conn->query("ALTER TABLE `$tableName` ADD INDEX `$indexName` ($columns)");
-    }
+    chatSharedAddIndexIfMissing($conn, $tableName, $indexName, $columns);
 }
 
 function liveChatNormalizeTableCollation(mysqli $conn, string $tableName): void
@@ -505,12 +610,33 @@ function liveChatNormalizeTableCollation(mysqli $conn, string $tableName): void
 
 function liveChatJsonInput(): array
 {
-    $raw = file_get_contents('php://input');
-    if (!$raw) {
-        return [];
-    }
-    $data = json_decode($raw, true);
-    return is_array($data) ? $data : [];
+    return chatSharedJsonInput();
+}
+
+function liveChatStoreUpload(mysqli $conn, array $file, string $prefix): array
+{
+    $allowedExtensions = $prefix === 'voice'
+        ? ['mp3', 'wav', 'ogg', 'm4a', 'webm']
+        : ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'mp3', 'wav', 'ogg', 'm4a', 'webm', 'mp4', 'mov'];
+    $allowedMimes = $prefix === 'voice'
+        ? ['audio/', 'video/', 'application/ogg', 'application/octet-stream']
+        : ['image/', 'audio/', 'video/', 'application/pdf', 'application/msword', 'application/vnd.', 'text/plain', 'text/csv'];
+
+    $upload = chatSharedStoreUpload($conn, $file, [
+        'storage_dir' => 'live_chat',
+        'prefix' => $prefix,
+        'allowed_extensions' => $allowedExtensions,
+        'allowed_mimes' => $allowedMimes,
+        'label' => ucfirst($prefix) . ' upload',
+        'storage_context' => 'live_chat_' . $prefix,
+        'scanned_by' => $_SESSION['userId'] ?? null,
+        'scanned_by_name' => $_SESSION['userName'] ?? null,
+        'scanned_by_role' => $_SESSION['userRole'] ?? null,
+        'scan_setting_key' => $prefix === 'voice' ? 'live_chat_voice_scan_enabled' : 'attachment_scan_enabled'
+    ]);
+
+    $upload['mime_type'] = chatSharedPlaybackMime((string)($upload['mime_type'] ?? ''), (string)($upload['file_name'] ?? ''));
+    return $upload;
 }
 
 function liveChatCanReachUser(mysqli $conn, string $userId): bool
@@ -522,9 +648,10 @@ function liveChatCanReachUser(mysqli $conn, string $userId): bool
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
     if (!$row) return false;
+    if (liveChatRoleIsSuperAdmin($row['userRole'] ?? '')) return false;
     return function_exists('canRoleAccessMessagingModule')
         ? canRoleAccessMessagingModule((string)$row['userRole'])
-        : !in_array((string)$row['userRole'], ['pensioner', 'user'], true);
+        : !in_array(liveChatNormalizeRoleKey($row['userRole'] ?? ''), ['pensioner', 'user'], true);
 }
 
 function liveChatIsUserOnline(mysqli $conn, string $userId, int $freshSeconds = 45): bool
@@ -577,6 +704,5 @@ function liveChatTouchPresence(mysqli $conn, string $userId, string $context = '
 
 function liveChatRespond(array $payload): void
 {
-    echo json_encode($payload);
-    exit;
+    chatSharedJson($payload);
 }

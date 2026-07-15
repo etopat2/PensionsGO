@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#6d1116" />
+    <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+    <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
+    <title>UPS PensionsGo - About</title>
+  <!-- SEO Metadata -->
+  <meta name="description" content="Learn about PensionsGo, the Uganda Prisons Service digital pension workflow platform supporting transparent pension processing, tracking, communication, and pension service delivery." />
+  <meta name="keywords" content="about PensionsGo, Uganda Prisons Service pensions, pension workflow automation, digital pension services Uganda" />
+  <meta name="author" content="Uganda Prisons Service ICT Unit" />
+  <meta name="robots" content="index, follow" />
+  <meta name="application-name" content="PensionsGo" />
+  <meta name="format-detection" content="telephone=no" />
+  <link rel="canonical" href="about.html" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="PensionsGo" />
+  <meta property="og:title" content="UPS PensionsGo - About" />
+  <meta property="og:description" content="Learn about PensionsGo, the Uganda Prisons Service digital pension workflow platform supporting transparent pension processing, tracking, communication, and pension service delivery." />
+  <meta property="og:url" content="about.html" />
+  <meta property="og:image" content="assets/pwa/apple-touch-icon.png" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="UPS PensionsGo - About" />
+  <meta name="twitter:description" content="Learn about PensionsGo, the Uganda Prisons Service digital pension workflow platform supporting transparent pension processing, tracking, communication, and pension service delivery." />
+  <meta name="twitter:image" content="assets/pwa/apple-touch-icon.png" />
+  <script type="application/ld+json" data-seo-json>
+{
+    "@context": "https://schema.org",
+    "@type": "AboutPage",
+    "name": "UPS PensionsGo - About",
+    "description": "Learn about PensionsGo, the Uganda Prisons Service digital pension workflow platform supporting transparent pension processing, tracking, communication, and pension service delivery.",
+    "url": "about.html",
+    "isPartOf": {
+        "@type": "WebSite",
+        "name": "PensionsGo",
+        "url": "index.html"
+    },
+    "publisher": {
+        "@type": "GovernmentOrganization",
+        "name": "Uganda Prisons Service"
+    },
+    "inLanguage": "en"
+}
+  </script>
+
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
+    <link rel="stylesheet" href="css/styles.css?v=20260713a" />
+    <link rel="stylesheet" href="css/about.css?v=20260504a" />
+    <link rel="stylesheet" href="css/public_chat.css?v=20260714o" />
+
+    <script src="js/auth_bootstrap.js?v=20260606b"></script>
+  <script type="module" src="js/main.js?v=20260713a"></script>
+    <script defer src="js/about.js"></script>
+    <script defer src="js/public_chat_widget.js?v=20260714o"></script>
+</head>
+<body class="about-page">
+    <main class="about-main">
+        <div class="about-shell">
+            <section class="about-hero">
+                <div class="about-hero-copy">
+                    <span class="about-kicker">About UPS PensionsGo</span>
+                    <h1>Secure pension administration, presented with clarity.</h1>
+                    <p class="about-hero-lead">
+                        UPS PensionsGo is the Uganda Prisons Service pensions workflow platform built to
+                        organize applications, records, file movement, payroll matching, claims, and pensioner
+                        self-service in one controlled environment.
+                    </p>
+                    <div class="about-hero-actions">
+                        <a href="login.html" class="about-primary-action">Access the Platform</a>
+                        <a href="faq.html" class="about-secondary-action">View Common Questions</a>
+                        <a href="podcast.html" class="about-tertiary-action" id="publicPodcastHeroButton" hidden>Watch Public Pension Videos</a>
+                    </div>
+                    <dl class="about-hero-facts">
+                        <div>
+                            <dt>Workflow Coverage</dt>
+                            <dd>From application verification to approval and registry placement</dd>
+                        </div>
+                        <div>
+                            <dt>Operational Control</dt>
+                            <dd>Role-based actions, audit trails, and monitored task accountability</dd>
+                        </div>
+                        <div>
+                            <dt>Pensioner Visibility</dt>
+                            <dd>Status, payroll, claims, life certificate, and benefits in one view</dd>
+                        </div>
+                    </dl>
+                </div>
+                <aside class="about-hero-panel">
+                    <div class="about-hero-card">
+                        <span class="about-panel-label">Service Focus</span>
+                        <h2>Built for disciplined pension operations.</h2>
+                        <p>
+                            The platform reduces manual handoffs, exposes status clearly, and keeps critical
+                            pension data traceable across workflow, registry, and financial processes.
+                        </p>
+                    </div>
+                    <div class="about-stat-grid">
+                        <article class="about-stat-card">
+                            <strong>Applications</strong>
+                            <span>Workflow-driven submission and review lifecycle</span>
+                        </article>
+                        <article class="about-stat-card">
+                            <strong>Registry</strong>
+                            <span>Structured file custody, movements, and shelf accountability</span>
+                        </article>
+                        <article class="about-stat-card">
+                            <strong>Claims</strong>
+                            <span>Arrears planning, payment reconciliation, and accountability tracking</span>
+                        </article>
+                        <article class="about-stat-card">
+                            <strong>Support</strong>
+                            <span>Public guidance, pensioner self-service, and staff task management</span>
+                        </article>
+                    </div>
+                </aside>
+            </section>
+
+            <section class="about-section">
+                <div class="about-section-heading">
+                    <span class="about-section-tag">Purpose</span>
+                    <h2>Why the platform exists</h2>
+                    <p>
+                        Pension administration is sensitive, document-heavy, and deadline-dependent. UPS PensionsGo
+                        was designed to reduce delay, protect records, and make every stage easier to monitor.
+                    </p>
+                </div>
+                <div class="about-purpose-grid">
+                    <article class="about-surface-card">
+                        <h3>Operational efficiency</h3>
+                        <p>
+                            It replaces fragmented manual follow-up with structured workflow stages, delegated tasks,
+                            automated status tracking, and guided review routines.
+                        </p>
+                    </article>
+                    <article class="about-surface-card">
+                        <h3>Transparency and traceability</h3>
+                        <p>
+                            It keeps application status, file movement, payroll presence, and claims history visible
+                            to the right users with an auditable system record.
+                        </p>
+                    </article>
+                    <article class="about-surface-card">
+                        <h3>Better pensioner service</h3>
+                        <p>
+                            Pensioners can view information relevant to them, follow application progress,
+                            understand their account state, and access approved guidance content.
+                        </p>
+                    </article>
+                </div>
+            </section>
+
+            <section class="about-section">
+                <div class="about-section-heading">
+                    <span class="about-section-tag">Capabilities</span>
+                    <h2>What the platform brings together</h2>
+                    <p>
+                        The system is not a single-purpose form tool. It is a connected operating environment for pension
+                        processing, control, and reporting.
+                    </p>
+                </div>
+                <div class="about-capability-grid">
+                    <article class="about-capability-card">
+                        <h3>Application workflow</h3>
+                        <p>Verification, authorization, write-up, file creation, data capture, assessment, audit, and approval.</p>
+                    </article>
+                    <article class="about-capability-card">
+                        <h3>Registry and file tracking</h3>
+                        <p>Controlled file registry, movement history, shelf availability, and box allocation governance.</p>
+                    </article>
+                    <article class="about-capability-card">
+                        <h3>Benefits and planning</h3>
+                        <p>Benefits estimation, budgeting, arrears tracking, accountability checks, and financial-year forecasting.</p>
+                    </article>
+                    <article class="about-capability-card">
+                        <h3>Payroll oversight</h3>
+                        <p>Payroll uploads, reconciliation against registry data, monthly visibility, and mismatch analysis.</p>
+                    </article>
+                    <article class="about-capability-card">
+                        <h3>Security and governance</h3>
+                        <p>Role governance, audit trails, session controls, backup and restore, export tooling, and activity monitoring.</p>
+                    </article>
+                    <article class="about-capability-card">
+                        <h3>Guidance and communication</h3>
+                        <p>Internal messaging, alerts, public pension guidance, staff knowledge support, and pensioner-facing updates.</p>
+                    </article>
+                </div>
+            </section>
+
+            <section class="about-section about-journey-section">
+                <div class="about-section-heading">
+                    <span class="about-section-tag">Process View</span>
+                    <h2>How a pension case progresses</h2>
+                    <p>
+                        The platform structures work into a monitored journey so responsibility is visible and progress
+                        can be tracked at each stage.
+                    </p>
+                </div>
+                <div class="about-journey-rail">
+                    <article class="about-journey-step">
+                        <span>01</span>
+                        <h3>Submission and verification</h3>
+                        <p>Retirement records are initiated, reviewed, and prepared for workflow processing.</p>
+                    </article>
+                    <article class="about-journey-step">
+                        <span>02</span>
+                        <h3>Controlled staff workflow</h3>
+                        <p>Tasks move through write-up, file creation, data capture, assessment, audit, and approval.</p>
+                    </article>
+                    <article class="about-journey-step">
+                        <span>03</span>
+                        <h3>Registry and payroll linkage</h3>
+                        <p>Approved cases populate the registry, payroll visibility, and downstream monitoring tools.</p>
+                    </article>
+                    <article class="about-journey-step">
+                        <span>04</span>
+                        <h3>Pensioner service and compliance</h3>
+                        <p>Pensioners can view status, claims position, life certificate standing, and account conditions.</p>
+                    </article>
+                </div>
+            </section>
+
+            <section class="about-section">
+                <div class="about-section-heading">
+                    <span class="about-section-tag">Users</span>
+                    <h2>Who the platform serves</h2>
+                    <p>
+                        Access is structured by responsibility. Each user sees only the tools and data required for the role.
+                    </p>
+                </div>
+                <div class="about-audience-grid">
+                    <article class="about-audience-card">
+                        <h3>Operational staff</h3>
+                        <p>Clerks, data entrants, write-up officers, file creators, assessors, auditors, and approvers manage workflow actions and supporting records.</p>
+                    </article>
+                    <article class="about-audience-card">
+                        <h3>Leadership and oversight</h3>
+                        <p>OC/Pension, Deputy OC/Pension, and administrators monitor queues, performance, file control, settings, and audit activity.</p>
+                    </article>
+                    <article class="about-audience-card">
+                        <h3>Pensioners and the public</h3>
+                        <p>Pensioners access information relevant to their own records, while the public can view approved informational content and guidance.</p>
+                    </article>
+                </div>
+            </section>
+
+            <section class="about-podcast-cta" id="publicPodcastCta" hidden>
+                <div class="about-podcast-copy">
+                    <span class="about-podcast-kicker">Public Video Guidance</span>
+                    <h2>Trusted pension guidance, delivered in video format.</h2>
+                    <p>
+                        Public-facing pension videos explain procedures, questions, and common concerns in a format that is easier to follow than static instructions alone.
+                    </p>
+                    <a href="podcast.html" class="about-podcast-btn" id="openPublicPodcastBtn">Open Public Pension Videos</a>
+                </div>
+                <div class="about-podcast-preview" id="publicPodcastPreview">
+                    <div class="about-podcast-preview-card loading">Loading public video highlights...</div>
+                </div>
+            </section>
+
+            <section class="about-section about-governance-section">
+                <div class="about-section-heading">
+                    <span class="about-section-tag">Governance</span>
+                    <h2>Security, privacy, and control</h2>
+                    <p>
+                        Pension data is sensitive. The platform is structured around controlled access, monitored actions,
+                        and administrative visibility for critical operations.
+                    </p>
+                </div>
+                <div class="about-governance-grid">
+                    <article class="about-governance-card">
+                        <h3>Role-based access</h3>
+                        <p>Users operate within permissions tied to workflow, administration, and pensioner-service responsibilities.</p>
+                    </article>
+                    <article class="about-governance-card">
+                        <h3>Auditability</h3>
+                        <p>Critical actions, imports, exports, deletions, and workflow events are recorded for reference and accountability.</p>
+                    </article>
+                    <article class="about-governance-card">
+                        <h3>Data continuity</h3>
+                        <p>Backup, restore, recycle-bin patterns, and structured cleanup tooling support safer administration over time.</p>
+                    </article>
+                </div>
+            </section>
+
+            <section class="about-support-strip">
+                <div>
+                    <span class="about-section-tag">Support</span>
+                    <h2>Need help using the platform?</h2>
+                    <p>
+                        For operational support, issue reporting, or guided assistance, contact the systems administrator
+                        or the designated pensions supervisory office.
+                    </p>
+                </div>
+                <div class="about-support-actions">
+                    <a href="faq.html" class="about-secondary-action">Read FAQs</a>
+                    <a href="mailto:etopat2@gmail.com" class="about-primary-action">Contact Support</a>
+                </div>
+            </section>
+        </div>
+    </main>
+</body>
+</html>
+
+

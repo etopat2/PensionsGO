@@ -28,8 +28,17 @@ $fields = [
     'prisonUnit', 'NIN', 'telNo', 'birthDate', 'enlistmentDate',
     'retirementDate', 'financialYear', 'retirementType', 'monthlySalary',
     'lengthOfService', 'annualSalary', 'reducedPension', 'fullPension',
-    'gratuity', 'submissionStatus', 'appnStatus'
+    'gratuity', 'submissionStatus', 'appnStatus', 'employeeNo', 'ippsNo',
+    'rankPosition', 'firstName', 'middleName', 'lastName', 'next_of_kin_nin',
+    'salaryScale', 'employmentStatus', 'service_file_status', 'service_file_location'
 ];
+
+// Accept the HRMIS vocabulary while maintaining legacy aliases used downstream.
+if (($data['employeeNo'] ?? '') !== '') $data['regNo'] = pensionNumberFromEmployeeNumber($data['employeeNo']);
+if (($data['ippsNo'] ?? '') !== '') $data['computerNo'] = $data['ippsNo'];
+if (($data['rankPosition'] ?? '') !== '') $data['title'] = $data['rankPosition'];
+if (($data['firstName'] ?? '') !== '' || ($data['middleName'] ?? '') !== '') $data['fName'] = trim(($data['firstName'] ?? '') . ' ' . ($data['middleName'] ?? ''));
+if (($data['lastName'] ?? '') !== '') $data['sName'] = $data['lastName'];
 
 if (!array_key_exists('computerNo', $data) && array_key_exists('supplierNo', $data)) {
     $data['computerNo'] = $data['supplierNo'];
@@ -84,6 +93,13 @@ $duplicateStmt->close();
 if ($duplicateRow) {
     echo json_encode(['success' => false, 'message' => 'File number already exists. Please use a unique file number.']);
     exit;
+}
+
+if ($data['employeeNo'] !== '') {
+    $employeeStmt = $conn->prepare("SELECT id FROM tb_staffdue WHERE employeeNo = ? LIMIT 1");
+    $employeeStmt->bind_param('s', $data['employeeNo']); $employeeStmt->execute();
+    $employeeDuplicate = $employeeStmt->get_result()->fetch_assoc(); $employeeStmt->close();
+    if ($employeeDuplicate) { echo json_encode(['success' => false, 'message' => 'Employee number already exists.']); exit; }
 }
 
 $rawTel = $data['telNo'];
@@ -206,6 +222,10 @@ $stmt->bind_param(
 );
 
 if ($stmt->execute()) {
+    $staffId = (int)$conn->insert_id;
+    $extended = $conn->prepare("UPDATE tb_staffdue SET employeeNo=?, ippsNo=?, rankPosition=?, firstName=?, middleName=?, lastName=?, next_of_kin_nin=?, salaryScale=?, employmentStatus=?, service_file_status=?, service_file_location=? WHERE id=?");
+    $extended->bind_param('sssssssssssi', $data['employeeNo'], $data['ippsNo'], $data['rankPosition'], $data['firstName'], $data['middleName'], $data['lastName'], $data['next_of_kin_nin'], $data['salaryScale'], $data['employmentStatus'], $data['service_file_status'], $data['service_file_location'], $staffId);
+    $extended->execute(); $extended->close();
     echo json_encode(['success' => true, 'message' => 'Staff added successfully']);
 } else {
     echo json_encode(['success' => false, 'message' => 'Failed to insert record: ' . $stmt->error]);

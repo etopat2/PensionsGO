@@ -80,6 +80,8 @@ The full demo dump `database/pension_db.sql` includes the following sample users
 
 Important: staff and administrator passwords in the SQL dump are stored only as bcrypt hashes. The plaintext passwords cannot be recovered from the repository. Pensioner accounts are different: auto-provisioned pensioner users use the code-defined default password `Pensioner123` unless later changed by an administrator.
 
+New staff/user accounts created from the user-registration screens prefill the password field with `Prisons123`. Administrators can replace that value before submitting the account form.
+
 | Role | Name | Email / Login ID | Phone | Default Password |
 |---|---|---|---|---|
 | Super Administrator | Demo Super Administrator | `etopat2@gmail.com` | `+256791170164` | `SuperAdmin123` |

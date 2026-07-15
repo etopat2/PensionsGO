@@ -27,23 +27,26 @@ if (!isset($_SESSION['session_id'], $_SESSION['userId'])) {
 }
 
 try {
+    $sessionId = (string)$_SESSION['session_id'];
+    $userId = (string)$_SESSION['userId'];
     $requestDeviceId = null;
-    if (!validateSessionDeviceBinding($conn, $_SESSION['session_id'], $_SESSION['userId'] ?? '', $requestDeviceId)) {
+    if (!validateSessionDeviceBinding($conn, $sessionId, $userId, $requestDeviceId)) {
         http_response_code(403);
         echo json_encode(['success' => false, 'message' => 'Device verification failed']);
         exit;
     }
 
+    $_SESSION['last_activity'] = time();
+    session_write_close();
+
     $sm = SessionManager::getInstance($conn);
     $sm->cleanupExpiredSessionsThrottled(60);
-    $touched = $sm->touchSession($_SESSION['session_id'], $requestDeviceId);
+    $touched = $sm->touchSession($sessionId, $requestDeviceId);
     if (!$touched) {
         http_response_code(403);
         echo json_encode(['success' => false, 'message' => 'Session is not active on this device']);
         exit;
     }
-
-    $_SESSION['last_activity'] = time();
 
     echo json_encode(['success' => true]);
 } catch (Throwable $e) {

@@ -7,32 +7,16 @@ if (!isset($_SESSION['userRole']) || $_SESSION['userRole'] === 'pensioner') {
     exit;
 }
 
-if (function_exists('ensureStaffDueWorkflowColumns')) {
-    ensureStaffDueWorkflowColumns($conn);
-}
-if (function_exists('ensureStaffDueBaseColumns')) {
-    ensureStaffDueBaseColumns($conn);
-}
-if (function_exists('ensureStaffDueSoftDeleteColumns')) {
-    ensureStaffDueSoftDeleteColumns($conn);
-}
-if (function_exists('ensureApplicationQueueTable')) {
-    ensureApplicationQueueTable($conn);
-}
-if (function_exists('ensureTasksTable')) {
-    ensureTasksTable($conn);
-}
-if (function_exists('ensureTaskPerformanceIndexes')) {
-    ensureTaskPerformanceIndexes($conn);
-}
-if (function_exists('ensureStaffDuePerformanceIndexes')) {
-    ensureStaffDuePerformanceIndexes($conn);
-}
+// Keep this hot read path free of ALTER/SHOW maintenance work. The required
+// schema and indexes are provisioned by migrations and application setup.
 
 $search = trim((string)($_GET['search'] ?? ''));
 $retirementType = trim((string)($_GET['retirementType'] ?? ''));
 $submissionStatus = strtolower(trim((string)($_GET['submissionStatus'] ?? '')));
 $appnStatus = strtolower(trim((string)($_GET['appnStatus'] ?? '')));
+$page = max(1, (int)($_GET['page'] ?? 1));
+$limit = min(50, max(6, (int)($_GET['limit'] ?? 12)));
+$offset = ($page - 1) * $limit;
 $verificationEscalationDays = getStaffDueVerificationEscalationDays($conn);
 $verificationDueSoonDays = getStaffDueVerificationDueSoonDays($conn, $verificationEscalationDays);
 
@@ -85,9 +69,24 @@ $effectiveAppnStatusExpr = "
 ";
 
 $sql = "
-    SELECT
+    SELECT SQL_CALC_FOUND_ROWS
         sd.id,
         sd.regNo,
+        sd.employeeNo,
+        sd.ippsNo,
+        sd.rankPosition,
+        sd.rankName,
+        sd.positionName,
+        sd.firstName,
+        sd.middleName,
+        sd.lastName,
+        sd.next_of_kin_nin,
+        sd.salaryScale,
+        sd.employmentStatus,
+        sd.service_file_status,
+        sd.service_file_location,
+        COALESCE(sf.availability_status, 'not_availed') AS service_file_availability,
+        COALESCE(sf.registry_stage, sd.service_file_status, 'pending_processing') AS service_file_registry_stage,
         sd.computerNo,
         sd.title,
         sd.sName,
@@ -128,6 +127,7 @@ $sql = "
             ELSE NULL
         END AS days_since_submission
     FROM tb_staffdue sd
+    LEFT JOIN tb_service_files sf ON sf.staffdue_id = sd.id
     LEFT JOIN tb_application_queue q
       ON q.staffdue_id = sd.id
     LEFT JOIN (
@@ -155,6 +155,8 @@ $types = '';
 if ($search !== '') {
     $sql .= " AND (
         sd.regNo LIKE ?
+        OR sd.employeeNo LIKE ?
+        OR sd.ippsNo LIKE ?
         OR sd.sName LIKE ?
         OR sd.fName LIKE ?
         OR sd.title LIKE ?
@@ -163,8 +165,8 @@ if ($search !== '') {
         OR sd.telNo LIKE ?
     )";
     $searchTerm = '%' . $search . '%';
-    $params = array_merge($params, array_fill(0, 7, $searchTerm));
-    $types .= 'sssssss';
+    $params = array_merge($params, array_fill(0, 9, $searchTerm));
+    $types .= 'sssssssss';
 }
 
 if ($retirementType !== '') {
@@ -207,7 +209,11 @@ $sql .= " ORDER BY
     END,
     COALESCE(sd.submission_at, sd.timeStamp) ASC,
     sd.id DESC
+    LIMIT ? OFFSET ?
 ";
+$params[] = $limit;
+$params[] = $offset;
+$types .= 'ii';
 
 $stmt = $conn->prepare($sql);
 if (!$stmt) {
@@ -230,9 +236,16 @@ while ($row = $result->fetch_assoc()) {
     $row['appnStatus'] = (string)($row['appn_status_effective'] ?? $row['appn_status_normalized'] ?? $row['appnStatus'] ?? 'pending');
     $records[] = $row;
 }
+$totalResult = $conn->query("SELECT FOUND_ROWS() AS total");
+$totalRecords = $totalResult ? (int)(($totalResult->fetch_assoc()['total'] ?? 0)) : count($records);
+$totalPages = max(1, (int)ceil($totalRecords / $limit));
 
 echo json_encode([
     'success' => true,
+    'page' => $page,
+    'limit' => $limit,
+    'totalRecords' => $totalRecords,
+    'totalPages' => $totalPages,
     'records' => $records,
     'settings' => [
         'verificationEscalationWindowDays' => $verificationEscalationDays,

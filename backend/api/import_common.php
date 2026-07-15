@@ -56,32 +56,48 @@ function getDataImportDatasetDefinitions(mysqli $conn): array
             'description' => 'Bulk load upcoming retirement records and benefit snapshots into the due-for-retirement register.',
             'icon' => '&#128221;',
             'table' => 'tb_staffdue',
-            'key_column' => 'regNo',
-            'key_label' => 'File Number',
+            'key_column' => 'employeeNo',
+            'key_label' => 'Employee Number',
             'case_insensitive_key' => false,
             'accepted_formats' => ['csv', 'xlsx'],
             'requirements' => [
-                'File Number must be unique and is used as the match key.',
+                'Employee Number must be unique and is used as the HRMIS match key. Pension Number is generated automatically.',
                 'Title must already exist in Title Settings and Unit must already exist in Prison Units.',
                 'Mode of Retirement should use the approved retirement label where possible; supported legacy labels are still normalized during import.',
                 'Age and service retirement-policy checks are enforced during import whenever the supplied retirement profile requires them.',
                 'Blank imported values never overwrite existing populated values. They are treated as no-change.'
             ],
             'columns' => [
-                ['field' => 'regNo', 'label' => 'File Number', 'required' => true, 'aliases' => ['regno', 'filenumber', 'file_number', 'file no', 'file no.', 'registrationnumber'], 'format' => 'Text', 'example' => 'UPS/RET/0001'],
-                ['field' => 'computerNo', 'label' => 'Computer Number', 'required' => false, 'aliases' => ['computerno', 'computer_number', 'supplierno', 'suppliernumber'], 'format' => 'Text', 'example' => 'PC-00981'],
-                ['field' => 'title', 'label' => 'Title', 'required' => false, 'aliases' => ['title', 'rank'], 'format' => 'Existing title', 'example' => 'Warder'],
-                ['field' => 'sName', 'label' => 'Surname', 'required' => true, 'aliases' => ['surname', 'sname', 'last_name', 'lastname'], 'format' => 'Text', 'example' => 'Okello'],
-                ['field' => 'fName', 'label' => 'First Name', 'required' => true, 'aliases' => ['firstname', 'first_name', 'fname', 'othernames', 'givenname'], 'format' => 'Text', 'example' => 'John'],
+                ['field' => 'employeeNo', 'label' => 'Employee Number', 'required' => true, 'aliases' => ['employeenumber', 'employee_no', 'employeeno', 'staffnumber', 'staffno', 'regno'], 'format' => 'HRMIS employee number', 'example' => 'P/A/123'],
+                ['field' => 'ippsNo', 'label' => 'IPPS Number', 'required' => false, 'aliases' => ['ippsnumber', 'ippsno', 'ipps_no', 'computerno', 'computer_number'], 'format' => 'Text', 'example' => 'IPPS-00981'],
+                ['field' => 'rankName', 'label' => 'Rank', 'required' => false, 'aliases' => ['rank', 'rankname'], 'format' => 'Uniformed rank', 'example' => 'Warder'],
+                ['field' => 'positionName', 'label' => 'Position', 'required' => false, 'aliases' => ['position', 'positionname', 'title'], 'format' => 'Non-uniformed position', 'example' => 'Records Officer'],
+                ['field' => 'firstName', 'label' => 'First Name', 'required' => true, 'aliases' => ['firstname', 'first_name', 'fname', 'givenname'], 'format' => 'Text', 'example' => 'John'],
+                ['field' => 'middleName', 'label' => 'Middle Name', 'required' => false, 'aliases' => ['middlename', 'middle_name', 'othernames'], 'format' => 'Text', 'example' => 'Peter'],
+                ['field' => 'lastName', 'label' => 'Last Name', 'required' => false, 'aliases' => ['lastname', 'last_name', 'surname', 'sname'], 'format' => 'Text', 'example' => 'Okello'],
                 ['field' => 'gender', 'label' => 'Gender', 'required' => true, 'aliases' => ['gender', 'sex'], 'format' => 'Male or Female', 'example' => 'Male'],
                 ['field' => 'prisonUnit', 'label' => 'Unit', 'required' => true, 'aliases' => ['unit', 'prisonunit', 'station'], 'format' => 'Existing prison unit', 'example' => 'Luzira Upper Prison'],
                 ['field' => 'NIN', 'label' => 'NIN', 'required' => false, 'aliases' => ['nin', 'nationalid'], 'format' => 'Text', 'example' => 'CF80A123456789'],
-                ['field' => 'telNo', 'label' => 'Phone Number', 'required' => false, 'aliases' => ['telno', 'phone', 'phone_number', 'contact'], 'format' => 'International or Uganda local', 'example' => '+256701234567'],
+                ['field' => 'next_of_kin_nin', 'label' => 'Next of Kin NIN', 'required' => false, 'aliases' => ['nextofkinnin', 'next_of_kin_nin', 'administratornin'], 'format' => 'Text', 'example' => 'CM80A123456789'],
+                ['field' => 'salaryScale', 'label' => 'Salary Scale', 'required' => false, 'aliases' => ['salaryscale', 'salary_scale', 'scale'], 'format' => 'Text', 'example' => 'U8'],
+                ['field' => 'employmentStatus', 'label' => 'Employment Status', 'required' => false, 'aliases' => ['employmentstatus', 'employment_status', 'employeestate', 'empstate', 'status'], 'format' => 'Text', 'example' => 'Active'],
+                ['field' => 'tribe', 'label' => 'Tribe', 'required' => false, 'aliases' => ['tribe'], 'format' => 'Text', 'example' => 'Acholi'],
+                ['field' => 'homeDistrict', 'label' => 'Home District', 'required' => false, 'aliases' => ['district', 'homedistrict'], 'format' => 'Text', 'example' => 'Gulu'],
+                ['field' => 'homeRegion', 'label' => 'Home Region', 'required' => false, 'aliases' => ['region', 'homeregion'], 'format' => 'Text', 'example' => 'Northern'],
+                ['field' => 'religion', 'label' => 'Religion', 'required' => false, 'aliases' => ['religion'], 'format' => 'Text', 'example' => 'Christian'],
+                ['field' => 'country', 'label' => 'Country', 'required' => false, 'aliases' => ['country', 'nationality'], 'format' => 'Text', 'example' => 'Uganda'],
+                ['field' => 'subCounty', 'label' => 'Sub County', 'required' => false, 'aliases' => ['subcounty', 'sub_county'], 'format' => 'Text', 'example' => 'Laroo'],
+                ['field' => 'parish', 'label' => 'Parish', 'required' => false, 'aliases' => ['parish'], 'format' => 'Text', 'example' => 'Pece'],
+                ['field' => 'village', 'label' => 'Village', 'required' => false, 'aliases' => ['village'], 'format' => 'Text', 'example' => 'Senior Quarters'],
+                ['field' => 'alternateTelNo', 'label' => 'Alternative Phone Number', 'required' => false, 'aliases' => ['tel2', 'telephone2', 'alternatephone'], 'format' => 'Phone number', 'example' => '+256772000000'],
+                ['field' => 'maritalStatus', 'label' => 'Marital Status', 'required' => false, 'aliases' => ['maritalstatus', 'marital_status'], 'format' => 'Text', 'example' => 'Married'],
+                ['field' => 'applicant_email', 'label' => 'Email Address', 'required' => false, 'aliases' => ['email', 'emailaddress', 'applicantemail'], 'format' => 'Email', 'example' => 'officer@ugandaprisons.go.ug'],
+                ['field' => 'telNo', 'label' => 'Phone Number', 'required' => false, 'aliases' => ['telno', 'tel1', 'telephone1', 'phone', 'phone_number', 'contact'], 'format' => 'International or Uganda local', 'example' => '+256701234567'],
                 ['field' => 'birthDate', 'label' => 'Date of Birth', 'required' => false, 'aliases' => ['birthdate', 'dateofbirth', 'dob'], 'format' => 'YYYY-MM-DD', 'example' => '1970-05-20'],
-                ['field' => 'enlistmentDate', 'label' => 'Date of Enlistment', 'required' => false, 'aliases' => ['enlistmentdate', 'dateofenlistment'], 'format' => 'YYYY-MM-DD', 'example' => '1990-01-10'],
+                ['field' => 'enlistmentDate', 'label' => 'Date of Enlistment', 'required' => false, 'aliases' => ['enlistmentdate', 'dateofenlistment', 'enrollment', 'enrolment'], 'format' => 'YYYY-MM-DD', 'example' => '1990-01-10'],
                 ['field' => 'retirementDate', 'label' => 'Date of Retirement', 'required' => false, 'aliases' => ['retirementdate', 'dateofretirement'], 'format' => 'YYYY-MM-DD', 'example' => '2026-06-30'],
                 ['field' => 'financialYear', 'label' => 'Financial Year', 'required' => false, 'aliases' => ['financialyear', 'fy'], 'format' => 'FY YYYY/YYYY', 'example' => 'FY 2025/2026'],
-                ['field' => 'retirementType', 'label' => 'Mode of Retirement', 'required' => true, 'aliases' => ['retirementtype', 'modeofretirement', 'retirement_mode'], 'format' => 'Approved retirement label or supported legacy alias', 'example' => 'Mandatory Retirement'],
+                ['field' => 'retirementType', 'label' => 'Mode of Retirement', 'required' => false, 'aliases' => ['retirementtype', 'modeofretirement', 'retirement_mode'], 'format' => 'Defaults to Mandatory Retirement for raw HRMIS master reports', 'example' => 'Mandatory Retirement'],
                 ['field' => 'monthlySalary', 'label' => 'Monthly Salary', 'required' => false, 'aliases' => ['monthlysalary', 'salary'], 'format' => 'Decimal', 'example' => '1250000'],
                 ['field' => 'lengthOfService', 'label' => 'Length of Service (Months)', 'required' => false, 'aliases' => ['lengthofservice', 'service_months'], 'format' => 'Whole number', 'example' => '360'],
                 ['field' => 'annualSalary', 'label' => 'Annual Salary', 'required' => false, 'aliases' => ['annualsalary'], 'format' => 'Decimal', 'example' => '15000000'],
@@ -92,7 +108,7 @@ function getDataImportDatasetDefinitions(mysqli $conn): array
                 ['field' => 'appnStatus', 'label' => 'Application Status', 'required' => false, 'aliases' => ['appnstatus', 'applicationstatus'], 'format' => 'Pending, Verified, Queried, Rejected, Completed', 'example' => 'Pending']
             ],
             'template_rows' => [
-                ['UPS/RET/0001', 'PC-00981', 'Warder', 'Okello', 'John', 'Male', 'Luzira Upper Prison', 'CF1234567890AB', '+256701234567', '1970-05-20', '1990-01-10', '2026-06-30', 'FY 2025/2026', 'Mandatory Retirement', '1250000', '360', '15000000', '650000', '820000', '25000000', 'Pending', 'Pending']
+                ['P/A/123', 'IPPS-00981', 'Warder', '', 'John', 'Peter', 'Okello', 'Male', 'Luzira Upper Prison', 'CF1234567890AB', 'CM1234567890AB', 'U8', 'Active', 'Acholi', 'Gulu', 'Northern', 'Christian', 'Uganda', 'Laroo', 'Pece', 'Senior Quarters', '+256772000000', 'Married', 'officer@ugandaprisons.go.ug', '+256701234567', '1970-05-20', '1990-01-10', '2026-06-30', 'FY 2025/2026', 'Mandatory Retirement', '1250000', '360', '15000000', '650000', '820000', '25000000', 'Pending', 'Pending']
             ]
         ],
         'file_registry' => [
@@ -1159,6 +1175,26 @@ function importApplyCalculatedDatasetFields(string $datasetKey, array $values, a
     }
 
     if ($datasetKey === 'staff_due') {
+        if (trim((string)($source['retirementType'] ?? '')) === '') {
+            $source['retirementType'] = 'mandatory';
+            $values['retirementType'] = 'mandatory';
+        }
+        if (trim((string)($source['retirementDate'] ?? '')) === '' && !empty($source['birthDate'])) {
+            try {
+                $mandatoryDate = (new DateTimeImmutable((string)$source['birthDate']))->modify('+60 years')->format('Y-m-d');
+                $source['retirementDate'] = $mandatoryDate;
+                $values['retirementDate'] = $mandatoryDate;
+                $values['financialYear'] = importNormalizeFinancialYear('', $mandatoryDate);
+            } catch (Throwable $ignored) {}
+        }
+        $employeeNo = trim((string)($source['employeeNo'] ?? ''));
+        $values['regNo'] = pensionNumberFromEmployeeNumber($employeeNo);
+        $values['computerNo'] = trim((string)($source['ippsNo'] ?? ''));
+        $rankPosition = trim((string)($source['rankName'] ?? '')) ?: trim((string)($source['positionName'] ?? ''));
+        $values['rankPosition'] = $rankPosition;
+        $values['title'] = $rankPosition;
+        $values['fName'] = trim(implode(' ', array_filter([$source['firstName'] ?? '', $source['middleName'] ?? ''], static fn($part) => trim((string)$part) !== '')));
+        $values['sName'] = trim((string)($source['lastName'] ?? ''));
         $values['payType'] = deriveRegistryPayTypeFromProfile(
             $source['retirementType'] ?? null,
             $source['enlistmentDate'] ?? null,
@@ -1266,6 +1302,12 @@ function importInsertRow(mysqli $conn, array $dataset, array $values): bool
     }
 
     if ($dataset['key'] === 'staff_due') {
+        foreach (['regNo', 'computerNo', 'title', 'rankPosition', 'fName', 'sName'] as $compatibilityField) {
+            if (!in_array($compatibilityField, $columns, true) && !empty($values[$compatibilityField])) {
+                $columns[] = $compatibilityField;
+                $params[] = $values[$compatibilityField];
+            }
+        }
         if (empty($values['submissionStatus'])) {
             $columns[] = 'submissionStatus';
             $params[] = 'Pending';
@@ -1633,7 +1675,10 @@ function processDataImport(mysqli $conn, string $datasetKey, string $path, strin
 
     $dataset = $definitions[$datasetKey];
     $rows = importParseFileRows($path, $extension);
-    enforceParsedRowLimit($conn, max(0, count($rows) - 1), $dataset['label']);
+    // The official UPS HRMIS master report contains roughly 17.7k staff rows.
+    // Other datasets retain the configured ceiling; this bounded exception still
+    // passes the file-size and ZIP archive safety controls.
+    enforceParsedRowLimit($conn, max(0, count($rows) - 1), $dataset['label'], $datasetKey === 'staff_due' ? 25000 : 0);
     if (count($rows) < 2) {
         throw new RuntimeException('The import file must contain a header row and at least one data row.');
     }
@@ -1671,6 +1716,16 @@ function processDataImport(mysqli $conn, string $datasetKey, string $path, strin
             $errors = $built['errors'];
             $keyField = $dataset['key_column'];
             $displayKey = '';
+
+            if ($datasetKey === 'staff_due') {
+                $employeeState = strtolower(trim((string)($values['employmentStatus'] ?? '')));
+                $disqualifiedStates = ['absconded', 'deserted', 'dismissed', 'dismisses', 'terminated'];
+                if (in_array($employeeState, $disqualifiedStates, true)) {
+                    $summary['skipped_exact_rows']++;
+                    $reportRows[] = ['row_number'=>$rowNumber, 'key_value'=>(string)($values['employeeNo'] ?? ''), 'status'=>'skipped', 'message'=>'Employee state is not benefit-eligible: ' . $employeeState, 'merged_fields'=>[], 'conflict_fields'=>[]];
+                    continue;
+                }
+            }
 
             if (!empty($dataset['composite_key_fields'])) {
                 $keyValue = [];

@@ -12,7 +12,7 @@ if ($sessionId <= 0) {
 }
 
 if ($asAgent) {
-    $actor = publicChatResolveActor($conn, $sessionId, '', true, true);
+    $actor = publicChatResolveActor($conn, $sessionId, '', true, true, true);
     $agentId = (string)$actor['sender_id'];
     $agentProfile = $actor['profile'];
 } else {
@@ -20,6 +20,7 @@ if ($asAgent) {
     $agentId = '';
     $agentProfile = [];
 }
+publicChatReleaseSessionLock();
 $session = $actor['session'];
 $viewerType = $asAgent ? 'agent' : 'visitor';
 
@@ -40,6 +41,7 @@ publicChatJson([
     ],
     'canReply' => $canReply,
     'messages' => $messages,
+    'receipts' => publicChatReceiptRows($conn, $sessionId, $viewerType),
     'typing' => publicChatTypingRows($conn, $sessionId, $asAgent ? 'visitor' : 'agent')
 ]);
 ?>

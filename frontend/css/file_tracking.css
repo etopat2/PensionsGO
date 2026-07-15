@@ -24,6 +24,23 @@
   gap: 0.75rem;
   margin-top: 1rem;
 }
+.service-registry-actions { display: flex; justify-content: flex-end; gap: .7rem; flex-wrap: wrap; margin: 1.1rem 0; padding: .8rem; border: 1px solid var(--border-color); border-radius: 12px; background: color-mix(in srgb, var(--card-bg) 88%, var(--menu-bg-dark) 12%); }
+.service-registry-actions button, .movement-item-actions button { border: 1px solid transparent; border-radius: 9px; min-height: 40px; padding: .58rem .9rem; font-weight: 700; letter-spacing: .01em; box-shadow: 0 4px 10px color-mix(in srgb, #0f172a 14%, transparent); transition: transform .16s ease, box-shadow .16s ease, filter .16s ease; }
+.service-registry-actions button:hover, .movement-item-actions button:hover { transform: translateY(-2px); box-shadow: 0 7px 15px color-mix(in srgb, #0f172a 20%, transparent); filter: brightness(1.05); }
+.service-registry-actions button:active, .movement-item-actions button:active { transform: translateY(0); box-shadow: 0 2px 6px color-mix(in srgb, #0f172a 16%, transparent); }
+.service-registry-actions button:focus-visible, .movement-item-actions button:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary-gold) 55%, transparent); outline-offset: 2px; }
+#openFileTrackerBtn, .registry-track { background: #4b5563; color: #fff; border-color: #4b5563; }
+.service-registry-actions .action-receive, .action-receive { background: linear-gradient(145deg,#218456,#176b45); color: #fff; border-color: #176b45; }
+.service-registry-actions .action-move, .action-move, .registry-move { background: linear-gradient(145deg,#3d75ad,#315f91); color: #fff; border-color: #315f91; }
+.service-registry-actions .action-return, .action-return, .registry-return { background: linear-gradient(145deg,#a16c24,#875918); color: #fff; border-color: #875918; }
+.service-action { background: var(--card-bg); color: var(--heading-color); border-color: var(--border-color) !important; box-shadow: none !important; }
+.file-operation-modal { position: relative; width: min(1080px, 94vw); max-height: 92dvh; overflow-y: auto; margin: 0; }
+.operation-modal-close { position: sticky; top: 0; float: right; z-index: 3; }
+.file-move-form label { display: flex; flex-direction: column; gap: .3rem; color: var(--muted-color); font-size: .78rem; }
+.field-hidden { display: none !important; }
+.file-move-form select, .file-track-form select { min-height: 42px; padding: .55rem .7rem; border: 1px solid var(--border-color); border-radius: 8px; background: var(--input-bg); color: var(--text-color); }
+@media (max-width: 700px) { .file-operation-modal { width: 97vw; max-height: 95dvh; padding: 1rem; } .file-move-form { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .service-registry-actions { display: grid; grid-template-columns: 1fr; } .service-registry-actions button { width: 100%; } }
 
 .file-track-form input,
 .file-move-form input {

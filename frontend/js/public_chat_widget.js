@@ -1,6 +1,10 @@
 (function () {
   const SCRIPT_URL = document.currentScript?.src || new URL("js/public_chat_widget.js", location.href).href;
   const PUBLIC_CHAT_PAGES = new Set(["index.html", "", "about.html", "faq.html", "podcast.html", "podcast_public.html", "feedback.html", "terms.html", "login.html", "pensioner_board.html"]);
+  const PUBLIC_CHAT_ASSET_VERSION = "20260714w";
+  const PUBLIC_CHAT_ICON_STYLE_ID = "pensionsgo-public-chat-icons-css";
+  const PUBLIC_CHAT_ATTACHMENT_ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png,.gif,.webp,.mp3,.wav,.ogg,.m4a,.webm,.mp4,.mov,image/*,audio/*,video/*";
+  let publicChatUseFallbackIcons = false;
   const state = {
     settings: null,
     availability: null,
@@ -16,6 +20,8 @@
     pollTimer: null,
     typingTimer: null,
     typingStopTimer: null,
+    typingPulseTimer: null,
+    typingHideTimer: null,
     lastTypingAt: 0,
     mediaRecorder: null,
     recordingStream: null,
@@ -23,7 +29,8 @@
     voiceStartedAt: 0,
     voiceTimer: null,
     voiceDraft: null,
-    rating: 0
+    rating: 0,
+    appCsrfToken: ""
   };
 
   const api = (path) => `../backend/api/${path}`;
@@ -34,21 +41,117 @@
     return new URL(path, SCRIPT_URL).href;
   }
 
+  function markPublicChatFallbackIcons() {
+    publicChatUseFallbackIcons = true;
+    document.getElementById("publicChatPanel")?.classList.add("public-chat-fallback-icons");
+  }
+
+  function ensurePublicChatIconStylesheet() {
+    if (document.getElementById(PUBLIC_CHAT_ICON_STYLE_ID) || document.querySelector('link[href*="font-awesome"],link[href*="fontawesome"]')) return;
+    const csp = document.querySelector('meta[http-equiv="Content-Security-Policy" i]')?.content || "";
+    const stylePolicy = csp.match(/(?:^|;)\s*style-src\s+([^;]+)/i)?.[1] || "";
+    const allowsExternalStyles = !stylePolicy
+      || /\*/.test(stylePolicy)
+      || /\bhttps:\b/i.test(stylePolicy)
+      || /cdnjs\.cloudflare\.com/i.test(stylePolicy);
+    if (!allowsExternalStyles) {
+      markPublicChatFallbackIcons();
+      return;
+    }
+    const link = document.createElement("link");
+    link.id = PUBLIC_CHAT_ICON_STYLE_ID;
+    link.rel = "stylesheet";
+    link.href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css";
+    link.onerror = markPublicChatFallbackIcons;
+    document.head.appendChild(link);
+  }
+
+  let chatShared = null;
+  async function loadChatSharedHelpers() {
+    if (chatShared) return chatShared;
+    try {
+      chatShared = await import(moduleUrl(`modules/chat_shared.js?v=${PUBLIC_CHAT_ASSET_VERSION}`));
+    } catch (_error) {
+      chatShared = {};
+    }
+    return chatShared;
+  }
+
   function escapeHtml(value) {
+    if (chatShared?.escapeHtml) return chatShared.escapeHtml(value);
     return String(value || "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[m]));
   }
 
   function formatText(value) {
+    if (chatShared?.formatText) return chatShared.formatText(value);
     return escapeHtml(value).replace(/\n/g, "<br>");
   }
 
-  async function fetchJson(url, options = {}) {
-    const response = await fetch(url, { credentials: "include", cache: "no-store", ...options });
+  async function fetchJsonRequest(url, options = {}) {
+    if (chatShared?.fetchJson) return chatShared.fetchJson(url, options);
+    const { timeoutMs = 0, ...requestOptions } = options;
+    const timeoutValue = Math.max(0, Number(timeoutMs || 0));
+    let timeoutId = null;
+    let abortController = null;
+    if (timeoutValue > 0) {
+      abortController = new AbortController();
+      requestOptions.signal = abortController.signal;
+      timeoutId = setTimeout(() => abortController.abort(), timeoutValue);
+    }
+    let response;
+    try {
+      response = await fetch(url, { credentials: "include", cache: "no-store", ...requestOptions });
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
     const data = await response.json().catch(() => ({ success: false, message: "The server returned an unreadable response." }));
     if (!response.ok && data && data.success !== true) {
       data.message = data.message || "The request could not be completed.";
     }
     return data;
+  }
+
+  async function refreshAppCsrfToken(force = false) {
+    if (state.appCsrfToken && !force) return state.appCsrfToken;
+    const data = await fetchJsonRequest(api("get_csrf_token.php")).catch(() => null);
+    if (data?.success && data.token) {
+      state.appCsrfToken = data.token;
+      return state.appCsrfToken;
+    }
+    return "";
+  }
+
+  async function fetchJson(url, options = {}, retryCsrf = true) {
+    const method = String(options.method || "GET").toUpperCase();
+    const requestOptions = { ...options };
+    const needsAppCsrf = method !== "GET" && method !== "HEAD" && !isPublicChatEndpoint(url);
+    if (needsAppCsrf) {
+      const token = await refreshAppCsrfToken(false);
+      if (token) {
+        const headers = new Headers(requestOptions.headers || {});
+        headers.set("X-CSRF-Token", token);
+        requestOptions.headers = headers;
+      }
+    }
+    const data = await fetchJsonRequest(url, requestOptions);
+    if (
+      retryCsrf &&
+      needsAppCsrf &&
+      data?.success === false &&
+      /security token validation failed/i.test(String(data.message || ""))
+    ) {
+      const token = await refreshAppCsrfToken(true);
+      if (token) return fetchJson(url, options, false);
+    }
+    return data;
+  }
+
+  function isPublicChatEndpoint(url) {
+    try {
+      return /\/public_chat_[^/]+\.php$/i.test(new URL(url, location.href).pathname);
+    } catch (_) {
+      return /public_chat_[^/?#]+\.php/i.test(String(url || ""));
+    }
   }
 
   function showChatFeedback(message, type = "info", title = "Public Live Support") {
@@ -65,6 +168,8 @@
   function removePublicChatShell() {
     clearTimeout(state.pollTimer);
     clearTimeout(state.typingStopTimer);
+    clearTimeout(state.typingHideTimer);
+    if (state.typingPulseTimer) clearInterval(state.typingPulseTimer);
     if (state.voiceTimer) clearInterval(state.voiceTimer);
     state.recordingStream?.getTracks?.().forEach((track) => track.stop());
     state.recordingStream = null;
@@ -77,13 +182,21 @@
   async function initStaffLiveChatForAuthenticatedUser(visitor = {}) {
     removePublicChatShell();
     window.__disablePublicLiveChat = true;
+    const normalizeRole = (value) => String(value || "").toLowerCase().replace(/[\s-]+/g, "_");
+    const role = normalizeRole(visitor.role || visitor.userRole || localStorage.getItem("userRole"));
+    const effectiveRole = normalizeRole(visitor.userRoleEffective || visitor.roleEffective || localStorage.getItem("userRoleEffective"));
+    if (["super_admin", "superadministrator", "system_administrator"].includes(role) || ["super_admin", "superadministrator", "system_administrator"].includes(effectiveRole)) {
+      window.__disableStaffLiveChat = true;
+      return;
+    }
     if (window.PensionsGoLiveChat?.instance) return;
     try {
-      const mod = await import(moduleUrl("modules/live_chat.js?v=20260609d"));
+      const mod = await import(moduleUrl(`modules/live_chat.js?v=${PUBLIC_CHAT_ASSET_VERSION}`));
       await mod?.initLiveChat?.({
         userId: visitor.userId || localStorage.getItem("loggedInUser") || "",
         userName: visitor.userName || localStorage.getItem("loggedInUserName") || "",
-        userRole: visitor.role || visitor.userRole || localStorage.getItem("userRole") || ""
+        userRole: visitor.role || visitor.userRole || localStorage.getItem("userRole") || "",
+        userRoleEffective: visitor.userRoleEffective || visitor.roleEffective || localStorage.getItem("userRoleEffective") || ""
       });
     } catch (error) {
       console.warn("Staff live chat initialization failed:", error.message || error);
@@ -96,6 +209,7 @@
   }
 
   function createClientNonce(prefix = "public") {
+    if (chatShared?.createClientNonce) return chatShared.createClientNonce(prefix);
     const random = window.crypto?.getRandomValues
       ? Array.from(window.crypto.getRandomValues(new Uint32Array(2))).map((part) => part.toString(36)).join("")
       : Math.random().toString(36).slice(2);
@@ -123,12 +237,13 @@
 
   function renderShell() {
     if (document.getElementById("publicChatLauncher")) return;
+    ensurePublicChatIconStylesheet();
     document.body.insertAdjacentHTML("beforeend", `
       <button id="publicChatLauncher" class="public-chat-launcher" type="button" aria-controls="publicChatPanel" aria-expanded="false">
         <span>Live Support</span>
         <small id="publicChatLauncherState">${state.availability?.online ? "Online" : "Offline"}</small>
       </button>
-      <section id="publicChatPanel" class="public-chat-panel" hidden aria-live="polite">
+      <section id="publicChatPanel" class="public-chat-panel${publicChatUseFallbackIcons ? " public-chat-fallback-icons" : ""}" hidden aria-live="polite">
         <div class="public-chat-head">
           <div>
             <h2 class="public-chat-title">Public Live Support</h2>
@@ -139,14 +254,20 @@
         <div class="public-chat-body" id="publicChatBody"></div>
         <form class="public-chat-reply" id="publicChatReply" hidden>
           <div class="public-chat-typing" id="publicChatTyping" hidden>Officer is typing...</div>
-          <div class="public-chat-voice-draft" id="publicChatVoiceDraft" hidden></div>
+          <div class="public-chat-voice-draft live-voice-draft" id="publicChatVoiceDraft" hidden></div>
           <div class="public-chat-composer">
-            <textarea id="publicChatReplyText" maxlength="${Number(state.settings?.maxMessageLength || 2000)}" placeholder="Type your message" aria-label="Type your message"></textarea>
-            <button type="button" class="public-chat-composer-icon public-chat-attach-icon" id="publicChatAttachBtn" ${state.settings?.attachmentsEnabled ? "" : "hidden"} title="Attach file" aria-label="Attach file">+</button>
-            <button type="button" class="public-chat-composer-icon public-chat-voice-icon" id="publicChatVoiceBtn" title="Record voice note" aria-label="Record voice note"><span class="public-chat-mic-icon" aria-hidden="true"></span></button>
+            <div class="attachment-picker public-chat-attachment-picker hidden" id="publicChatAttachmentPicker">
+              <button type="button" data-accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt" data-label="Document"><i class="fas fa-file-alt"></i> Document</button>
+              <button type="button" data-accept="image/*,video/*" data-label="Photos & Videos"><i class="fas fa-photo-video"></i> Photos & Videos</button>
+              <button type="button" data-accept="image/*" data-capture="environment" data-label="Camera"><i class="fas fa-camera"></i> Camera</button>
+              <button type="button" data-accept="audio/*" data-label="Audio"><i class="fas fa-music"></i> Audio</button>
+            </div>
+            <textarea id="publicChatReplyText" rows="1" maxlength="${Number(state.settings?.maxMessageLength || 2000)}" placeholder="Type your message" aria-label="Type your message"></textarea>
+            <button type="button" class="public-chat-composer-icon public-chat-attach-icon" id="publicChatAttachBtn" ${state.settings?.attachmentsEnabled ? "" : "hidden"} title="Attachments" aria-label="Attachments"><i class="fas fa-plus" aria-hidden="true"></i></button>
+            <button type="button" class="public-chat-composer-icon public-chat-voice-icon" id="publicChatVoiceBtn" title="Record voice note" aria-label="Record voice note"><i class="fas fa-microphone" aria-hidden="true"></i></button>
           </div>
           <div class="public-chat-actions-row">
-            <input type="file" id="publicChatAttachment" hidden accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+            <input type="file" id="publicChatAttachment" hidden accept="${PUBLIC_CHAT_ATTACHMENT_ACCEPT}">
             <button type="button" class="public-chat-secondary" id="publicChatEndBtn">End Chat</button>
             <button type="submit" class="public-chat-send">Send</button>
           </div>
@@ -160,6 +281,7 @@
           <p>Help us improve public correspondence support.</p>
           <div class="public-chat-rating" id="publicChatRating"></div>
           <textarea id="publicChatFeedbackComments" maxlength="2000" placeholder="Optional comment"></textarea>
+          <div class="public-chat-feedback-status" id="publicChatFeedbackStatus" aria-live="polite" hidden></div>
           <div class="public-chat-actions-row">
             <button type="button" class="public-chat-secondary" id="publicChatFeedbackSkip">Skip</button>
             <button type="button" class="public-chat-submit" id="publicChatFeedbackSend">Submit Feedback</button>
@@ -179,14 +301,64 @@
     document.getElementById("publicChatFeedbackClose").addEventListener("click", closeFeedbackPopup);
     document.getElementById("publicChatFeedbackSkip").addEventListener("click", closeFeedbackPopup);
     document.querySelector("[data-public-chat-feedback-close]")?.addEventListener("click", closeFeedbackPopup);
-    document.getElementById("publicChatAttachBtn").addEventListener("click", () => document.getElementById("publicChatAttachment").click());
+    document.getElementById("publicChatPanel").addEventListener("click", handlePublicChatPanelClick);
+    document.getElementById("publicChatAttachBtn").addEventListener("click", toggleAttachmentPicker);
+    document.getElementById("publicChatAttachmentPicker")?.addEventListener("click", handleAttachmentPicker);
     document.getElementById("publicChatAttachment").addEventListener("change", uploadAttachment);
     document.getElementById("publicChatVoiceBtn").addEventListener("click", toggleVoiceRecording);
-    document.getElementById("publicChatReplyText").addEventListener("input", notifyTyping);
-    document.getElementById("publicChatReplyText").addEventListener("blur", () => stopTyping(false));
+    const replyText = document.getElementById("publicChatReplyText");
+    replyText.addEventListener("input", handleReplyInput);
+    replyText.addEventListener("keydown", handleReplyKeydown);
+    replyText.addEventListener("blur", () => stopTyping(false));
+    resizeReplyTextarea(replyText);
+    document.addEventListener("click", closeTransientPopups);
     renderRating();
     restoreSession();
     setInterval(refreshAvailability, 10000);
+  }
+
+  function hideAttachmentPicker() {
+    document.getElementById("publicChatAttachmentPicker")?.classList.add("hidden");
+  }
+
+  function toggleAttachmentPicker(event) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    const picker = document.getElementById("publicChatAttachmentPicker");
+    if (!picker) return;
+    picker.classList.toggle("hidden");
+  }
+
+  function handleAttachmentPicker(event) {
+    const button = event.target instanceof Element ? event.target.closest("button[data-accept]") : null;
+    if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const input = document.getElementById("publicChatAttachment");
+    if (!input) return;
+    input.accept = button.dataset.accept || PUBLIC_CHAT_ATTACHMENT_ACCEPT;
+    if (button.dataset.capture) {
+      input.setAttribute("capture", button.dataset.capture);
+    } else {
+      input.removeAttribute("capture");
+    }
+    input.dataset.label = button.dataset.label || "Attachment";
+    hideAttachmentPicker();
+    input.click();
+  }
+
+  function closeTransientPopups(event) {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest?.(".public-chat-composer")) return;
+    hideAttachmentPicker();
+  }
+
+  function handlePublicChatPanelClick(event) {
+    const mediaButton = event.target instanceof Element ? event.target.closest(".live-media-open[data-media-url]") : null;
+    if (!mediaButton) return;
+    event.preventDefault();
+    const url = mediaButton.dataset.mediaUrl || "";
+    if (url) window.open(url, "_blank", "noopener");
   }
 
   async function togglePanel() {
@@ -203,6 +375,7 @@
     try {
       const data = await fetchJson(api("public_chat_availability.php"));
       if (data.success) {
+        if (data.appCsrfToken) state.appCsrfToken = data.appCsrfToken;
         state.availability = data.availability || state.availability;
         const launcherState = document.getElementById("publicChatLauncherState");
         if (launcherState) launcherState.textContent = state.availability?.online ? "Online" : "Offline";
@@ -228,6 +401,14 @@
     }
   }
 
+  function setFeedbackStatus(message = "", type = "info") {
+    const status = document.getElementById("publicChatFeedbackStatus");
+    if (!status) return;
+    status.hidden = !message;
+    status.textContent = message;
+    status.className = `public-chat-feedback-status ${type}`;
+  }
+
   function openFeedbackPopup() {
     state.feedbackSession = state.session;
     if (!state.settings?.feedbackEnabled) {
@@ -239,6 +420,14 @@
     const modal = document.getElementById("publicChatFeedbackModal");
     if (!modal) return;
     modal.hidden = false;
+    const comments = document.getElementById("publicChatFeedbackComments");
+    if (comments) comments.value = "";
+    const submit = document.getElementById("publicChatFeedbackSend");
+    if (submit) {
+      submit.disabled = false;
+      submit.textContent = "Submit Feedback";
+    }
+    setFeedbackStatus("");
     renderRating();
     document.getElementById("publicChatFeedbackSend")?.focus();
     resetChatPanel();
@@ -258,7 +447,11 @@
     localStorage.removeItem(storeKey());
     document.getElementById("publicChatRef").textContent = "Welcome to UPS PensionsGo support";
     document.getElementById("publicChatReply").hidden = true;
-    document.getElementById("publicChatReplyText").value = "";
+    const replyText = document.getElementById("publicChatReplyText");
+    if (replyText) {
+      replyText.value = "";
+      resizeReplyTextarea(replyText);
+    }
     cleanupVoiceDraft();
     hideTypingIndicator();
     renderStartForm(state.availability?.online ? "online" : "offline");
@@ -299,9 +492,10 @@
     if (state.session) {
       try {
         const params = new URLSearchParams({ session_id: state.session.session_id, token: state.session.token, last_id: state.lastId });
-        const data = await fetchJson(`${api("public_chat_poll.php")}?${params.toString()}`);
+        const data = await fetchJson(`${api("public_chat_poll.php")}?${params.toString()}`, { timeoutMs: 9000 });
         if (data.success && data.session?.status !== "closed") {
           showThread();
+          syncReceipts(data.receipts || []);
           addMessages(data.messages || []);
           renderPeerTyping(data.typing || []);
           poll();
@@ -384,7 +578,7 @@
       return;
     }
     document.getElementById("publicChatRef").textContent = state.session?.chat_reference || "Active chat";
-    document.getElementById("publicChatBody").innerHTML = `<div class="public-chat-thread" id="publicChatThread"></div><div class="public-chat-peer-typing" id="publicChatPeerTyping" hidden><span></span><span></span><span></span><strong>Officer is typing</strong></div>`;
+    document.getElementById("publicChatBody").innerHTML = `<div class="public-chat-thread" id="publicChatThread"></div><div class="live-typing-indicator public-chat-peer-typing" id="publicChatPeerTyping" hidden><span></span><span></span><span></span><strong>Officer is typing</strong></div>`;
     document.getElementById("publicChatReply").hidden = false;
   }
 
@@ -403,7 +597,8 @@
             state.lastId = Math.max(state.lastId, id);
           }
           pending.classList.remove("pending", "failed");
-          pending.innerHTML = `${renderMessageContent(msg)}<small>${escapeHtml(msg.sender_name || msg.sender_type || "")} - ${escapeHtml(msg.created_at || "Sent")}</small>`;
+          pending.dataset.receiptStatus = receiptStatus(msg);
+          pending.innerHTML = `${renderMessageContent(msg)}<small>${escapeHtml(messageMeta(msg, "Sent"))}</small>`;
           return;
         }
       }
@@ -411,13 +606,15 @@
       const item = document.createElement("div");
       item.className = `public-chat-message ${msg.sender_type === "visitor" ? "visitor" : "agent"}`;
       item.dataset.messageId = String(Number(msg.message_id || 0));
-      item.innerHTML = `${renderMessageContent(msg)}<small>${escapeHtml(msg.sender_name || msg.sender_type || "")} - ${escapeHtml(msg.created_at || "")}</small>`;
+      item.dataset.receiptStatus = receiptStatus(msg);
+      item.innerHTML = `${renderMessageContent(msg)}<small>${escapeHtml(messageMeta(msg))}</small>`;
       thread.appendChild(item);
     });
     thread.scrollTop = thread.scrollHeight;
   }
 
   function formatFileSize(bytes) {
+    if (chatShared?.formatFileSize) return chatShared.formatFileSize(bytes);
     const size = Number(bytes || 0);
     if (!size) return "";
     if (size < 1024) return `${size} B`;
@@ -425,30 +622,61 @@
     return `${Math.round(size / 104857.6) / 10} MB`;
   }
 
-  function renderAttachment(att) {
+  function renderAttachment(att, message = {}) {
     const name = escapeHtml(att.file_name || "Attachment");
     const size = formatFileSize(att.file_size);
-    const url = `../backend/api/${att.preview_url || att.view_url || ""}`;
-    const download = `../backend/api/${att.download_url || att.view_url || ""}`;
-    if (att.is_voice) {
+    const previewPath = att.preview_url || att.view_url || "";
+    const downloadPath = att.download_url || att.view_url || previewPath;
+    const url = previewPath ? `../backend/api/${previewPath}` : "";
+    const download = downloadPath ? `../backend/api/${downloadPath}` : url;
+    const kind = chatShared?.attachmentMediaKind?.(att, message) || (att.is_voice ? "voice" : "file");
+    const escapedUrl = escapeHtml(url);
+    const escapedDownload = escapeHtml(download || url);
+    const downloadLink = download
+      ? `<a class="live-file-download" href="${escapedDownload}" download="${name}"><i class="fas fa-download"></i> Download</a>`
+      : "";
+    if (kind === "voice" || kind === "audio") {
       const mime = escapeHtml(att.mime_type || "audio/webm");
-      const mediaTag = String(att.mime_type || "").toLowerCase().startsWith("video/")
-        ? `<video controls preload="metadata"><source src="${escapeHtml(url)}" type="${mime}"></video>`
-        : `<audio controls preload="metadata"><source src="${escapeHtml(url)}" type="${mime}"></audio>`;
       return `
-        <div class="public-chat-file-card voice">
-          <div><strong>Voice note</strong><span>${name}${size ? ` - ${escapeHtml(size)}` : ""}</span></div>
-          ${mediaTag}
+        <div class="live-thread-voice-note">
+          <span class="live-thread-voice-icon"><i class="fas fa-microphone-lines" aria-hidden="true"></i></span>
+          <audio controls preload="metadata">
+            <source src="${escapedUrl}" type="${mime}">
+          </audio>
+          ${download ? `<a class="live-thread-voice-download" href="${escapedDownload}" download="${name}" title="Download voice note"><i class="fas fa-download" aria-hidden="true"></i></a>` : ""}
+        </div>
+      `;
+    }
+    if (kind === "image") {
+      return `
+        <figure class="live-file-preview-message">
+          <button type="button" class="live-media-open" data-media-type="image" data-media-url="${escapedUrl}" data-media-name="${name}" title="Open photo">
+            <img src="${escapedUrl}" alt="${name}" loading="lazy" decoding="async">
+          </button>
+          <figcaption>${name}${size ? ` - ${escapeHtml(size)}` : ""}</figcaption>
+          ${downloadLink}
+        </figure>
+      `;
+    }
+    if (kind === "video") {
+      const mime = escapeHtml(att.mime_type || "video/webm");
+      return `
+        <div class="live-file-preview-message">
+          <button type="button" class="live-media-open video" data-media-type="video" data-media-url="${escapedUrl}" data-media-name="${name}" title="Open video">
+            <video preload="metadata" muted playsinline>
+              <source src="${escapedUrl}" type="${mime}">
+            </video>
+            <i class="fas fa-video"></i>
+          </button>
+          <span>${name}${size ? ` - ${escapeHtml(size)}` : ""}</span>
+          ${downloadLink}
         </div>
       `;
     }
     return `
-      <div class="public-chat-file-card">
-        <div><strong>${name}</strong><span>${escapeHtml(att.mime_type || "File")}${size ? ` - ${escapeHtml(size)}` : ""}</span></div>
-        <div class="public-chat-file-actions">
-          <a href="${escapeHtml(url)}" target="_blank" rel="noopener">View</a>
-          <a href="${escapeHtml(download)}">Download</a>
-        </div>
+      <div class="live-file-preview-message compact">
+        <a href="${escapedUrl}" target="_blank" rel="noopener"><i class="fas fa-paperclip" aria-hidden="true"></i> ${name}${size ? ` - ${escapeHtml(size)}` : ""}</a>
+        ${downloadLink}
       </div>
     `;
   }
@@ -456,15 +684,54 @@
   function renderMessageContent(msg) {
     const attachments = Array.isArray(msg.attachments) ? msg.attachments : [];
     const text = String(msg.message_text || "").trim();
-    const attachmentHtml = attachments.map(renderAttachment).join("");
+    const attachmentHtml = attachments.map((att) => renderAttachment(att, msg)).join("");
     const showText = text && text !== "Attachment uploaded" && text !== "Voice note";
     return `${showText ? `<div>${formatText(text)}</div>` : ""}${attachmentHtml || (!showText ? `<div>${formatText(text || "Message")}</div>` : "")}`;
+  }
+
+  function receiptStatus(message = {}) {
+    return String(message.receiptStatus || message.receipt_status || (message.read_at ? "read" : (message.delivered_at ? "delivered" : "sent")) || "sent").toLowerCase();
+  }
+
+  function receiptLabel(status = "sent") {
+    const normalized = String(status || "sent").toLowerCase();
+    if (normalized === "read") return "Read";
+    if (normalized === "delivered") return "Delivered";
+    if (normalized === "sending") return "Sending";
+    if (normalized === "failed") return "Not sent";
+    return "Sent";
+  }
+
+  function messageMeta(message = {}, fallbackTime = "") {
+    const own = message.sender_type === "visitor";
+    const sender = own ? "You" : (message.sender_name || message.sender_type || "Officer");
+    const when = message.created_at || fallbackTime || "";
+    const status = own ? ` - ${receiptLabel(receiptStatus(message))}` : "";
+    return `${sender} - ${when}${status}`;
+  }
+
+  function syncReceipts(receipts = []) {
+    const thread = document.getElementById("publicChatThread");
+    if (!thread || !Array.isArray(receipts)) return;
+    receipts.forEach((receipt) => {
+      const id = Number(receipt.message_id || receipt.id || 0);
+      if (id <= 0) return;
+      const node = thread.querySelector(`.public-chat-message.visitor[data-message-id="${id}"]`);
+      if (!node || node.classList.contains("pending") || node.classList.contains("failed")) return;
+      const status = receiptStatus(receipt);
+      node.dataset.receiptStatus = status;
+      const small = node.querySelector("small");
+      if (!small) return;
+      const base = small.dataset.baseMeta || small.textContent.replace(/\s-\s(?:Sent|Delivered|Read|Not sent|Sending)$/i, "");
+      small.dataset.baseMeta = base;
+      small.textContent = `${base} - ${receiptLabel(status)}`;
+    });
   }
 
   async function poll() {
     if (!state.session) return;
     clearTimeout(state.pollTimer);
-    const activePollMs = Math.max(800, Math.min(Number(state.settings?.pollIntervalMs || 2500), 15000));
+    const activePollMs = Math.max(650, Math.min(Number(state.settings?.pollIntervalMs || 1000), 3000));
     if (state.polling) {
       state.pollTimer = setTimeout(poll, activePollMs);
       return;
@@ -472,8 +739,9 @@
     state.polling = true;
     try {
       const params = new URLSearchParams({ session_id: state.session.session_id, token: state.session.token, last_id: state.lastId });
-      const data = await fetchJson(`${api("public_chat_poll.php")}?${params.toString()}`);
+      const data = await fetchJson(`${api("public_chat_poll.php")}?${params.toString()}`, { timeoutMs: 5000 });
       if (data.success) {
+        syncReceipts(data.receipts || []);
         addMessages(data.messages || []);
         renderPeerTyping(data.typing || []);
         if (data.session?.status === "closed") {
@@ -498,8 +766,9 @@
     state.sendingMessage = true;
     const clientNonce = createClientNonce("visitor");
     textarea.value = "";
+    resizeReplyTextarea(textarea);
     const tempNode = appendVisitorMessage(message, clientNonce);
-    await stopTyping(true);
+    stopTyping(false);
     const data = await fetchJson(api("public_chat_send.php"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -508,10 +777,15 @@
     if (data.success) {
       if (data.message) addMessages([data.message]);
       const messageId = Number(data.message_id || 0);
-      if (messageId > 0 && tempNode) {
+      if (messageId > 0 && tempNode && tempNode.classList.contains("pending")) {
         tempNode.dataset.messageId = String(messageId);
         tempNode.classList.remove("pending");
-        tempNode.querySelector("small").textContent = `You - Sent`;
+        tempNode.dataset.receiptStatus = "sent";
+        const status = tempNode.querySelector("small");
+        if (status) {
+          status.dataset.baseMeta = "You";
+          status.textContent = "You - Sent";
+        }
         state.lastId = Math.max(state.lastId, messageId);
       }
       poll();
@@ -522,8 +796,42 @@
       }
       showChatFeedback(data.message || "Unable to send message.", "error");
       textarea.value = message;
+      resizeReplyTextarea(textarea);
     }
     state.sendingMessage = false;
+  }
+
+  function resizeReplyTextarea(textarea = document.getElementById("publicChatReplyText")) {
+    if (!textarea) return;
+    const styles = window.getComputedStyle(textarea);
+    const lineHeight = Number.parseFloat(styles.lineHeight) || 20;
+    const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
+    const paddingBottom = Number.parseFloat(styles.paddingBottom) || 0;
+    const borderTop = Number.parseFloat(styles.borderTopWidth) || 0;
+    const borderBottom = Number.parseFloat(styles.borderBottomWidth) || 0;
+    const chrome = paddingTop + paddingBottom + borderTop + borderBottom;
+    const minHeight = Math.ceil(lineHeight + chrome);
+    const maxHeight = Math.ceil((lineHeight * 4) + chrome);
+    textarea.style.height = `${minHeight}px`;
+    const nextHeight = Math.min(maxHeight, Math.max(minHeight, textarea.scrollHeight));
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight + 1 ? "auto" : "hidden";
+  }
+
+  function handleReplyInput(event) {
+    resizeReplyTextarea(event.currentTarget);
+    notifyTyping();
+  }
+
+  function handleReplyKeydown(event) {
+    if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+    event.preventDefault();
+    const form = event.currentTarget?.form || document.getElementById("publicChatReply");
+    if (form?.requestSubmit) {
+      form.requestSubmit();
+    } else {
+      form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    }
   }
 
   function appendVisitorMessage(message, clientNonce = "") {
@@ -538,13 +846,19 @@
     return item;
   }
 
-  async function notifyTyping() {
+  function staffTypingTiming(key, fallback) {
+    return Number(chatShared?.[key] || fallback);
+  }
+
+  async function notifyTyping(touchActivity = true) {
     if (!state.session) return;
     const now = Date.now();
-    state.lastTypingAt = now;
-    clearTimeout(state.typingStopTimer);
-    state.typingStopTimer = setTimeout(() => stopTyping(false), 1200);
-    if (state.typingTimer && now - state.typingTimer < 250) return;
+    if (touchActivity) {
+      state.lastTypingAt = now;
+      clearTimeout(state.typingStopTimer);
+      state.typingStopTimer = setTimeout(() => stopTyping(false), staffTypingTiming("STAFF_TYPING_IDLE_MS", 5000));
+    }
+    if (state.typingTimer && now - state.typingTimer < staffTypingTiming("STAFF_TYPING_NOTIFY_MS", 250)) return;
     state.typingTimer = now;
     try {
       await fetchJson(api("public_chat_typing.php"), {
@@ -552,10 +866,31 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: state.session.session_id, token: state.session.token, typing: true })
       });
+      syncTypingPulse();
     } catch (_) {}
   }
 
+  function syncTypingPulse() {
+    if (!state.session || !state.lastTypingAt || Date.now() - state.lastTypingAt >= staffTypingTiming("STAFF_TYPING_IDLE_MS", 5000)) {
+      if (state.typingPulseTimer) clearInterval(state.typingPulseTimer);
+      state.typingPulseTimer = null;
+      return;
+    }
+    if (state.typingPulseTimer) return;
+    state.typingPulseTimer = setInterval(() => {
+      if (!state.lastTypingAt || Date.now() - state.lastTypingAt >= staffTypingTiming("STAFF_TYPING_IDLE_MS", 5000)) {
+        if (state.typingPulseTimer) clearInterval(state.typingPulseTimer);
+        state.typingPulseTimer = null;
+        stopTyping(false);
+        return;
+      }
+      notifyTyping(false);
+    }, staffTypingTiming("STAFF_TYPING_PULSE_MS", 1000));
+  }
+
   async function stopTyping(wait) {
+    if (state.typingPulseTimer) clearInterval(state.typingPulseTimer);
+    state.typingPulseTimer = null;
     clearTimeout(state.typingStopTimer);
     state.typingStopTimer = null;
     state.lastTypingAt = 0;
@@ -578,6 +913,8 @@
     const names = typing.map((item) => item.name || "Officer").slice(0, 2).join(", ");
     indicator.querySelector("strong").textContent = `${names} ${typing.length === 1 ? "is" : "are"} typing`;
     indicator.hidden = false;
+    clearTimeout(state.typingHideTimer);
+    state.typingHideTimer = setTimeout(hideTypingIndicator, staffTypingTiming("STAFF_TYPING_HIDE_MS", 1200));
     const thread = document.getElementById("publicChatThread");
     if (thread) thread.scrollTop = thread.scrollHeight;
   }
@@ -601,7 +938,7 @@
     form.append("attachment", fileInput.files[0]);
     form.append("kind", "attachment");
     fileInput.value = "";
-    const data = await fetchJson(api("public_chat_upload.php"), { method: "POST", body: form }).catch((error) => ({ success: false, message: error.message || "Unable to upload attachment." }));
+    const data = await fetchJson(api("public_chat_upload.php"), { method: "POST", body: form, timeoutMs: 60000 }).catch((error) => ({ success: false, message: error.message || "Unable to upload attachment." }));
     if (data.success) {
       addMessages(data.message ? [data.message] : []);
       poll();
@@ -612,49 +949,84 @@
   }
 
   function formatDuration(seconds) {
+    if (chatShared?.formatDuration) return chatShared.formatDuration(seconds);
     const total = Math.max(0, Number(seconds || 0));
     const mins = String(Math.floor(total / 60)).padStart(2, "0");
     const secs = String(Math.floor(total % 60)).padStart(2, "0");
     return `${mins}:${secs}`;
   }
 
-  function getSupportedVoiceRecorderType() {
+  function supportedVoiceMimeType() {
+    if (chatShared?.getSupportedVoiceMimeType) return chatShared.getSupportedVoiceMimeType();
     const candidates = [
       "audio/webm;codecs=opus",
-      "audio/ogg;codecs=opus",
       "audio/webm",
-      "audio/ogg",
-      "audio/mp4",
-      "audio/mpeg"
+      "audio/ogg;codecs=opus",
+      "audio/mp4"
     ];
-    if (!window.MediaRecorder?.isTypeSupported) return "";
-    return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+    return candidates.find((type) => window.MediaRecorder?.isTypeSupported?.(type)) || "";
   }
 
-  function voiceExtensionForMime(mimeType) {
+  function voiceCaptureConstraints() {
+    if (chatShared?.staffVoiceCaptureConstraints) return chatShared.staffVoiceCaptureConstraints();
+    return {
+      audio: {
+        echoCancellation: { ideal: true },
+        noiseSuppression: { ideal: true },
+        autoGainControl: { ideal: true },
+        channelCount: { ideal: 1 }
+      }
+    };
+  }
+
+  function hasRecordableAudioTrack(stream) {
+    return stream?.getAudioTracks?.().some((track) => track.readyState === "live" && track.enabled !== false) || false;
+  }
+
+  function normalizeVoiceMimeType(mimeType = "") {
+    if (chatShared?.normalizeVoiceMimeType) return chatShared.normalizeVoiceMimeType(mimeType);
+    const clean = String(mimeType || "").toLowerCase();
+    if (clean.includes("ogg")) return "audio/ogg";
+    if (clean.includes("mp4") || clean.includes("aac") || clean.includes("m4a")) return "audio/mp4";
+    if (clean.includes("mpeg") || clean.includes("mp3")) return "audio/mpeg";
+    if (clean.includes("wav")) return "audio/wav";
+    return "audio/webm";
+  }
+
+  function voiceRecordingMimeType(chunks = []) {
+    const recorderType = String(state.mediaRecorder?.mimeType || "").trim();
+    const chunkType = String(chunks.find((chunk) => chunk?.type)?.type || "").trim();
+    return chunkType || recorderType || "audio/webm";
+  }
+
+  function voiceExtensionForMime(mimeType = "") {
     const clean = String(mimeType || "").toLowerCase();
     if (clean.includes("ogg")) return "ogg";
-    if (clean.includes("mp4")) return "m4a";
+    if (clean.includes("mp4") || clean.includes("aac")) return "m4a";
     if (clean.includes("mpeg") || clean.includes("mp3")) return "mp3";
     if (clean.includes("wav")) return "wav";
     return "webm";
   }
 
-  function createVoiceFile(chunks, startedAt, fallbackType = "") {
-    const type = fallbackType || chunks.find((chunk) => chunk?.type)?.type || "audio/webm";
-    const blob = new Blob(chunks, { type });
-    const extension = voiceExtensionForMime(type);
+  function createVoiceFile(chunks, startedAt) {
+    const mimeType = normalizeVoiceMimeType(voiceRecordingMimeType(chunks));
+    const extension = voiceExtensionForMime(mimeType);
+    const blob = new Blob(chunks, { type: mimeType });
     return {
       blob,
-      file: new File([blob], `voice-note-${Date.now()}.${extension}`, { type }),
+      file: new File([blob], `voice-note-${Date.now()}.${extension}`, { type: mimeType }),
       url: URL.createObjectURL(blob),
-      duration: Math.max(1, Math.round((Date.now() - startedAt) / 1000))
+      duration: Math.max(1, Math.round((Date.now() - startedAt) / 1000)),
+      mimeType
     };
   }
 
   async function toggleVoiceRecording() {
     const btn = document.getElementById("publicChatVoiceBtn");
     if (state.mediaRecorder?.state === "recording") {
+      try {
+        state.mediaRecorder.requestData?.();
+      } catch (_) {}
       state.mediaRecorder.stop();
       btn?.classList.remove("recording");
       btn?.setAttribute("aria-pressed", "false");
@@ -670,24 +1042,15 @@
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          channelCount: 1
-        }
-      });
-      const audioTrack = stream.getAudioTracks?.()[0];
-      if (!audioTrack || audioTrack.readyState === "ended") {
+      const stream = await navigator.mediaDevices.getUserMedia(voiceCaptureConstraints());
+      if (!hasRecordableAudioTrack(stream)) {
         stream.getTracks().forEach((track) => track.stop());
-        showChatFeedback("No active microphone was found.", "error");
-        return;
+        throw new Error("No active microphone track was returned.");
       }
       state.recordingStream = stream;
       state.voiceChunks = [];
       state.voiceStartedAt = Date.now();
-      const mimeType = getSupportedVoiceRecorderType();
+      const mimeType = supportedVoiceMimeType();
       state.mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       state.mediaRecorder.ondataavailable = (event) => {
         if (event.data?.size) state.voiceChunks.push(event.data);
@@ -696,28 +1059,38 @@
         stream.getTracks().forEach((track) => track.stop());
         state.recordingStream = null;
         stopRecordingTimer();
-        if (!state.voiceChunks.length) {
+        const chunks = state.voiceChunks.filter((chunk) => chunk?.size > 0);
+        const size = chunks.reduce((total, chunk) => total + Number(chunk.size || 0), 0);
+        if (!size) {
+          state.voiceChunks = [];
           state.mediaRecorder = null;
-          showChatFeedback("No audio was captured. Check microphone permissions and try again.", "warning");
+          btn?.classList.remove("recording");
+          btn?.setAttribute("aria-pressed", "false");
+          const draftNode = document.getElementById("publicChatVoiceDraft");
+          if (draftNode) {
+            draftNode.hidden = true;
+            draftNode.innerHTML = "";
+          }
+          showChatFeedback("No audio was captured. Check your microphone permission and try again.", "warning", "Voice Note");
           return;
         }
-        const draft = createVoiceFile(state.voiceChunks, state.voiceStartedAt, state.mediaRecorder?.mimeType || mimeType);
+        const draft = createVoiceFile(chunks, state.voiceStartedAt);
         state.voiceChunks = [];
         state.voiceDraft = {
           file: draft.file,
           url: draft.url,
           duration: draft.duration,
-          mimeType: draft.file.type
+          mimeType: draft.mimeType
         };
         state.mediaRecorder = null;
         renderVoiceDraft();
       };
-      state.mediaRecorder.start(250);
+      state.mediaRecorder.start(200);
       btn?.classList.add("recording");
       btn?.setAttribute("aria-pressed", "true");
       startRecordingTimer();
-    } catch (_) {
-      showChatFeedback("Unable to access the microphone.", "error");
+    } catch (error) {
+      showChatFeedback(error?.name === "NotAllowedError" ? "Microphone permission is required to record voice notes." : "Unable to access the microphone.", "error");
     }
   }
 
@@ -729,12 +1102,12 @@
     const render = () => {
       const elapsed = Math.max(0, Math.floor((Date.now() - state.voiceStartedAt) / 1000));
       draft.innerHTML = `
-        <div class="public-chat-voice-preview public-chat-recording-preview">
-          <div class="public-chat-recording-status"><span></span><strong>Recording ${formatDuration(elapsed)}</strong></div>
+        <div class="live-voice-preview live-recording-preview public-chat-voice-preview public-chat-recording-preview">
+          <div class="live-recording-status public-chat-recording-status"><span></span><strong>Recording ${formatDuration(elapsed)}</strong></div>
         </div>
-        <div class="public-chat-voice-actions">
-          <button type="button" id="publicChatStopRecording" class="public-chat-submit">Stop</button>
-          <button type="button" id="publicChatCancelRecording" class="public-chat-secondary">Cancel</button>
+        <div class="live-voice-actions public-chat-voice-actions">
+          <button type="button" id="publicChatStopRecording" class="public-chat-submit"><i class="fas fa-stop"></i> Stop</button>
+          <button type="button" id="publicChatCancelRecording" class="public-chat-secondary"><i class="fas fa-trash"></i> Cancel</button>
         </div>
       `;
       document.getElementById("publicChatStopRecording")?.addEventListener("click", toggleVoiceRecording, { once: true });
@@ -773,16 +1146,19 @@
     if (!draft || !state.voiceDraft) return;
     draft.hidden = false;
     draft.innerHTML = `
-      <div class="public-chat-voice-preview">
-        <strong>Voice note ${formatDuration(state.voiceDraft.duration)}</strong>
-        <audio controls src="${escapeHtml(state.voiceDraft.url)}"></audio>
+      <div class="live-voice-preview public-chat-voice-preview">
+        <strong><i class="fas fa-microphone-lines"></i> Voice note ${formatDuration(state.voiceDraft.duration)}</strong>
+        <audio controls preload="metadata">
+          <source src="${escapeHtml(state.voiceDraft.url)}" type="${escapeHtml(state.voiceDraft.mimeType || state.voiceDraft.file?.type || "audio/webm")}">
+        </audio>
       </div>
-      <div class="public-chat-voice-actions">
-        <button type="button" id="publicChatSendVoiceDraft" class="public-chat-submit">Send</button>
-        <button type="button" id="publicChatRedoVoiceDraft" class="public-chat-secondary">Re-record</button>
-        <button type="button" id="publicChatDeleteVoiceDraft" class="public-chat-secondary">Delete</button>
+      <div class="live-voice-actions public-chat-voice-actions">
+        <button type="button" id="publicChatSendVoiceDraft" class="public-chat-submit"><i class="fas fa-paper-plane"></i> Send</button>
+        <button type="button" id="publicChatRedoVoiceDraft" class="public-chat-secondary"><i class="fas fa-rotate-right"></i> Re-record</button>
+        <button type="button" id="publicChatDeleteVoiceDraft" class="public-chat-secondary"><i class="fas fa-trash"></i> Delete</button>
       </div>
     `;
+    draft.querySelector("audio")?.load?.();
     document.getElementById("publicChatSendVoiceDraft")?.addEventListener("click", sendVoiceDraft, { once: true });
     document.getElementById("publicChatRedoVoiceDraft")?.addEventListener("click", redoVoiceDraft, { once: true });
     document.getElementById("publicChatDeleteVoiceDraft")?.addEventListener("click", clearVoiceDraft, { once: true });
@@ -791,12 +1167,17 @@
   async function sendVoiceDraft() {
     if (!state.voiceDraft || !state.session || state.sendingVoice) return;
     state.sendingVoice = true;
+    const sendButton = document.getElementById("publicChatSendVoiceDraft");
+    if (sendButton) {
+      sendButton.disabled = true;
+      sendButton.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Sending`;
+    }
     const form = new FormData();
     form.append("session_id", state.session.session_id);
     form.append("token", state.session.token);
     form.append("kind", "voice");
-    form.append("attachment", state.voiceDraft.file, state.voiceDraft.file.name || "voice-note.webm");
-    const data = await fetchJson(api("public_chat_upload.php"), { method: "POST", body: form }).catch((error) => ({ success: false, message: error.message }));
+    form.append("attachment", state.voiceDraft.file, state.voiceDraft.file.name || `voice-note.${voiceExtensionForMime(state.voiceDraft.mimeType || state.voiceDraft.file?.type || "audio/webm")}`);
+    const data = await fetchJson(api("public_chat_upload.php"), { method: "POST", body: form, timeoutMs: 60000 }).catch((error) => ({ success: false, message: error.message }));
     if (data.success) {
       clearVoiceDraft();
       addMessages(data.message ? [data.message] : []);
@@ -845,24 +1226,46 @@
 
   async function submitFeedback() {
     const feedbackSession = state.feedbackSession || state.session;
-    if (!feedbackSession || !state.rating) return;
+    if (!feedbackSession) {
+      setFeedbackStatus("The feedback session has expired. Please start a new chat if you need more help.", "error");
+      return;
+    }
+    if (!state.rating) {
+      setFeedbackStatus("Select a rating before submitting.", "error");
+      return;
+    }
     const comments = document.getElementById("publicChatFeedbackComments")?.value || "";
+    const submit = document.getElementById("publicChatFeedbackSend");
+    if (submit) {
+      submit.disabled = true;
+      submit.textContent = "Submitting...";
+    }
+    setFeedbackStatus("Submitting feedback...", "info");
     const data = await fetchJson(api("public_chat_feedback.php"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ session_id: feedbackSession.session_id, token: feedbackSession.token, rating: state.rating, comments })
-    });
+    }).catch((error) => ({ success: false, message: error.message || "Unable to submit feedback." }));
     if (data.success) {
-      closeFeedbackPopup();
-      showChatFeedback("Thank you. Your feedback has been recorded.", "success");
+      setFeedbackStatus(data.message || "Thank you. Your feedback has been recorded.", "success");
+      window.setTimeout(() => {
+        closeFeedbackPopup();
+        showChatFeedback(data.message || "Thank you. Your feedback has been recorded.", "success");
+      }, 700);
     } else {
-      showChatFeedback(data.message || "Unable to submit feedback.", "error");
+      if (submit) {
+        submit.disabled = false;
+        submit.textContent = "Submit Feedback";
+      }
+      setFeedbackStatus(data.message || "Unable to submit feedback.", "error");
     }
   }
 
   document.addEventListener("DOMContentLoaded", async () => {
     try {
+      await loadChatSharedHelpers();
       const data = await fetchJson(api("public_chat_bootstrap.php"));
+      if (data.appCsrfToken) state.appCsrfToken = data.appCsrfToken;
       if (data.visitor?.isLoggedIn && !data.visitor?.isPensioner) {
         await initStaffLiveChatForAuthenticatedUser(data.visitor);
         return;

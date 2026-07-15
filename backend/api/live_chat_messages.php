@@ -4,7 +4,7 @@ require_once __DIR__ . '/live_chat_common.php';
 try {
     $userId = liveChatRequireStaff($conn);
     liveChatEnsureTables($conn);
-    liveChatTouchPresence($conn, $userId);
+    liveChatReleaseSessionLock();
 
     $peerId = trim((string)($_GET['peer_id'] ?? ''));
     $peerType = trim((string)($_GET['peer_type'] ?? 'user'));
@@ -71,12 +71,14 @@ if ($peerType === 'group') {
         u.userPhoto AS sender_photo,
         rm.message_text AS reply_message_text,
         rm.file_name AS reply_file_name,
-        ru.userName AS reply_sender_name
+        ru.userName AS reply_sender_name,
+        rr.chat_message_id AS read_marker_id
     FROM tb_live_chat_messages m
     LEFT JOIN tb_users u ON u.userId = m.sender_id
     LEFT JOIN tb_live_chat_messages rm ON rm.chat_message_id = m.reply_to_message_id
     LEFT JOIN tb_users ru ON ru.userId = rm.sender_id
     LEFT JOIN tb_live_chat_message_deletions md ON md.chat_message_id = m.chat_message_id AND md.user_id = ?
+    LEFT JOIN tb_live_chat_message_reads rr ON rr.chat_message_id = m.chat_message_id AND rr.user_id = ?
     WHERE m.recipient_id = ?
       AND m.chat_message_id > ?
       AND m.admin_deleted_at IS NULL
@@ -126,7 +128,7 @@ if ($peerType === 'group') {
         throw new RuntimeException('Unable to load live chat messages.');
     }
     if ($peerType === 'group') {
-        $stmt->bind_param('ssi', $userId, $peerId, $sinceId);
+        $stmt->bind_param('sssi', $userId, $userId, $peerId, $sinceId);
     } else {
         $stmt->bind_param('sssssi', $userId, $userId, $peerId, $peerId, $userId, $sinceId);
     }
@@ -143,6 +145,9 @@ while ($row = $result->fetch_assoc()) {
     if (!$hasPollCandidate && str_contains($messageText, '"type":"poll"')) {
         $hasPollCandidate = true;
     }
+    $isRead = $peerType === 'group'
+        ? ($row['sender_id'] === $userId || !empty($row['read_marker_id']))
+        : ((int)$row['is_read'] === 1 || !empty($row['read_at']));
     $messages[] = [
         'id' => $messageId,
         'clientNonce' => $row['client_nonce'] ?? '',
@@ -161,7 +166,7 @@ while ($row = $result->fetch_assoc()) {
         'reactionEmoji' => $row['reaction_emoji'] ?? '',
         'isPinned' => (int)($row['is_pinned'] ?? 0) === 1,
         'deliveredAt' => $row['delivered_at'] ?? null,
-        'isRead' => (int)$row['is_read'] === 1,
+        'isRead' => $isRead,
         'readAt' => $row['read_at'] ?? null,
         'isEdited' => !empty($row['edited_at']),
         'isDeleted' => !empty($row['deleted_at']),
@@ -273,7 +278,7 @@ while ($row = $result->fetch_assoc()) {
             WHERE t.peer_type = 'group'
               AND t.peer_id = ?
               AND t.user_id <> ?
-              AND t.updated_at >= DATE_SUB(NOW(), INTERVAL 4 SECOND)
+              AND t.updated_at >= DATE_SUB(NOW(), INTERVAL 8 SECOND)
             ORDER BY t.updated_at DESC
             LIMIT 3
         ");
@@ -288,7 +293,7 @@ while ($row = $result->fetch_assoc()) {
             WHERE t.peer_type = 'user'
               AND t.peer_id = ?
               AND t.user_id = ?
-              AND t.updated_at >= DATE_SUB(NOW(), INTERVAL 4 SECOND)
+              AND t.updated_at >= DATE_SUB(NOW(), INTERVAL 8 SECOND)
             LIMIT 1
         ");
         if ($typingStmt) {
@@ -308,8 +313,9 @@ while ($row = $result->fetch_assoc()) {
     }
 
     $deletedUpdates = $sinceId > 0 ? liveChatDeletedUpdates($conn, $userId, $peerType, $peerId) : [];
+    $hiddenUpdates = liveChatHiddenUpdates($conn, $userId, $peerType, $peerId);
 
-    liveChatRespond(['success' => true, 'messages' => $messages, 'receipts' => $receipts, 'deletedUpdates' => $deletedUpdates, 'typing' => $typing, 'serverTime' => date('Y-m-d H:i:s')]);
+    liveChatRespond(['success' => true, 'messages' => $messages, 'receipts' => $receipts, 'deletedUpdates' => $deletedUpdates, 'hiddenUpdates' => $hiddenUpdates, 'typing' => $typing, 'serverTime' => date('Y-m-d H:i:s')]);
 } catch (Throwable $e) {
     http_response_code(400);
     liveChatRespond(['success' => false, 'message' => $e->getMessage(), 'messages' => []]);
@@ -374,6 +380,53 @@ function liveChatHiddenMessageIds(mysqli $conn, string $userId, int $sinceId): a
     }
     $stmt->close();
     return $hidden;
+}
+
+function liveChatHiddenUpdates(mysqli $conn, string $userId, string $peerType, string $peerId): array
+{
+    $updates = [];
+    if ($peerType === 'group') {
+        $stmt = $conn->prepare("
+            SELECT d.chat_message_id, d.deleted_at
+            FROM tb_live_chat_message_deletions d
+            INNER JOIN tb_live_chat_messages m ON m.chat_message_id = d.chat_message_id
+            WHERE d.user_id = ?
+              AND m.recipient_id = ?
+              AND m.admin_deleted_at IS NULL
+            ORDER BY d.deleted_at DESC
+            LIMIT 150
+        ");
+        if ($stmt) {
+            $stmt->bind_param('ss', $userId, $peerId);
+        }
+    } else {
+        $stmt = $conn->prepare("
+            SELECT d.chat_message_id, d.deleted_at
+            FROM tb_live_chat_message_deletions d
+            INNER JOIN tb_live_chat_messages m ON m.chat_message_id = d.chat_message_id
+            WHERE d.user_id = ?
+              AND ((m.sender_id = ? AND m.recipient_id = ?) OR (m.sender_id = ? AND m.recipient_id = ?))
+              AND m.admin_deleted_at IS NULL
+            ORDER BY d.deleted_at DESC
+            LIMIT 150
+        ");
+        if ($stmt) {
+            $stmt->bind_param('sssss', $userId, $userId, $peerId, $peerId, $userId);
+        }
+    }
+    if (!$stmt) {
+        return $updates;
+    }
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $updates[] = [
+            'id' => (int)$row['chat_message_id'],
+            'hiddenAt' => $row['deleted_at'] ?? null
+        ];
+    }
+    $stmt->close();
+    return $updates;
 }
 
 function liveChatDeletedMessageIds(mysqli $conn, string $userId, string $peerType, string $peerId, int $sinceId): array

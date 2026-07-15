@@ -42,6 +42,9 @@ async function initStaffDueController() {
   let currentFetchController = null;
   let currentPage = 1;
   let currentRecords = [];
+  let totalRecords = 0;
+  let totalPages = 1;
+  let lastRenderedStaffSignature = "";
   let verificationEscalationWindowDays = 60;
   let verificationDueSoonWindowDays = 45;
   const STAFF_DUE_CACHE_KEY = "pensionsgoStaffDueSessionCache:v1";
@@ -86,7 +89,12 @@ async function initStaffDueController() {
     verificationEscalationWindowDays = Math.max(7, Number(data.settings?.verificationEscalationWindowDays || verificationEscalationWindowDays || 60));
     verificationDueSoonWindowDays = Math.max(1, Number(data.settings?.verificationDueSoonWindowDays || verificationDueSoonWindowDays || Math.max(1, verificationEscalationWindowDays - 15)));
     currentRecords = Array.isArray(data.records) ? data.records : [];
-    if (resetPage) currentPage = 1;
+    totalRecords = Number(data.totalRecords ?? currentRecords.length);
+    totalPages = Math.max(1, Number(data.totalPages || 1));
+    currentPage = Math.max(1, Number(data.page || (resetPage ? 1 : currentPage)));
+    const signature = JSON.stringify([currentPage, totalRecords, currentRecords]);
+    if (signature === lastRenderedStaffSignature) return;
+    lastRenderedStaffSignature = signature;
     renderStaffCards();
   }
 
@@ -259,7 +267,8 @@ async function initStaffDueController() {
     });
   }
 
-  async function fetchStaffData() {
+  async function fetchStaffData({ resetPage = false } = {}) {
+    if (resetPage) currentPage = 1;
     if (currentFetchController) {
       currentFetchController.abort();
     }
@@ -272,6 +281,8 @@ async function initStaffDueController() {
         retirementType: filterRetirementType.value,
         submissionStatus: filterSubmissionStatus.value,
         appnStatus: filterAppnStatus.value
+        ,page: String(currentPage)
+        ,limit: String(pageSize)
       });
       const cacheKey = params.toString();
       const cachedPayload = getStaffDueCachedPayload(cacheKey);
@@ -288,6 +299,7 @@ async function initStaffDueController() {
       const data = await res.json();
 
       if (!data.success) {
+        lastRenderedStaffSignature = "";
         currentRecords = [];
         currentPage = 1;
         renderPagination();
@@ -299,6 +311,7 @@ async function initStaffDueController() {
     } catch (err) {
       if (err?.name === "AbortError") return;
       console.error("Error fetching staff data:", err);
+      lastRenderedStaffSignature = "";
       currentRecords = [];
       currentPage = 1;
       renderPagination();
@@ -320,28 +333,26 @@ async function initStaffDueController() {
     }, delay);
   }
 
-  searchButton.addEventListener("click", fetchStaffData);
+  searchButton.addEventListener("click", () => fetchStaffData({ resetPage: true }));
   if (searchInput) {
     searchInput.addEventListener("input", () => {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
       searchDebounceTimer = setTimeout(() => {
-        fetchStaffData();
+        fetchStaffData({ resetPage: true });
       }, searchDebounceMs);
     });
   }
   [filterRetirementType, filterSubmissionStatus, filterAppnStatus].forEach((el) =>
-    el.addEventListener("change", fetchStaffData)
+    el.addEventListener("change", () => fetchStaffData({ resetPage: true }))
   );
 
   fetchStaffData();
 
   function getTotalPages() {
-    return Math.max(1, Math.ceil(currentRecords.length / pageSize));
+    return totalPages;
   }
 
   function renderStaffCards() {
-    staffContainer.innerHTML = "";
-
     if (!currentRecords.length) {
       renderPagination();
       staffContainer.innerHTML = "<div class=\"app-state-message app-state-neutral\">No records found.</div>";
@@ -353,8 +364,8 @@ async function initStaffDueController() {
       currentPage = totalPages;
     }
 
-    const startIndex = (currentPage - 1) * pageSize;
-    const visibleRecords = currentRecords.slice(startIndex, startIndex + pageSize);
+    const visibleRecords = currentRecords;
+    const fragment = document.createDocumentFragment();
 
     visibleRecords.forEach((staff) => {
       const card = document.createElement("div");
@@ -386,7 +397,7 @@ async function initStaffDueController() {
 
       card.innerHTML = `
         <div class="card-summary">
-          <div class="summary-row summary-name">${escapeHtml(name || "Unknown")}</div>
+          <div class="summary-row summary-name"><span>${escapeHtml(name || "Unknown")}</span><span class="service-file-badge service-file-${escapeHtml(String(staff.service_file_availability || "not_availed").replaceAll("_", "-"))}" title="Service file: ${escapeHtml(String(staff.service_file_registry_stage || "pending processing").replaceAll("_", " "))}">${staff.service_file_availability === "available" ? "Service file available" : staff.service_file_availability === "out" ? "Service file out" : staff.service_file_availability === "archived" ? "Archived" : "Not availed"}</span></div>
           <div class="summary-row summary-file-rank">
             <span class="summary-file">${escapeHtml(fileNumber)}</span>
             <span class="summary-sep">-</span>
@@ -424,9 +435,9 @@ async function initStaffDueController() {
         });
       });
 
-      staffContainer.appendChild(card);
+      fragment.appendChild(card);
     });
-
+    staffContainer.replaceChildren(fragment);
     renderPagination();
   }
 
@@ -445,8 +456,8 @@ async function initStaffDueController() {
     staffPagination.hidden = false;
     const totalPages = getTotalPages();
     const startItem = ((currentPage - 1) * pageSize) + 1;
-    const endItem = Math.min(currentPage * pageSize, currentRecords.length);
-    staffPaginationSummary.textContent = `Showing ${startItem}-${endItem} of ${currentRecords.length} records`;
+    const endItem = Math.min(currentPage * pageSize, totalRecords);
+    staffPaginationSummary.textContent = `Showing ${startItem}-${endItem} of ${totalRecords} records`;
 
     const pageButtons = buildPaginationButtons(currentPage, totalPages);
     staffPaginationControls.innerHTML = `
@@ -461,7 +472,7 @@ async function initStaffDueController() {
     staffPaginationControls.querySelectorAll("[data-page-number]").forEach((button) => {
       button.addEventListener("click", () => {
         currentPage = Number(button.dataset.pageNumber || currentPage);
-        renderStaffCards();
+        fetchStaffData();
         scrollToCardGrid();
       });
     });
@@ -476,7 +487,7 @@ async function initStaffDueController() {
         } else {
           return;
         }
-        renderStaffCards();
+        fetchStaffData();
         scrollToCardGrid();
       });
     });
@@ -653,8 +664,33 @@ async function initStaffDueController() {
     pendingAction = "verify";
     pendingStaff = staff;
     actionModalTitle.textContent = "Verify Application Status";
-    actionModalSubtitle.textContent = "Choose the appropriate application status.";
+    actionModalSubtitle.textContent = "Confirm every required document before passing the application to the verification queue.";
+    const retirementMode = String(staff?.retirementType || "").trim().toLowerCase();
+    const documents = [
+      ["ap_pf7_ns3", "AP(PF7/NS3)"], ["ns7", "NS7"], ["psf18_20", "PSF18/20"],
+      ["bank_statement", "Original Bank Statement"], ["national_id", "National ID"], ["tin", "TIN"],
+      ["payslip", "Payslip"], ["first_appointment_letter", "First Appointment Letter"],
+      ["confirmation_letter", "Confirmation Letter"], ["last_appointment_letter", "Last Appointment Letter"]
+    ];
+    if (retirementMode.includes("death")) {
+      documents.push(["death_certificate", "Death Certificate"], ["letters_of_administration", "Letters of Administration"]);
+    } else if (!retirementMode.includes("mandatory")) {
+      documents.push(["discharge_certificate", "Discharge Certificate"]);
+    }
+    const checklist = documents.map(([code, label]) => `
+      <label class="verification-check-item">
+        <input type="checkbox" data-verification-document="${escapeHtml(code)}">
+        <span>${escapeHtml(label)}</span>
+      </label>`).join("");
     actionModalBody.innerHTML = `
+      <section class="verification-identity" aria-label="Officer identification">
+        <div><span>Employee Number</span><strong>${escapeHtml(staff.employeeNo || "Not recorded")}</strong></div>
+        <div><span>Officer Names</span><strong>${escapeHtml([staff.firstName, staff.middleName, staff.lastName].filter(Boolean).join(" ") || formatFullName(staff.sName, staff.fName))}</strong></div>
+        <div><span>IPPS Number</span><strong>${escapeHtml(staff.ippsNo || staff.computerNo || "Not recorded")}</strong></div>
+        <div><span>Rank / Position</span><strong>${escapeHtml(staff.rankName || staff.positionName || staff.rankPosition || staff.title || "Not recorded")}</strong></div>
+      </section>
+      <div class="verification-workspace">
+      <div class="verification-controls">
       <label class="modal-field">
         <span>Status</span>
         <select id="verifyStatusSelect">
@@ -663,12 +699,31 @@ async function initStaffDueController() {
           <option value="rejected">Rejected</option>
         </select>
       </label>
+      <label class="modal-field">
+        <span>Mode of Retirement</span>
+        <select id="verifyRetirementTypeSelect"></select>
+      </label>
+      </div>
+      <fieldset class="verification-checklist">
+        <legend>Required application documents</legend>
+        ${checklist}
+      </fieldset>
+      </div>
       <label class="modal-field" id="verifyReasonWrap" style="display:none;">
         <span>Reason</span>
         <textarea id="verifyReasonInput" rows="3" placeholder="Provide reason"></textarea>
       </label>
     `;
     const statusSelect = document.getElementById("verifyStatusSelect");
+    const retirementSelect = document.getElementById("verifyRetirementTypeSelect");
+    const retirementOptions = window.PensionsGoRetirementTypes?.getDefinitions?.() || ["Mandatory Retirement", "Death", "Medical Grounds", "Early Retirement", "Retirement in Public Interest"];
+    retirementSelect.innerHTML = retirementOptions.map((option) => {
+      const value = typeof option === "string" ? option : (option.key || option.value || option.label);
+      const label = typeof option === "string" ? option : (option.label || option.value);
+      const selectedValue = window.PensionsGoRetirementTypes?.normalizeValue?.(staff.retirementType) || String(staff.retirementType || "").toLowerCase();
+      return `<option value="${escapeHtml(value)}" ${String(value).toLowerCase() === String(selectedValue).toLowerCase() ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    }).join("");
+    retirementSelect.addEventListener("change", () => openVerifyModal({ ...staff, retirementType: retirementSelect.value }));
     const reasonWrap = document.getElementById("verifyReasonWrap");
     statusSelect.addEventListener("change", () => {
       const status = statusSelect.value;
@@ -703,7 +758,8 @@ async function initStaffDueController() {
       if (pendingAction === "submit") {
         await submitApplication(pendingStaff.id);
       } else if (pendingAction === "verify") {
-        await verifyApplication(pendingStaff.id);
+        const verified = await verifyApplication(pendingStaff.id);
+        if (!verified) return;
       } else if (pendingAction === "delete") {
         const reasonInput = document.getElementById("deleteReasonInput");
         const reason = reasonInput ? reasonInput.value.trim() : "";
@@ -745,13 +801,22 @@ async function initStaffDueController() {
     const reasonInput = document.getElementById("verifyReasonInput");
     const status = statusSelect ? statusSelect.value : "verified";
     const reason = reasonInput ? reasonInput.value.trim() : "";
+    const documents = {};
+    document.querySelectorAll("[data-verification-document]").forEach((input) => {
+      documents[input.getAttribute("data-verification-document")] = input.checked;
+    });
+    const retirementType = document.getElementById("verifyRetirementTypeSelect")?.value || pendingStaff?.retirementType || "";
+    if (status === "verified" && Object.values(documents).some((checked) => !checked)) {
+      showFeedbackModal("error", "Checklist Incomplete", "Every required document must be confirmed before this application can pass verification.");
+      return false;
+    }
 
     try {
       const res = await fetch("../backend/api/update_appn_status.php", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, status, reason })
+        body: JSON.stringify({ id, status, reason, documents, retirementType })
       });
       const data = await res.json();
       if (!data.success) {
@@ -759,9 +824,11 @@ async function initStaffDueController() {
       } else {
         showFeedbackModal("success", "Status Updated", data.message || "Application status updated.");
       }
+      return Boolean(data.success);
     } catch (err) {
       console.error(err);
       showFeedbackModal("error", "Status Update Failed", "Unable to update status.");
+      return false;
     }
   }
 
@@ -825,6 +892,10 @@ async function initStaffDueController() {
       scheduleStaffRefresh(40);
     }
   });
+  const staffRealtimeTimer = window.setInterval(() => {
+    if (!document.hidden && !currentFetchController) scheduleStaffRefresh(0);
+  }, 30000);
+  window.addEventListener("pagehide", () => window.clearInterval(staffRealtimeTimer), { once: true });
 
   async function openQueueModal() {
     if (!canManageWorkflowActions()) {

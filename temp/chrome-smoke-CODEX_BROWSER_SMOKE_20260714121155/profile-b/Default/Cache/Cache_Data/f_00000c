@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
+
+    <!-- Security Meta Tags -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com data:; img-src 'self' data:;">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <title>Admin Dashboard - PensionsGo Management System</title>
+    
+    <!-- CSS Imports -->
+     
+    <link rel="stylesheet" href="../frontend/css/admin-dashboard.css?v=20260602a">
+    <link rel="stylesheet" href="../frontend/css/color-variables.css?v=20260602a">
+    <link rel="stylesheet" href="../frontend/css/admin-dashboard/user-activity-logs.css?v=20260504a">
+    <link rel="stylesheet" href="../frontend/css/admin-dashboard/mobile-sidebar.css?v=20260504a">
+    
+    <link rel="stylesheet" href="../frontend/css/auth.css?v=20260504a">
+    <link rel="stylesheet" href="../frontend/css/profile.css?v=20260504a">
+    <link rel="stylesheet" href="../frontend/css/overlay.css?v=20260504a">
+    <link rel="stylesheet" href="../frontend/css/broadcast_popup.css?v=20260504a">
+    <link rel="stylesheet" href="../frontend/css/menu.css?v=20260504d">
+    <link rel="stylesheet" href="../frontend/css/styles.css?v=20260713a">
+    <link rel="stylesheet" href="../frontend/css/dashboard.css?v=20260602a">
+    
+
+    
+    <script defer src="../frontend/js/public_chat_management.js?v=20260714a"></script>
+</head>
+<body>
+    <!-- Security Overlay (Hidden by default) -->
+    <div id="securityOverlay" class="security-overlay" style="display: none;">
+        <div class="security-modal">
+            <div class="security-icon">&#128274;</div>
+            <h3>Security Verification Required</h3>
+            <p id="securityMessage">Please verify your identity to access admin features</p>
+            <div class="security-actions">
+                <button id="verifyAdmin" class="security-btn security-btn-primary">
+                    <span class="btn-text">Verify as Admin</span>
+                    <span class="btn-spinner" style="display: none;">&#128260;</span>
+                </button>
+                <button id="cancelAccess" class="security-btn security-btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Access Denied Overlay -->
+    <div id="adminAccessDenied" class="access-denied-overlay" style="display: none;">
+        <div class="access-denied-content">
+            <div class="access-denied-icon">&#128683;</div>
+            <h2>Admin Access Required</h2>
+            <p>You do not have the required administrator privileges to access this dashboard.</p>
+            <p class="access-denied-details">This area is restricted to administrator and super administrator roles only.</p>
+            <div class="access-denied-actions">
+                <button id="goToDashboard" class="access-denied-btn">Go to Dashboard</button>
+                <button id="logoutFromDenied" class="access-denied-btn secondary">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Admin Dashboard Structure -->
+    <div id="adminDashboard" class="admin-dashboard" style="display: none;">
+        <!-- Admin Main Content -->
+        <main class="admin-main">
+            <!-- Admin Sidebar Navigation -->
+            <aside class="admin-sidebar" id="adminSidebar">
+                <div class="sidebar-header">
+                    <div class="admin-brand">
+                        <div class="brand-icon">&#9881;</div>
+                        <h2>Admin Console</h2>
+                    </div>
+                </div>
+
+                <nav class="sidebar-nav">
+                    <ul class="nav-menu">
+                        <!-- Dashboard Overview -->
+                        <li class="nav-item">
+                            <a href="#dashboard" class="nav-link active" data-section="dashboard">
+                                <span class="nav-icon">&#128202;</span>
+                                <span class="nav-text">Dashboard Overview</span>
+                            </a>
+                        </li>
+
+                        <!-- User Management -->
+                        <li class="nav-item">
+                            <a href="#user-management" class="nav-link" data-section="user-management">
+                                <span class="nav-icon">&#128101;</span>
+                                <span class="nav-text">User Management</span>
+                                <span class="nav-badge" id="userCountBadge">0</span>
+                            </a>
+                        </li>
+
+                        <!-- System Settings -->
+                        <li class="nav-item has-submenu">
+                            <a href="#system-settings" class="nav-link" data-section="system-settings">
+                                <span class="nav-icon">&#9881;</span>
+                                <span class="nav-text">System Settings</span>
+                                <span class="nav-arrow">&#9660;</span>
+                            </a>
+                            <ul class="submenu">
+                                <li><a href="#app-settings" class="submenu-link" data-section="app-settings">App Settings</a></li>
+                                <li><a href="#security-settings" class="submenu-link" data-section="security-settings">Security Settings</a></li>
+                                <li><a href="#access-control" class="submenu-link" data-section="access-control">Access Control</a></li>
+                                <li><a href="#role-settings" class="submenu-link" data-section="role-settings">Role Governance</a></li>
+                                <li><a href="#notification-settings" class="submenu-link" data-section="notification-settings">Notifications</a></li>
+                                <li><a href="#live-chat-settings" class="submenu-link" data-section="live-chat-settings">Live Chat</a></li>
+                                <li class="submenu-group public-chat-support-menu">
+                                    <a href="#public-chat-support" class="submenu-link submenu-group-label" data-section="public-chat-support">Public Chat Support</a>
+                                    <ul class="nested-submenu">
+                                        <li><a href="#public-chat-agents" class="submenu-link nested-submenu-link" data-section="public-chat-agents">Public Chat Agents</a></li>
+                                        <li><a href="#public-chat-settings" class="submenu-link nested-submenu-link" data-section="public-chat-settings">Public Chat Settings</a></li>
+                                        <li><a href="#public-chat-reports" class="submenu-link nested-submenu-link" data-section="public-chat-reports">Public Chat Reports</a></li>
+                                        <li><a href="#public-chat-audit" class="submenu-link nested-submenu-link" data-section="public-chat-audit">Public Chat Audit Logs</a></li>
+                                    </ul>
+                                </li>
+                                <li><a href="#notification-queue" class="submenu-link" data-section="notification-queue">Notification Queue</a></li>
+                                <li><a href="#podcast-settings" class="submenu-link" data-section="podcast-settings">Podcast</a></li>
+                                <li><a href="#title-settings" class="submenu-link" data-section="title-settings">Titles</a></li>
+                                <li><a href="#bank-settings" class="submenu-link" data-section="bank-settings">Banks</a></li>
+                                <li><a href="#unit-settings" class="submenu-link" data-section="unit-settings">Prison Units</a></li>
+                                <li><a href="#prison-district-settings" class="submenu-link" data-section="prison-district-settings">Prison Districts</a></li>
+                                <li><a href="#prison-region-settings" class="submenu-link" data-section="prison-region-settings">Prison Regions</a></li>
+                                <li><a href="#political-district-settings" class="submenu-link" data-section="political-district-settings">Political Districts</a></li>
+                                <li><a href="#faq-settings" class="submenu-link" data-section="faq-settings">FAQ Knowledge Base</a></li>
+                                <li><a href="#terms-settings" class="submenu-link" data-section="terms-settings">Terms of Use</a></li>
+                            </ul>
+                        </li>
+
+                        <!-- Data Management -->
+                        <li class="nav-item has-submenu">
+                            <a href="#data-management" class="nav-link" data-section="data-management">
+                                <span class="nav-icon">&#128190;</span>
+                                <span class="nav-text">Data Management</span>
+                                <span class="nav-arrow">&#9660;</span>
+                            </a>
+                            <ul class="submenu">
+                                <li><a href="#data-backup" class="submenu-link" data-section="data-backup">Backup & Restore</a></li>
+                                <li><a href="#data-export" class="submenu-link" data-section="data-export">Export Data</a></li>
+                                <li><a href="#data-import" class="submenu-link" data-section="data-import">Import Data</a></li>
+                                <li><a href="#data-cleanup" class="submenu-link" data-section="data-cleanup">Data Cleanup</a></li>
+                            </ul>
+                        </li>
+
+                        <!-- Storage Management -->
+                        <li class="nav-item has-submenu">
+                            <a href="#storage-management" class="nav-link" data-section="storage-management">
+                                <span class="nav-icon">&#128189;</span>
+                                <span class="nav-text">Storage Management</span>
+                                <span class="nav-arrow">&#9660;</span>
+                            </a>
+                            <ul class="submenu">
+                                <li><a href="#storage-overview" class="submenu-link" data-section="storage-overview">Storage Overview</a></li>
+                                <li><a href="#message-storage" class="submenu-link" data-section="message-storage">Message Storage</a></li>
+                                <li><a href="#attachment-storage" class="submenu-link" data-section="attachment-storage">Attachments</a></li>
+                                <li><a href="#document-storage" class="submenu-link" data-section="document-storage">Document Storage</a></li>
+                                <li><a href="#storage-cleanup" class="submenu-link" data-section="storage-cleanup">Cleanup Tools</a></li>
+                            </ul>
+                        </li>
+
+                        <!-- Activity Logs -->
+                        <li class="nav-item has-submenu">
+                            <a href="#activity-logs" class="nav-link" data-section="activity-logs">
+                                <span class="nav-icon">&#128203;</span>
+                                <span class="nav-text">Activity Logs</span>
+                                <span class="nav-badge" id="logCountBadge">0</span>
+                                <span class="nav-arrow">&#9660;</span>
+                            </a>
+                            <ul class="submenu">
+                                <li><a href="#chat-oversight" class="submenu-link" data-section="chat-oversight">Chat Oversight</a></li>
+                                <li><a href="#user-logs" class="submenu-link" data-section="user-logs">User Activity Logs</a></li>
+                                <li><a href="#workflow-logs" class="submenu-link" data-section="workflow-logs">Workflow Reports</a></li>
+                                <li><a href="#task-logs" class="submenu-link" data-section="task-logs">Task Delegation</a></li>
+                                <li><a href="#system-logs" class="submenu-link" data-section="system-logs">System Logs</a></li>
+                            </ul>
+                        </li>
+
+                        <!-- Analysis & Reporting -->
+                        <li class="nav-item">
+                            <a href="#analysis-reporting" class="nav-link" data-section="analysis-reporting">
+                                <span class="nav-icon">&#128200;</span>
+                                <span class="nav-text">Analysis & Reporting</span>
+                            </a>
+                        </li>
+
+                        <!-- Audit Trail -->
+                        <li class="nav-item">
+                            <a href="#audit-trail" class="nav-link" data-section="audit-trail">
+                                <span class="nav-icon">&#128269;</span>
+                                <span class="nav-text">Audit Trail</span>
+                            </a>
+                        </li>
+
+                        <!-- System Health -->
+                        <li class="nav-item">
+                            <a href="#system-health" class="nav-link" data-section="system-health">
+                                <span class="nav-icon">&#10084;</span>
+                                <span class="nav-text">System Health</span>
+                                <span class="health-indicator" id="systemHealthIndicator">&#9679;</span>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+
+                <div class="sidebar-footer">
+                    <div class="system-status">
+                        <div class="status-item">
+                            <span class="status-label">Last Backup</span>
+                            <span class="status-value" id="lastBackupTime">Never</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Active Users</span>
+                            <span class="status-value" id="activeUsersCount">0</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Admin Content Area -->
+            <section class="admin-content">
+                <div class="content-header">
+                    <div class="breadcrumb">
+                        <span class="breadcrumb-item">Admin Console</span>
+                        <span class="breadcrumb-separator">/</span>
+                        <span class="breadcrumb-item active" id="currentSection">Dashboard Overview</span>
+                    </div>
+                    <div class="content-actions">
+                        <button id="refreshData" class="action-btn" title="Refresh Data">
+                            <span class="action-icon">&#128260;</span> Refresh
+                        </button>
+                        <div class="admin-search">
+                            <input type="search" id="adminSearch" name="admin_feature_search" placeholder="Search settings, controls, or reports..." class="search-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" readonly>
+                            <span class="search-icon">&#128269;</span>
+                            <div id="adminSearchResults" class="admin-search-results" hidden></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="content-body" id="contentBody">
+                    <!-- Content will be dynamically loaded based on section selection -->
+                    <div class="welcome-message">
+                        <div class="welcome-icon">&#128075;</div>
+                        <h1>Welcome to Admin Console</h1>
+                        <p>Select a section from the sidebar to manage system settings and view reports.</p>
+                        <div class="welcome-stats">
+                            <div class="stat-card">
+                                <div class="stat-icon">&#128101;</div><div class="stat-info"><span class="stat-value" id="welcomeUserCount">0</span>
+                                    <span class="stat-label">Total Users</span>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">&#128203;</div><div class="stat-info"><span class="stat-value" id="welcomeLogCount">0</span>
+                                    <span class="stat-label">Today's Logs</span>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">&#9889;</div><div class="stat-info"><span class="stat-value" id="welcomeActiveSessions">0</span>
+                                    <span class="stat-label">Active Sessions</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- JavaScript Imports -->
+    <script src="js/auth_bootstrap.js?v=20260606b"></script>
+  <script type="module" src="../frontend/js/main.js?v=20260713a"></script>
+    <script src="../frontend/js/admin-dashboard.js?v=20260710a"></script>
+    <script src="../frontend/js/security-admin.js"></script>
+    <!-- <script src="../frontend/js/security.js"></script> -->
+
+</body>
+</html>

@@ -1,5 +1,5 @@
 const FALLBACK_APP_VERSION = '1.0.0-dev';
-const ASSET_REVISION = '20260609e';
+const ASSET_REVISION = '20260714n';
 try {
   importScripts('../backend/api/pwa_version.php');
 } catch (error) {
@@ -99,6 +99,7 @@ const PRECACHE_URLS = [
   './js/modules/session-worker.js',
   './js/modules/ui_feedback.js',
   './js/modules/pwa.js',
+  './js/modules/chat_shared.js',
   './js/modules/live_chat.js',
   './images/default-user.png',
   './assets/favicon.ico',

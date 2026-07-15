@@ -1,0 +1,1965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#6d1116" />
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png?v=20260430c" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png?v=20260430c" />
+  <link rel="shortcut icon" href="assets/favicon.ico?v=20260430c" type="image/x-icon" />
+  <title>PensionsGo Dashboard</title>
+
+  <!-- Prevent browser caching of protected pages -->
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
+  <!-- ================== STYLES ================== -->
+  <link rel="stylesheet" href="css/styles.css?v=20260713a" />
+  <link rel="stylesheet" href="css/overlay.css?v=20260504a" />
+  <link rel="stylesheet" href="css/auth.css?v=20260504a" />
+  <link rel="stylesheet" href="css/menu.css?v=20260504d" />
+  <link rel="stylesheet" href="css/dashboard.css?v=20260613a" />
+  <link rel="stylesheet" href="css/broadcast_popup.css?v=20260504a" />
+  <link rel="stylesheet" href="css/public_chat.css?v=20260714o" />
+
+  <!-- ================== SCRIPTS ================== -->
+  <!-- main.js handles header/footer loading -->
+  <script src="js/auth_bootstrap.js?v=20260606b"></script>
+  <script type="module" src="js/main.js?v=20260713a"></script>
+  <script defer src="js/modules/filterable_select.js?v=20260429a"></script>
+  <script defer src="js/modules/retirement-types.js"></script>
+  <script defer src="js/public_chat_management.js?v=20260714t"></script>
+  <script defer>
+    window.addEventListener('load', function () {
+      var loadDashboardController = function () {
+        if (document.getElementById('dashboardControllerScript')) return;
+        var script = document.createElement('script');
+        script.id = 'dashboardControllerScript';
+        script.src = 'js/dashboard.js?v=20260709a';
+        script.defer = true;
+        document.head.appendChild(script);
+      };
+      if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(loadDashboardController, { timeout: 900 });
+      } else {
+        window.setTimeout(loadDashboardController, 120);
+      }
+    }, { once: true });
+  </script>
+  
+
+</head>
+
+<body>
+  <!-- Header will be dynamically inserted here by main.js -->
+
+  <main class="dashboard-main">
+    <div class="dashboard-wrapper">
+      <!-- Sidebar Navigation -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <h2>Summary</h2>
+        </div>
+
+        <!-- Desktop Navigation -->
+        <nav class="sidebar-nav desktop-nav">
+          <ul>
+            <li><a href="#" class="active" data-target="claimsSection">Claims Summary</a></li>
+            <li><a href="#" data-target="pensionersSection">Pensioners Summary</a></li>
+            <li><a href="#" data-target="demographicsSection">Demographics &amp; Longevity</a></li>
+            <li><a href="#" data-target="categoriesSection">By Retirement Label</a></li>
+            <li><a href="#" data-target="lifeCertSection">Life Certificate Status</a></li>
+            <li><a href="#" data-target="payrollSection">Payroll Movements</a></li>
+            <li><a href="#" data-target="staffDueSection">Staff Due for Retirement</a></li>
+            <li><a href="#" data-target="filesSection">File Registry</a></li>
+            <li><a href="#" data-target="fileMovementSection">File Movements</a></li>
+            <li><a href="#" data-target="usersSection">System Users</a></li>
+            <li><a href="#" data-target="workflowSection">Workflow Performance</a></li>
+            <li><a href="#" data-target="feedbackSection">Feedback Management</a></li>
+            <li id="publicChatDashboardNavItem" hidden><a href="#" data-target="publicChatSection">Public Live Chat</a></li>
+            <li><a href="#" data-target="generalSection">General Statistics</a></li>
+            <li><a href="#" data-target="dataSection">Data Management</a></li>
+          </ul>
+        </nav>
+
+        <!-- Mobile Navigation Dropdown -->
+        <div class="mobile-nav-select">
+          <select id="mobileNavSelect">
+            <option value="claimsSection" selected>Claims Summary</option>
+            <option value="pensionersSection">Pensioners Summary</option>
+            <option value="demographicsSection">Demographics &amp; Longevity</option>
+            <option value="categoriesSection">By Retirement Label</option>
+            <option value="lifeCertSection">Life Certificate Status</option>
+            <option value="payrollSection">Payroll Movements</option>
+            <option value="staffDueSection">Staff Due for Retirement</option>
+            <option value="filesSection">File Registry</option>
+            <option value="fileMovementSection">File Movements</option>
+            <option value="usersSection">System Users</option>
+            <option value="workflowSection">Workflow Performance</option>
+            <option value="feedbackSection">Feedback Management</option>
+            <option value="publicChatSection" id="publicChatDashboardMobileOption" hidden>Public Live Chat</option>
+            <option value="generalSection">General Statistics</option>
+            <option value="dataSection">Data Management</option>
+          </select>
+        </div>
+      </aside>
+
+      <!-- Main Dashboard Content Area -->
+      <div class="dashboard-content">
+        <div class="dashboard-header">
+          <h1>PensionsGo Dashboard</h1>
+          <p id="welcomeUser">Loading user information...</p>
+          <div class="dashboard-live-strip" id="dashboardLiveStrip" aria-live="polite">
+            <span class="live-dot" aria-hidden="true"></span>
+            <span id="dashboardLiveText">Live dashboard sync initializing...</span>
+          </div>
+        </div>
+
+        <!-- Claims Summary Section -->
+        <section id="claimsSection" class="dashboard-section active">
+          <h2>Claims Summary (Number of Claims)</h2>
+          <p>Overview of claims by type.</p>
+          <div class="section-analytics-grid">
+            <article class="analytics-panel analytics-panel-emphasis">
+              <div class="analytics-panel-header">
+                <h3>Claims Exposure by Type</h3>
+                <p>Balance-weighted view of the arrears portfolio for faster prioritization.</p>
+              </div>
+              <div class="analytics-bar-list" id="claimsTypeAnalytics"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Quarterly Claims Pressure</h3>
+                <p>Quarter and year slices showing where arrears concentration is building.</p>
+              </div>
+              <div class="analytics-bar-list" id="claimsQuarterAnalytics"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Claims Decision Support</h3>
+                <p>Operational ratios and governance indicators for payment planning.</p>
+              </div>
+              <div class="analytics-stat-grid" id="claimsInsightGrid"></div>
+            </article>
+          </div>
+        </section>
+        <!-- Pensioners Summary Section -->
+        <section id="pensionersSection" class="dashboard-section">
+          <h2>Pensioners Summary</h2>
+          <p>Breakdown of pensioners by total, gender, and living status.</p>
+          <div class="section-analytics-grid">
+            <article class="analytics-panel analytics-panel-emphasis">
+              <div class="analytics-panel-header">
+                <h3>Population Composition</h3>
+                <p>Live mix of alive, deceased, male, and female pensioner records.</p>
+              </div>
+              <div class="analytics-bar-list" id="pensionerPopulationAnalytics"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Pay Type & Living Status</h3>
+                <p>Registry structure by pensioner and one-off files for storage and service planning.</p>
+              </div>
+              <div class="analytics-bar-list" id="pensionerCompositionAnalytics"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Population Insights</h3>
+                <p>Quick decision prompts derived from current registry composition.</p>
+              </div>
+              <div class="analytics-stat-grid" id="pensionerInsightGrid"></div>
+            </article>
+          </div>
+        </section>
+        <section id="demographicsSection" class="dashboard-section">
+          <div class="dashboard-section-heading">
+            <div>
+              <h2>Demographics &amp; Longevity</h2>
+              <p>Age extremes, estate lifecycle markers, and observed lifespan patterns across the pensioner base.</p>
+            </div>
+            <div class="dashboard-section-toolbar">
+              <button type="button" class="btn-action btn-secondary" id="demographicsRefreshBtn">Refresh</button>
+              <button type="button" class="btn-action" id="demographicsFilterBtn">Explore Pensioners</button>
+            </div>
+          </div>
+          <div class="section-analytics-grid">
+            <article class="analytics-panel analytics-panel-emphasis">
+              <div class="analytics-panel-header">
+                <h3>Age Extremes</h3>
+                <p>Oldest and youngest alive pensioners, plus estate lifecycle counts for quick planning.</p>
+              </div>
+              <div class="analytics-stat-grid" id="demographicsOverallGrid"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>By Gender</h3>
+                <p>Highest current ages within each gender grouping, with the youngest counterpart for balance.</p>
+              </div>
+              <div class="analytics-bar-list" id="demographicsGenderAnalytics"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Lifespan After Retirement</h3>
+                <p>Observed and projected years lived after retirement for pensioners whose retirement label was not Death.</p>
+              </div>
+              <div class="analytics-stat-grid" id="demographicsLifespanGrid"></div>
+            </article>
+          </div>
+          <div class="section-analytics-grid">
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>By Political Region</h3>
+                <p>Regional age peaks to support outreach, welfare, and survivorship monitoring.</p>
+              </div>
+              <div class="analytics-bar-list" id="demographicsRegionAnalytics"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>By Retirement Label</h3>
+                <p>Longevity signals across retirement pathways using the current alive pensioner population.</p>
+              </div>
+              <div class="analytics-bar-list" id="demographicsRetirementAnalytics"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Estate Window Signals</h3>
+                <p>How many reported deaths remain within the 15-year window and how many have fully elapsed.</p>
+              </div>
+              <div class="analytics-stat-grid" id="demographicsEstateGrid"></div>
+            </article>
+          </div>
+        </section>
+        <!-- Retirement Category Section -->
+        <section id="categoriesSection" class="dashboard-section">
+          <h2>By Retirement Label</h2>
+          <p>Distribution of pensioners based on type of retirement, subdivided by alive and deceased.</p>
+          <div class="section-analytics-grid">
+            <article class="analytics-panel analytics-panel-emphasis">
+              <div class="analytics-panel-header">
+                <h3>Retirement Mode Ranking</h3>
+                <p>Modes with the highest operational footprint across the pension file base.</p>
+              </div>
+              <div class="analytics-bar-list" id="retirementModeAnalytics"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Retirement Mode Insights</h3>
+                <p>Survival mix and concentration risk across retirement categories.</p>
+              </div>
+              <div class="analytics-stat-grid" id="retirementModeInsightGrid"></div>
+            </article>
+          </div>
+        </section>
+        <!-- Life Certificate Section -->
+        <section id="lifeCertSection" class="dashboard-section">
+          <h2>Life Certificate Submissions</h2>
+          <div class="filter-group lifecert-toolbar">
+            <label for="lifeCertYear">Year:</label>
+            <select id="lifeCertYear">
+              <option value="">-- Select Year --</option>
+              <script>
+                const currentYear = new Date().getFullYear();
+                for (let y = currentYear; y >= currentYear - 10; y--) {
+                  document.write(`<option value="${y}">${y}</option>`);
+                }
+              </script>
+            </select>
+            <label for="lifeCertStatusFilter">Status:</label>
+            <select id="lifeCertStatusFilter">
+              <option value="">All</option>
+              <option value="submitted">Submitted</option>
+              <option value="not_submitted">Not Submitted</option>
+              <option value="exempt">Exempt</option>
+            </select>
+            <label for="lifeCertSearch">Search:</label>
+            <input type="text" id="lifeCertSearch" placeholder="File no, name, station, phone...">
+            <button type="button" class="btn-action" id="lifeCertRefreshBtn">Refresh</button>
+            <div class="life-cert-export-actions">
+              <button type="button" class="btn-action" id="lifeCertExportXlsxBtn">Export XLSX</button>
+              <button type="button" class="btn-action" id="lifeCertExportPdfBtn">Export PDF</button>
+              <button type="button" class="btn-action" id="lifeCertExportCsvBtn">Export CSV</button>
+            </div>
+          </div>
+          <p>Track annual submissions. "Not Submitted" resets automatically every new year unless submitted for that year.</p>
+          <div class="cards-container" id="lifeCertCards"></div>
+          <div class="section-analytics-grid">
+            <article class="analytics-panel analytics-panel-emphasis">
+              <div class="analytics-panel-header">
+                <h3>Compliance Distribution</h3>
+                <p>Submission, non-submission, and exemption mix for the selected year.</p>
+              </div>
+              <div class="analytics-bar-list" id="lifeCertAnalyticsBars"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Compliance Insights</h3>
+                <p>Progress rate and priority follow-up indicators for operations.</p>
+              </div>
+              <div class="analytics-stat-grid" id="lifeCertInsightGrid"></div>
+            </article>
+          </div>
+
+          <div class="dashboard-table-wrap">
+            <table class="dashboard-data-table">
+              <thead>
+                <tr>
+                  <th>File Number</th>
+                  <th>Name</th>
+                  <th>Title/Rank</th>
+                  <th>Station</th>
+                  <th>Pay Type</th>
+                  <th>Living Status</th>
+                  <th>Status</th>
+                  <th>Submitted At</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="lifeCertTableBody">
+                <tr><td colspan="9">Loading life certificate records...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="section-pagination" id="lifeCertPagination">
+            <button type="button" class="btn-action" id="lifeCertPrevBtn">Previous</button>
+            <span id="lifeCertPageLabel">Page 1 of 1</span>
+            <button type="button" class="btn-action" id="lifeCertNextBtn">Next</button>
+          </div>
+        </section>
+        <!-- Payroll Movement Section -->
+        <section id="payrollSection" class="dashboard-section">
+          <h2>Payroll Movements</h2>
+          <div class="filter-group payroll-toolbar">
+            <label for="payrollMonth">Month:</label>
+            <select id="payrollMonth">
+              <option value="">-- Select Month --</option>
+              <option value="01">January</option><option value="02">February</option>
+              <option value="03">March</option><option value="04">April</option>
+              <option value="05">May</option><option value="06">June</option>
+              <option value="07">July</option><option value="08">August</option>
+              <option value="09">September</option><option value="10">October</option>
+              <option value="11">November</option><option value="12">December</option>
+            </select>
+            <label for="payrollYear">Year:</label>
+            <select id="payrollYear">
+              <option value="">-- Select Year --</option>
+              <script>
+                for (let y = new Date().getFullYear(); y >= new Date().getFullYear() - 10; y--) {
+                  document.write(`<option value="${y}">${y}</option>`);
+                }
+              </script>
+            </select>
+            <label for="payrollFinancialYear">Financial Year:</label>
+            <select id="payrollFinancialYear">
+              <option value="">All</option>
+            </select>
+            <label for="payrollQuarter">Quarter:</label>
+            <select id="payrollQuarter">
+              <option value="">All</option>
+              <option value="Q1">Q1 (Jul-Sep)</option>
+              <option value="Q2">Q2 (Oct-Dec)</option>
+              <option value="Q3">Q3 (Jan-Mar)</option>
+              <option value="Q4">Q4 (Apr-Jun)</option>
+            </select>
+            <label for="payrollStatusFilter">Status:</label>
+            <select id="payrollStatusFilter">
+              <option value="">All</option>
+              <option value="on">On Payroll</option>
+              <option value="off">Not on Payroll</option>
+            </select>
+            <label for="payrollSearch">Search:</label>
+            <input type="text" id="payrollSearch" placeholder="File no, name, supplier no...">
+            <button type="button" class="btn-action" id="payrollRefreshBtn">Refresh</button>
+          </div>
+          <p>Upload payroll source files and payment register PDFs each month, then track matched registry status against uploaded payroll totals.</p>
+          <div class="cards-container" id="payrollCards"></div>
+          <div class="section-analytics-grid">
+            <article class="analytics-panel analytics-panel-emphasis">
+              <div class="analytics-panel-header">
+                <h3>Latest Payroll Coverage</h3>
+                <p>On/off payroll spread for the most recent reconciled payroll cycle.</p>
+              </div>
+              <div class="analytics-bar-list" id="payrollCoverageAnalytics"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Payroll Reconciliation Insights</h3>
+                <p>Variance and coverage metrics to support monthly reconciliation decisions.</p>
+              </div>
+              <div class="analytics-stat-grid" id="payrollInsightGrid"></div>
+            </article>
+          </div>
+
+          <div class="payroll-upload-tools" id="payrollUploadTools">
+            <h4>Upload Monthly Payroll Files</h4>
+            <p class="payroll-upload-intro">Open the appropriate upload workspace below to load the payroll source file or attach the signed payment register for the selected month.</p>
+            <div class="payroll-upload-row">
+              <button type="button" class="btn-action btn-import" id="openPayrollUploadModalBtn">Upload Payroll</button>
+              <button type="button" class="btn-action btn-secondary" id="openPayrollRegisterModalBtn">Upload Payment Register</button>
+            </div>
+            <div class="payroll-history-link" id="payrollHistoryLinkWrap" style="display:none;">
+              <a href="payroll_upload.html" class="btn-action btn-payroll-history-link">Open Upload History Drill-down</a>
+            </div>
+          </div>
+
+          <div class="payroll-cycles" id="payrollRecentCycles">
+            <p>Recent payroll uploads will appear here.</p>
+          </div>
+
+          <div class="dashboard-table-wrap">
+            <table class="dashboard-data-table">
+              <thead>
+                <tr>
+                  <th>File Number</th>
+                  <th>Name</th>
+                  <th>Supplier Number</th>
+                  <th>Status</th>
+                  <th>Amount (UGX)</th>
+                  <th>FY</th>
+                  <th>Quarter</th>
+                  <th>Month/Year</th>
+                </tr>
+              </thead>
+              <tbody id="payrollTableBody">
+                <tr><td colspan="8">Loading payroll records...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="section-pagination" id="payrollPagination">
+            <button type="button" class="btn-action" id="payrollPrevBtn">Previous</button>
+            <span id="payrollPageLabel">Page 1 of 1</span>
+            <button type="button" class="btn-action" id="payrollNextBtn">Next</button>
+          </div>
+        </section>
+        <!-- Staff Due For Retirement Section -->
+        <section id="staffDueSection" class="dashboard-section">
+          <h2>Staff Due for Retirement</h2>
+          <p>Total number of staff due for retirement, categorized by gender and application status.</p>
+          <div class="cards-container" id="staffDueCards"></div>
+          <div class="section-analytics-grid">
+            <article class="analytics-panel analytics-panel-emphasis">
+              <div class="analytics-panel-header">
+                <h3>Retirement Label Load</h3>
+                <p>Which retirement categories currently dominate intake and verification effort.</p>
+              </div>
+              <div class="analytics-bar-list" id="staffDueTypeAnalytics"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Workflow Funnel</h3>
+                <p>Submission and processing transitions for current retirement files.</p>
+              </div>
+              <p class="analytics-rule-caption" id="staffDuePipelineCaption">Processing escalation window: 60 days from submission before verification-start escalation.</p>
+              <div class="analytics-bar-list" id="staffDuePipelineAnalytics"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Staff Due Insights</h3>
+                <p>Actionable measures for verification capacity and application readiness.</p>
+              </div>
+              <div class="analytics-stat-grid" id="staffDueInsightGrid"></div>
+            </article>
+          </div>
+        </section>
+        <!-- File Registry Section -->
+        <section id="filesSection" class="dashboard-section">
+          <h2>File Registry Summary</h2>
+          <p>Summary of files currently in registry and those moved out.</p>
+          <div class="section-analytics-grid">
+            <article class="analytics-panel analytics-panel-emphasis">
+              <div class="analytics-panel-header">
+                <h3>Registry Composition</h3>
+                <p>Live structure of pensioner and one-off files by living status.</p>
+              </div>
+              <div class="analytics-bar-list" id="fileRegistryCompositionAnalytics"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Latest Payroll Status View</h3>
+                <p>Most recent payroll cycle cut for alive and deceased pensioner files.</p>
+              </div>
+              <div class="analytics-bar-list" id="fileRegistryPayrollAnalytics"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Registry Insights</h3>
+                <p>Storage, circulation, and file-state indicators for registry planning.</p>
+              </div>
+              <div class="analytics-stat-grid" id="fileRegistryInsightGrid"></div>
+            </article>
+          </div>
+        </section>
+        <!-- File Movements Section -->
+        <section id="fileMovementSection" class="dashboard-section">
+          <h2>File Movement Analytics</h2>
+          <p>Comprehensive tracking of movement volume, custody, returns, and office workload.</p>
+          <div class="cards-container" id="fileMovementSummaryCards"></div>
+          <div class="section-analytics-grid">
+            <article class="analytics-panel analytics-panel-emphasis">
+              <div class="analytics-panel-header">
+                <h3>Movement Load by Office</h3>
+                <p>Destination offices with the highest file traffic and open custody pressure.</p>
+              </div>
+              <div class="analytics-bar-list" id="fileMovementOfficeAnalytics"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Movement Risk Signals</h3>
+                <p>Open, overdue, and turnaround indicators for registry circulation control.</p>
+              </div>
+              <div class="analytics-stat-grid" id="fileMovementInsightGrid"></div>
+            </article>
+          </div>
+
+          <div class="movement-analytics-grid">
+            <article class="movement-analytics-panel">
+              <h3>By Destination Office</h3>
+              <div class="movement-table-wrap">
+                <table class="movement-table">
+                  <thead>
+                    <tr>
+                      <th>Office</th>
+                      <th>Total</th>
+                      <th>Open</th>
+                      <th>Returned</th>
+                    </tr>
+                  </thead>
+                  <tbody id="fileMovementOfficeBody">
+                    <tr><td colspan="4">Loading office metrics...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <article class="movement-analytics-panel">
+              <h3>Open Custody</h3>
+              <div class="movement-table-wrap">
+                <table class="movement-table">
+                  <thead>
+                    <tr>
+                      <th>Office</th>
+                      <th>Open Files</th>
+                      <th>Longest Open</th>
+                    </tr>
+                  </thead>
+                  <tbody id="fileMovementCustodyBody">
+                    <tr><td colspan="3">Loading custody metrics...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+
+          <article class="movement-analytics-panel">
+            <h3>Recent Movements</h3>
+            <div class="movement-table-wrap">
+              <table class="movement-table movement-table-wide">
+                <thead>
+                  <tr>
+                    <th>File Number</th>
+                    <th>From</th>
+                    <th>To</th>
+                    <th>Delivered By</th>
+                    <th>Moved</th>
+                    <th>Status</th>
+                    <th>Duration</th>
+                    <th>Reason</th>
+                  </tr>
+                </thead>
+                <tbody id="fileMovementRecentBody">
+                  <tr><td colspan="8">Loading movement timeline...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+        <!-- System Users Section -->
+        <section id="usersSection" class="dashboard-section">
+          <h2>System Users Summary</h2>
+          <p>Breakdown of registered system users by role.</p>
+          <div class="section-analytics-grid">
+            <article class="analytics-panel analytics-panel-emphasis">
+              <div class="analytics-panel-header">
+                <h3>Role Distribution</h3>
+                <p>Role concentration across operational, governance, and pensioner accounts.</p>
+              </div>
+              <div class="analytics-bar-list" id="userRoleAnalytics"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Governance Insights</h3>
+                <p>Role coverage, custom-role spread, and account-structure indicators.</p>
+              </div>
+              <div class="analytics-stat-grid" id="userInsightGrid"></div>
+            </article>
+          </div>
+        </section>
+        <!-- Workflow Performance Section -->
+        <section id="workflowSection" class="dashboard-section">
+          <div class="workflow-performance-header">
+            <div>
+              <h2>Workflow Performance</h2>
+              <p>Task throughput, overdue workload, and officer response metrics.</p>
+            </div>
+            <div class="workflow-performance-actions">
+              <button type="button" class="btn-action btn-export" id="exportWorkflowPerformanceXlsxBtn">Export XLSX</button>
+              <button type="button" class="btn-action btn-export" id="exportWorkflowPerformancePdfBtn">Export PDF</button>
+            </div>
+          </div>
+          <div class="cards-container" id="workflowSummaryCards"></div>
+          <div class="section-analytics-grid">
+            <article class="analytics-panel analytics-panel-emphasis">
+              <div class="analytics-panel-header">
+                <h3>Workflow Response Leaders</h3>
+                <p>Officer response-rate view for comparative performance monitoring.</p>
+              </div>
+              <div class="analytics-bar-list" id="workflowResponseAnalytics"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Workflow Insights</h3>
+                <p>Backlog, overdue, and throughput indicators for operational control.</p>
+              </div>
+              <div class="analytics-stat-grid" id="workflowInsightGrid"></div>
+            </article>
+          </div>
+          <div class="section-analytics-grid workflow-extended-analytics">
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Delegated Tasks</h3>
+                <p>Delegation requests, acceptance, decline, and pending handoffs.</p>
+              </div>
+              <div class="analytics-stat-grid" id="workflowDelegationGrid"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Processing Duration</h3>
+                <p>Verification-to-Approval process timing and recent approval trends.</p>
+              </div>
+              <div class="analytics-stat-grid" id="workflowProcessGrid"></div>
+              <div class="workflow-table-wrap compact">
+                <table class="workflow-table workflow-process-trend-table">
+                  <thead>
+                    <tr>
+                      <th>Period</th>
+                      <th>Completed</th>
+                      <th>Avg Duration</th>
+                    </tr>
+                  </thead>
+                  <tbody id="workflowProcessTrendBody">
+                    <tr><td colspan="3">Loading process trends...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+          <div class="workflow-filter-bar">
+            <input type="search" id="workflowSearchInput" placeholder="Search officer..." aria-label="Search officer" />
+            <select id="workflowRoleFilter" aria-label="Filter by role">
+              <option value="">All Roles</option>
+            </select>
+            <select id="workflowStateFilter" aria-label="Filter by state">
+              <option value="">All States</option>
+              <option value="overdue">Has Overdue</option>
+              <option value="open">Has Open Tasks</option>
+              <option value="high_response">High Response (>= 80%)</option>
+              <option value="low_response">Low Response (< 50%)</option>
+            </select>
+          </div>
+          <div class="workflow-table-wrap">
+            <table class="workflow-table">
+              <thead>
+                <tr>
+                  <th>Officer</th>
+                  <th>Role</th>
+                  <th>Assigned</th>
+                  <th>Completed</th>
+                  <th>Open</th>
+                  <th>Overdue</th>
+                  <th>Response Rate</th>
+                  <th>Avg Completion</th>
+                </tr>
+              </thead>
+              <tbody id="workflowPerformanceBody">
+                <tr><td colspan="8">Loading metrics...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="workflow-alerts-analytics" id="workflowAlertsAnalytics">
+            <div class="workflow-alerts-header">
+              <div>
+                <h3>System-Generated Delay Alerts</h3>
+                <p>Real-time accountability metrics for pending, overdue, and stalled workflow tasks.</p>
+              </div>
+              <div class="workflow-alert-actions">
+                <button type="button" class="btn-action btn-export" id="exportWorkflowAlertsXlsBtn">Export XLSX</button>
+                <button type="button" class="btn-action btn-export" id="exportWorkflowAlertsPdfBtn">Export PDF</button>
+              </div>
+            </div>
+            <div class="cards-container" id="workflowAlertSummaryCards"></div>
+            <div class="workflow-alerts-grid">
+              <article class="workflow-alerts-panel">
+                <h4>Alert Trend (Last 14 Days)</h4>
+                <canvas id="workflowAlertTrendChart" width="900" height="240" aria-label="Workflow alert trend chart"></canvas>
+              </article>
+              <article class="workflow-alerts-panel">
+                <h4>By Workflow Role</h4>
+                <div class="workflow-table-wrap">
+                  <table class="workflow-table workflow-alert-role-table">
+                    <thead>
+                      <tr>
+                        <th>Role</th>
+                        <th>Open</th>
+                        <th>Overdue</th>
+                        <th>Stalled</th>
+                        <th>Resolved</th>
+                        <th>Avg Ack</th>
+                      </tr>
+                    </thead>
+                    <tbody id="workflowAlertRoleBody">
+                      <tr><td colspan="6">Loading role analytics...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+            </div>
+            <div class="workflow-alerts-grid">
+              <article class="workflow-alerts-panel">
+                <h4>At-Risk Staff</h4>
+                <div class="workflow-table-wrap">
+                  <table class="workflow-table workflow-alert-user-table">
+                    <thead>
+                      <tr>
+                        <th>Officer</th>
+                        <th>Role</th>
+                        <th>Open</th>
+                        <th>Overdue</th>
+                        <th>Critical</th>
+                        <th>Avg Ack</th>
+                      </tr>
+                    </thead>
+                    <tbody id="workflowAlertUserBody">
+                      <tr><td colspan="6">Loading staff analytics...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+              <article class="workflow-alerts-panel">
+                <h4>Recent Open Alerts</h4>
+                <div class="workflow-alert-feed" id="workflowAlertRecentFeed">
+                  <div class="workflow-feed-empty">Loading recent alerts...</div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+        <section id="feedbackSection" class="dashboard-section">
+          <div class="workflow-performance-header">
+            <div>
+              <h2>Feedback Management</h2>
+              <p>Operational inbox for public, staff, and pensioner feedback with ownership, response tracking, and service analytics.</p>
+            </div>
+            <div class="workflow-alert-actions feedback-export-actions">
+              <button type="button" class="btn-action btn-export" id="feedbackExportXlsxBtn">Export XLSX</button>
+              <button type="button" class="btn-action btn-export" id="feedbackExportPdfBtn">Export PDF</button>
+              <button type="button" class="btn-action btn-export" id="feedbackExportCsvBtn">Export CSV</button>
+            </div>
+          </div>
+          <div id="feedbackAccessNotice" class="dashboard-empty-message hidden">
+            You do not have permission to access the feedback management workspace.
+          </div>
+          <div id="feedbackWorkspace">
+            <div class="cards-container feedback-summary-cards" id="feedbackSummaryCards"></div>
+            <div class="section-analytics-grid">
+              <article class="analytics-panel analytics-panel-emphasis">
+                <div class="analytics-panel-header">
+                  <h3>Feedback by Type</h3>
+                  <p>See where service issues are clustering so triage and product fixes target the right themes.</p>
+                </div>
+                <div class="analytics-bar-list" id="feedbackTypeAnalytics"></div>
+              </article>
+              <article class="analytics-panel">
+                <div class="analytics-panel-header">
+                  <h3>By Audience</h3>
+                  <p>Compare demand coming from the public, staff, and pensioners and where the backlog is building.</p>
+                </div>
+                <div class="analytics-bar-list" id="feedbackAudienceAnalytics"></div>
+              </article>
+            </div>
+            <div class="section-analytics-grid">
+              <article class="analytics-panel">
+                <div class="analytics-panel-header">
+                  <h3>Service Response Trend</h3>
+                  <p>Weekly intake versus closure movement across the most recent service window.</p>
+                </div>
+                <div class="analytics-bar-list" id="feedbackTrendAnalytics"></div>
+              </article>
+              <article class="analytics-panel">
+                <div class="analytics-panel-header">
+                  <h3>Decision Support Metrics</h3>
+                  <p>Ownership, SLA, and closure signals for service governance and support planning.</p>
+                </div>
+                <div class="analytics-stat-grid" id="feedbackInsightGrid"></div>
+              </article>
+            </div>
+            <div class="section-analytics-grid">
+              <article class="analytics-panel">
+                <div class="analytics-panel-header">
+                  <h3>Service Management Notes</h3>
+                  <p>Action cues synthesized from the latest feedback queue state.</p>
+                </div>
+                <div class="analytics-note-list" id="feedbackNoteList"></div>
+              </article>
+            </div>
+            <div class="feedback-workspace-guide">
+              <div>
+                <strong>Workflow Handling</strong>
+                <p>Open a feedback record to assign an owner, move it into review, then resolve or close it with a documented summary.</p>
+              </div>
+              <div>
+                <strong>Operational Rule</strong>
+                <p>Only users with feedback workflow rights can assign ownership or mark a submission resolved.</p>
+              </div>
+            </div>
+            <div class="data-filter-bar feedback-filter-bar">
+              <label class="dashboard-filter-field">
+                <span>Search</span>
+                <input type="text" id="feedbackSearchInput" class="dashboard-filter-search" placeholder="Reference, sender, subject, contact, assignee...">
+              </label>
+              <label class="dashboard-filter-field">
+                <span>Type</span>
+                <select id="feedbackTypeFilter">
+                  <option value="">All Types</option>
+                </select>
+              </label>
+              <label class="dashboard-filter-field">
+                <span>Audience</span>
+                <select id="feedbackAudienceFilter">
+                  <option value="">All Audiences</option>
+                  <option value="public">Public</option>
+                  <option value="staff">Staff</option>
+                  <option value="pensioner">Pensioner</option>
+                </select>
+              </label>
+              <label class="dashboard-filter-field">
+                <span>Status</span>
+                <select id="feedbackStatusFilter">
+                  <option value="">All Statuses</option>
+                </select>
+              </label>
+              <label class="dashboard-filter-field">
+                <span>Priority</span>
+                <select id="feedbackPriorityFilter">
+                  <option value="">All Priorities</option>
+                  <option value="low">Low</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </label>
+              <label class="dashboard-filter-field">
+                <span>Assigned To</span>
+                <select id="feedbackAssigneeFilter">
+                  <option value="">All Owners</option>
+                </select>
+              </label>
+              <label class="dashboard-filter-field">
+                <span>Date From</span>
+                <input type="date" id="feedbackDateFrom">
+              </label>
+              <label class="dashboard-filter-field">
+                <span>Date To</span>
+                <input type="date" id="feedbackDateTo">
+              </label>
+              <label class="dashboard-filter-field feedback-checkbox-field">
+                <span>Focus</span>
+                <label class="dashboard-inline-checkbox">
+                  <input type="checkbox" id="feedbackOverdueOnly">
+                  <span>Overdue Only</span>
+                </label>
+              </label>
+              <div class="dataset-panel-actions">
+                <button type="button" class="btn-action" id="feedbackRefreshBtn">Refresh</button>
+                <button type="button" class="btn-action btn-secondary" id="feedbackClearBtn">Clear Filters</button>
+              </div>
+            </div>
+            <div class="dashboard-table-wrap">
+              <table class="dashboard-data-table feedback-dashboard-table">
+                <thead>
+                  <tr>
+                    <th>Reference</th>
+                    <th>Submitted</th>
+                    <th>Type</th>
+                    <th>Audience</th>
+                    <th>Sender</th>
+                    <th>Subject</th>
+                    <th>Status</th>
+                    <th>Priority</th>
+                    <th>Assigned To</th>
+                    <th>Due</th>
+                    <th class="action-col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="feedbackTableBody">
+                  <tr><td colspan="11">Loading feedback submissions...</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="section-pagination" id="feedbackPagination">
+              <button type="button" class="btn-action" id="feedbackPrevBtn">Previous</button>
+              <span id="feedbackPageLabel">Page 1 of 1</span>
+              <button type="button" class="btn-action" id="feedbackNextBtn">Next</button>
+            </div>
+          </div>
+        </section>
+        <section id="publicChatSection" class="dashboard-section">
+          <div class="workflow-performance-header">
+            <div>
+              <h2>Public Live Chat</h2>
+              <p>Manage public correspondence, waiting chats, assigned conversations, offline messages, tickets, escalations, canned responses, agents, reports, and audit logs.</p>
+            </div>
+            <div class="workflow-alert-actions">
+              <button type="button" class="btn-action btn-secondary" id="publicChatRefreshDashboardBtn">Refresh</button>
+              <button type="button" class="btn-action" id="publicChatAvailabilityBtn">Set Online</button>
+            </div>
+          </div>
+          <div id="publicChatDashboardAccessNotice" class="dashboard-empty-message">
+            Checking Public Live Chat access...
+          </div>
+          <div id="publicChatDashboardMount" class="public-chat-dashboard-shell" hidden></div>
+        </section>
+        <section id="generalSection" class="dashboard-section">
+          <div class="workflow-performance-header">
+            <div>
+              <h2>General Statistics</h2>
+              <p>Cross-application decision support built from pension operations, compliance, workflow, and registry signals.</p>
+            </div>
+            <div class="dashboard-section-toolbar">
+              <button type="button" class="btn-action" id="openSummaryReportBtn">Summary Report</button>
+            </div>
+          </div>
+          <div class="cards-container general-summary-cards" id="generalSummaryCards"></div>
+          <div class="section-analytics-grid">
+            <article class="analytics-panel analytics-panel-emphasis">
+              <div class="analytics-panel-header">
+                <h3>Operational Volume</h3>
+                <p>Top-level workload distribution across the core pension operations modules.</p>
+              </div>
+              <div class="analytics-bar-list" id="generalVolumeAnalytics"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Compliance & Risk</h3>
+                <p>Combined visibility on payroll, life certificates, workflow risk, and claims exposure.</p>
+              </div>
+              <div class="analytics-bar-list" id="generalRiskAnalytics"></div>
+            </article>
+          </div>
+          <div class="section-analytics-grid">
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>Decision Support Metrics</h3>
+                <p>Summative indicators for prioritization, staffing, and budget follow-up.</p>
+              </div>
+              <div class="analytics-stat-grid" id="generalInsightGrid"></div>
+            </article>
+            <article class="analytics-panel">
+              <div class="analytics-panel-header">
+                <h3>General Outlook</h3>
+                <p>Action cues synthesized from the latest operational signals across the application.</p>
+              </div>
+              <div class="analytics-note-list" id="generalNoteList"></div>
+            </article>
+          </div>
+        </section>
+        <!-- Data Management Section -->
+        <section id="dataSection" class="dashboard-section">
+          <div class="data-management-shell">
+            <div class="data-management-header">
+              <div>
+                <h2>Data Management</h2>
+                <p>Work through operational datasets in one place, filter precisely, export controlled views, and move into deeper modules only when action requires it.</p>
+              </div>
+            </div>
+
+            <div class="data-management-tabbar" role="tablist" aria-label="Data management datasets">
+              <button type="button" class="data-management-tab active" data-data-tab="recycle" role="tab" aria-selected="true">Registry Recycle Bin</button>
+              <button type="button" class="data-management-tab" data-data-tab="registry" role="tab" aria-selected="false">Pension File Registry</button>
+              <button type="button" class="data-management-tab" data-data-tab="staffDue" role="tab" aria-selected="false">Staff Due for Retirement</button>
+              <button type="button" class="data-management-tab" data-data-tab="movements" role="tab" aria-selected="false">File Movements</button>
+              <button type="button" class="data-management-tab" data-data-tab="claims" role="tab" aria-selected="false">Claims</button>
+              <button type="button" class="data-management-tab" data-data-tab="tasks" role="tab" aria-selected="false">Workflow Tasks</button>
+            </div>
+
+            <div class="data-management-panels">
+              <article class="data-management-panel active" id="dataPanel-recycle" data-data-panel="recycle">
+                <div class="dataset-panel-header">
+                  <div>
+                    <h3>Registry Recycle Bin</h3>
+                    <p>Recover deleted registry records, review deletion patterns, and apply retention controls without leaving the dashboard.</p>
+                  </div>
+                  <div class="dataset-panel-actions">
+                    <button type="button" class="btn-action btn-export" id="recycleBinExportXlsxBtn">Export XLSX</button>
+                    <button type="button" class="btn-action btn-export" id="recycleBinExportPdfBtn">Export PDF</button>
+                    <button type="button" class="btn-action btn-export" id="recycleBinExportCsvBtn">Export CSV</button>
+                    <button type="button" class="btn-action btn-danger hidden" id="recycleBinPurgeToggleBtn">Permanently Purge</button>
+                  </div>
+                </div>
+
+                <div id="recycleBinAccessNotice" class="dashboard-empty-message hidden">
+                  You do not have permission to manage the registry recycle bin.
+                </div>
+
+                <div id="recycleBinWorkspace" class="recycle-dashboard-panel hidden">
+                  <div class="cards-container recycle-summary-cards" id="recycleBinSummaryCards"></div>
+
+                  <div class="recycle-filter-bar">
+                    <label class="dashboard-filter-field dashboard-filter-search">
+                      <span>Search</span>
+                      <input type="text" id="recycleBinSearchInput" placeholder="File number, title, name, reason, deleted by...">
+                    </label>
+                    <label class="dashboard-filter-field">
+                      <span>Status</span>
+                      <select id="recycleBinStateFilter">
+                        <option value="all">All Records</option>
+                        <option value="deleted">Deleted Only</option>
+                        <option value="restored">Restored Only</option>
+                      </select>
+                    </label>
+                    <label class="dashboard-filter-field">
+                      <span>Deleted By Role</span>
+                      <select id="recycleBinRoleFilter">
+                        <option value="">All Roles</option>
+                      </select>
+                    </label>
+                    <label class="dashboard-filter-field">
+                      <span>Deleted From</span>
+                      <input type="date" id="recycleBinDateFrom">
+                    </label>
+                    <label class="dashboard-filter-field">
+                      <span>Deleted To</span>
+                      <input type="date" id="recycleBinDateTo">
+                    </label>
+                    <div class="dashboard-filter-actions">
+                      <button type="button" class="btn-action" id="recycleBinRefreshBtn">Refresh</button>
+                      <button type="button" class="btn-action btn-secondary" id="recycleBinClearFiltersBtn">Clear Filters</button>
+                    </div>
+                  </div>
+
+                  <div id="recycleBinPurgePanel" class="recycle-purge-panel hidden">
+                    <div class="recycle-purge-header">
+                      <div>
+                        <h3>Recycle Bin Retention Rules</h3>
+                        <p>Preview and permanently remove stale recycle-bin records that are older than the selected retention window.</p>
+                      </div>
+                      <button type="button" class="btn-action btn-secondary" id="recycleBinPurgeCloseBtn">Close</button>
+                    </div>
+                    <div class="recycle-purge-grid">
+                      <label class="dashboard-filter-field">
+                        <span>Older Than (Days)</span>
+                        <input type="number" id="recycleBinPurgeDays" min="1" max="3650" value="90">
+                      </label>
+                      <label class="dashboard-filter-field">
+                        <span>Scope</span>
+                        <select id="recycleBinPurgeState">
+                          <option value="restored">Restored Only</option>
+                          <option value="deleted">Deleted Only</option>
+                          <option value="all">All Matching Records</option>
+                        </select>
+                      </label>
+                      <label class="dashboard-filter-field">
+                        <span>Deleted By Role</span>
+                        <select id="recycleBinPurgeRole">
+                          <option value="">All Roles</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div class="recycle-purge-actions">
+                      <button type="button" class="btn-action btn-secondary" id="recycleBinPurgePreviewBtn">Preview Purge</button>
+                      <button type="button" class="btn-action btn-danger" id="recycleBinPurgeConfirmBtn">Purge Matching Records</button>
+                    </div>
+                    <div id="recycleBinPurgePreview" class="recycle-purge-preview">
+                      <p>Preview the purge first to review how many records will be removed.</p>
+                    </div>
+                  </div>
+
+                  <div class="dashboard-table-wrap recycle-table-wrap">
+                    <table class="dashboard-data-table recycle-bin-table">
+                      <thead>
+                        <tr>
+                          <th>File Number</th>
+                          <th>Title</th>
+                          <th>Name</th>
+                          <th>Delete Mode</th>
+                          <th>Status</th>
+                          <th>Delete Reason</th>
+                          <th>Deleted By</th>
+                          <th>Deleted At</th>
+                          <th>Restored By</th>
+                          <th>Restored At</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody id="recycleBinTableBody">
+                        <tr><td colspan="11">Loading recycle bin records...</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div class="section-pagination" id="recycleBinPagination">
+                    <button type="button" class="btn-action" id="recycleBinPrevBtn">Previous</button>
+                    <span id="recycleBinPageLabel">Page 1 of 1</span>
+                    <button type="button" class="btn-action" id="recycleBinNextBtn">Next</button>
+                  </div>
+                </div>
+              </article>
+
+              <article class="data-management-panel" id="dataPanel-registry" data-data-panel="registry">
+                <div class="dataset-panel-header">
+                  <div>
+                    <h3>Pension File Registry</h3>
+                    <p>Work with registry identity, payroll status, availability, and compliance signals without leaving the dashboard.</p>
+                  </div>
+                  <div class="dataset-panel-actions">
+                    <a href="pension_file_registry.html" class="btn-action btn-secondary">Open Registry Workspace</a>
+                    <button type="button" class="btn-action btn-export" data-dm-export="file_registry" data-format="xlsx">Export XLSX</button>
+                    <button type="button" class="btn-action btn-export" data-dm-export="file_registry" data-format="pdf">Export PDF</button>
+                    <button type="button" class="btn-action btn-export" data-dm-export="file_registry" data-format="csv">Export CSV</button>
+                  </div>
+                </div>
+                <div class="cards-container data-metric-cards" id="dmRegistrySummaryCards"></div>
+                <div class="data-filter-bar">
+                  <label class="dashboard-filter-field dashboard-filter-search">
+                    <span>Search</span>
+                    <input type="text" id="dmRegistrySearch" placeholder="File no, box no, name, supplier, NIN, station, phone...">
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>Box Number</span>
+                    <select id="dmRegistryBoxNumber" data-filterable-select>
+                      <option value="">All Box Numbers</option>
+                    </select>
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>Gender</span>
+                    <select id="dmRegistryGender">
+                      <option value="">All</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                    </select>
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>Living Status</span>
+                    <select id="dmRegistryLivingStatus">
+                      <option value="">All</option>
+                      <option value="Alive">Alive</option>
+                      <option value="Deceased">Deceased</option>
+                    </select>
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>Pay Type</span>
+                    <select id="dmRegistryPayType">
+                      <option value="">All</option>
+                      <option value="Pensioner">Pensioner</option>
+                      <option value="One-off Payment">One-off Payment</option>
+                    </select>
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>Payroll Status</span>
+                    <select id="dmRegistryPayrollStatus">
+                      <option value="">All</option>
+                      <option value="On Payroll">On Payroll</option>
+                      <option value="Not on Payroll">Not on Payroll</option>
+                    </select>
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>Availability</span>
+                    <select id="dmRegistryAvailability">
+                      <option value="">All</option>
+                      <option value="in_shelf">In Shelf</option>
+                      <option value="out_of_shelf">Out of Shelf</option>
+                    </select>
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>Life Certificate</span>
+                    <select id="dmRegistryLifeCert">
+                      <option value="">All</option>
+                      <option value="Submitted">Submitted</option>
+                      <option value="Not Submitted">Not Submitted</option>
+                      <option value="Exempt">Exempt</option>
+                    </select>
+                  </label>
+                  <div class="dashboard-filter-actions">
+                    <button type="button" class="btn-action" id="dmRegistryRefreshBtn">Refresh</button>
+                    <button type="button" class="btn-action btn-secondary" id="dmRegistryClearBtn">Clear Filters</button>
+                  </div>
+                </div>
+                <div class="dashboard-table-wrap">
+                  <table class="dashboard-data-table data-management-table data-management-table-registry">
+                    <thead>
+                      <tr>
+                        <th>File Number</th>
+                        <th>Name</th>
+                        <th>Gender</th>
+                        <th>Living Status</th>
+                        <th>Pay Type</th>
+                        <th>Payroll Status</th>
+                        <th>Availability</th>
+                        <th>Life Certificate</th>
+                        <th>Retirement Label</th>
+                        <th>Retirement Date</th>
+                        <th>Station</th>
+                        <th>Phone</th>
+                      </tr>
+                    </thead>
+                    <tbody id="dmRegistryTableBody">
+                      <tr><td colspan="12">Loading registry records...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="section-pagination" id="dmRegistryPagination">
+                  <button type="button" class="btn-action" id="dmRegistryPrevBtn">Previous</button>
+                  <span id="dmRegistryPageLabel">Page 1 of 1</span>
+                  <button type="button" class="btn-action" id="dmRegistryNextBtn">Next</button>
+                </div>
+              </article>
+
+              <article class="data-management-panel" id="dataPanel-staffDue" data-data-panel="staffDue">
+                <div class="dataset-panel-header">
+                  <div>
+                    <h3>Staff Due for Retirement</h3>
+                    <p>Monitor intake readiness, submission quality, and workflow transition signals before records move deeper into the pension pipeline.</p>
+                  </div>
+                  <div class="dataset-panel-actions">
+                    <a href="staff_due.html" class="btn-action btn-secondary" id="dmStaffDueWorkspaceLink">Open Full Workspace</a>
+                    <button type="button" class="btn-action btn-danger" id="dmStaffDueDeleteFilteredBtn">Delete All Filtered</button>
+                    <button type="button" class="btn-action btn-export" data-dm-export="staff_due" data-format="xlsx">Export XLSX</button>
+                    <button type="button" class="btn-action btn-export" data-dm-export="staff_due" data-format="pdf">Export PDF</button>
+                    <button type="button" class="btn-action btn-export" data-dm-export="staff_due" data-format="csv">Export CSV</button>
+                  </div>
+                </div>
+                <div class="cards-container data-metric-cards" id="dmStaffDueSummaryCards"></div>
+                <div class="data-filter-bar">
+                  <label class="dashboard-filter-field dashboard-filter-search">
+                    <span>Search</span>
+                    <input type="text" id="dmStaffDueSearch" placeholder="File no, name, title, unit, NIN, phone...">
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>Retirement Label</span>
+                    <select id="dmStaffDueRetirementType">
+                      <option value="">All Retirement Labels</option>
+                    </select>
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>Submission Status</span>
+                    <select id="dmStaffDueSubmissionStatus">
+                      <option value="">All</option>
+                      <option value="Pending">Pending</option>
+                      <option value="Submitted">Submitted</option>
+                    </select>
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>Application Status</span>
+                    <select id="dmStaffDueAppStatus">
+                      <option value="">All</option>
+                      <option value="Pending">Pending</option>
+                      <option value="Verified">Verified</option>
+                      <option value="Queried">Queried</option>
+                      <option value="Rejected">Rejected</option>
+                      <option value="Approved">Approved</option>
+                    </select>
+                  </label>
+                  <div class="dashboard-filter-actions">
+                    <button type="button" class="btn-action" id="dmStaffDueRefreshBtn">Refresh</button>
+                    <button type="button" class="btn-action btn-secondary" id="dmStaffDueClearBtn">Clear Filters</button>
+                  </div>
+                </div>
+                <div class="dashboard-table-wrap">
+                  <table class="dashboard-data-table data-management-table">
+                    <thead>
+                      <tr>
+                        <th>File Number</th>
+                        <th>Title</th>
+                        <th>Name</th>
+                        <th>Retirement Date</th>
+                        <th>Retirement</th>
+                        <th>FY</th>
+                        <th>Submission</th>
+                        <th>Application</th>
+                        <th>Workflow</th>
+                        <th class="action-col">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="dmStaffDueTableBody">
+                      <tr><td colspan="10">Loading staff due records...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="section-pagination" id="dmStaffDuePagination">
+                  <button type="button" class="btn-action" id="dmStaffDuePrevBtn">Previous</button>
+                  <span id="dmStaffDuePageLabel">Page 1 of 1</span>
+                  <button type="button" class="btn-action" id="dmStaffDueNextBtn">Next</button>
+                </div>
+              </article>
+
+              <article class="data-management-panel" id="dataPanel-movements" data-data-panel="movements">
+                <div class="dataset-panel-header">
+                  <div>
+                    <h3>File Movements</h3>
+                    <p>Track custody, overdue circulation, and movement reasons while retaining a fast route into full file tracking operations.</p>
+                  </div>
+                  <div class="dataset-panel-actions">
+                    <a href="file_tracking.html" class="btn-action btn-secondary">Open File Tracking</a>
+                    <button type="button" class="btn-action btn-export" data-dm-export="file_movements" data-format="xlsx">Export XLSX</button>
+                    <button type="button" class="btn-action btn-export" data-dm-export="file_movements" data-format="pdf">Export PDF</button>
+                    <button type="button" class="btn-action btn-export" data-dm-export="file_movements" data-format="csv">Export CSV</button>
+                  </div>
+                </div>
+                <div class="cards-container data-metric-cards" id="dmMovementsSummaryCards"></div>
+                <div class="data-filter-bar">
+                  <label class="dashboard-filter-field dashboard-filter-search">
+                    <span>Search</span>
+                    <input type="text" id="dmMovementsSearch" placeholder="File no, office, delivered by, reason...">
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>Status</span>
+                    <select id="dmMovementsType">
+                      <option value="">All Movements</option>
+                      <option value="Moved Out">Moved Out</option>
+                      <option value="Returned">Returned</option>
+                    </select>
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>From Office</span>
+                    <select id="dmMovementsFromOffice">
+                      <option value="">All Offices</option>
+                    </select>
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>To Office</span>
+                    <select id="dmMovementsToOffice">
+                      <option value="">All Offices</option>
+                    </select>
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>Moved From</span>
+                    <input type="date" id="dmMovementsDateFrom">
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>Moved To</span>
+                    <input type="date" id="dmMovementsDateTo">
+                  </label>
+                  <div class="dashboard-filter-actions">
+                    <button type="button" class="btn-action" id="dmMovementsRefreshBtn">Refresh</button>
+                    <button type="button" class="btn-action btn-secondary" id="dmMovementsClearBtn">Clear Filters</button>
+                  </div>
+                </div>
+                <div class="dashboard-table-wrap dashboard-table-wrap-fit">
+                  <table class="dashboard-data-table data-management-table data-management-table-movements">
+                    <thead>
+                      <tr>
+                        <th>File Number</th>
+                        <th>Status</th>
+                        <th>From</th>
+                        <th>To</th>
+                        <th>Delivered By</th>
+                        <th>Moved At</th>
+                        <th>Expected Return</th>
+                        <th>Returned At</th>
+                        <th>Duration</th>
+                        <th>Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody id="dmMovementsTableBody">
+                      <tr><td colspan="10">Loading file movements...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="section-pagination" id="dmMovementsPagination">
+                  <button type="button" class="btn-action" id="dmMovementsPrevBtn">Previous</button>
+                  <span id="dmMovementsPageLabel">Page 1 of 1</span>
+                  <button type="button" class="btn-action" id="dmMovementsNextBtn">Next</button>
+                </div>
+              </article>
+
+              <article class="data-management-panel" id="dataPanel-claims" data-data-panel="claims">
+                <div class="dataset-panel-header">
+                  <div>
+                    <h3>Claims</h3>
+                    <p>Review arrears exposure, balances, and accountability state without leaving the dashboard.</p>
+                  </div>
+                  <div class="dataset-panel-actions">
+                    <a href="claims.html" class="btn-action btn-secondary">Open Claims Dashboard</a>
+                    <a href="budgeting.html" class="btn-action btn-secondary">Budget Forecast</a>
+                    <button type="button" class="btn-action btn-danger" id="dmClaimsDeleteFilteredBtn">Delete All Filtered</button>
+                    <button type="button" class="btn-action btn-export" data-dm-export="claims_ledger" data-format="xlsx">Export XLSX</button>
+                    <button type="button" class="btn-action btn-export" data-dm-export="claims_ledger" data-format="pdf">Export PDF</button>
+                    <button type="button" class="btn-action btn-export" data-dm-export="claims_ledger" data-format="csv">Export CSV</button>
+                  </div>
+                </div>
+                <div class="cards-container data-metric-cards" id="dmClaimsSummaryCards"></div>
+                <div class="data-filter-bar">
+                  <label class="dashboard-filter-field dashboard-filter-search">
+                    <span>Search</span>
+                    <input type="text" id="dmClaimsSearch" placeholder="File no, name, supplier no...">
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>Claim Type</span>
+                    <select id="dmClaimsType">
+                      <option value="">All Types</option>
+                    </select>
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>Status</span>
+                    <select id="dmClaimsStatus">
+                      <option value="">All</option>
+                      <option value="Pending">Pending</option>
+                      <option value="Partially Paid">Partially Paid</option>
+                      <option value="Paid">Paid</option>
+                      <option value="Waived">Waived</option>
+                    </select>
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>Year</span>
+                    <input type="number" id="dmClaimsYear" min="2000" max="2100" placeholder="e.g. 2026">
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>Quarter</span>
+                    <select id="dmClaimsQuarter">
+                      <option value="">All</option>
+                      <option value="Q1">Q1</option>
+                      <option value="Q2">Q2</option>
+                      <option value="Q3">Q3</option>
+                      <option value="Q4">Q4</option>
+                    </select>
+                  </label>
+                  <div class="dashboard-filter-actions">
+                    <button type="button" class="btn-action" id="dmClaimsRefreshBtn">Refresh</button>
+                    <button type="button" class="btn-action btn-secondary" id="dmClaimsClearBtn">Clear Filters</button>
+                  </div>
+                </div>
+                <div class="dashboard-table-wrap">
+                  <table class="dashboard-data-table data-management-table">
+                    <thead>
+                      <tr>
+                        <th>File Number</th>
+                        <th>Title</th>
+                        <th>Name</th>
+                        <th>Claim Type</th>
+                        <th>FY</th>
+                        <th>Quarter</th>
+                        <th>Expected</th>
+                        <th>Paid</th>
+                        <th>Balance</th>
+                        <th>Status</th>
+                        <th>Accountability</th>
+                        <th class="action-col">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="dmClaimsTableBody">
+                      <tr><td colspan="12">Loading claims data...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="section-pagination" id="dmClaimsPagination">
+                  <button type="button" class="btn-action" id="dmClaimsPrevBtn">Previous</button>
+                  <span id="dmClaimsPageLabel">Page 1 of 1</span>
+                  <button type="button" class="btn-action" id="dmClaimsNextBtn">Next</button>
+                </div>
+              </article>
+
+              <article class="data-management-panel" id="dataPanel-tasks" data-data-panel="tasks">
+                <div class="dataset-panel-header">
+                  <div>
+                    <h3>Workflow Tasks</h3>
+                    <p>Keep operational visibility on workload, due dates, and current assignments while retaining a direct route into task execution.</p>
+                  </div>
+                  <div class="dataset-panel-actions">
+                    <a href="tasks.html" class="btn-action btn-secondary">Open Tasks Workspace</a>
+                    <button type="button" class="btn-action btn-export" data-dm-export="tasks" data-format="xlsx">Export XLSX</button>
+                    <button type="button" class="btn-action btn-export" data-dm-export="tasks" data-format="pdf">Export PDF</button>
+                    <button type="button" class="btn-action btn-export" data-dm-export="tasks" data-format="csv">Export CSV</button>
+                  </div>
+                </div>
+                <div class="cards-container data-metric-cards" id="dmTasksSummaryCards"></div>
+                <div class="data-filter-bar">
+                  <label class="dashboard-filter-field dashboard-filter-search">
+                    <span>Search</span>
+                    <input type="text" id="dmTasksSearch" placeholder="File no, applicant, task title, role...">
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>Status</span>
+                    <select id="dmTasksStatus">
+                      <option value="">All</option>
+                    </select>
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>Priority</span>
+                    <select id="dmTasksPriority">
+                      <option value="">All</option>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="urgent">Urgent</option>
+                    </select>
+                  </label>
+                  <label class="dashboard-filter-field">
+                    <span>Assigned Role</span>
+                    <select id="dmTasksRole">
+                      <option value="">All Roles</option>
+                    </select>
+                  </label>
+                  <div class="dashboard-filter-actions">
+                    <button type="button" class="btn-action" id="dmTasksRefreshBtn">Refresh</button>
+                    <button type="button" class="btn-action btn-secondary" id="dmTasksClearBtn">Clear Filters</button>
+                  </div>
+                </div>
+                <div class="dashboard-table-wrap">
+                  <table class="dashboard-data-table data-management-table">
+                    <thead>
+                      <tr>
+                        <th>File Number</th>
+                        <th>Applicant</th>
+                        <th>Task</th>
+                        <th>Type</th>
+                        <th>Assigned By</th>
+                        <th>Assigned Role</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Due</th>
+                        <th>Created</th>
+                      </tr>
+                    </thead>
+                    <tbody id="dmTasksTableBody">
+                      <tr><td colspan="10">Loading workflow tasks...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="section-pagination" id="dmTasksPagination">
+                  <button type="button" class="btn-action" id="dmTasksPrevBtn">Previous</button>
+                  <span id="dmTasksPageLabel">Page 1 of 1</span>
+                  <button type="button" class="btn-action" id="dmTasksNextBtn">Next</button>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div class="dashboard-data-modal dashboard-export-modal" id="dmPdfExportModal" aria-hidden="true">
+    <div class="dashboard-data-modal-backdrop" data-dm-export-modal-close="1"></div>
+    <div class="dashboard-data-modal-panel dashboard-export-modal-panel" role="dialog" aria-modal="true" aria-labelledby="dmPdfExportModalTitle">
+      <div class="dashboard-data-modal-header">
+        <div>
+          <p class="dashboard-data-modal-eyebrow">PDF Export Builder</p>
+          <h3 id="dmPdfExportModalTitle">Choose PDF Fields</h3>
+        </div>
+        <button type="button" class="dashboard-data-modal-close dashboard-export-modal-x" id="dmPdfExportModalCloseBtn" aria-label="Close PDF export builder">&times;</button>
+      </div>
+      <div class="dashboard-data-modal-body dashboard-export-modal-body">
+        <div class="dashboard-data-modal-summary dashboard-export-modal-summary">
+          <h4>Build a cleaner PDF export</h4>
+          <div class="dashboard-data-modal-summary-grid">
+            <div class="dashboard-data-modal-summary-item">
+              <span>Dataset</span>
+              <strong id="dmPdfExportDatasetLabel">Preparing...</strong>
+            </div>
+            <div class="dashboard-data-modal-summary-item">
+              <span>Selected Fields</span>
+              <strong id="dmPdfExportSelectedCount">0 fields</strong>
+            </div>
+            <div class="dashboard-data-modal-summary-item">
+              <span>Active Filters</span>
+              <strong id="dmPdfExportFilterCount">0 active</strong>
+            </div>
+          </div>
+          <p class="dashboard-export-modal-description" id="dmPdfExportModalDescription">Choose the columns you want in the PDF. Focused field selections generate faster, cleaner, and more readable exports.</p>
+          <div class="dashboard-export-modal-toolbar">
+            <button type="button" class="btn-action btn-secondary" id="dmPdfSelectDefaultBtn">Use Recommended</button>
+            <button type="button" class="btn-action btn-secondary" id="dmPdfSelectAllBtn">Select All</button>
+            <button type="button" class="btn-action btn-secondary" id="dmPdfClearSelectionBtn">Clear All</button>
+          </div>
+        </div>
+        <div class="dashboard-export-filter-summary" id="dmPdfExportFilterSummary"></div>
+        <div class="dashboard-export-field-groups" id="dmPdfExportFieldGroups"></div>
+      </div>
+      <div class="dashboard-data-modal-footer dashboard-export-modal-footer">
+        <button type="button" class="btn-action btn-secondary" id="dmPdfExportModalCancelBtn">Cancel</button>
+        <button type="button" class="btn-action" id="dmPdfExportModalConfirmBtn">Generate PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dashboard-data-modal" id="dataRowActionModal" aria-hidden="true">
+    <div class="dashboard-data-modal-backdrop" data-data-modal-close="1"></div>
+    <div class="dashboard-data-modal-panel" role="dialog" aria-modal="true" aria-labelledby="dataRowActionModalTitle">
+      <div class="dashboard-data-modal-header">
+        <div>
+          <p class="dashboard-data-modal-eyebrow" id="dataRowActionModalEyebrow">Record Actions</p>
+          <h3 id="dataRowActionModalTitle">Manage record</h3>
+        </div>
+        <button type="button" class="dashboard-data-modal-close" id="dataRowActionModalCloseBtn" aria-label="Close record actions">Close</button>
+      </div>
+      <div class="dashboard-data-modal-body">
+        <div class="dashboard-data-modal-summary" id="dataRowActionModalSummary"></div>
+        <div class="dashboard-data-modal-actions" id="dataRowActionModalActions"></div>
+      </div>
+      <div class="dashboard-data-modal-footer">
+        <button type="button" class="btn-action btn-secondary" id="dataRowActionModalDismissBtn">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dashboard-data-modal feedback-detail-modal" id="feedbackDetailModal" aria-hidden="true">
+    <div class="dashboard-data-modal-backdrop" data-feedback-modal-close="1"></div>
+    <div class="dashboard-data-modal-panel feedback-detail-panel" role="dialog" aria-modal="true" aria-labelledby="feedbackDetailModalTitle">
+      <div class="dashboard-data-modal-header">
+        <div>
+          <p class="dashboard-data-modal-eyebrow" id="feedbackDetailModalEyebrow">Feedback Submission</p>
+          <h3 id="feedbackDetailModalTitle">Feedback Details</h3>
+        </div>
+        <button type="button" class="dashboard-data-modal-close" id="feedbackDetailModalCloseBtn" aria-label="Close feedback details">Close</button>
+      </div>
+      <div class="feedback-detail-tabs" role="tablist" aria-label="Feedback detail tabs">
+        <button type="button" class="feedback-detail-tab active" data-feedback-tab="overview">Overview</button>
+        <button type="button" class="feedback-detail-tab" data-feedback-tab="message">Message</button>
+        <button type="button" class="feedback-detail-tab" data-feedback-tab="activity">Activity</button>
+      </div>
+      <div class="dashboard-data-modal-body feedback-detail-body">
+        <section class="feedback-detail-pane active" data-feedback-pane="overview">
+          <div class="feedback-detail-overview" id="feedbackDetailOverview"></div>
+          <form class="feedback-workflow-form" id="feedbackWorkflowForm">
+            <input type="hidden" id="feedbackDetailSubmissionId">
+            <div class="feedback-workflow-helper" id="feedbackWorkflowHelper">
+              <strong>Workflow Actions</strong>
+              <span>Assign an owner, move the item into review, then resolve or close it with a clear summary for traceability.</span>
+            </div>
+            <div class="feedback-workflow-grid">
+              <label class="dashboard-filter-field">
+                <span>Status</span>
+                <select id="feedbackDetailStatus">
+                  <option value="new">New</option>
+                  <option value="reviewed">In Review</option>
+                  <option value="resolved">Resolved</option>
+                  <option value="closed">Closed</option>
+                </select>
+              </label>
+              <label class="dashboard-filter-field">
+                <span>Priority</span>
+                <select id="feedbackDetailPriority">
+                  <option value="low">Low</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </label>
+              <label class="dashboard-filter-field feedback-detail-assignee-field">
+                <span>Assigned To</span>
+                <select id="feedbackDetailAssignee">
+                  <option value="">Unassigned</option>
+                </select>
+              </label>
+              <label class="dashboard-filter-field feedback-detail-resolution-field">
+                <span>Resolution Summary</span>
+                <textarea id="feedbackDetailResolutionSummary" rows="4" placeholder="Summarize what was done, who handled it, and any follow-up that remains."></textarea>
+              </label>
+              <label class="dashboard-filter-field feedback-detail-note-field">
+                <span>Internal Note</span>
+                <textarea id="feedbackDetailInternalNote" rows="4" placeholder="Add an internal note, action taken, or triage guidance."></textarea>
+              </label>
+            </div>
+          </form>
+        </section>
+        <section class="feedback-detail-pane" data-feedback-pane="message">
+          <div class="feedback-message-card">
+            <div class="feedback-message-meta" id="feedbackMessageMeta"></div>
+            <article class="feedback-message-body" id="feedbackMessageBody"></article>
+          </div>
+        </section>
+        <section class="feedback-detail-pane" data-feedback-pane="activity">
+          <div class="feedback-activity-list" id="feedbackActivityList"></div>
+        </section>
+      </div>
+      <div class="dashboard-data-modal-footer feedback-detail-footer">
+        <button type="button" class="btn-action btn-secondary" id="feedbackDetailDismissBtn">Done</button>
+        <button type="button" class="btn-action btn-secondary hidden" id="feedbackDetailAssignBtn">Assign Owner</button>
+        <button type="button" class="btn-action btn-secondary hidden" id="feedbackDetailReviewBtn">Mark In Review</button>
+        <button type="button" class="btn-action hidden" id="feedbackDetailResolveBtn">Resolve Feedback</button>
+        <button type="button" class="btn-action btn-secondary hidden" id="feedbackDetailCloseBtn">Close Record</button>
+        <button type="button" class="btn-action hidden" id="feedbackDetailSaveBtn">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dashboard-data-modal" id="demographicsDetailModal" aria-hidden="true">
+    <div class="dashboard-data-modal-backdrop" data-demographics-modal-close="1"></div>
+    <div class="dashboard-data-modal-panel demographics-detail-panel" role="dialog" aria-modal="true" aria-labelledby="demographicsDetailModalTitle">
+      <div class="dashboard-data-modal-header">
+        <div>
+          <p class="dashboard-data-modal-eyebrow">Demographics Explorer</p>
+          <h3 id="demographicsDetailModalTitle">Explore Oldest / Youngest Pensioners</h3>
+        </div>
+        <button type="button" class="dashboard-data-modal-close" id="demographicsDetailModalCloseBtn" aria-label="Close demographics explorer">Close</button>
+      </div>
+      <div class="dashboard-data-modal-body demographics-modal-body">
+        <div class="dashboard-data-modal-summary demographics-result-summary" id="demographicsResultSummary"></div>
+        <div class="demographics-filter-grid">
+          <label class="dashboard-filter-field">
+            <span>Focus</span>
+            <select id="demographicsFocusFilter">
+              <option value="oldest">Oldest</option>
+              <option value="youngest">Youngest</option>
+              <option value="all">All Matched</option>
+            </select>
+          </label>
+          <label class="dashboard-filter-field">
+            <span>Living Status</span>
+            <select id="demographicsLivingStatusFilter">
+              <option value="">All Statuses</option>
+              <option value="Alive">Alive</option>
+              <option value="Deceased">Deceased</option>
+            </select>
+          </label>
+          <label class="dashboard-filter-field">
+            <span>Gender</span>
+            <select id="demographicsGenderFilter">
+              <option value="">All Genders</option>
+            </select>
+          </label>
+          <label class="dashboard-filter-field">
+            <span>Political Region</span>
+            <select id="demographicsRegionFilter">
+              <option value="">All Regions</option>
+            </select>
+          </label>
+          <label class="dashboard-filter-field">
+            <span>Political District</span>
+            <select id="demographicsDistrictFilter">
+              <option value="">All Districts</option>
+            </select>
+          </label>
+          <label class="dashboard-filter-field">
+            <span>Retirement Label</span>
+            <select id="demographicsRetirementTypeFilter">
+              <option value="">All Retirement Labels</option>
+            </select>
+          </label>
+          <label class="dashboard-filter-field demographics-search-field">
+            <span>Search</span>
+            <input type="text" id="demographicsSearchInput" placeholder="File number, name, district..." />
+          </label>
+        </div>
+        <div class="demographics-live-results" id="demographicsLiveResults" aria-live="polite">
+          <div class="demographics-live-results-empty">Filtered pensioner records will appear here as you refine the explorer.</div>
+        </div>
+        <div class="dashboard-section-toolbar demographics-modal-toolbar">
+          <button type="button" class="btn-action btn-secondary" id="demographicsResetBtn">Reset</button>
+          <button type="button" class="btn-action" id="demographicsApplyBtn">Apply Filters</button>
+        </div>
+        <div class="dashboard-table-wrap demographics-table-wrap">
+          <table class="dashboard-data-table demographics-data-table">
+            <thead>
+              <tr>
+                <th>File Number</th>
+                <th>Name</th>
+                <th>Gender</th>
+                <th>Age</th>
+                <th>District</th>
+                <th>Region</th>
+                <th>Retirement Label</th>
+                <th>Living Status</th>
+                <th>Years After Retirement</th>
+                <th>Estate Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="demographicsTableBody">
+              <tr><td colspan="11">Loading pensioner details...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="dashboard-data-modal-footer">
+        <button type="button" class="btn-action btn-secondary" id="demographicsDetailModalDismissBtn">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dashboard-data-modal" id="deathReportModal" aria-hidden="true">
+    <div class="dashboard-data-modal-backdrop" data-death-report-close="1"></div>
+    <div class="dashboard-data-modal-panel death-report-panel" role="dialog" aria-modal="true" aria-labelledby="deathReportModalTitle">
+      <div class="dashboard-data-modal-header">
+        <div>
+          <p class="dashboard-data-modal-eyebrow">Estate Update</p>
+          <h3 id="deathReportModalTitle">Report Pensioner Death</h3>
+        </div>
+        <button type="button" class="dashboard-data-modal-close" id="deathReportModalCloseBtn" aria-label="Close death report form">Close</button>
+      </div>
+      <div class="dashboard-data-modal-body">
+        <div class="dashboard-data-modal-summary">
+          <h4 id="deathReportSubject">Selected pensioner</h4>
+          <div class="dashboard-data-modal-summary-grid">
+            <div class="dashboard-data-modal-summary-item">
+              <span>Registry ID</span>
+              <strong id="deathReportRegistryMeta">--</strong>
+            </div>
+            <div class="dashboard-data-modal-summary-item">
+              <span>File Number</span>
+              <strong id="deathReportRegNoMeta">--</strong>
+            </div>
+            <div class="dashboard-data-modal-summary-item">
+              <span>Retirement Label</span>
+              <strong id="deathReportRetirementMeta">--</strong>
+            </div>
+            <div class="dashboard-data-modal-summary-item">
+              <span>Retirement Date</span>
+              <strong id="deathReportRetirementDateMeta">--</strong>
+            </div>
+          </div>
+        </div>
+        <input type="hidden" id="deathReportRegistryId" />
+        <input type="hidden" id="deathReportRegNo" />
+        <div class="demographics-filter-grid death-report-grid">
+          <label class="dashboard-filter-field">
+            <span>Date of Death</span>
+            <input type="date" id="deathReportDateOfDeath" />
+          </label>
+          <label class="dashboard-filter-field">
+            <span>Notification Date</span>
+            <input type="date" id="deathReportNotificationDate" />
+          </label>
+          <label class="dashboard-filter-field">
+            <span>Notifying Person</span>
+            <input type="text" id="deathReportNotifierName" placeholder="Name of notifying person" />
+          </label>
+          <label class="dashboard-filter-field">
+            <span>Notifier Contact</span>
+            <input type="text" id="deathReportNotifierContact" placeholder="+256..." />
+          </label>
+          <label class="dashboard-filter-field death-report-notes-field">
+            <span>Notes</span>
+            <textarea id="deathReportNotes" rows="4" placeholder="Add any helpful context, report source, or verification note."></textarea>
+          </label>
+        </div>
+      </div>
+      <div class="dashboard-data-modal-footer">
+        <button type="button" class="btn-action btn-secondary" id="deathReportCancelBtn">Cancel</button>
+        <button type="button" class="btn-action" id="deathReportSaveBtn">Save Death Report</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dashboard-data-modal" id="summaryReportModal" aria-hidden="true">
+    <div class="dashboard-data-modal-backdrop" data-summary-report-close="1"></div>
+    <div class="dashboard-data-modal-panel summary-report-modal-panel" role="dialog" aria-modal="true" aria-labelledby="summaryReportModalTitle">
+      <div class="dashboard-data-modal-header">
+        <div>
+          <p class="dashboard-data-modal-eyebrow">Executive Reporting</p>
+          <h3 id="summaryReportModalTitle">Pension Performance Summary Report</h3>
+        </div>
+        <button type="button" class="dashboard-data-modal-close" id="summaryReportModalCloseBtn" aria-label="Close summary report">Close</button>
+      </div>
+      <div class="dashboard-data-modal-body summary-report-modal-body">
+        <div id="summaryReportContent" class="summary-report-content">
+          <div class="analytics-empty-state">Preparing pension performance summary...</div>
+        </div>
+      </div>
+      <div class="dashboard-data-modal-footer summary-report-footer">
+        <button type="button" class="btn-action btn-secondary" id="summaryReportRefreshBtn">Refresh</button>
+        <button type="button" class="btn-action btn-secondary" id="summaryReportPrintBtn">Print</button>
+        <button type="button" class="btn-action btn-secondary" id="summaryReportWordBtn">Export Word</button>
+        <button type="button" class="btn-action" id="summaryReportPdfBtn">Export PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dashboard-data-modal" id="payrollUploadModal" aria-hidden="true">
+    <div class="dashboard-data-modal-backdrop" data-payroll-upload-close="1"></div>
+    <div class="dashboard-data-modal-panel payroll-upload-modal-panel" role="dialog" aria-modal="true" aria-labelledby="payrollUploadModalTitle">
+      <div class="dashboard-data-modal-header">
+        <div>
+          <p class="dashboard-data-modal-eyebrow">Payroll Operations</p>
+          <h3 id="payrollUploadModalTitle">Upload Monthly Payroll</h3>
+        </div>
+        <button type="button" class="dashboard-data-modal-close" id="payrollUploadModalCloseBtn" aria-label="Close payroll upload">Close</button>
+      </div>
+      <div class="dashboard-data-modal-body payroll-upload-modal-body">
+        <div class="dashboard-data-modal-summary payroll-upload-summary-card">
+          <h4>Payroll Source Upload</h4>
+          <p>Upload the monthly payroll CSV or XLSX file for reconciliation. The system matches supplier numbers to the pension file registry, updates payroll status for the active cycle, and automatically downloads any unmatched or invalid rows for review.</p>
+        </div>
+        <form id="payrollUploadModalForm" class="dashboard-form-grid" novalidate>
+          <label class="dashboard-form-field">
+            <span>Payroll Month</span>
+            <select id="payrollUploadModalMonth" required></select>
+          </label>
+          <label class="dashboard-form-field">
+            <span>Payroll Year</span>
+            <select id="payrollUploadModalYear" required></select>
+          </label>
+          <label class="dashboard-form-field dashboard-form-field-full">
+            <span>Payroll Source File</span>
+            <input type="file" id="payrollUploadFile" accept=".csv,.xlsx,.xlxl" required>
+            <small>Accepted formats: CSV and XLSX.</small>
+          </label>
+          <label class="dashboard-form-field dashboard-form-field-full">
+            <span>Upload Notes</span>
+            <textarea id="payrollUploadNotes" rows="3" placeholder="Optional remarks for this payroll upload"></textarea>
+          </label>
+        </form>
+      </div>
+      <div class="dashboard-data-modal-footer payroll-upload-modal-footer">
+        <button type="button" class="btn-action btn-secondary" id="payrollDownloadTemplateBtn">Download Template</button>
+        <button type="button" class="btn-action btn-secondary" id="payrollUploadModalCancelBtn">Cancel</button>
+        <button type="button" class="btn-action btn-import" id="payrollUploadBtn">Upload Payroll</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dashboard-data-modal" id="payrollRegisterUploadModal" aria-hidden="true">
+    <div class="dashboard-data-modal-backdrop" data-payroll-register-close="1"></div>
+    <div class="dashboard-data-modal-panel payroll-upload-modal-panel" role="dialog" aria-modal="true" aria-labelledby="payrollRegisterUploadModalTitle">
+      <div class="dashboard-data-modal-header">
+        <div>
+          <p class="dashboard-data-modal-eyebrow">Payroll Operations</p>
+          <h3 id="payrollRegisterUploadModalTitle">Upload Payment Register</h3>
+        </div>
+        <button type="button" class="dashboard-data-modal-close" id="payrollRegisterUploadModalCloseBtn" aria-label="Close payment register upload">Close</button>
+      </div>
+      <div class="dashboard-data-modal-body payroll-upload-modal-body">
+        <div class="dashboard-data-modal-summary payroll-upload-summary-card">
+          <h4>Payment Register Attachment</h4>
+          <p>Select the payroll month and year that already has a payroll upload, then attach the signed payment register PDF. The latest active payroll cycle for that period will be updated.</p>
+        </div>
+        <form id="payrollRegisterUploadForm" class="dashboard-form-grid" novalidate>
+          <label class="dashboard-form-field">
+            <span>Payroll Month</span>
+            <select id="payrollRegisterModalMonth" required></select>
+          </label>
+          <label class="dashboard-form-field">
+            <span>Payroll Year</span>
+            <select id="payrollRegisterModalYear" required></select>
+          </label>
+          <label class="dashboard-form-field dashboard-form-field-full">
+            <span>Payment Register PDF</span>
+            <input type="file" id="payrollRegisterFile" accept=".pdf" required>
+            <small>Accepted format: PDF only.</small>
+          </label>
+          <label class="dashboard-form-field dashboard-form-field-full">
+            <span>Register Notes</span>
+            <textarea id="payrollRegisterUploadNotes" rows="3" placeholder="Optional remarks for this payment register"></textarea>
+          </label>
+        </form>
+      </div>
+      <div class="dashboard-data-modal-footer payroll-upload-modal-footer">
+        <button type="button" class="btn-action btn-secondary" id="payrollRegisterUploadCancelBtn">Cancel</button>
+        <button type="button" class="btn-action btn-import" id="payrollRegisterUploadBtn">Upload Register</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer will be dynamically inserted here by main.js -->
+</body>
+</html>

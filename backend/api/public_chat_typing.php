@@ -37,6 +37,7 @@ if ($asAgent) {
     $actorId = publicChatSessionToken($sessionId, (string)$session['chat_reference']);
     $actorName = publicChatClean((string)($session['visitor_name'] ?? 'Visitor'), 160);
 }
+publicChatReleaseSessionLock();
 
 if (!$typing) {
     $stmt = $conn->prepare("DELETE FROM public_chat_typing WHERE session_id = ? AND actor_type = ? AND actor_id = ?");

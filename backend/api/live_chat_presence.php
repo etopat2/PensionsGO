@@ -5,6 +5,7 @@ try {
     $userId = liveChatRequireStaff($conn);
     liveChatEnsureTables($conn);
     liveChatTouchPresence($conn, $userId);
+    liveChatReleaseSessionLock();
 
     $result = $conn->query("
         SELECT user_id, status, last_seen,
@@ -24,9 +25,14 @@ try {
         ];
     }
 
+    $unreadSnapshot = liveChatUnreadSnapshot($conn, $userId);
+
     liveChatRespond([
         'success' => true,
         'presence' => $presence,
+        'unreadTotal' => (int)$unreadSnapshot['total'],
+        'unreadUsers' => $unreadSnapshot['users'],
+        'unreadGroups' => $unreadSnapshot['groups'],
         'serverTime' => date('Y-m-d H:i:s')
     ]);
 } catch (Throwable $e) {

@@ -27,8 +27,14 @@ if (!isset($_SESSION['session_id'], $_SESSION['userId'])) {
 }
 
 try {
+    $sessionId = (string)$_SESSION['session_id'];
+    $userId = (string)$_SESSION['userId'];
+    $userName = (string)($_SESSION['userName'] ?? '');
+    $userRole = (string)($_SESSION['userRole'] ?? '');
+    $userPhoto = (string)($_SESSION['userPhoto'] ?? '');
+
     $requestDeviceId = null;
-    if (!validateSessionDeviceBinding($conn, $_SESSION['session_id'], $_SESSION['userId'], $requestDeviceId)) {
+    if (!validateSessionDeviceBinding($conn, $sessionId, $userId, $requestDeviceId)) {
         echo json_encode([
             'active' => false,
             'expired' => false,
@@ -42,18 +48,24 @@ try {
         exit;
     }
 
+    $_SESSION['last_activity'] = time();
+    session_write_close();
+
     $sm = SessionManager::getInstance($conn);
     $sm->cleanupExpiredSessionsThrottled(60);
-    $state = $sm->validateSession($_SESSION['session_id'], $_SESSION['userId']);
-
-    // Update session activity only if still active
-    if (!empty($state['active'])) {
-        $_SESSION['last_activity'] = time();
-    }
+    $state = $sm->validateSession($sessionId, $userId);
     
     $effectiveRole = function_exists('resolveRoleAccessKey')
-        ? resolveRoleAccessKey($conn, (string)($_SESSION['userRole'] ?? ''))
-        : (string)($_SESSION['userRole'] ?? '');
+        ? resolveRoleAccessKey($conn, $userRole)
+        : $userRole;
+
+    if (empty($state['active'])) {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+        session_unset();
+        session_destroy();
+    }
 
     echo json_encode([
         'active'              => $state['active'],
@@ -62,17 +74,12 @@ try {
         'time_until_timeout'  => $state['seconds_left'],
         'reason'              => $state['reason'] ?? null,
         'message'             => $state['message'] ?? null,
-        'userId'              => $_SESSION['userId'] ?? '',
-        'userName'            => $_SESSION['userName'] ?? '',
-        'userRole'            => $_SESSION['userRole'] ?? '',
+        'userId'              => $userId,
+        'userName'            => $userName,
+        'userRole'            => $userRole,
         'userRoleEffective'   => $effectiveRole,
-        'userPhoto'           => $_SESSION['userPhoto'] ?? ''
+        'userPhoto'           => $userPhoto
     ]);
-    
-    if (empty($state['active'])) {
-        session_unset();
-        session_destroy();
-    }
 } catch (Throwable $e) {
     echo json_encode([
         'active' => false,
