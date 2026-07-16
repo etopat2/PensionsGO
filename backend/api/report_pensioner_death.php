@@ -234,6 +234,8 @@ if (!$updateStmt->execute()) {
 }
 $updateStmt->close();
 
+ensurePensionBeneficiaryTables($conn);$earning=calculateBeneficiaryEarningPeriod($retirementDate,$dateOfDeath,false);$beneficiaryUpdate=$conn->prepare('UPDATE tb_pension_beneficiaries SET earning_start_date=?,earning_end_date=?,earning_basis_date=?,earning_expiry_date=?,last_earning_month=?,earning_period_label=?,updated_at=NOW() WHERE is_active=1 AND deceased_registry_id=?');$earningExpiry=(string)($earning['expiry_date']??'');$earningBasis=(string)($earning['basis_date']??'');$lastEarningMonth=(string)($earning['last_earning_month']??'');$earningLabel=(string)($earning['remaining_label']??'');$beneficiaryUpdate->bind_param('ssssssi',$dateOfDeath,$earningExpiry,$earningBasis,$earningExpiry,$lastEarningMonth,$earningLabel,$registryId);$beneficiaryUpdate->execute();$beneficiaryUpdate->close();
+
 $conn->commit();
 
 try {

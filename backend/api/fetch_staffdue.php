@@ -73,6 +73,7 @@ $sql = "
         sd.id,
         sd.regNo,
         sd.employeeNo,
+        sd.pensionNo,
         sd.ippsNo,
         sd.rankPosition,
         sd.rankName,
@@ -135,7 +136,7 @@ $sql = "
         FROM tb_fileregistry
         WHERE COALESCE(is_deleted, 0) = 0
     ) fr_done
-      ON fr_done.regNo = sd.regNo
+      ON fr_done.regNo = COALESCE(NULLIF(sd.pensionNo, ''), sd.regNo)
     LEFT JOIN (
         SELECT
             related_staff_id,
@@ -234,6 +235,12 @@ $result = $stmt->get_result();
 $records = [];
 while ($row = $result->fetch_assoc()) {
     $row['appnStatus'] = (string)($row['appn_status_effective'] ?? $row['appn_status_normalized'] ?? $row['appnStatus'] ?? 'pending');
+    $row['employeeNo'] = normalizeEmployeeNumber(trim((string)($row['employeeNo'] ?? '')) ?: (string)($row['regNo'] ?? ''));
+    $row['pensionNo'] = trim((string)($row['pensionNo'] ?? '')) ?: (string)($row['regNo'] ?? '');
+    $row['ippsNo'] = trim((string)($row['ippsNo'] ?? '')) ?: (string)($row['computerNo'] ?? '');
+    $row['lastName'] = trim((string)($row['lastName'] ?? '')) ?: (string)($row['sName'] ?? '');
+    if (trim((string)($row['firstName'] ?? '')) === '') { $parts=preg_split('/\s+/',trim((string)($row['fName']??'')),2);$row['firstName']=$parts[0]??'';$row['middleName']=trim((string)($row['middleName']??''))?:($parts[1]??''); }
+    $row['fileNumber'] = $row['employeeNo']; // human-facing legacy File Number alias
     $records[] = $row;
 }
 $totalResult = $conn->query("SELECT FOUND_ROWS() AS total");

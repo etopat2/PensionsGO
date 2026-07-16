@@ -24,14 +24,14 @@
   <link rel="stylesheet" href="../frontend/css/overlay.css?v=20260504a" />
   
   <link rel="stylesheet" href="../frontend/css/forms.css?v=20260602a" />
-  <link rel="stylesheet" href="../frontend/css/add_staff.css?v=20260504b" />
+  <link rel="stylesheet" href="../frontend/css/add_staff.css?v=20260716c" />
   <link rel="stylesheet" href="../frontend/css/staff_workspaces.css?v=20260504b" />
 
   <script defer src="../frontend/js/modules/filterable_select.js?v=20260429a"></script>
   <script src="js/auth_bootstrap.js?v=20260606b"></script>
   <script type="module" src="../frontend/js/main.js?v=20260713a"></script>
   <script defer src="../frontend/js/modules/retirement-types.js"></script>
-  <script defer src="../frontend/js/add_staff.js"></script>
+  <script defer src="../frontend/js/add_staff.js?v=20260716c"></script>
 </head>
 
 <body>
@@ -62,6 +62,9 @@
         <button type="button" class="workspace-tab registry-edit-tab" data-tab-target="service" data-valid-state="neutral">
           <span>Service &amp; Benefits</span><span class="workspace-tab-status" aria-hidden="true"></span>
         </button>
+        <button type="button" class="workspace-tab registry-edit-tab" data-tab-target="beneficiary" data-valid-state="neutral">
+          <span>Next of Kin / Beneficiary</span><span class="workspace-tab-status" aria-hidden="true"></span>
+        </button>
         <button type="button" class="workspace-tab registry-edit-tab" data-tab-target="workflow" data-valid-state="neutral">
           <span>Workflow Snapshot</span><span class="workspace-tab-status" aria-hidden="true"></span>
         </button>
@@ -75,30 +78,33 @@
               <p class="workspace-section-copy">Capture the official file reference, name details, station information, and core contact identifiers exactly as they appear on the service record.</p>
               <div class="form-grid add-staff-grid edit-grid">
                 <label class="form-group edit-field">
-                  <span>Reg No</span>
-                  <input type="text" id="regNo" name="regNo" data-text-case="upper" required />
+                  <span>Employee Number</span>
+                  <input type="text" id="regNo" name="employeeNo" data-text-case="upper" required />
                 </label>
 
                 <label class="form-group edit-field">
-                  <span>Computer No</span>
-                  <input type="text" id="computerNo" name="computerNo" />
+                  <span>IPPS Number</span>
+                  <input type="text" id="computerNo" name="ippsNo" />
                 </label>
 
                 <label class="form-group edit-field">
-                  <span>Title</span>
-                  <select id="title" name="title" required data-filterable-select>
-                    <option value="">Select Title</option>
+                  <span>Position</span>
+                  <select id="title" name="positionName" required data-filterable-select>
+                    <option value="">Select Position</option>
                   </select>
                 </label>
 
                 <label class="form-group edit-field">
-                  <span>Surname</span>
-                  <input type="text" id="sName" name="sName" required />
-                </label>
-
-                <label class="form-group edit-field">
                   <span>First Name</span>
-                  <input type="text" id="fName" name="fName" required />
+                  <input type="text" id="fName" name="firstName" required />
+                </label>
+                <label class="form-group edit-field">
+                  <span>Middle Name</span>
+                  <input type="text" id="middleName" name="middleName" />
+                </label>
+                <label class="form-group edit-field">
+                  <span>Last Name</span>
+                  <input type="text" id="sName" name="lastName" required />
                 </label>
 
                 <label class="form-group edit-field">
@@ -149,6 +155,50 @@
                   <span>Birth Date</span>
                   <input type="date" id="birthDate" name="birthDate" />
                 </label>
+                <label class="form-group edit-field"><span>Employment Status</span><select id="employmentStatus" name="employmentStatus" data-filterable-select><option value="">Select Employment Status</option></select></label>
+                <label class="form-group edit-field"><span>Tribe</span><select id="tribe" name="tribe" data-filterable-select><option value="">Select Tribe</option></select></label>
+                <label class="form-group edit-field"><span>Home District</span><select id="homeDistrict" name="homeDistrict" data-filterable-select><option value="">Select Political District</option></select></label>
+                <label class="form-group edit-field"><span>Home Region</span><select id="homeRegion" name="homeRegion" data-filterable-select><option value="">Select Political Region</option></select></label>
+                <label class="form-group edit-field"><span>Religion</span><select id="religion" name="religion" data-filterable-select><option value="">Select Religion</option></select></label>
+                <label class="form-group edit-field"><span>Country</span><input name="country" value="Uganda" /></label>
+                <label class="form-group edit-field"><span>Sub County</span><input name="subCounty" /></label>
+                <label class="form-group edit-field"><span>Parish</span><input name="parish" /></label>
+                <label class="form-group edit-field"><span>Village</span><input name="village" /></label>
+                <label class="form-group edit-field"><span>Alternative Phone Number</span><input name="alternateTelNo" /></label>
+                <label class="form-group edit-field"><span>Email Address</span><input type="email" name="applicant_email" /></label>
+                <label class="form-group edit-field"><span>Marital Status</span><input name="maritalStatus" /></label>
+                <label class="form-group edit-field"><span>TIN</span><input name="TIN" data-text-case="upper" /></label>
+                <label class="form-group edit-field"><span>Address</span><input name="address" /></label>
+              </div>
+            </div>
+          </section>
+
+          <section class="workspace-panel registry-edit-panel-group" data-panel="beneficiary" role="tabpanel">
+            <div class="workspace-panel-scroll">
+              <h3 class="workspace-section-title">Next of Kin / Beneficiary</h3>
+              <p class="workspace-section-copy" id="beneficiaryGuidance">Optional during staff-due population. Complete these details when a deceased officer or pensioner has a remaining earning period.</p>
+              <div class="form-grid add-staff-grid edit-grid">
+                <label class="form-group edit-field"><span>Beneficiary Type</span><select name="beneficiary_type"><option value="administrator">Administrator</option><option value="next_of_kin">Next of Kin</option><option value="dependent">Dependent</option><option value="estate">Estate Representative</option></select></label>
+                <label class="form-group edit-field"><span>Relationship to Deceased</span><input name="relationship_to_deceased" /></label>
+                <label class="form-group edit-field"><span>First Name</span><input id="beneficiaryFirstName" name="beneficiary_first_name" /></label>
+                <label class="form-group edit-field"><span>Middle Name</span><input name="beneficiary_middle_name" /></label>
+                <label class="form-group edit-field"><span>Last Name</span><input id="beneficiaryLastName" name="beneficiary_last_name" /></label>
+                <label class="form-group edit-field"><span>Gender</span><select id="beneficiaryGender" name="beneficiary_gender"><option value="">Select</option><option>Male</option><option>Female</option></select></label>
+                <label class="form-group edit-field"><span>Beneficiary / NOK NIN</span><input id="beneficiaryNin" name="beneficiary_nin" data-text-case="upper" /></label>
+                <label class="form-group edit-field"><span>Phone Number</span><input id="beneficiaryTelephone" name="beneficiary_telephone" /></label>
+                <label class="form-group edit-field"><span>Email</span><input type="email" name="beneficiary_email" /></label>
+                <label class="form-group edit-field beneficiary-deceased-only" hidden><span>Beneficiary IPPS Number</span><input name="beneficiary_ipps_no" disabled /></label>
+                <label class="form-group edit-field beneficiary-deceased-only" hidden><span>Supplier Number</span><input name="beneficiary_supplier_no" disabled /></label>
+                <label class="form-group edit-field beneficiary-deceased-only" hidden><span>Administration Reference</span><input name="administration_reference" disabled /></label>
+                <label class="form-group edit-field beneficiary-deceased-only" hidden><span>Earning Basis Date</span><input type="date" id="beneficiaryEarningBasis" readonly disabled /></label>
+                <label class="form-group edit-field beneficiary-deceased-only" hidden><span>15-Year Expiry Date</span><input type="date" id="beneficiaryEarningExpiry" name="earning_end_date" readonly disabled /></label>
+                <label class="form-group edit-field beneficiary-deceased-only" hidden><span>Final Payable Month</span><input type="text" id="beneficiaryLastEarningMonth" readonly disabled /></label>
+                <label class="form-group edit-field beneficiary-deceased-only" hidden><span>Time Left to Earn</span><input type="text" id="beneficiaryEarningRemaining" name="earning_period_label" readonly disabled /></label>
+                <input type="hidden" id="beneficiaryEarningStart" name="earning_start_date" disabled />
+                <label class="form-group edit-field beneficiary-deceased-only" hidden><span>Beneficiary Bank</span><input name="beneficiary_bank_name" disabled /></label>
+                <label class="form-group edit-field beneficiary-deceased-only" hidden><span>Beneficiary Bank Account</span><input name="beneficiary_bank_account" disabled /></label>
+                <label class="form-group edit-field beneficiary-deceased-only" hidden><span>Beneficiary Bank Branch</span><input name="beneficiary_bank_branch" disabled /></label>
+                <label class="form-group edit-field edit-field-span-2"><span>Notes</span><textarea name="beneficiary_notes" rows="3"></textarea></label>
               </div>
             </div>
           </section>
@@ -166,6 +216,10 @@
                 <label class="form-group edit-field">
                   <span>Retirement Date</span>
                   <input type="date" id="retirementDate" name="retirementDate" />
+                </label>
+                <label class="form-group edit-field" id="dateOfDeathField" hidden>
+                  <span>Date of Death</span>
+                  <input type="date" id="dateOfDeath" name="dateOfDeath" disabled />
                 </label>
 
                 <label class="form-group edit-field">
@@ -200,6 +254,9 @@
                   <span>Monthly Salary (UGX)</span>
                   <input type="number" id="monthlySalary" name="monthlySalary" step="0.01" data-money-input data-money-fixed-decimals="2" />
                 </label>
+                <label class="form-group edit-field"><span>Salary Scale</span><select id="salaryScale" name="salaryScale" required data-filterable-select><option value="">Loading salary scales...</option></select></label>
+                <label class="form-group edit-field"><span>Living Status</span><select id="livingStatus" name="livingStatus"><option value="Alive">Alive</option><option value="Deceased">Deceased</option></select></label>
+                <label class="form-group edit-field"><span>Pay Type</span><select name="payType"><option value="">Auto determine</option><option value="Pensioner">Pensioner</option><option value="One-off Payment">One-off Payment</option></select></label>
 
                 <label class="form-group edit-field">
                   <span>Length of Service (Months)</span>
@@ -278,7 +335,7 @@
           <div class="registry-bulk-upload-summary">
             <span class="registry-meta-chip">Dataset: <strong>Staff Due for Retirement</strong></span>
             <span class="registry-meta-chip">Accepted Files: <strong>CSV, XLSX</strong></span>
-            <span class="registry-meta-chip">Primary Key: <strong>File Number</strong></span>
+            <span class="registry-meta-chip">Primary Key: <strong>Employee Number</strong></span>
           </div>
           <div class="registry-bulk-upload-note">
             <div class="registry-bulk-upload-note-icon" aria-hidden="true">i</div>
@@ -294,7 +351,7 @@
                   <h4>Template &amp; Source File</h4>
                   <p>Download the official template, populate it, and upload it here.</p>
                 </div>
-                <button type="button" class="workspace-btn secondary" id="staffDueBulkDownloadTemplateBtn">Download CSV Template</button>
+                <button type="button" class="workspace-btn secondary" id="staffDueBulkDownloadTemplateBtn">Download XLSX Template</button>
               </div>
               <div class="form-group">
                 <label>Import File</label>
@@ -328,6 +385,3 @@
   </div>
 </body>
 </html>
-
-
-

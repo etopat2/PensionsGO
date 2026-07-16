@@ -58,6 +58,8 @@ if ($search !== '') {
     // Search spans identity, registry identifiers, and assignment station fields.
     $where .= " AND (
         fr.regNo LIKE ?
+        OR fr.pensionNo LIKE ?
+        OR fr.ippsNo LIKE ?
         OR fr.computerNo LIKE ?
         OR fr.supplierNo LIKE ?
         OR fr.boxNo LIKE ?
@@ -69,8 +71,8 @@ if ($search !== '') {
         OR COALESCE(fr.telNo, sd.telNo) LIKE ?
     ) ";
     $like = '%' . $search . '%';
-    $params = array_merge($params, [$like, $like, $like, $like, $like, $like, $like, $like, $like, $like]);
-    $types .= 'ssssssssss';
+    $params = array_merge($params, array_fill(0, 12, $like));
+    $types .= 'ssssssssssss';
 }
 
 if ($boxNumber !== '') {
@@ -91,7 +93,7 @@ if ($payType !== '' && in_array($payType, ['Pensioner', 'One-off Payment'], true
     $types .= 's';
 }
 
-$countJoinSql = $search !== '' ? " LEFT JOIN tb_staffdue sd ON sd.regNo = fr.regNo " : "";
+$countJoinSql = $search !== '' ? " LEFT JOIN tb_staffdue sd ON COALESCE(NULLIF(sd.pensionNo,''),sd.regNo)=COALESCE(NULLIF(fr.pensionNo,''),fr.regNo) " : "";
 
 $countSql = "
     SELECT COUNT(*) AS total
@@ -127,6 +129,11 @@ $dataSql = "
     SELECT
         fr.id,
         fr.regNo,
+        COALESCE(NULLIF(fr.pensionNo,''),fr.regNo) AS pensionNo,
+        COALESCE(NULLIF(fr.ippsNo,''),fr.computerNo,sd.ippsNo,sd.computerNo) AS ippsNo,
+        COALESCE(NULLIF(fr.firstName,''),sd.firstName) AS firstName,
+        COALESCE(NULLIF(fr.middleName,''),sd.middleName) AS middleName,
+        COALESCE(NULLIF(fr.lastName,''),sd.lastName) AS lastName,
         fr.boxNo,
         fr.computerNo,
         fr.supplierNo,
@@ -155,7 +162,7 @@ $dataSql = "
         sd.prisonUnit AS station,
         COALESCE(fr.telNo, sd.telNo) AS phone
     FROM tb_fileregistry fr
-    LEFT JOIN tb_staffdue sd ON sd.regNo = fr.regNo
+    LEFT JOIN tb_staffdue sd ON COALESCE(NULLIF(sd.pensionNo,''),sd.regNo)=COALESCE(NULLIF(fr.pensionNo,''),fr.regNo)
     {$where}
     ORDER BY {$orderBy}
     LIMIT ? OFFSET ?
@@ -184,13 +191,18 @@ while ($row = $result->fetch_assoc()) {
     $records[] = [
         'id' => (int)$row['id'],
         'regNo' => $row['regNo'],
+        'pensionNo' => $row['pensionNo'] ?? $row['regNo'],
+        'ippsNo' => $row['ippsNo'] ?? $row['computerNo'],
+        'firstName' => $row['firstName'] ?? '',
+        'middleName' => $row['middleName'] ?? '',
+        'lastName' => $row['lastName'] ?? '',
         'boxNo' => $row['boxNo'],
         'computerNo' => $row['computerNo'],
         'supplierNo' => $row['supplierNo'],
         'title' => $row['title'],
         'sName' => $row['sName'],
         'fName' => $row['fName'],
-        'name' => formatTitleName((string)($row['title'] ?? ''), (string)($row['sName'] ?? ''), (string)($row['fName'] ?? '')),
+        'name' => trim((string)($row['title'] ?? '') . ' ' . implode(' ', array_filter([$row['firstName'] ?? '',$row['middleName'] ?? '',$row['lastName'] ?? '']))),
         'livingStatus' => $row['livingStatus'] ?? '',
         'payType' => $row['payType'] ?? '',
         'lifeCertificate' => $row['lifeCertificateStatus'] ?? ($row['lifeCertificate'] ?? 'Not Submitted'),

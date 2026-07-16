@@ -36,7 +36,7 @@ if (function_exists('ensureStaffDueExtendedColumns')) {
 $conn->begin_transaction();
 try {
     $recordStmt = $conn->prepare("
-        SELECT regNo, retirementType, next_of_kin, next_of_kin_contact
+        SELECT regNo, retirementType, livingStatus, next_of_kin, next_of_kin_contact
         FROM tb_staffdue
         WHERE id = ? AND COALESCE(is_deleted, 0) = 0
         LIMIT 1
@@ -56,8 +56,10 @@ try {
     $retirementType = normalizeBenefitsRetirementTypeKey((string)($record['retirementType'] ?? ''));
     $nextOfKin = trim((string)($record['next_of_kin'] ?? ''));
     $nextOfKinContact = trim((string)($record['next_of_kin_contact'] ?? ''));
-    if ($retirementType === 'death' && ($nextOfKin === '' || $nextOfKinContact === '')) {
-        throw new RuntimeException('Death retirements require next of kin name and contact before submission. Edit the record and complete Contact & Bank first.');
+    $isDeceased=$retirementType==='death'||strtolower(trim((string)($record['livingStatus']??'')))==='deceased';
+    if($isDeceased){ensurePensionBeneficiaryTables($conn);$beneficiaryStmt=$conn->prepare('SELECT beneficiary_id FROM tb_pension_beneficiaries WHERE deceased_staffdue_id=? AND is_active=1 AND TRIM(first_name)<>\'\' AND TRIM(last_name)<>\'\' AND TRIM(beneficiary_nin)<>\'\' LIMIT 1');$beneficiaryStmt->bind_param('i',$id);$beneficiaryStmt->execute();$hasBeneficiary=(bool)$beneficiaryStmt->get_result()->fetch_assoc();$beneficiaryStmt->close();}else{$hasBeneficiary=true;}
+    if ($isDeceased && !$hasBeneficiary && ($nextOfKin === '' || $nextOfKinContact === '')) {
+        throw new RuntimeException('A deceased officer requires complete linked beneficiary or next-of-kin details before processing can start.');
     }
     if ($nextOfKinContact !== '' && normalizePhoneNumber($nextOfKinContact) === null) {
         throw new RuntimeException('Next of kin contact must be a valid phone number before submission.');

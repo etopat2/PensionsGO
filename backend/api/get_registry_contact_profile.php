@@ -25,6 +25,7 @@ if (function_exists('ensureFileMovementTables')) {
 if (function_exists('ensureStaffDueExtendedColumns')) {
     ensureStaffDueExtendedColumns($conn);
 }
+ensurePensionBeneficiaryTables($conn);
 
 $regNo = trim((string)($_GET['regNo'] ?? ''));
 if ($regNo === '') {
@@ -48,6 +49,9 @@ if (!$record) {
     echo json_encode(['success' => false, 'message' => 'Registry record not found']);
     exit;
 }
+
+$beneficiaryStmt=$conn->prepare('SELECT beneficiary_nin FROM tb_pension_beneficiaries WHERE is_active=1 AND (deceased_registry_id=? OR deceased_staffdue_id=(SELECT id FROM tb_staffdue WHERE regNo=? LIMIT 1)) ORDER BY is_primary DESC,beneficiary_id LIMIT 1');
+$registryId=(int)$record['id'];$beneficiaryStmt->bind_param('is',$registryId,$regNo);$beneficiaryStmt->execute();$beneficiary=$beneficiaryStmt->get_result()->fetch_assoc();$beneficiaryStmt->close();$record['beneficiary_nin']=(string)($beneficiary['beneficiary_nin']??'');
 
 echo json_encode([
     'success' => true,

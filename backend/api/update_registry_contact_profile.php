@@ -79,6 +79,8 @@ try {
             fr.bank_branch,
             fr.retirementType AS registry_retirement_type,
             fr.livingStatus AS registry_living_status,
+            fr.retirementDate AS registry_retirement_date,
+            fr.dateOfDeath AS registry_date_of_death,
             sd.id AS staff_id,
             sd.telNo AS staff_telNo,
             sd.applicant_email AS staff_email,
@@ -136,6 +138,7 @@ try {
     $bankNameKeyPresent = array_key_exists('bank_name', $payload);
     $bankAccountKeyPresent = array_key_exists('bank_account', $payload);
     $bankBranchKeyPresent = array_key_exists('bank_branch', $payload);
+    $beneficiaryNin=trim((string)($payload['beneficiary_nin']??''));
 
     $telNo = $phoneKeyPresent
         ? trim((string)($payload['telNo'] ?? $payload['phone'] ?? ''))
@@ -179,6 +182,8 @@ try {
     if ($currentLivingStatus === '' && normalizeRestrictedContactValue($currentRetirementType) === 'death') {
         $currentLivingStatus = 'Deceased';
     }
+    $isDeceasedProfile=normalizeRestrictedContactValue($currentRetirementType)==='death'||normalizeRestrictedContactValue($currentLivingStatus)==='deceased';
+    if($beneficiaryNin!==''){$ninValidation=validateNationalIdNumber($beneficiaryNin,null,null);if(!$ninValidation['valid'])throw new RuntimeException($ninValidation['message']??'Beneficiary NIN is invalid.');$beneficiaryNin=$ninValidation['normalized'];}
     $pensionerRestrictedContactFields = $isPensioner
         && (
             normalizeRestrictedContactValue($currentRetirementType) === 'death'
@@ -355,6 +360,13 @@ try {
             throw new RuntimeException($error ?: 'Unable to update the linked user account.');
         }
         $userStmt->close();
+    }
+
+    if($isDeceasedProfile&&$nextOfKin!==''){
+        if($beneficiaryNin==='')throw new RuntimeException('Beneficiary/NOK NIN is required for a deceased pensioner.');
+        ensurePensionBeneficiaryTables($conn);$nameParts=preg_split('/\s+/',trim($nextOfKin));$firstName=(string)array_shift($nameParts);$lastName=trim(implode(' ',$nameParts));if($lastName==='')$lastName=$firstName;$registryId=(int)$existing['id'];
+        $lookup=$conn->prepare('SELECT beneficiary_id FROM tb_pension_beneficiaries WHERE is_active=1 AND (deceased_registry_id=? OR deceased_staffdue_id=?) ORDER BY is_primary DESC,beneficiary_id LIMIT 1');$lookup->bind_param('ii',$registryId,$staffId);$lookup->execute();$beneficiaryId=(int)($lookup->get_result()->fetch_assoc()['beneficiary_id']??0);$lookup->close();
+        if($beneficiaryId>0){$beneficiaryStmt=$conn->prepare('UPDATE tb_pension_beneficiaries SET deceased_registry_id=?,deceased_staffdue_id=?,deceased_ipps_no=COALESCE(NULLIF(deceased_ipps_no,\'\'),(SELECT COALESCE(NULLIF(ippsNo,\'\'),computerNo,\'\') FROM tb_fileregistry WHERE id=?)),first_name=?,last_name=?,beneficiary_nin=?,telephone=?,bank_name=?,bank_account=?,bank_branch=?,updated_at=NOW() WHERE beneficiary_id=?');$beneficiaryStmt->bind_param('iiisssssssi',$registryId,$staffId,$registryId,$firstName,$lastName,$beneficiaryNin,$nextOfKinContact,$bankName,$bankAccount,$bankBranch,$beneficiaryId);}else{$beneficiaryStmt=$conn->prepare('INSERT INTO tb_pension_beneficiaries(deceased_staffdue_id,deceased_registry_id,deceased_ipps_no,beneficiary_type,first_name,last_name,beneficiary_nin,telephone,bank_name,bank_account,bank_branch,is_primary,created_by) SELECT ?,?,COALESCE(NULLIF(ippsNo,\'\'),computerNo,\'\'),\'next_of_kin\',?,?,?,?,?,?,?,1,? FROM tb_fileregistry WHERE id=?');$actor=(string)$_SESSION['userId'];$beneficiaryStmt->bind_param('iissssssssi',$staffId,$registryId,$firstName,$lastName,$beneficiaryNin,$nextOfKinContact,$bankName,$bankAccount,$bankBranch,$actor,$registryId);}$beneficiaryStmt->execute();if($beneficiaryId<1)$beneficiaryId=(int)$conn->insert_id;$beneficiaryStmt->close();$earning=calculateBeneficiaryEarningPeriod((string)($existing['registry_retirement_date']??''),(string)($existing['registry_date_of_death']??''),normalizeBenefitsRetirementTypeKey($currentRetirementType)==='death');$earningUpdate=$conn->prepare('UPDATE tb_pension_beneficiaries SET earning_start_date=?,earning_end_date=?,earning_basis_date=?,earning_expiry_date=?,last_earning_month=?,earning_period_label=? WHERE beneficiary_id=?');$start=(string)($existing['registry_date_of_death']??'');$expiry=(string)($earning['expiry_date']??'');$basis=(string)($earning['basis_date']??'');$last=(string)($earning['last_earning_month']??'');$label=(string)($earning['remaining_label']??'');$earningUpdate->bind_param('ssssssi',$start,$expiry,$basis,$expiry,$last,$label,$beneficiaryId);$earningUpdate->execute();$earningUpdate->close();
     }
 
     $conn->commit();

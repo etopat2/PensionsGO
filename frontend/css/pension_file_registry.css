@@ -75,6 +75,19 @@
   filter: brightness(1.03);
   box-shadow: 0 14px 28px color-mix(in srgb, var(--primary-maroon) 22%, transparent 78%);
 }
+.registry-action-btn.movement-move { border-color: color-mix(in srgb,var(--primary-blue) 50%,var(--border-color)); background: var(--primary-blue); color: #fff; }
+.registry-action-btn.movement-return { border-color: color-mix(in srgb,var(--primary-gold-dark) 52%,var(--border-color)); background: color-mix(in srgb,var(--primary-gold) 14%,var(--card-bg)); color: var(--primary-gold-darker); }
+.registry-movement-panel { width: min(860px,94vw); }
+.registry-movement-panel .registry-modal-header p { margin: .2rem 0 0; color: var(--muted-color); font-size: .78rem; }
+.registry-movement-form { display: grid; gap: .75rem; }
+.registry-movement-identity { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .55rem; }
+.registry-movement-identity > div { padding: .62rem; border: 1px solid var(--border-color); border-radius: 9px; background: var(--surface-soft); }
+.registry-movement-identity span { display: block; margin-bottom: .16rem; color: var(--muted-color); font-size: .65rem; font-weight: 700; text-transform: uppercase; }
+.registry-movement-identity strong { color: var(--heading-color); font-size: .8rem; overflow-wrap: anywhere; }
+.registry-movement-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .65rem; }
+.registry-movement-hint { padding: .5rem .65rem; border-left: 3px solid var(--border-color); color: var(--muted-color); font-size: .75rem; }
+.registry-movement-hint.is-valid { border-left-color: #2d8a57; color: #17603a; }
+@media(max-width:650px){.registry-movement-identity,.registry-movement-fields{grid-template-columns:1fr;}}
 
 .registry-header-actions #registryDeleteQueueBtn {
   display: inline-flex;

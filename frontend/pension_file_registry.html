@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="css/profile.css?v=20260504a">
   <link rel="stylesheet" href="css/menu.css?v=20260504d">
   <link rel="stylesheet" href="css/overlay.css?v=20260504a">
-  <link rel="stylesheet" href="css/pension_file_registry.css?v=20260608a">
+  <link rel="stylesheet" href="css/pension_file_registry.css?v=20260716c">
   <script src="js/auth_bootstrap.js?v=20260606b"></script>
   <script type="module" src="js/main.js?v=20260713a"></script>
   <script defer src="js/modules/filterable_select.js?v=20260429a"></script>
@@ -26,7 +26,7 @@
         if (document.getElementById('registryControllerScript')) return;
         var script = document.createElement('script');
         script.id = 'registryControllerScript';
-        script.src = 'js/pension_file_registry.js?v=20260715a';
+        script.src = 'js/pension_file_registry.js?v=20260716d';
         script.defer = true;
         document.head.appendChild(script);
       };
@@ -89,7 +89,7 @@
         <select id="registrySortSelect">
           <option value="recent">Most Recent</option>
           <option value="name_asc">Name (A-Z)</option>
-          <option value="reg_asc">File Number (A-Z)</option>
+          <option value="reg_asc">Pension Number (A-Z)</option>
         </select>
       </label>
       <label class="toolbar-field registry-filter-page-size">
@@ -162,11 +162,11 @@
           <section class="registry-edit-panel-group is-active" data-edit-panel="identity" role="tabpanel">
             <div class="edit-grid">
               <label class="edit-field">
-                <span>File Number</span>
+                <span>Pension Number</span>
                 <input type="text" id="editRegNo" data-text-case="upper" placeholder="PEN/" autocomplete="off" pattern="^PEN\/(?:[1-9][0-9]{0,4}|[A-Z]\/[1-9][0-9]{0,3})$" readonly>
               </label>
               <label class="edit-field">
-                <span>Computer Number</span>
+                <span>IPPS Number</span>
                 <input type="text" id="editComputerNo">
               </label>
               <label class="edit-field">
@@ -179,12 +179,16 @@
               </label>
               <datalist id="editTitleOptions"></datalist>
               <label class="edit-field">
-                <span>Surname</span>
-                <input type="text" id="editSName" required>
-              </label>
-              <label class="edit-field">
                 <span>First Name</span>
                 <input type="text" id="editFName" required>
+              </label>
+              <label class="edit-field">
+                <span>Middle Name</span>
+                <input type="text" id="editMiddleName">
+              </label>
+              <label class="edit-field">
+                <span>Last Name</span>
+                <input type="text" id="editSName" required>
               </label>
               <label class="edit-field">
                 <span>Gender</span>
@@ -436,7 +440,7 @@
           <div class="registry-bulk-upload-summary">
             <span class="registry-meta-chip">Dataset: <strong>Pension File Registry</strong></span>
             <span class="registry-meta-chip">Accepted Files: <strong>CSV, XLSX</strong></span>
-            <span class="registry-meta-chip">Match Key: <strong>File Number</strong></span>
+            <span class="registry-meta-chip">Match Key: <strong>Pension Number</strong></span>
           </div>
 
           <div class="registry-bulk-upload-note">
@@ -471,7 +475,7 @@
                 </div>
               </div>
               <ul class="registry-bulk-upload-list">
-                <li>File Number is the primary matching key.</li>
+                <li>Pension Number is the primary registry matching key.</li>
                 <li>Titles must exist in the approved titles catalogue.</li>
                 <li>Box Number is auto-assigned when left blank.</li>
                 <li>Life Certificate and pay type values are normalized automatically.</li>
@@ -526,7 +530,7 @@
         <p class="life-cert-subtitle">Mark a beneficiary as submitted for the selected year.</p>
         <form id="registryLifeCertForm" class="life-cert-action-stack">
           <label class="edit-field">
-            <span>File Number</span>
+            <span>Pension Number</span>
             <input type="text" id="registryLifeCertRegNo" list="registryLifeCertRegNoList" placeholder="Enter file number" autocomplete="off" data-text-case="upper" required>
           </label>
           <datalist id="registryLifeCertRegNoList"></datalist>
@@ -566,6 +570,10 @@
                 <input type="text" id="registryLifeCertNokContact" readonly>
               </label>
               <label class="edit-field">
+                <span>Beneficiary / NOK NIN</span>
+                <input type="text" id="registryLifeCertNokNin" data-text-case="upper" readonly>
+              </label>
+              <label class="edit-field">
                 <span>Bank Name</span>
                 <select id="registryLifeCertBankName" disabled>
                   <option value="">Select bank</option>
@@ -587,6 +595,29 @@
           </div>
         </form>
       </div>
+    </section>
+  </div>
+  <div id="registryMovementModal" class="registry-modal-overlay hidden" aria-hidden="true">
+    <div class="registry-modal-backdrop" data-close-registry-movement></div>
+    <section class="registry-modal-panel registry-movement-panel" role="dialog" aria-modal="true" aria-labelledby="registryMovementTitle">
+      <header class="registry-modal-header"><div><h3 id="registryMovementTitle">Pension File Movement</h3><p id="registryMovementSubtitle">Validate file custody before continuing.</p></div><button type="button" class="registry-modal-close" data-close-registry-movement aria-label="Close">&times;</button></header>
+      <form id="registryMovementForm" class="registry-modal-body registry-movement-form">
+        <div id="registryMovementIdentity" class="registry-movement-identity"></div>
+        <input type="hidden" id="registryMovementRegNo">
+        <div id="registryMoveFields" class="registry-movement-fields">
+          <label class="edit-field"><span>Destination Office or Officer</span><input id="registryMoveDestination" required></label>
+          <label class="edit-field"><span>Purpose of Movement</span><input id="registryMoveReason" placeholder="Reason file is required"></label>
+          <label class="edit-field"><span>Released / Delivered By</span><input id="registryMoveDeliveredBy" required></label>
+          <label class="edit-field"><span>Expected Return</span><input type="datetime-local" id="registryMoveExpectedReturn"></label>
+        </div>
+        <div id="registryReturnFields" class="registry-movement-fields hidden">
+          <label class="edit-field"><span>Return Into</span><select id="registryReturnDestination"><option value="pension_file_registry">Pension File Registry</option></select></label>
+          <label class="edit-field"><span>Received Back By</span><input id="registryReturnReceivedBy"></label>
+          <label class="edit-field edit-field-span-2"><span>Return Note</span><input id="registryReturnNote" placeholder="Condition or handover note"></label>
+        </div>
+        <div id="registryMovementCustodyHint" class="registry-movement-hint">Checking custody...</div>
+        <footer class="registry-modal-footer"><button type="button" class="btn-cancel" data-close-registry-movement>Cancel</button><button type="submit" class="btn-confirm" id="registryMovementSubmitBtn" disabled>Continue</button></footer>
+      </form>
     </section>
   </div>
 </body>

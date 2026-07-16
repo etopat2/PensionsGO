@@ -62,8 +62,15 @@ function validatePensionFileNumberInput(string $value): ?string
 }
 
 $regNo = normalizePensionFileNumberInput((string)($payload['regNo'] ?? ''));
-$sName = trim((string)($payload['sName'] ?? ''));
-$fName = trim((string)($payload['fName'] ?? ''));
+$ippsNo = trim((string)($payload['ippsNo'] ?? ($payload['computerNo'] ?? '')));
+$firstName = trim((string)($payload['firstName'] ?? ''));
+$middleName = trim((string)($payload['middleName'] ?? ''));
+$lastName = trim((string)($payload['lastName'] ?? ($payload['sName'] ?? '')));
+$legacyGivenNames = trim((string)($payload['fName'] ?? ''));
+if ($firstName === '' && $legacyGivenNames !== '') { $parts=preg_split('/\s+/', $legacyGivenNames, 2); $firstName=$parts[0]??''; $middleName=$middleName ?: ($parts[1]??''); }
+$sName = $lastName;
+$fName = trim($firstName . ' ' . $middleName);
+$payload['sName']=$sName; $payload['fName']=$fName;
 $requiredMessages = [
     'regNo' => 'Identity Profile is missing the file number.',
     'title' => 'Identity Profile is missing the title or rank.',
@@ -100,7 +107,7 @@ if ($duplicateRow) {
     exit;
 }
 
-$computerNo = trim((string)($payload['computerNo'] ?? ''));
+$computerNo = $ippsNo;
 if ($computerNo !== '') {
     $computerStmt = $conn->prepare("SELECT id FROM tb_fileregistry WHERE computerNo = ? LIMIT 1");
     if ($computerStmt) {
@@ -110,7 +117,7 @@ if ($computerNo !== '') {
         $computerRow = $computerResult ? $computerResult->fetch_assoc() : null;
         $computerStmt->close();
         if ($computerRow) {
-            echo json_encode(['success' => false, 'message' => 'Computer number already exists. Use a unique Computer Number or leave it blank.']);
+            echo json_encode(['success' => false, 'message' => 'IPPS number already exists. Use a unique IPPS Number or leave it blank.']);
             exit;
         }
     }
@@ -420,6 +427,8 @@ if (!$stmt->execute()) {
 
 $newId = (int)$stmt->insert_id;
 $stmt->close();
+$canonicalStmt=$conn->prepare("UPDATE tb_fileregistry SET employeeNo=NULL,pensionNo=?,ippsNo=?,firstName=?,middleName=?,lastName=? WHERE id=?");
+if($canonicalStmt){$canonicalStmt->bind_param('sssssi',$regNo,$ippsNo,$firstName,$middleName,$lastName,$newId);$canonicalStmt->execute();$canonicalStmt->close();}
 
 if (function_exists('upsertPensionerUserFromRegistry')) {
     try {

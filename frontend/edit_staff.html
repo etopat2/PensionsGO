@@ -73,12 +73,12 @@
               </div>
               <div class="form-grid cols-4 edit-grid">
                 <label class="field-group edit-field">
-                  <span class="field-label">File Number</span>
-                  <input type="text" id="regNo" name="regNo" data-text-case="upper" required readonly>
+                  <span class="field-label">Employee Number</span>
+                  <input type="text" id="regNo" name="employeeNo" data-text-case="upper" required readonly>
                 </label>
                 <label class="field-group edit-field">
-                  <span class="field-label">Computer Number</span>
-                  <input type="text" id="computerNo" name="computerNo">
+                  <span class="field-label">IPPS Number</span>
+                  <input type="text" id="computerNo" name="ippsNo">
                 </label>
                 <label class="field-group edit-field edit-field-span-2">
                   <span class="field-label">Title</span>
@@ -87,12 +87,16 @@
                   </select>
                 </label>
                 <label class="field-group edit-field">
-                  <span class="field-label">Surname</span>
-                  <input type="text" id="sName" name="sName" required>
+                  <span class="field-label">First Name</span>
+                  <input type="text" id="fName" name="firstName" required>
                 </label>
                 <label class="field-group edit-field">
-                  <span class="field-label">First Name</span>
-                  <input type="text" id="fName" name="fName" required>
+                  <span class="field-label">Middle Name</span>
+                  <input type="text" id="middleName" name="middleName">
+                </label>
+                <label class="field-group edit-field">
+                  <span class="field-label">Last Name</span>
+                  <input type="text" id="sName" name="lastName" required>
                 </label>
                 <label class="field-group edit-field">
                   <span class="field-label">Gender</span>
@@ -292,5 +296,4 @@
   <footer id="dynamicFooter"></footer>
 </body>
 </html>
-
 

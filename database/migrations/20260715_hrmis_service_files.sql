@@ -1,6 +1,7 @@
 -- HRMIS identity alignment and service-file lifecycle (idempotent on MariaDB 10.3+).
 ALTER TABLE tb_staffdue
   ADD COLUMN IF NOT EXISTS employeeNo VARCHAR(80) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS pensionNo VARCHAR(80) DEFAULT NULL,
   ADD COLUMN IF NOT EXISTS ippsNo VARCHAR(80) DEFAULT NULL,
   ADD COLUMN IF NOT EXISTS rankPosition VARCHAR(160) DEFAULT NULL,
   ADD COLUMN IF NOT EXISTS rankName VARCHAR(160) DEFAULT NULL,
@@ -23,6 +24,32 @@ ALTER TABLE tb_staffdue
   ADD COLUMN IF NOT EXISTS maritalStatus VARCHAR(50) DEFAULT NULL,
   ADD COLUMN IF NOT EXISTS service_file_status VARCHAR(40) NOT NULL DEFAULT 'pending_processing',
   ADD COLUMN IF NOT EXISTS service_file_location VARCHAR(160) DEFAULT NULL;
+
+ALTER TABLE tb_fileregistry
+  ADD COLUMN IF NOT EXISTS employeeNo VARCHAR(80) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS pensionNo VARCHAR(80) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS ippsNo VARCHAR(80) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS firstName VARCHAR(100) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS middleName VARCHAR(100) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS lastName VARCHAR(100) DEFAULT NULL;
+
+UPDATE tb_staffdue SET
+  pensionNo=REPLACE(COALESCE(NULLIF(TRIM(pensionNo),''),NULLIF(TRIM(regNo),'')),'PEN/PEN/','PEN/'),
+  regNo=REPLACE(regNo,'PEN/PEN/','PEN/'),
+  employeeNo=CASE WHEN COALESCE(NULLIF(TRIM(employeeNo),''),CASE WHEN UPPER(regNo) LIKE 'PEN/%' THEN SUBSTRING(regNo,5) ELSE regNo END) REGEXP '^[A-Z]/[0-9]+$' THEN CONCAT('P/',COALESCE(NULLIF(TRIM(employeeNo),''),SUBSTRING(regNo,5))) ELSE COALESCE(NULLIF(TRIM(employeeNo),''),CASE WHEN UPPER(regNo) LIKE 'PEN/%' THEN SUBSTRING(regNo,5) ELSE regNo END) END,
+  ippsNo=COALESCE(NULLIF(TRIM(ippsNo),''),NULLIF(TRIM(computerNo),'')),
+  lastName=COALESCE(NULLIF(TRIM(lastName),''),NULLIF(TRIM(sName),'')),
+  firstName=COALESCE(NULLIF(TRIM(firstName),''),NULLIF(SUBSTRING_INDEX(TRIM(fName),' ',1),'')),
+  middleName=COALESCE(NULLIF(TRIM(middleName),''),NULLIF(TRIM(SUBSTRING(TRIM(fName),LENGTH(SUBSTRING_INDEX(TRIM(fName),' ',1))+1)),''));
+
+UPDATE tb_fileregistry SET
+  pensionNo=REPLACE(COALESCE(NULLIF(TRIM(pensionNo),''),NULLIF(TRIM(regNo),'')),'PEN/PEN/','PEN/'),
+  regNo=REPLACE(regNo,'PEN/PEN/','PEN/'),
+  employeeNo=NULL,
+  ippsNo=COALESCE(NULLIF(TRIM(ippsNo),''),NULLIF(TRIM(computerNo),'')),
+  lastName=COALESCE(NULLIF(TRIM(lastName),''),NULLIF(TRIM(sName),'')),
+  firstName=COALESCE(NULLIF(TRIM(firstName),''),NULLIF(SUBSTRING_INDEX(TRIM(fName),' ',1),'')),
+  middleName=COALESCE(NULLIF(TRIM(middleName),''),NULLIF(TRIM(SUBSTRING(TRIM(fName),LENGTH(SUBSTRING_INDEX(TRIM(fName),' ',1))+1)),''));
 
 CREATE TABLE IF NOT EXISTS tb_staff_verification_documents (
   verification_document_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -49,15 +76,15 @@ CREATE TABLE IF NOT EXISTS tb_pension_beneficiaries (
 
 CREATE TABLE IF NOT EXISTS tb_service_files (
   service_file_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  staffdue_id INT NOT NULL, employeeNo VARCHAR(80) NOT NULL, pensionNo VARCHAR(80) DEFAULT NULL,
+  staffdue_id INT DEFAULT NULL, registry_id INT DEFAULT NULL, file_type VARCHAR(30) NOT NULL DEFAULT 'service', employeeNo VARCHAR(80) DEFAULT NULL, pensionNo VARCHAR(80) DEFAULT NULL, registry_box_no INT DEFAULT NULL,
   registry_stage VARCHAR(40) NOT NULL DEFAULT 'pending_processing', shelf_reference VARCHAR(120) DEFAULT NULL,
   bunch_reference VARCHAR(120) DEFAULT NULL, availability_status VARCHAR(40) NOT NULL DEFAULT 'not_availed',
   current_holder VARCHAR(160) DEFAULT NULL, availed_at DATETIME DEFAULT NULL,
   pension_file_created_at DATETIME DEFAULT NULL, gratuity_paid_at DATETIME DEFAULT NULL,
   archived_at DATETIME DEFAULT NULL, notes TEXT DEFAULT NULL, updated_by VARCHAR(100) DEFAULT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT NULL,
-  UNIQUE KEY uq_service_file_staff (staffdue_id), UNIQUE KEY uq_service_file_employee (employeeNo),
-  KEY idx_service_registry_stage (registry_stage), KEY idx_service_availability (availability_status)
+  UNIQUE KEY uq_service_file_staff (staffdue_id), UNIQUE KEY uq_service_file_registry (registry_id), UNIQUE KEY uq_service_file_employee (employeeNo),
+  KEY idx_service_registry_stage (registry_stage), KEY idx_service_registry_box (registry_stage,registry_box_no), KEY idx_service_availability (availability_status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 ALTER TABLE tb_file_movements

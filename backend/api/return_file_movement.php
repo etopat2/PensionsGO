@@ -88,8 +88,10 @@ try {
     $registryStmt->execute();
     $registryStmt->close();
     $serviceStage=in_array($destinationRegistry,['pending_processing','still_in_process','archives'],true)?$destinationRegistry:null;
-    $serviceStmt=$conn->prepare("UPDATE tb_service_files SET availability_status='available', registry_stage=COALESCE(?,registry_stage), current_holder=?, updated_at=NOW() WHERE pensionNo=? OR employeeNo=?");
-    $serviceStmt->bind_param('ssss',$serviceStage,$destinationLabel,$regNo,$regNo);$serviceStmt->execute();$serviceStmt->close();
+    $serviceRowStmt=$conn->prepare("SELECT service_file_id FROM tb_service_files WHERE pensionNo=? OR employeeNo=? LIMIT 1");$serviceRowStmt->bind_param('ss',$regNo,$regNo);$serviceRowStmt->execute();$serviceFileId=(int)($serviceRowStmt->get_result()->fetch_assoc()['service_file_id']??0);$serviceRowStmt->close();
+    $registryBox=$serviceStage ? allocateServiceRegistryBox($conn,$serviceStage,$serviceFileId) : null;
+    $serviceStmt=$conn->prepare("UPDATE tb_service_files SET availability_status='available', registry_stage=COALESCE(?,registry_stage), registry_box_no=?, current_holder=?, updated_at=NOW() WHERE pensionNo=? OR employeeNo=?");
+    $serviceStmt->bind_param('sisss',$serviceStage,$registryBox,$destinationLabel,$regNo,$regNo);$serviceStmt->execute();$serviceStmt->close();
 
     $conn->commit();
 

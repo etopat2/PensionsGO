@@ -1,52 +1,31 @@
 <?php
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/import_common.php';
-
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+require_once __DIR__.'/../config.php';require_once __DIR__.'/import_common.php';
+if(!isset($_SESSION['userId'])||!currentUserHasPermission($conn,'staff_due.bulk_upload')){http_response_code(403);echo 'Access denied';exit;}
+if(!class_exists('ZipArchive')){http_response_code(500);echo 'ZipArchive is required';exit;}
+$dataset=getDataImportDatasetDefinitions($conn)['staff_due'];$headers=array_column($dataset['columns'],'label');$example=$dataset['template_rows'][0];$columnByField=[];foreach($dataset['columns'] as $index=>$definition)$columnByField[$definition['field']]=colName($index+1);
+function sx($v){return htmlspecialchars((string)$v,ENT_XML1|ENT_QUOTES,'UTF-8');}
+function colName($n){$s='';while($n>0){$n--; $s=chr(65+($n%26)).$s;$n=intdiv($n,26);}return $s;}
+$headerCells='';foreach($headers as $i=>$label){$ref=colName($i+1).'1';$headerCells.='<c r="'.$ref.'" t="inlineStr" s="1"><is><t>'.sx($label).'</t></is></c>';}
+$rows='<row r="1" ht="30" customHeight="1">'.$headerCells.'</row>';
+for($r=2;$r<=201;$r++){
+  $cells='';foreach($headers as $i=>$label){$col=colName($i+1);$ref=$col.$r;$value=$r===2?($example[$i]??''):'';$formula=null;
+    if($col==='AB')$formula='IF(AA'.$r.'="","","FY "&amp;(YEAR(AA'.$r.')-IF(MONTH(AA'.$r.')&lt;7,1,0))&amp;"/"&amp;(YEAR(AA'.$r.')+IF(MONTH(AA'.$r.')&gt;=7,1,0)))';
+    if($col==='AE')$formula='IF(OR(Z'.$r.'="",AA'.$r.'="",AA'.$r.'&lt;=Z'.$r.'),"",DATEDIF(Z'.$r.',AA'.$r.',"m")+IF(AA'.$r.'-EDATE(Z'.$r.',DATEDIF(Z'.$r.',AA'.$r.',"m"))&gt;=15,1,0))';
+    if($col==='AF')$formula='IF(AD'.$r.'="","",ROUND(AD'.$r.'*12,2))';
+    $type='LOWER(AC'.$r.')';$base='MIN(AE'.$r.',900)*AF'.$r.'/500';$long='AE'.$r.'&gt;=120';
+    $mandatory='OR(ISNUMBER(SEARCH("mandatory",'.$type.')),ISNUMBER(SEARCH("voluntary",'.$type.')),ISNUMBER(SEARCH("old age",'.$type.')))';
+    $conditional='OR(ISNUMBER(SEARCH("early",'.$type.')),ISNUMBER(SEARCH("aor",'.$type.')),ISNUMBER(SEARCH("c.b.e",'.$type.')),ISNUMBER(SEARCH("cbe",'.$type.')),ISNUMBER(SEARCH("u.b.e",'.$type.')),ISNUMBER(SEARCH("ube",'.$type.')),ISNUMBER(SEARCH("public interest",'.$type.')),ISNUMBER(SEARCH("death",'.$type.')),ISNUMBER(SEARCH("medical",'.$type.')))';
+    if($col==='AG')$formula='IF(OR(AE'.$r.'="",AF'.$r.'="",AC'.$r.'=""),"",ROUND(IF(ISNUMBER(SEARCH("abolition",'.$type.')),('.$base.')*0.25*(2/3)/12,IF(OR('.$mandatory.',AND('.$long.','.$conditional.')),('.$base.')*(2/3)/12,0)),2))';
+    if($col==='AH')$formula='IF(OR(AE'.$r.'="",AF'.$r.'="",AC'.$r.'=""),"",ROUND(IF(ISNUMBER(SEARCH("abolition",'.$type.')),('.$base.')*0.25/12,IF(OR('.$mandatory.',AND('.$long.','.$conditional.')),('.$base.')/12,0)),2))';
+    if($col==='AI'){$short='MIN(AE'.$r.',900)*AF'.$r.'*10/500';$marriage='MIN(AE'.$r.',900)*AF'.$r.'*5/500';$mandatoryGrat='('.$base.')*(1/3)*15';$formula='IF(OR(AE'.$r.'="",AF'.$r.'="",AC'.$r.'=""),"",ROUND(IF(ISNUMBER(SEARCH("abolition",'.$type.')),('.$base.')*0.25*(1/3)*15,IF(OR(ISNUMBER(SEARCH("contract",'.$type.')),ISNUMBER(SEARCH("t.x",'.$type.')),ISNUMBER(SEARCH("tx",'.$type.'))),0.25*AF'.$r.'*2,IF(ISNUMBER(SEARCH("marriage",'.$type.')),'.$marriage.',IF(OR(ISNUMBER(SEARCH("death",'.$type.')),ISNUMBER(SEARCH("medical",'.$type.'))),MAX(3*AF'.$r.','.$mandatoryGrat.'),IF(AND(NOT('.$long.'),OR(ISNUMBER(SEARCH("c.b.e",'.$type.')),ISNUMBER(SEARCH("cbe",'.$type.')),ISNUMBER(SEARCH("u.b.e",'.$type.')),ISNUMBER(SEARCH("ube",'.$type.')),ISNUMBER(SEARCH("public interest",'.$type.')))),'.$short.',IF(OR('.$mandatory.',AND('.$long.','.$conditional.')) ,'.$mandatoryGrat.',0)))))),2))';}
+    if($formula!==null){$cells.='<c r="'.$ref.'" s="2"><f>'.$formula.'</f><v></v></c>';}elseif($value!==''&&in_array($col,['Y','Z','AA'],true)){$date=DateTimeImmutable::createFromFormat('!Y-m-d',(string)$value);$serial=$date?((int)$date->format('U')/86400+25569):'';$cells.='<c r="'.$ref.'" s="3"><v>'.$serial.'</v></c>';}elseif($value!==''){$cells.='<c r="'.$ref.'" t="inlineStr"><is><t>'.sx($value).'</t></is></c>';}
+  }$rows.='<row r="'.$r.'">'.$cells.'</row>';
 }
-
-header('Content-Type: application/json; charset=utf-8');
-
-if (!isset($_SESSION['userId'], $_SESSION['userRole'])) {
-    echo json_encode(['success' => false, 'message' => 'Authentication required']);
-    exit;
-}
-
-if (!currentUserHasPermission($conn, 'staff_due.bulk_upload')) {
-    echo json_encode(['success' => false, 'message' => 'Access denied']);
-    exit;
-}
-
-$definitions = getDataImportDatasetDefinitions($conn);
-$dataset = $definitions['staff_due'] ?? null;
-if (!$dataset) {
-    echo json_encode(['success' => false, 'message' => 'Staff due import template is unavailable']);
-    exit;
-}
-
-$timestamp = date('Ymd_His');
-$filename = 'staff_due_template_' . $timestamp . '.csv';
-$templateRows = $dataset['template_rows'];
-
-$titleResult = $conn->query("SELECT title_name FROM tb_titles WHERE is_active = 1 ORDER BY title_name ASC LIMIT 1");
-$title = $titleResult ? (string)(($titleResult->fetch_assoc()['title_name'] ?? '')) : '';
-if (!empty($templateRows[0]) && $title !== '') {
-    $templateRows[0][2] = $title;
-}
-
-header_remove('Content-Type');
-header('Content-Type: text/csv; charset=utf-8');
-header('Content-Disposition: attachment; filename="' . $filename . '"');
-
-$out = fopen('php://output', 'w');
-if ($out === false) {
-    exit;
-}
-
-fputcsv($out, array_map(static fn($column) => $column['field'], $dataset['columns']));
-foreach ($templateRows as $row) {
-    fputcsv($out, $row);
-}
-fclose($out);
-$conn->close();
+$last=colName(count($headers));$sheet='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:'.$last.'201"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>';for($i=1;$i<=count($headers);$i++){$sheet.='<col min="'.$i.'" max="'.$i.'" width="'.min(30,max(13,strlen($headers[$i-1])+3)).'" customWidth="1"/>';}$sheet.='</cols><sheetData>'.$rows.'</sheetData><autoFilter ref="A1:'.$last.'201"/></worksheet>';
+$tmp=tempnam(sys_get_temp_dir(),'staffxlsx_');$zip=new ZipArchive();$zip->open($tmp,ZipArchive::CREATE|ZipArchive::OVERWRITE);
+$zip->addFromString('[Content_Types].xml','<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>');
+$zip->addFromString('_rels/.rels','<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+$zip->addFromString('xl/workbook.xml','<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Staff Due Upload" sheetId="1" r:id="rId1"/></sheets><calcPr calcId="191029" fullCalcOnLoad="1" forceFullCalc="1"/></workbook>');
+$zip->addFromString('xl/_rels/workbook.xml.rels','<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
+$zip->addFromString('xl/styles.xml','<?xml version="1.0"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF244764"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="4"><xf fontId="0" fillId="0" borderId="0" xfId="0"/><xf fontId="1" fillId="2" borderId="0" xfId="0" applyFill="1" applyFont="1" applyAlignment="1"><alignment wrapText="1"/></xf><xf fontId="0" fillId="0" borderId="0" xfId="0" numFmtId="4" applyNumberFormat="1"/><xf fontId="0" fillId="0" borderId="0" xfId="0" numFmtId="14" applyNumberFormat="1"/></cellXfs></styleSheet>');$zip->addFromString('xl/worksheets/sheet1.xml',$sheet);$zip->close();
+$filename='staff_due_template_'.date('Ymd_His').'.xlsx';header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');header('Content-Disposition: attachment; filename="'.$filename.'"');header('Content-Length: '.filesize($tmp));readfile($tmp);unlink($tmp);

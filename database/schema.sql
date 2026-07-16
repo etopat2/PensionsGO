@@ -625,8 +625,14 @@ CREATE TABLE IF NOT EXISTS `tb_feedback_submissions` (
 --
 
 CREATE TABLE IF NOT EXISTS `tb_fileregistry` (
-  `id` int(11) NOT NULL,
-  `computerNo` varchar(50) DEFAULT NULL,
+    `id` int(11) NOT NULL,
+    `employeeNo` varchar(50) DEFAULT NULL,
+    `pensionNo` varchar(50) DEFAULT NULL,
+    `ippsNo` varchar(50) DEFAULT NULL,
+    `firstName` varchar(100) DEFAULT NULL,
+    `middleName` varchar(100) DEFAULT NULL,
+    `lastName` varchar(100) DEFAULT NULL,
+    `computerNo` varchar(50) DEFAULT NULL,
   `supplierNo` varchar(50) DEFAULT NULL,
   `regNo` varchar(50) DEFAULT NULL,
   `title` varchar(120) DEFAULT NULL,
@@ -1539,8 +1545,14 @@ CREATE TABLE IF NOT EXISTS `tb_session_settings` (
 --
 
 CREATE TABLE IF NOT EXISTS `tb_staffdue` (
-  `id` int(11) NOT NULL,
-  `regNo` varchar(50) DEFAULT NULL,
+    `id` int(11) NOT NULL,
+    `employeeNo` varchar(50) DEFAULT NULL,
+    `pensionNo` varchar(50) DEFAULT NULL,
+    `ippsNo` varchar(50) DEFAULT NULL,
+    `firstName` varchar(100) DEFAULT NULL,
+    `middleName` varchar(100) DEFAULT NULL,
+    `lastName` varchar(100) DEFAULT NULL,
+    `regNo` varchar(50) DEFAULT NULL,
   `computerNo` varchar(50) DEFAULT NULL,
   `title` varchar(120) DEFAULT NULL,
   `sName` varchar(100) DEFAULT NULL,

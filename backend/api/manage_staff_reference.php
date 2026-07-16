@@ -1,0 +1,9 @@
+<?php
+header('Content-Type: application/json; charset=utf-8');require_once __DIR__.'/../config.php';
+if(!isset($_SESSION['userId'])||!in_array(strtolower((string)($_SESSION['userRole']??'')),['admin','super_admin'],true)){http_response_code(403);echo json_encode(['success'=>false,'message'=>'Administrator access required']);exit;}
+ensureStaffReferenceTables($conn);$p=json_decode(file_get_contents('php://input'),true)?:[];
+$defs=['employment_status'=>['tb_employment_statuses','employment_status_id','status_name'],'religion'=>['tb_religions','religion_id','religion_name'],'tribe'=>['tb_tribes','tribe_id','tribe_name'],'political_region'=>['tb_polregions','political_region_id','region_name']];$type=strtolower(trim((string)($p['type']??'')));
+if(!isset($defs[$type])){echo json_encode(['success'=>false,'message'=>'Invalid reference type']);exit;}[$table,$idCol,$valueCol]=$defs[$type];$id=(int)($p['id']??0);$action=strtolower(trim((string)($p['action']??'save')));
+if($action==='delete'){$stmt=$conn->prepare("DELETE FROM {$table} WHERE {$idCol}=?");$stmt->bind_param('i',$id);$ok=$stmt->execute();echo json_encode(['success'=>$ok,'message'=>$ok?'Reference value deleted.':$stmt->error]);exit;}
+$value=trim((string)($p['value']??''));$order=max(0,(int)($p['sort_order']??0));$active=(!isset($p['is_active'])||filter_var($p['is_active'],FILTER_VALIDATE_BOOL))?1:0;if($value===''){echo json_encode(['success'=>false,'message'=>'Value is required']);exit;}
+if($id>0){$stmt=$conn->prepare("UPDATE {$table} SET {$valueCol}=?,sort_order=?,is_active=?,updated_at=NOW() WHERE {$idCol}=?");$stmt->bind_param('siii',$value,$order,$active,$id);}else{$stmt=$conn->prepare("INSERT INTO {$table} ({$valueCol},sort_order,is_active) VALUES (?,?,?)");$stmt->bind_param('sii',$value,$order,$active);}$ok=$stmt->execute();echo json_encode(['success'=>$ok,'message'=>$ok?'Reference value saved.':$stmt->error]);

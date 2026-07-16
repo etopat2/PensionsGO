@@ -23,6 +23,10 @@ $summary = [
     'moved_this_week' => 0,
     'avg_turnaround_seconds' => 0,
     'longest_open_seconds' => 0
+    ,'registered_service_files' => 0
+    ,'pending_processing_files' => 0
+    ,'still_in_process_files' => 0
+    ,'archived_service_files' => 0
 ];
 
 $summarySql = "
@@ -53,6 +57,11 @@ if ($summaryRes && $summaryRes->num_rows > 0) {
         'avg_turnaround_seconds' => (int)round((float)($row['avg_turnaround_seconds'] ?? 0)),
         'longest_open_seconds' => (int)($row['longest_open_seconds'] ?? 0)
     ];
+}
+
+$inventoryRes = $conn->query("SELECT COUNT(*) registered_service_files, SUM(registry_stage='pending_processing') pending_processing_files, SUM(registry_stage='still_in_process') still_in_process_files, SUM(registry_stage='archives') archived_service_files FROM tb_service_files");
+if ($inventoryRes && ($inventory = $inventoryRes->fetch_assoc())) {
+    foreach (['registered_service_files','pending_processing_files','still_in_process_files','archived_service_files'] as $key) $summary[$key] = (int)($inventory[$key] ?? 0);
 }
 
 $byOffice = [];

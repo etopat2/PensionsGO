@@ -16,12 +16,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   const tabPanels = Array.from(document.querySelectorAll(".workspace-panel"));
   const prevBtn = document.getElementById("addStaffPrevBtn");
   const nextBtn = document.getElementById("addStaffNextBtn");
-  const tabOrder = ["identity", "service", "workflow"];
+  const tabOrder = ["identity", "service", "beneficiary", "workflow"];
 
   const regNo = document.getElementById("regNo");
   const computerNo = document.getElementById("computerNo");
   const sName = document.getElementById("sName");
   const fName = document.getElementById("fName");
+  const middleName = document.getElementById("middleName");
   const gender = document.getElementById("gender");
   const nin = document.getElementById("NIN");
   const telNo = document.getElementById("telNo");
@@ -30,6 +31,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const retirementDate = document.getElementById("retirementDate");
   const monthlySalary = document.getElementById("monthlySalary");
   const retirementType = document.getElementById("retirementType");
+  const livingStatus = document.getElementById("livingStatus");
+  const dateOfDeath = document.getElementById("dateOfDeath");
+  const dateOfDeathField = document.getElementById("dateOfDeathField");
   const submissionStatus = document.getElementById("submissionStatus");
   const appnStatus = document.getElementById("appnStatus");
 
@@ -40,6 +44,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   const prisonSearch = document.getElementById("prisonSearch");
   const prisonList = document.getElementById("prisonList");
   const titleSelect = document.getElementById("title");
+  const salaryScaleSelect = document.getElementById("salaryScale");
+  const employmentStatusSelect = document.getElementById("employmentStatus");
+  const tribeSelect = document.getElementById("tribe");
+  const homeDistrictSelect = document.getElementById("homeDistrict");
+  const homeRegionSelect = document.getElementById("homeRegion");
+  const religionSelect = document.getElementById("religion");
+  const beneficiaryNin = document.getElementById("beneficiaryNin");
+  const beneficiaryGender = document.getElementById("beneficiaryGender");
+  const beneficiaryTelephone = document.getElementById("beneficiaryTelephone");
+  const beneficiaryEarningBasis = document.getElementById("beneficiaryEarningBasis");
+  const beneficiaryEarningExpiry = document.getElementById("beneficiaryEarningExpiry");
+  const beneficiaryLastEarningMonth = document.getElementById("beneficiaryLastEarningMonth");
+  const beneficiaryEarningRemaining = document.getElementById("beneficiaryEarningRemaining");
+  const beneficiaryEarningStart = document.getElementById("beneficiaryEarningStart");
 
   const lengthOfService = document.getElementById("lengthOfService");
   const annualSalary = document.getElementById("annualSalary");
@@ -211,7 +229,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function syncAllFilterableSelects() {
-    [titleSelect, gender, prisonUnitSelect, retirementType].forEach(syncFilterableSelect);
+    [titleSelect, gender, prisonUnitSelect, retirementType, salaryScaleSelect, employmentStatusSelect, tribeSelect, homeDistrictSelect, homeRegionSelect, religionSelect].forEach(syncFilterableSelect);
   }
 
   function syncDirectCreateAccess() {
@@ -304,9 +322,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const validationRules = {
     identity: [
-      { field: regNo, message: "Identity Profile is missing the file number.", isInvalid: () => !String(regNo?.value || "").trim() },
-      { field: titleSelect, message: "Identity Profile is missing the title or rank.", isInvalid: () => !String(titleSelect?.value || "").trim() },
-      { field: sName, message: "Identity Profile is missing the surname.", isInvalid: () => !String(sName?.value || "").trim() },
+      { field: regNo, message: "Identity Profile is missing the employee number.", isInvalid: () => !String(regNo?.value || "").trim() },
+      { field: titleSelect, message: "Identity Profile is missing the officer position.", isInvalid: () => !String(titleSelect?.value || "").trim() },
+      { field: sName, message: "Identity Profile is missing the last name.", isInvalid: () => !String(sName?.value || "").trim() },
       { field: fName, message: "Identity Profile is missing the first name.", isInvalid: () => !String(fName?.value || "").trim() },
       { field: gender, message: "Identity Profile is missing gender.", isInvalid: () => !String(gender?.value || "").trim() },
       {
@@ -342,12 +360,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         isInvalid: () => Boolean(getRetirementPolicyAssessment().errors.length)
       }
     ],
+    beneficiary: [
+      {
+        field: beneficiaryNin,
+        message: () => validateNationalIdValue(beneficiaryNin?.value || "", { gender: beneficiaryGender?.value || "" }).message || "Beneficiary NIN is invalid.",
+        isInvalid: () => String(beneficiaryNin?.value || "").trim() !== "" && !validateNationalIdValue(beneficiaryNin.value, { gender: beneficiaryGender?.value || "" }).valid
+      },
+      { field: beneficiaryTelephone, message: "Beneficiary phone number is invalid.", isInvalid: () => String(beneficiaryTelephone?.value || "").trim() !== "" && !normalizePhone(beneficiaryTelephone.value) }
+    ],
     workflow: []
   };
 
   const tabFieldGroups = {
-    identity: [regNo, computerNo, titleSelect, sName, fName, gender, prisonUnitSelect, nin, telNo, birthDate],
+    identity: [regNo, computerNo, titleSelect, fName, middleName, sName, gender, prisonUnitSelect, nin, telNo, birthDate],
     service: [enlistmentDate, retirementDate, financialYear, retirementType, monthlySalary, lengthOfService, annualSalary, reducedPension, fullPension, gratuity],
+    beneficiary: [beneficiaryNin, beneficiaryGender, beneficiaryTelephone],
     workflow: [submissionStatus, appnStatus]
   };
 
@@ -863,7 +890,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const disposition = response.headers.get("content-disposition") || "";
       const match = disposition.match(/filename=\"?([^\"]+)\"?/i);
       anchor.href = url;
-      anchor.download = match?.[1] || "staff_due_template.csv";
+      anchor.download = match?.[1] || "staff_due_template.xlsx";
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -998,6 +1025,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  function parseLocalDate(value){if(!/^\d{4}-\d{2}-\d{2}$/.test(String(value||"")))return null;const [year,month,day]=value.split("-").map(Number);return new Date(year,month-1,day);}
+  function formatLocalDate(date){if(!(date instanceof Date)||Number.isNaN(date.getTime()))return "";return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;}
+  function updateBeneficiaryEarningPolicy(){
+    const diedWhileServing=getRetirementTypesApi().normalizeValue(retirementType?.value||"")==="death";
+    const deceased=diedWhileServing||String(livingStatus?.value||"").toLowerCase()==="deceased";
+    document.querySelectorAll(".beneficiary-deceased-only").forEach(wrapper=>{wrapper.hidden=!deceased;wrapper.querySelectorAll("input,select,textarea").forEach(field=>field.disabled=!deceased);});
+    if(dateOfDeathField)dateOfDeathField.hidden=!deceased;if(dateOfDeath)dateOfDeath.disabled=!deceased;
+    const deathValue=String(dateOfDeath?.value||"").trim()||(diedWhileServing?String(retirementDate?.value||"").trim():"");
+    const basisValue=diedWhileServing?deathValue:String(retirementDate?.value||"").trim();const basis=parseLocalDate(basisValue);
+    if(beneficiaryEarningStart){beneficiaryEarningStart.disabled=!deceased;beneficiaryEarningStart.value=deceased?deathValue:"";}
+    if(!deceased||!basis){[beneficiaryEarningBasis,beneficiaryEarningExpiry,beneficiaryLastEarningMonth,beneficiaryEarningRemaining].forEach(field=>{if(field)field.value="";});return;}
+    const expiry=new Date(basis.getFullYear()+15,basis.getMonth(),basis.getDate());const finalMonth=expiry.getDate()>=15?new Date(expiry.getFullYear(),expiry.getMonth()+1,0):new Date(expiry.getFullYear(),expiry.getMonth(),0);
+    const today=new Date();const remaining=Math.max(0,(finalMonth.getFullYear()-today.getFullYear())*12+finalMonth.getMonth()-today.getMonth()+1);const years=Math.floor(remaining/12);const months=remaining%12;const label=remaining===0?"Earning period expired":[years?`${years} year${years===1?"":"s"}`:"",months?`${months} month${months===1?"":"s"}`:""].filter(Boolean).join(" ");
+    if(beneficiaryEarningBasis)beneficiaryEarningBasis.value=formatLocalDate(basis);if(beneficiaryEarningExpiry)beneficiaryEarningExpiry.value=formatLocalDate(expiry);if(beneficiaryLastEarningMonth)beneficiaryLastEarningMonth.value=finalMonth.toLocaleDateString(undefined,{month:"long",year:"numeric"});if(beneficiaryEarningRemaining)beneficiaryEarningRemaining.value=label;
+  }
+
   if (closePrisonModalBtn) {
     closePrisonModalBtn.addEventListener("click", () => {
       if (prisonModal) prisonModal.style.display = "none";
@@ -1044,7 +1087,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const data = await res.json();
       if (!data.success || !Array.isArray(data.titles)) return;
 
-      titleSelect.innerHTML = '<option value="">Select Title</option>';
+      titleSelect.innerHTML = '<option value="">Select Position</option>';
       const groups = {
         "Uniformed - Junior": [],
         "Uniformed - Senior": [],
@@ -1086,6 +1129,41 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  async function loadSalaryScales() {
+    if (!salaryScaleSelect) return;
+    try {
+      const data=await fetch("../backend/api/get_salary_scales.php?active_only=1",{credentials:"include",cache:"no-store"}).then((response)=>response.json());
+      salaryScaleSelect.innerHTML='<option value="">Select Salary Scale</option>';
+      (data.salary_scales||[]).forEach((scale)=>{const option=document.createElement("option");option.value=scale.scale_code;option.textContent=scale.scale_code;salaryScaleSelect.appendChild(option);});
+      syncFilterableSelect(salaryScaleSelect);
+    } catch(error) { salaryScaleSelect.innerHTML='<option value="">Unable to load salary scales</option>'; }
+  }
+
+  function fillReferenceSelect(select, rows, placeholder) {
+    if (!select) return;
+    select.innerHTML = `<option value="">${placeholder}</option>`;
+    (rows || []).forEach((row) => { const option=document.createElement("option"); option.value=row.value; option.textContent=row.value; select.appendChild(option); });
+    syncFilterableSelect(select);
+  }
+
+  async function loadStaffReferenceData() {
+    try {
+      const [references, districts] = await Promise.all([
+      fetch("../backend/api/get_staff_reference_data.php?active_only=1", { credentials:"include", cache:"no-store" }).then(r=>r.json()),
+      fetch("../backend/api/get_political_districts.php?limit=500", { credentials:"include", cache:"no-store" }).then(r=>r.json())
+    ]);
+    fillReferenceSelect(employmentStatusSelect, references.data?.employment_status, "Select Employment Status");
+    fillReferenceSelect(tribeSelect, references.data?.tribe, "Select Tribe");
+    fillReferenceSelect(religionSelect, references.data?.religion, "Select Religion");
+    fillReferenceSelect(homeRegionSelect, (references.political_regions||[]).map(value=>({value})), "Select Political Region");
+    fillReferenceSelect(homeDistrictSelect, (districts.districts||[]).map(item=>({value:item.district})), "Select Political District");
+    const districtRegion = new Map((districts.districts||[]).map(item=>[item.district,item.region]));
+      homeDistrictSelect?.addEventListener("change",()=>{const region=districtRegion.get(homeDistrictSelect.value)||"";if(region&&homeRegionSelect){homeRegionSelect.value=region;syncFilterableSelect(homeRegionSelect);}});
+    } catch (error) {
+      [employmentStatusSelect,tribeSelect,homeDistrictSelect,homeRegionSelect,religionSelect].forEach(select=>{if(select)select.innerHTML='<option value="">Reference data unavailable</option>';});
+    }
+  }
+
   form.addEventListener("reset", () => {
     window.setTimeout(() => {
       touchedFields.clear();
@@ -1098,6 +1176,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (submissionStatus) submissionStatus.value = "pending";
       if (appnStatus) appnStatus.value = "pending";
       updateComputedFields();
+      updateBeneficiaryEarningPolicy();
       syncAllFilterableSelects();
       updateTabStates();
       setActiveTab("identity");
@@ -1126,6 +1205,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     data.submissionStatus = "pending";
     data.appnStatus = "pending";
     data.NIN = normalizeNationalIdValue(data.NIN || "");
+    data.beneficiary_nin = normalizeNationalIdValue(data.beneficiary_nin || "");
     data.monthlySalary = parseMoneyInputValue(data.monthlySalary, 0);
     data.annualSalary = parseMoneyInputValue(data.annualSalary, 0);
     data.reducedPension = parseMoneyInputValue(data.reducedPension, 0);
@@ -1146,6 +1226,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       data.telNo = normalizedTel;
       telNo.value = normalizedTel;
     }
+    const rawBeneficiaryTel=String(data.beneficiary_telephone||"").trim();
+    if(rawBeneficiaryTel){const normalized=normalizePhone(rawBeneficiaryTel);if(!normalized){showValidationError({tab:"beneficiary",field:beneficiaryTelephone,message:"Beneficiary phone number is invalid."});return;}data.beneficiary_telephone=normalized;beneficiaryTelephone.value=normalized;}
 
     try {
       setFormMessage("Saving staff record...", "");
@@ -1177,6 +1259,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   await loadPrisonUnits();
   await loadTitles();
+  await loadSalaryScales();
+  await loadStaffReferenceData();
+  [livingStatus,retirementType,retirementDate,dateOfDeath].forEach(field=>field?.addEventListener("change",updateBeneficiaryEarningPolicy));
+  updateBeneficiaryEarningPolicy();
   if (nin) {
     const syncNin = () => {
       const normalized = normalizeNationalIdValue(nin.value);

@@ -76,11 +76,20 @@ function formatMoney(float $value): string
 }
 
 // Sanitize inputs
-$regNo = trim($_POST['regNo'] ?? '');
-$computerNo = trim($_POST['computerNo'] ?? ($_POST['supplierNo'] ?? ''));
+$employeeNo = normalizeEmployeeNumber($_POST['employeeNo'] ?? ($_POST['regNo'] ?? ''));
+if ($employeeNo !== '' && !preg_match('#^(?:[0-9]+|P/[A-Z]/[0-9]+)$#', $employeeNo)) {
+    echo json_encode(['success'=>false,'message'=>'Employee Number must use 123 or P/A/123 format.']);
+    exit;
+}
+$pensionNo = pensionNumberFromEmployeeNumber($employeeNo);
+$regNo = $pensionNo;
+$computerNo = trim($_POST['ippsNo'] ?? ($_POST['computerNo'] ?? ($_POST['supplierNo'] ?? '')));
 $title = trim($_POST['title'] ?? '');
-$sName = trim($_POST['sName'] ?? '');
-$fName = trim($_POST['fName'] ?? '');
+$firstName = trim($_POST['firstName'] ?? ($_POST['fName'] ?? ''));
+$middleName = trim($_POST['middleName'] ?? '');
+$lastName = trim($_POST['lastName'] ?? ($_POST['sName'] ?? ''));
+$sName = $lastName;
+$fName = trim($firstName . ' ' . $middleName);
 $gender = trim($_POST['gender'] ?? '');
 $prisonUnit = trim($_POST['prisonUnit'] ?? '');
 $nin = trim($_POST['NIN'] ?? '');
@@ -155,7 +164,7 @@ $fullPension = formatMoney($computedFull);
 $gratuity = formatMoney($computedGratuity);
 $financialYear = computeFinancialYearLabel($retirementDate);
 
-$currentStmt = $conn->prepare("SELECT regNo, address, livingStatus, payType FROM tb_staffdue WHERE id = ? LIMIT 1");
+$currentStmt = $conn->prepare("SELECT regNo, address, livingStatus, payType, dateOfDeath FROM tb_staffdue WHERE id = ? LIMIT 1");
 if (!$currentStmt) {
     echo json_encode(['success' => false, 'message' => 'Failed to load current record.']);
     exit;
@@ -172,6 +181,8 @@ if (!$currentRow) {
 }
 
 $existingRegNo = (string)($currentRow['regNo'] ?? '');
+$existingEmployeeNo = normalizeEmployeeNumber(trim((string)($currentRow['employeeNo'] ?? '')) ?: $existingRegNo);
+$existingPensionNo = trim((string)($currentRow['pensionNo'] ?? '')) ?: $existingRegNo;
 $existingAddress = trim((string)($currentRow['address'] ?? ''));
 $existingLivingStatus = (string)($currentRow['livingStatus'] ?? '');
 $existingPayType = (string)($currentRow['payType'] ?? '');
@@ -213,7 +224,9 @@ if ($normalizedTitle === null) {
 $title = $normalizedTitle;
 
 if (!$canEditRegNo) {
-    // Only admin/OC/Deputy can edit file numbers.
+    // Only admin/OC/Deputy can edit employee/pension identity numbers.
+    $employeeNo = $existingEmployeeNo;
+    $pensionNo = $existingPensionNo;
     $regNo = $existingRegNo;
 }
 
@@ -270,6 +283,7 @@ $payType = deriveRegistryPayTypeFromProfile(
     $existingPayType
 );
 $livingStatus = deriveLivingStatusFromRetirementType($retirementType, $existingLivingStatus);
+$dateOfDeath=$retirementType==='death'?$retirementDate:trim((string)($currentRow['dateOfDeath']??''));
 
 if ($canEditRegNo && $regNo !== $existingRegNo) {
     $dupStmt = $conn->prepare("SELECT id FROM tb_staffdue WHERE regNo = ? AND id <> ? LIMIT 1");
@@ -319,14 +333,15 @@ $stmt = $conn->prepare("UPDATE tb_staffdue
         bank_account = ?,
         bank_branch = ?,
         applicant_email = ?,
-        livingStatus = ?
+        livingStatus = ?,
+        dateOfDeath = ?
     WHERE id = ?");
 if (!$stmt) {
     echo json_encode(['success' => false, 'message' => 'Failed to prepare update.']);
     exit;
 }
 
-$types = str_repeat('s', 30) . 'i';
+$types = str_repeat('s', 31) . 'i';
 $stmt->bind_param(
     $types,
     $regNo,
@@ -359,6 +374,7 @@ $stmt->bind_param(
     $bankBranch,
     $applicantEmail,
     $livingStatus,
+    $dateOfDeath,
     $id
 );
 
@@ -375,6 +391,11 @@ try {
     if (!$stmt->execute()) {
         throw new RuntimeException('Database update failed.');
     }
+    $canonicalStmt=$conn->prepare("UPDATE tb_staffdue SET employeeNo=?,pensionNo=?,ippsNo=?,firstName=?,middleName=?,lastName=? WHERE id=?");
+    if(!$canonicalStmt){throw new RuntimeException('Unable to update canonical officer identity.');}
+    $canonicalStmt->bind_param('ssssssi',$employeeNo,$pensionNo,$computerNo,$firstName,$middleName,$lastName,$id);
+    if(!$canonicalStmt->execute()){throw new RuntimeException('Unable to update canonical officer identity.');}
+    $canonicalStmt->close();
 
     if ($regNoChangedByAdmin) {
         // Keep downstream records aligned when a privileged user corrects file number.

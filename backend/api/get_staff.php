@@ -34,6 +34,15 @@ if ($result->num_rows === 0) {
 
 $staff = $result->fetch_assoc();
 $staff['computerNo'] = (string)($staff['computerNo'] ?? ($staff['supplierNo'] ?? ''));
+$staff['employeeNo'] = (string)($staff['employeeNo'] ?? (stripos((string)($staff['regNo'] ?? ''), 'PEN/') === 0 ? substr((string)$staff['regNo'], 4) : ($staff['regNo'] ?? '')));
+$staff['pensionNo'] = (string)($staff['pensionNo'] ?? ($staff['regNo'] ?? ''));
+$staff['ippsNo'] = (string)($staff['ippsNo'] ?? $staff['computerNo']);
+$staff['lastName'] = (string)($staff['lastName'] ?? ($staff['sName'] ?? ''));
+if (trim((string)($staff['firstName'] ?? '')) === '') {
+    $givenParts = preg_split('/\s+/', trim((string)($staff['fName'] ?? '')), 2);
+    $staff['firstName'] = (string)($givenParts[0] ?? '');
+    $staff['middleName'] = (string)($staff['middleName'] ?? ($givenParts[1] ?? ''));
+}
 $staffId = (int)($staff['id'] ?? 0);
 $appnNormalized = strtolower(trim((string)($staff['appnStatus'] ?? '')));
 if ($appnNormalized === 'querried') {

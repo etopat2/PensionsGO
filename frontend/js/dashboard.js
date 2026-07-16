@@ -7310,6 +7310,8 @@ function initDashboardController() {
       fileMovementSummaryCards.innerHTML = "";
       fileMovementSummaryCards.appendChild(createCard("Total Movements", Number(summary.total_movements || 0), "This Week", Number(summary.moved_this_week || 0), "", "", "blue"));
       fileMovementSummaryCards.appendChild(createCard("Open Files", Number(summary.open_movements || 0), "Longest Open", formatDurationCompact(summary.longest_open_seconds || 0), "", "", "orange"));
+      fileMovementSummaryCards.appendChild(createCard("Registered Service Files", Number(summary.registered_service_files || 0), "Pending Processing", Number(summary.pending_processing_files || 0), "", "", "blue"));
+      fileMovementSummaryCards.appendChild(createCard("Files Still in Process", Number(summary.still_in_process_files || 0), "Archived", Number(summary.archived_service_files || 0), "", "", "green"));
       fileMovementSummaryCards.appendChild(createCard("Overdue Open", Number(summary.overdue_open || 0), "", "", "", "", "red"));
       fileMovementSummaryCards.appendChild(createCard("Due Soon (24h)", Number(summary.due_soon_open || 0), "", "", "", "", "teal"));
       fileMovementSummaryCards.appendChild(createCard("Moved Today", Number(summary.moved_today || 0), "", "", "", "", "green"));

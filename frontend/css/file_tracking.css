@@ -38,6 +38,11 @@
 .operation-modal-close { position: sticky; top: 0; float: right; z-index: 3; }
 .file-move-form label { display: flex; flex-direction: column; gap: .3rem; color: var(--muted-color); font-size: .78rem; }
 .field-hidden { display: none !important; }
+.receive-record-match { grid-column: 1 / -1; border: 1px dashed var(--border-color); border-radius: 10px; padding: .7rem .85rem; color: var(--muted-color); background: color-mix(in srgb,var(--card-bg) 92%,var(--primary-blue) 8%); }
+.receive-record-match.is-match { border-style: solid; border-color: #218456; color: var(--heading-color); }
+.service-file-card-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(300px,1fr)); gap: .9rem; }
+.service-file-card-grid .movement-item { margin: 0; min-height: 180px; flex-direction: column; }
+.service-file-card-grid .movement-item-actions { flex-wrap: wrap; gap: .45rem; margin-top: auto; }
 .file-move-form select, .file-track-form select { min-height: 42px; padding: .55rem .7rem; border: 1px solid var(--border-color); border-radius: 8px; background: var(--input-bg); color: var(--text-color); }
 @media (max-width: 700px) { .file-operation-modal { width: 97vw; max-height: 95dvh; padding: 1rem; } .file-move-form { grid-template-columns: 1fr; } }
 @media (max-width: 560px) { .service-registry-actions { display: grid; grid-template-columns: 1fr; } .service-registry-actions button { width: 100%; } }
@@ -425,6 +430,65 @@
   .file-move-form button {
     width: 100%;
   }
+}
+
+/* Service registry workspace */
+.service-registry-panel { overflow: hidden; }
+.service-registry-tabs { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .3rem; margin: 1rem 0 .75rem; padding: .3rem; border: 1px solid var(--border-color); border-radius: 12px; background: var(--surface-soft); }
+.service-registry-tab { min-height: 42px; padding: .55rem .75rem; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--muted-color); font-weight: 700; cursor: pointer; }
+.service-registry-tab:hover { color: var(--heading-color); background: color-mix(in srgb,var(--card-bg) 78%,var(--primary-blue) 4%); }
+.service-registry-tab.is-active { border-color: color-mix(in srgb,var(--primary-blue) 30%,var(--border-color)); background: var(--card-bg); color: var(--primary-blue); box-shadow: 0 2px 7px var(--shadow-light); }
+.selected-file-summary { margin: -.35rem 0 .85rem; padding: .5rem .7rem; border-left: 3px solid var(--border-color); color: var(--muted-color); font-size: .78rem; }
+.selected-file-summary.has-selection { border-left-color: var(--primary-gold); color: var(--heading-color); }
+.service-file-record { display: flex; flex-direction: column; gap: .45rem; min-height: 190px; padding: .85rem; border: 1px solid var(--border-color); border-radius: 12px; background: var(--card-bg); cursor: pointer; transition: border-color .16s ease,box-shadow .16s ease,transform .16s ease; }
+.service-file-record:hover { border-color: color-mix(in srgb,var(--primary-blue) 42%,var(--border-color)); transform: translateY(-1px); box-shadow: 0 7px 18px var(--shadow-light); }
+.service-file-record.is-selected { border-color: var(--primary-blue); box-shadow: 0 0 0 3px color-mix(in srgb,var(--primary-blue) 12%,transparent),0 8px 18px var(--shadow-light); }
+.service-file-record-header { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
+.service-file-number { color: var(--primary-blue); font-size: .92rem; font-weight: 800; }
+.service-custody { padding: .2rem .48rem; border-radius: 999px; font-size: .68rem; font-weight: 750; }
+.service-custody.is-in { background: color-mix(in srgb,#dff5e8 82%,var(--card-bg)); color: #17603a; }
+.service-custody.is-out { background: color-mix(in srgb,#f6e5d2 82%,var(--card-bg)); color: #874b13; }
+.service-file-name { color: var(--heading-color); font-size: .88rem; }
+.service-file-rank { color: var(--muted-color); font-size: .76rem; }
+.service-file-location { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; margin-top: .15rem; padding: .48rem .58rem; border-radius: 8px; background: var(--surface-soft); color: var(--heading-color); font-size: .76rem; font-weight: 700; }
+.service-file-location small { color: var(--muted-color); font-size: .64rem; font-weight: 500; }
+
+/* Calm, role-based action hierarchy */
+.service-registry-actions { justify-content: flex-start; background: transparent; padding: .2rem 0; border: 0; }
+.service-registry-actions button,.movement-item-actions button,.file-move-form button,.file-history-modal-tools button,.file-history-modal-footer button { min-height: 38px; border-radius: 8px; padding: .48rem .72rem; box-shadow: none; font-size: .76rem; }
+#openFileTrackerBtn,.registry-track,.service-action { border-color: var(--border-color) !important; background: var(--card-bg) !important; color: var(--primary-blue) !important; }
+.service-registry-actions .action-receive,.file-move-form .action-receive { border-color: var(--primary-maroon); background: var(--primary-maroon); color: #fff; }
+.service-registry-actions .action-move,.movement-item-actions .action-move,.btn-move-save { border-color: color-mix(in srgb,var(--primary-blue) 58%,var(--border-color)); background: var(--primary-blue); color: #fff; }
+.service-registry-actions .action-return,.movement-item-actions .action-return,.file-move-form .action-return,.return-btn { border-color: color-mix(in srgb,var(--primary-gold-dark) 54%,var(--border-color)); background: color-mix(in srgb,var(--primary-gold) 14%,var(--card-bg)); color: var(--primary-gold-darker); }
+.service-registry-actions button:hover,.movement-item-actions button:hover { transform: translateY(-1px); box-shadow: 0 4px 10px var(--shadow-light); filter: none; }
+.service-registry-actions button:disabled,.file-history-modal-tools button:disabled { opacity: .42; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* Harmonized operation dialogs */
+.tracker-panel,.recorder-panel { border-left: 1px solid var(--divider-color); }
+.file-operation-modal,.file-history-modal { border: 1px solid var(--border-color); border-radius: 16px; background: var(--card-bg); box-shadow: 0 24px 54px var(--shadow-dark); }
+.file-operation-modal { padding: 1rem 1.1rem 1.1rem; }
+.file-operation-modal > h2,.file-operation-modal > h3 { margin: .05rem 0 .2rem; color: var(--heading-color); font-size: 1.05rem; }
+.file-operation-modal > p { margin: 0; color: var(--muted-color); font-size: .8rem; }
+.file-move-form { padding: .75rem; border: 1px solid var(--divider-color); border-radius: 11px; background: var(--surface-soft); }
+.file-move-form input,.file-move-form select { min-height: 40px; background: var(--card-bg); }
+.operation-modal-close { position: absolute; top: .7rem; right: .7rem; float: none; background: var(--card-bg); }
+.btn-tracker-load { border-color: var(--primary-blue); background: var(--primary-blue); color: #fff; box-shadow: none; }
+.modal-custody-hint { grid-column: 1 / -1; padding: .48rem .6rem; border-left: 3px solid var(--border-color); color: var(--muted-color); font-size: .74rem; }
+.modal-custody-hint.is-valid { border-left-color: #2d8a57; color: #17603a; }
+.service-file-details-modal { width: min(780px,94vw); }
+.service-file-details-body { margin-top: .8rem; }
+.service-details-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .55rem; }
+.service-details-grid > div { padding: .65rem; border: 1px solid var(--border-color); border-radius: 9px; background: var(--surface-soft); }
+.service-details-grid span { display: block; margin-bottom: .18rem; color: var(--muted-color); font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.service-details-grid strong { color: var(--heading-color); font-size: .82rem; overflow-wrap: anywhere; }
+.service-file-details-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: .8rem; padding-top: .7rem; border-top: 1px solid var(--divider-color); }
+
+@media (max-width: 700px) {
+  .service-registry-tabs { grid-template-columns: 1fr; }
+  .service-registry-tab { text-align: left; }
+  .service-file-location { align-items: flex-start; flex-direction: column; }
+  .service-details-grid { grid-template-columns: 1fr; }
+  .service-file-details-actions { align-items: stretch; flex-direction: column; }
 }
 
 body.file-history-modal-open {

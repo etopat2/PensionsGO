@@ -42,34 +42,57 @@ if ($deliveredBy === '') {
     exit;
 }
 
+$isReceive = $movementAction === 'receive';
 $existsSql = $fileType === 'service'
-    ? "SELECT pensionNo AS regNo FROM tb_service_files WHERE (pensionNo = ? OR employeeNo = ?) LIMIT 1"
-    : "SELECT regNo FROM tb_fileregistry WHERE regNo = ? AND COALESCE(is_deleted, 0) = 0 LIMIT 1";
+    ? ($isReceive
+        ? "SELECT id AS staffdue_id, NULL AS registry_id, employeeNo, COALESCE(NULLIF(pensionNo,''),regNo) AS pensionNo FROM tb_staffdue WHERE (employeeNo=? OR pensionNo=? OR regNo=?) AND COALESCE(is_deleted,0)=0 LIMIT 1"
+        : "SELECT staffdue_id, registry_id, employeeNo, pensionNo FROM tb_service_files WHERE (pensionNo = ? OR employeeNo = ?) LIMIT 1")
+    : "SELECT NULL AS staffdue_id, id AS registry_id, NULL AS employeeNo, COALESCE(NULLIF(pensionNo,''),regNo) AS pensionNo FROM tb_fileregistry WHERE (pensionNo = ? OR regNo = ?) AND COALESCE(is_deleted, 0) = 0 LIMIT 1";
 $existsStmt = $conn->prepare($existsSql);
 if (!$existsStmt) {
     echo json_encode(['success' => false, 'message' => 'Unable to validate file number']);
     exit;
 }
-if ($fileType === 'service') $existsStmt->bind_param("ss", $regNo, $regNo); else $existsStmt->bind_param("s", $regNo);
+if ($fileType === 'service' && $isReceive) $existsStmt->bind_param("sss", $regNo, $regNo, $regNo);
+elseif ($fileType === 'service') $existsStmt->bind_param("ss", $regNo, $regNo);
+else $existsStmt->bind_param("ss", $regNo, $regNo);
 $existsStmt->execute();
 $exists = $existsStmt->get_result()->fetch_assoc();
 $existsStmt->close();
 
 if (!$exists) {
-    echo json_encode(['success' => false, 'message' => 'File number does not exist in the selected file registry']);
+    echo json_encode(['success' => false, 'message' => 'No related staff-due or pension-registry record matches this number.']);
     exit;
 }
+$regNo = $fileType === 'service'
+    ? (trim((string)($exists['employeeNo'] ?? '')) ?: trim((string)($exists['pensionNo'] ?? $regNo)))
+    : trim((string)($exists['pensionNo'] ?? $regNo));
 
 try {
     $conn->begin_transaction();
 
+    if ($movementAction === 'receive') {
+        $staffdueId = ($exists['staffdue_id'] ?? null) ? (int)$exists['staffdue_id'] : null;
+        $registryId = ($exists['registry_id'] ?? null) ? (int)$exists['registry_id'] : null;
+        $employeeNo = trim((string)($exists['employeeNo'] ?? '')) ?: null;
+        $pensionNo = trim((string)($exists['pensionNo'] ?? '')) ?: null;
+        $stage = in_array($destinationRegistry, ['pending_processing','still_in_process','pension_file_registry','archives'], true) ? $destinationRegistry : 'pending_processing';
+        $registryBox = allocateServiceRegistryBox($conn,$stage);
+        $receivedFile = $conn->prepare("INSERT INTO tb_service_files (staffdue_id,registry_id,file_type,employeeNo,pensionNo,registry_stage,registry_box_no,availability_status,current_holder,availed_at,updated_by,updated_at) VALUES (?,?,?,?,?,?,?,'available','Registry',NOW(),?,NOW()) ON DUPLICATE KEY UPDATE registry_id=COALESCE(VALUES(registry_id),registry_id),file_type=VALUES(file_type),pensionNo=COALESCE(VALUES(pensionNo),pensionNo),registry_stage=VALUES(registry_stage),registry_box_no=VALUES(registry_box_no),availability_status='available',current_holder='Registry',availed_at=COALESCE(availed_at,NOW()),updated_by=VALUES(updated_by),updated_at=NOW()");
+        if (!$receivedFile) throw new RuntimeException('Unable to prepare the received-file registry record.');
+        $actor=(string)$_SESSION['userId'];
+        $receivedFile->bind_param('iissssis',$staffdueId,$registryId,$fileType,$employeeNo,$pensionNo,$stage,$registryBox,$actor);
+        if (!$receivedFile->execute()) throw new RuntimeException('Unable to add the file to the selected registry.');
+        $receivedFile->close();
+    }
+
     $registryLabels = ['pending_processing'=>'Service Files Pending Processing','still_in_process'=>'Service Files Still in Process','pension_file_registry'=>'Pension File Registry','archives'=>'Archives','staff_registry'=>'Staff Registry','external_office'=>'External Office / Individual'];
     $latestOpen = getLatestOpenFileMovement($conn, $regNo, true);
+    if ($latestOpen && $movementAction === 'move') {
+        throw new RuntimeException('This file is already recorded as out. Return it before recording another movement.');
+    }
     $fromOffice = $movementAction === 'receive' ? ($registryLabels[$sourceRegistry] ?? ($sourceRegistry ?: 'Incoming Source')) : resolveCurrentFileHolderOffice($conn, $regNo);
     if ($movementAction === 'receive') $toOffice = $registryLabels[$destinationRegistry] ?? ($destinationRegistry ?: 'Registry');
-    if ($latestOpen && $movementAction === 'move') {
-        $fromOffice = trim((string)($latestOpen['to_office'] ?? ''));
-    }
     if ($fromOffice === '') {
         $fromOffice = resolveCurrentFileHolderOffice($conn, $regNo);
     }

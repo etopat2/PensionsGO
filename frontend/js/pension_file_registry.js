@@ -62,6 +62,7 @@ async function initPensionFileRegistryController() {
   const lifeCertAddress = document.getElementById("registryLifeCertAddress");
   const lifeCertNok = document.getElementById("registryLifeCertNok");
   const lifeCertNokContact = document.getElementById("registryLifeCertNokContact");
+  const lifeCertNokNin = document.getElementById("registryLifeCertNokNin");
   const lifeCertBankName = document.getElementById("registryLifeCertBankName");
   const lifeCertBankAccount = document.getElementById("registryLifeCertBankAccount");
   const lifeCertBankBranch = document.getElementById("registryLifeCertBankBranch");
@@ -81,6 +82,7 @@ async function initPensionFileRegistryController() {
   const editBoxNo = document.getElementById("editBoxNo");
   const editSName = document.getElementById("editSName");
   const editFName = document.getElementById("editFName");
+  const editMiddleName = document.getElementById("editMiddleName");
   const editGender = document.getElementById("editGender");
   const editLivingStatus = document.getElementById("editLivingStatus");
   const editLifeCertificate = document.getElementById("editLifeCertificate");
@@ -132,6 +134,7 @@ async function initPensionFileRegistryController() {
     editBoxNo,
     editSName,
     editFName,
+    editMiddleName,
     editGender,
     editLivingStatus,
     editLifeCertificate,
@@ -767,6 +770,9 @@ async function initPensionFileRegistryController() {
     }
   }
 
+  function canRecordFileMovement() { return getPermissionValue("file_movement.record", currentUserRole !== "pensioner"); }
+  function canReturnFileMovement() { return getPermissionValue("file_movement.return", currentUserRole !== "pensioner"); }
+
   function getRegistryEditBannerCopy(mode = registryFormMode) {
     const isCreate = mode === "create";
     const canCreateDirect = canEditRegistry();
@@ -865,6 +871,8 @@ async function initPensionFileRegistryController() {
         "registry.benefits.monthly_salary.edit",
         "registry.benefits.length_service.edit",
         "registry.benefits.amounts.edit"
+        ,"file_movement.record"
+        ,"file_movement.return"
       ];
       const res = await fetch(`../backend/api/get_current_permissions.php?keys=${encodeURIComponent(permissionKeys.join(","))}`, {
         credentials: "include",
@@ -996,7 +1004,7 @@ async function initPensionFileRegistryController() {
         }
       },
       { field: editTitle, message: "Identity Profile is missing the title or rank.", isInvalid: () => !String(editTitle?.value || "").trim() },
-      { field: editSName, message: "Identity Profile is missing the surname.", isInvalid: () => !String(editSName?.value || "").trim() },
+      { field: editSName, message: "Identity Profile is missing the last name.", isInvalid: () => !String(editSName?.value || "").trim() },
       { field: editFName, message: "Identity Profile is missing the first name.", isInvalid: () => !String(editFName?.value || "").trim() },
       {
         field: editNIN,
@@ -1080,7 +1088,7 @@ async function initPensionFileRegistryController() {
   };
 
   const registryTabFieldGroups = {
-    identity: [editRegNo, editComputerNo, editSupplierNo, editTitle, editSName, editFName, editGender, editNIN, editTIN, editTelNo, editAddress],
+    identity: [editRegNo, editComputerNo, editSupplierNo, editTitle, editFName, editMiddleName, editSName, editGender, editNIN, editTIN, editTelNo, editAddress],
     service: [editBirthDate, editEnlistmentDate, editRetirementDate, editRetirementType, editLivingStatus, editLifeCertificate, editPayrollStatus, editPayType],
     benefits: [editMonthlySalary, editLengthOfService, editAnnualSalary, editReducedPension, editFullPension, editGratuity],
     contact: [editApplicantEmail, editBankName, editBankAccount, editBankBranch, editNextOfKin, editNextOfKinContact],
@@ -1389,6 +1397,7 @@ async function initPensionFileRegistryController() {
     editBoxNo.value = "";
     editSName.value = "";
     editFName.value = "";
+    editMiddleName.value = "";
     editGender.value = "";
     editLivingStatus.value = "Alive";
     editLifeCertificate.value = "Not Submitted";
@@ -1442,12 +1451,17 @@ async function initPensionFileRegistryController() {
       regNo: registryFormMode === "create"
         ? normalizeRegistryFileNumber(editRegNo.value, { preservePrefix: false })
         : String(editRegNo.value || "").trim().toUpperCase(),
+      ippsNo: editComputerNo.value.trim(),
+      pensionNo: editRegNo.value.trim(),
       computerNo: editComputerNo.value.trim(),
       supplierNo: editSupplierNo.value.trim(),
       title: editTitle.value.trim(),
       boxNo: editBoxNo.value.trim(),
+      firstName: editFName.value.trim(),
+      middleName: editMiddleName?.value.trim() || "",
+      lastName: editSName.value.trim(),
       sName: editSName.value.trim(),
-      fName: editFName.value.trim(),
+      fName: [editFName.value.trim(), editMiddleName?.value.trim() || ""].filter(Boolean).join(" "),
       gender: editGender.value,
       livingStatus: editLivingStatus.value,
       lifeCertificate: editLifeCertificate.value,
@@ -2158,6 +2172,7 @@ async function initPensionFileRegistryController() {
       lifeCertAddress,
       lifeCertNok,
       lifeCertNokContact,
+      lifeCertNokNin,
       lifeCertBankName,
       lifeCertBankAccount,
       lifeCertBankBranch
@@ -2188,6 +2203,7 @@ async function initPensionFileRegistryController() {
       lifeCertAddress,
       lifeCertNok,
       lifeCertNokContact,
+      lifeCertNokNin,
       lifeCertBankName,
       lifeCertBankAccount,
       lifeCertBankBranch
@@ -2221,6 +2237,7 @@ async function initPensionFileRegistryController() {
     setDistrictValue(lifeCertAddress, String(safe.address || "").trim());
     if (lifeCertNok) lifeCertNok.value = String(safe.next_of_kin || "").trim();
     if (lifeCertNokContact) lifeCertNokContact.value = String(safe.next_of_kin_contact || "").trim();
+    if (lifeCertNokNin) lifeCertNokNin.value = String(safe.beneficiary_nin || safe.next_of_kin_nin || "").trim();
     setLifeCertBankValue(String(safe.bank_name || "").trim());
     if (lifeCertBankAccount) lifeCertBankAccount.value = String(safe.bank_account || "").trim();
     if (lifeCertBankBranch) lifeCertBankBranch.value = String(safe.bank_branch || "").trim();
@@ -2302,6 +2319,7 @@ async function initPensionFileRegistryController() {
       address: String(lifeCertAddress?.value || "").trim(),
       next_of_kin: String(lifeCertNok?.value || "").trim(),
       next_of_kin_contact: String(lifeCertNokContact?.value || "").trim(),
+      beneficiary_nin: String(lifeCertNokNin?.value || "").trim().toUpperCase(),
       bank_name: String(lifeCertBankName?.value || "").trim(),
       bank_account: String(lifeCertBankAccount?.value || "").trim(),
       bank_branch: String(lifeCertBankBranch?.value || "").trim()
@@ -2521,8 +2539,57 @@ async function initPensionFileRegistryController() {
     });
   }
 
+  let registryMovementContext = null;
+  function closeRegistryMovementModal() {
+    document.getElementById("registryMovementModal")?.classList.add("hidden");
+    registryMovementContext=null;
+  }
+  async function openRegistryMovementModal(record) {
+    const modal=document.getElementById("registryMovementModal");
+    const number=record.pensionNo||record.regNo;
+    registryMovementContext={record,number,isOut:false,openMovement:null};
+    document.getElementById("registryMovementRegNo").value=number;
+    document.getElementById("registryMovementIdentity").innerHTML=`<div><span>Pension Number</span><strong>${escapeHtml(number)}</strong></div><div><span>Pensioner</span><strong>${escapeHtml([record.firstName,record.middleName,record.lastName].filter(Boolean).join(" ")||record.name||"Not recorded")}</strong></div><div><span>Current Registry</span><strong>Pension File Registry</strong></div>`;
+    const submit=document.getElementById("registryMovementSubmitBtn");
+    const hint=document.getElementById("registryMovementCustodyHint");
+    submit.disabled=true;hint.textContent="Checking file custody...";
+    modal.classList.remove("hidden");
+    try {
+      const data=await fetch(`../backend/api/get_file_custody.php?number=${encodeURIComponent(number)}&file_type=pension`,{credentials:"include",cache:"no-store"}).then((response)=>response.json());
+      if(!data.exists) throw new Error("Pension file is not available in the registry.");
+      registryMovementContext.isOut=Boolean(data.is_out);registryMovementContext.openMovement=data.open_movement||null;
+      const isOut=registryMovementContext.isOut;
+      document.getElementById("registryMoveFields").classList.toggle("hidden",isOut);
+      document.getElementById("registryReturnFields").classList.toggle("hidden",!isOut);
+      document.querySelectorAll("#registryMoveFields input,#registryMoveFields select").forEach((field)=>field.disabled=isOut);
+      document.querySelectorAll("#registryReturnFields input,#registryReturnFields select").forEach((field)=>field.disabled=!isOut);
+      document.getElementById("registryMovementTitle").textContent=isOut?"Return Pension File":"Move Pension File";
+      document.getElementById("registryMovementSubtitle").textContent=isOut?"Receive this pension file back into registry custody.":"Record this pension file leaving registry custody.";
+      submit.textContent=isOut?"Mark File Returned":"Move File";
+      submit.disabled=isOut?!canReturnFileMovement():!canRecordFileMovement();
+      hint.textContent=isOut?"File is currently out and is eligible for return.":"File is in the registry and is eligible to move.";
+      hint.classList.add("is-valid");
+    }catch(error){hint.textContent=error.message;submit.disabled=true;}
+  }
+  document.querySelectorAll("[data-close-registry-movement]").forEach((button)=>button.addEventListener("click",closeRegistryMovementModal));
+  document.getElementById("registryMovementForm")?.addEventListener("submit",async(event)=>{
+    event.preventDefault();if(!registryMovementContext)return;
+    const submit=document.getElementById("registryMovementSubmitBtn");submit.disabled=true;
+    try{
+      let data;
+      if(registryMovementContext.isOut){
+        data=await fetch("../backend/api/return_file_movement.php",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({movement_id:Number(registryMovementContext.openMovement?.movement_id||0),regNo:registryMovementContext.number,received_by:document.getElementById("registryReturnReceivedBy").value.trim(),destination_registry:"pension_file_registry",note:document.getElementById("registryReturnNote").value.trim()})}).then((response)=>response.json());
+      }else{
+        data=await fetch("../backend/api/record_file_movement.php",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({movement_action:"move",file_type:"pension",regNo:registryMovementContext.number,source_registry:"pension_file_registry",destination_registry:"",to_office:document.getElementById("registryMoveDestination").value.trim(),reason:document.getElementById("registryMoveReason").value.trim(),delivered_by:document.getElementById("registryMoveDeliveredBy").value.trim(),expected_return_at:document.getElementById("registryMoveExpectedReturn").value})}).then((response)=>response.json());
+      }
+      if(!data.success)throw new Error(data.message||"Unable to update file movement.");
+      showFeedbackModal("success","File Movement",data.message);closeRegistryMovementModal();clearRegistryCache();await loadCards();
+    }catch(error){showFeedbackModal("error","File Movement",error.message);submit.disabled=false;}
+  });
+
   function renderCard(record) {
-    const nameCore = `${record.sName || ""} ${record.fName || ""}`.trim();
+    const nameCore = [record.firstName, record.middleName, record.lastName].filter(Boolean).join(" ")
+      || [record.fName, record.sName].filter(Boolean).join(" ");
     const formattedName = nameCore;
     const fallbackName = String(record.name || "").trim();
     const displayName = escapeHtml(formattedName || fallbackName || "Unknown");
@@ -2530,7 +2597,7 @@ async function initPensionFileRegistryController() {
     const payTypeClass = normalizedPayType === "One-off Payment"
       ? "registry-pay-type-chip registry-pay-type-oneoff"
       : "registry-pay-type-chip registry-pay-type-pensioner";
-    const fileNo = escapeHtml(record.regNo || "N/A");
+    const pensionNo = escapeHtml(record.pensionNo || record.regNo || "N/A");
     const rank = escapeHtml(record.title || "N/A");
     const retirementType = escapeHtml(formatRetirementTypeLabel(record.retirementType));
     const retirementDate = escapeHtml(formatDateBadge(record.retirementDate));
@@ -2556,6 +2623,10 @@ async function initPensionFileRegistryController() {
     const callBtn = phone
       ? `<a class="registry-action-link success mobile-only-call" data-action="call" href="tel:${escapeHtml(phone)}">Call</a>`
       : `<button class="registry-action-btn success mobile-only-call" data-action="call" disabled>No Phone</button>`;
+    const isFileOut = (record.availability_status || "in_shelf") === "out_of_shelf";
+    const movementBtn = isFileOut
+      ? (canReturnFileMovement() ? `<button class="registry-action-btn movement-return" data-action="movement" data-id="${Number(record.id)}">Mark Returned</button>` : "")
+      : (canRecordFileMovement() ? `<button class="registry-action-btn movement-move" data-action="movement" data-id="${Number(record.id)}">Move File</button>` : "");
 
     return `
       <article class="registry-card ${cardAvailabilityClass} ${cardPayrollClass}">
@@ -2564,7 +2635,7 @@ async function initPensionFileRegistryController() {
           <span class="${payTypeClass}">(${escapeHtml(normalizedPayType)})</span>
         </div>
         <div class="registry-card-line registry-card-line-top">
-          <span class="registry-card-line-text">${fileNo} - ${rank}</span>
+          <span class="registry-card-line-text">Pension: ${pensionNo} - ${rank}</span>
           <span class="registry-payroll-badge ${payrollBadgeClass}">${escapeHtml(payrollStatus)}</span>
         </div>
         <div class="registry-card-meta-row registry-card-retirement-row">
@@ -2580,6 +2651,7 @@ async function initPensionFileRegistryController() {
           ${editBtn}
           ${deleteBtn}
           ${lifeCertQuickBtn}
+          ${movementBtn}
           ${callBtn}
         </div>
       </article>
@@ -2695,12 +2767,13 @@ async function initPensionFileRegistryController() {
 
   function buildDetailsSections(record, documents, canEdit) {
     const identityFields = [
-      ["File Number", record.regNo],
-      ["Computer Number", record.computerNo],
+      ["Pension Number", record.pensionNo || record.regNo],
+      ["IPPS Number", record.ippsNo || record.computerNo],
       ["Supplier Number", record.supplierNo],
       ["Title/Rank", record.title],
-      ["Surname", record.sName],
-      ["First Name", record.fName],
+      ["First Name", record.firstName || String(record.fName || "").split(/\s+/)[0]],
+      ["Middle Name", record.middleName],
+      ["Last Name", record.lastName || record.sName],
       ["Gender", record.gender],
       ["Station", record.station],
       ["Phone", record.telNo || record.phone],
@@ -2891,12 +2964,13 @@ async function initPensionFileRegistryController() {
       };
       editRecordId.value = String(record.id || "");
       editRegNo.value = record.regNo || "";
-      editComputerNo.value = record.computerNo || "";
+      editComputerNo.value = record.ippsNo || record.computerNo || "";
       editSupplierNo.value = record.supplierNo || "";
       setRegistryTitleValue(record.title || "");
       editBoxNo.value = record.boxNo || "";
-      editSName.value = record.sName || "";
-      editFName.value = record.fName || "";
+      editSName.value = record.lastName || record.sName || "";
+      editFName.value = record.firstName || String(record.fName || "").split(/\s+/)[0] || "";
+      if (editMiddleName) editMiddleName.value = record.middleName || String(record.fName || "").split(/\s+/).slice(1).join(" ");
       editGender.value = record.gender || "";
       editLivingStatus.value = record.livingStatus || "";
       editLifeCertificate.value = record.lifeCertificateStatus || record.lifeCertificate || "Not Submitted";
@@ -3041,7 +3115,7 @@ async function initPensionFileRegistryController() {
     }
 
     if (!payload.sName || !payload.fName) {
-      showFeedbackModal("error", "Validation Error", "Surname and first name are required.");
+      showFeedbackModal("error", "Validation Error", "First name and last name are required.");
       setEditTab("identity");
       return;
     }
@@ -3743,9 +3817,27 @@ async function initPensionFileRegistryController() {
   }
 
   if (refreshBtn) {
-    refreshBtn.addEventListener("click", () => {
-      clearRegistryCache();
-      loadCards();
+    refreshBtn.addEventListener("click", async () => {
+      if (refreshBtn.disabled) return;
+      const originalLabel = refreshBtn.textContent;
+      refreshBtn.disabled = true;
+      refreshBtn.setAttribute("aria-busy", "true");
+      refreshBtn.textContent = "Refreshing...";
+      try {
+        clearRegistryCache();
+        await Promise.all([loadCards(), refreshDeleteQueueBadge()]);
+      } finally {
+        refreshBtn.disabled = false;
+        refreshBtn.removeAttribute("aria-busy");
+        refreshBtn.textContent = originalLabel;
+      }
+    });
+
+    grid.querySelectorAll("[data-action='movement']").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const record=records.find((row)=>Number(row.id)===Number(btn.dataset.id));
+        if(record) openRegistryMovementModal(record);
+      });
     });
   }
 

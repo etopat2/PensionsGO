@@ -133,8 +133,14 @@ if ($canEditRegNo && $regNo !== $existingRegNo) {
     }
 }
 
-$sName = trim((string)($payload['sName'] ?? ''));
-$fName = trim((string)($payload['fName'] ?? ''));
+$canonicalFirstName=trim((string)($payload['firstName']??''));
+$canonicalMiddleName=trim((string)($payload['middleName']??''));
+$canonicalLastName=trim((string)($payload['lastName']??($payload['sName']??'')));
+$canonicalLegacyGiven=trim((string)($payload['fName']??''));
+if($canonicalFirstName===''&&$canonicalLegacyGiven!==''){$parts=preg_split('/\s+/',$canonicalLegacyGiven,2);$canonicalFirstName=$parts[0]??'';$canonicalMiddleName=$canonicalMiddleName?:($parts[1]??'');}
+$payload['sName']=$canonicalLastName;$payload['fName']=trim($canonicalFirstName.' '.$canonicalMiddleName);
+$sName = $canonicalLastName;
+$fName = $payload['fName'];
 $requiredMessages = [
     'title' => 'Identity Profile is missing the title or rank.',
     'sName' => 'Identity Profile is missing the surname.',
@@ -161,7 +167,11 @@ if (!in_array($availabilityStatus, ['in_shelf', 'out_of_shelf'], true)) {
     $availabilityStatus = 'in_shelf';
 }
 
-$computerNo = trim((string)($payload['computerNo'] ?? ''));
+$ippsNo = trim((string)($payload['ippsNo'] ?? ($payload['computerNo'] ?? '')));
+$firstName = $canonicalFirstName;
+$middleName = $canonicalMiddleName;
+$lastName = $canonicalLastName;
+$computerNo = $ippsNo;
 $supplierNo = trim((string)($payload['supplierNo'] ?? ''));
 $title = trim((string)($payload['title'] ?? ''));
 $normalizedTitle = normalizeRegistryTitle($conn, $title);
@@ -462,6 +472,8 @@ if (!$stmt->execute()) {
 
 $affected = $stmt->affected_rows;
 $stmt->close();
+$canonicalStmt=$conn->prepare("UPDATE tb_fileregistry SET employeeNo=NULL,pensionNo=?,ippsNo=?,firstName=?,middleName=?,lastName=? WHERE id=?");
+if($canonicalStmt){$canonicalStmt->bind_param('sssssi',$regNo,$ippsNo,$firstName,$middleName,$lastName,$id);$canonicalStmt->execute();$canonicalStmt->close();}
 
 if ($regNo !== $existingRegNo) {
     $conn->query("SET FOREIGN_KEY_CHECKS=0");

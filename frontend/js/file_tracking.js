@@ -37,15 +37,39 @@ document.addEventListener("DOMContentLoaded", () => {
   const movementModalOverlay = document.getElementById("movementModalOverlay");
   const receiveModalOverlay = document.getElementById("receiveModalOverlay");
   const returnModalOverlay = document.getElementById("returnModalOverlay");
+  const openMoveFileBtn = document.getElementById("openMoveFileBtn");
+  const openReturnFileBtn = document.getElementById("openReturnFileBtn");
+  const selectedServiceFileSummary = document.getElementById("selectedServiceFileSummary");
+  const serviceFileDetailsOverlay = document.getElementById("serviceFileDetailsOverlay");
+  const serviceFileDetailsBody = document.getElementById("serviceFileDetailsBody");
+  const moveFileSubmitBtn = document.getElementById("moveFileSubmitBtn");
+  const returnFileSubmitBtn = document.getElementById("returnFileSubmitBtn");
+  const moveFileCustodyHint = document.getElementById("moveFileCustodyHint");
+  const returnFileCustodyHint = document.getElementById("returnFileCustodyHint");
+  let selectedServiceFile = null;
   const openOperationModal = (overlay) => { if (overlay) { overlay.style.display = "flex"; document.body.classList.add("file-history-modal-open"); } };
   const closeOperationModal = (overlay) => { if (overlay) { overlay.style.display = "none"; if (!isHistoryModalOpen) document.body.classList.remove("file-history-modal-open"); } };
   document.getElementById("openFileTrackerBtn")?.addEventListener("click", () => openOperationModal(trackerModalOverlay));
   document.getElementById("openReceiveFileBtn")?.addEventListener("click", () => openOperationModal(receiveModalOverlay));
-  document.getElementById("openMoveFileBtn")?.addEventListener("click", () => { if (moveFromInput) { moveFromInput.value = "Registry"; moveFromInput.dataset.registry = "pension_file_registry"; } openOperationModal(movementModalOverlay); });
-  document.getElementById("openReturnFileBtn")?.addEventListener("click", () => openOperationModal(returnModalOverlay));
+  openMoveFileBtn?.addEventListener("click", () => {
+    if (moveRegNoInput) moveRegNoInput.value = selectedServiceFile?.employeeNo || "";
+    if (moveFromInput) { moveFromInput.value = String(selectedServiceFile?.registry_stage || "Registry").replaceAll("_", " "); moveFromInput.dataset.registry = selectedServiceFile?.registry_stage || "pending_processing"; }
+    openOperationModal(movementModalOverlay);
+    validateModalCustody("move");
+  });
+  openReturnFileBtn?.addEventListener("click", () => {
+    document.getElementById("returnRegNo").value = selectedServiceFile?.employeeNo || "";
+    document.getElementById("returnDestination").value = selectedServiceFile?.registry_stage || "pending_processing";
+    openOperationModal(returnModalOverlay);
+    validateModalCustody("return");
+  });
   document.querySelectorAll("[data-close-operation]").forEach((button) => button.addEventListener("click", () => closeOperationModal(document.getElementById(button.dataset.closeOperation))));
   const receiveFileType = document.getElementById("receiveFileType");
   const receiveDestination = document.getElementById("receiveDestination");
+  const receiveRegNo = document.getElementById("receiveRegNo");
+  const receiveRecordMatch = document.getElementById("receiveRecordMatch");
+  let receiveLookupTimer = null;
+  let resolvedReceiveRecord = null;
   function syncReceiveDestinations() {
     if (!receiveDestination) return;
     const options = receiveFileType?.value === "pension"
@@ -56,25 +80,171 @@ document.addEventListener("DOMContentLoaded", () => {
   receiveFileType?.addEventListener("change", syncReceiveDestinations);
   syncReceiveDestinations();
 
+  async function lookupReceivableFile(value) {
+    const query = String(value || "").trim().toUpperCase();
+    resolvedReceiveRecord = null;
+    receiveRecordMatch?.classList.remove("is-match");
+    if (!query) {
+      if (receiveRecordMatch) receiveRecordMatch.textContent = "Enter an Employee Number or Pension Number to fetch the related officer.";
+      return;
+    }
+    if (receiveRecordMatch) receiveRecordMatch.textContent = "Looking up the related officer...";
+    try {
+      const data = await fetch(`../backend/api/lookup_receivable_file.php?q=${encodeURIComponent(query)}`, { credentials: "include", cache: "no-store" }).then((response) => response.json());
+      const matches = Array.isArray(data.records) ? data.records : [];
+      const exact = matches.find((item) => String(item.number || "").toUpperCase() === query) || (matches.length === 1 ? matches[0] : null);
+      if (!exact) {
+        if (receiveRecordMatch) receiveRecordMatch.textContent = matches.length ? "Multiple records match. Enter the complete Employee or Pension Number." : "No related staff-due or pension-registry record was found.";
+        return;
+      }
+      resolvedReceiveRecord = exact;
+      receiveRegNo.value = exact.number;
+      receiveFileType.value = exact.file_type;
+      syncReceiveDestinations();
+      receiveRecordMatch?.classList.add("is-match");
+      if (receiveRecordMatch) receiveRecordMatch.innerHTML = `<strong>${escapeHtml(exact.name || "Unnamed officer")}</strong> &middot; ${escapeHtml(exact.title || "Rank not recorded")}<br>${exact.file_type === "service" ? "Employee" : "Pension"} Number: ${escapeHtml(exact.number)}`;
+    } catch (error) {
+      if (receiveRecordMatch) receiveRecordMatch.textContent = "Unable to fetch the related record. Try again.";
+    }
+  }
+  receiveRegNo?.addEventListener("input", () => {
+    clearTimeout(receiveLookupTimer);
+    receiveLookupTimer = setTimeout(() => lookupReceivableFile(receiveRegNo.value), 280);
+  });
+
+  function updateSelectedFileState(file = null) {
+    selectedServiceFile = file;
+    const hasFile = Boolean(file?.employeeNo);
+    const isOut = hasFile && file.availability_status === "out";
+    if (selectedServiceFileSummary) {
+      selectedServiceFileSummary.textContent = hasFile
+        ? `${file.employeeNo} selected · ${isOut ? "File is out — return is available" : "File is in registry custody — move is available"}`
+        : "Select a file card to view its details and available custody action.";
+      selectedServiceFileSummary.classList.toggle("has-selection", hasFile);
+    }
+  }
+
+  async function validateModalCustody(action) {
+    const isMove = action === "move";
+    const input = isMove ? moveRegNoInput : document.getElementById("returnRegNo");
+    const button = isMove ? moveFileSubmitBtn : returnFileSubmitBtn;
+    const hint = isMove ? moveFileCustodyHint : returnFileCustodyHint;
+    const number = String(input?.value || "").trim();
+    if (button) button.disabled = true;
+    if (!number) { if (hint) hint.textContent = `Enter a file number to ${isMove ? "move" : "return"}.`; return; }
+    if (hint) hint.textContent = "Checking file custody...";
+    try {
+      const fileType = isMove ? (document.getElementById("moveFileType")?.value || "service") : "service";
+      const data = await fetch(`../backend/api/get_file_custody.php?number=${encodeURIComponent(number)}&file_type=${encodeURIComponent(fileType)}`, { credentials: "include", cache: "no-store" }).then((response) => response.json());
+      const permitted = Boolean(data.exists) && (isMove ? !data.is_out : data.is_out);
+      if (button) button.disabled = !permitted;
+      if (hint) {
+        hint.textContent = !data.exists ? "This file is not registered in the selected registry." : permitted ? (isMove ? "File is in registry custody and can be moved." : "File is out and can be returned.") : (isMove ? "This file is already out and cannot be moved again." : "This file is already in the registry and cannot be returned.");
+        hint.classList.toggle("is-valid", permitted);
+      }
+    } catch (error) { if (hint) hint.textContent = "Unable to validate file custody."; }
+  }
+
+  let custodyTimer = null;
+  moveRegNoInput?.addEventListener("input", () => { clearTimeout(custodyTimer); custodyTimer=setTimeout(()=>validateModalCustody("move"),250); });
+  document.getElementById("moveFileType")?.addEventListener("change", () => validateModalCustody("move"));
+  document.getElementById("returnRegNo")?.addEventListener("input", () => { clearTimeout(custodyTimer); custodyTimer=setTimeout(()=>validateModalCustody("return"),250); });
+
+  function openServiceFileDetails(file) {
+    updateSelectedFileState(file);
+    const isOut = file.availability_status === "out";
+    const isArchive = file.registry_stage === "archives";
+    serviceFileDetailsBody.innerHTML = `<div class="service-details-grid"><div><span>Employee / File Number</span><strong>${escapeHtml(file.employeeNo)}</strong></div><div><span>Officer</span><strong>${escapeHtml([file.firstName,file.middleName,file.lastName].filter(Boolean).join(" "))}</strong></div><div><span>Registry</span><strong>${escapeHtml(String(file.registry_stage).replaceAll("_"," "))}</strong></div><div><span>Storage</span><strong>${isArchive ? "Transferred to Archives" : `Box ${escapeHtml(file.registry_box_no || "Pending")}`}</strong></div><div><span>Custody</span><strong>${isOut ? "Out" : "In registry"}</strong></div></div>`;
+    document.getElementById("detailsMoveFileBtn").hidden = isOut;
+    document.getElementById("detailsReturnFileBtn").hidden = !isOut;
+    openOperationModal(serviceFileDetailsOverlay);
+  }
+
+  function renderServiceFiles(rows) {
+    if (!serviceFileResults) return;
+    if (!rows.length) {
+      serviceFileResults.innerHTML = '<div class="app-state-message app-state-neutral">No files have been registered in this service registry.</div>';
+      updateSelectedFileState(null);
+      return;
+    }
+    serviceFileResults.innerHTML = `<div class="service-file-card-grid">${rows.map((row) => {
+      const isSelected = selectedServiceFile?.service_file_id === row.service_file_id;
+      const isArchive = row.registry_stage === "archives";
+      const boxText = isArchive ? "Transferred to Archives" : `Box ${escapeHtml(row.registry_box_no || "Pending allocation")}`;
+      const custody = row.availability_status === "out" ? "Out" : row.availability_status === "archived" ? "Archived" : "In registry";
+      return `<article class="service-file-record${isSelected ? " is-selected" : ""}" tabindex="0" role="button" aria-pressed="${isSelected}" data-select-service-file="${Number(row.service_file_id)}">
+        <div class="service-file-record-header"><span class="service-file-number">${escapeHtml(row.employeeNo || "Employee number unavailable")}</span><span class="service-custody ${row.availability_status === "out" ? "is-out" : "is-in"}">${escapeHtml(custody)}</span></div>
+        <strong class="service-file-name">${escapeHtml([row.firstName,row.middleName,row.lastName].filter(Boolean).join(" ") || "Officer name unavailable")}</strong>
+        <span class="service-file-rank">${escapeHtml(row.rankName || row.positionName || row.rankPosition || "Rank not recorded")}</span>
+        <div class="service-file-location"><span>${escapeHtml(boxText)}</span>${!isArchive ? `<small>Maximum 10 files per box</small>` : ""}</div>
+        <div class="movement-item-actions"><button class="btn-secondary registry-track" data-file-number="${escapeHtml(row.employeeNo)}">Track history</button><button class="btn-secondary card-custody-action ${row.availability_status === "out" ? "action-return" : "action-move"}" data-service-id="${Number(row.service_file_id)}">${row.availability_status === "out" ? "Mark Returned" : "Move File"}</button>${row.staffdue_id ? `<button class="btn-secondary service-action" data-staff-id="${Number(row.staffdue_id)}" data-action="${row.registry_stage === "pending_processing" ? "create_pension_file" : row.registry_stage === "archives" ? "retrieve" : "archive"}">${row.registry_stage === "pending_processing" ? "Advance file" : row.registry_stage === "archives" ? "Retrieve" : "Send to Archives"}</button>` : ""}</div>
+      </article>`;
+    }).join("")}</div>`;
+    serviceFileResults.querySelectorAll("[data-select-service-file]").forEach((card) => {
+      const select = () => {
+        const row = rows.find((item) => Number(item.service_file_id) === Number(card.dataset.selectServiceFile));
+        updateSelectedFileState(row || null);
+        serviceFileResults.querySelectorAll("[data-select-service-file]").forEach((item) => { const active=item===card; item.classList.toggle("is-selected",active); item.setAttribute("aria-pressed",String(active)); });
+        if (row) openServiceFileDetails(row);
+      };
+      card.addEventListener("click", (event) => { if (!event.target.closest("button")) select(); });
+      card.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select(); } });
+      card.querySelector(".card-custody-action")?.addEventListener("click", () => {
+        const row = rows.find((item) => Number(item.service_file_id) === Number(card.dataset.selectServiceFile));
+        if (!row) return;
+        updateSelectedFileState(row);
+        (row.availability_status === "out" ? openReturnFileBtn : openMoveFileBtn)?.click();
+      });
+    });
+  }
+
   async function loadServiceFiles() {
     if (!serviceFileResults) return;
     const params = new URLSearchParams({ stage: document.getElementById("serviceFileStage")?.value || "", search: document.getElementById("serviceFileSearch")?.value.trim() || "" });
     serviceFileResults.innerHTML = '<div class="app-state-message app-state-neutral">Loading service files...</div>';
+    updateSelectedFileState(null);
     try {
       const response = await fetch(`../backend/api/service_files.php?${params}`, { credentials: "include" });
       const data = await response.json();
       if (!data.success) throw new Error(data.message || "Unable to load service files.");
       const rows = data.records || [];
-      serviceFileResults.innerHTML = rows.length ? `<div class="movement-list">${rows.map((row) => `
+      serviceFileResults.innerHTML = rows.length ? `<div class="service-file-card-grid">${rows.map((row) => `
         <article class="movement-item">
           <div class="movement-item-main"><strong>${escapeHtml(row.employeeNo)} · ${escapeHtml(row.pensionNo || "Pension file not created")}</strong>
           <div>${escapeHtml([row.rankName || row.positionName || row.rankPosition, row.firstName, row.middleName, row.lastName].filter(Boolean).join(" "))}</div>
           <div class="movement-meta">${escapeHtml(String(row.registry_stage || "").replaceAll("_", " "))} · Shelf ${escapeHtml(row.shelf_reference || "Not indexed")} · ${escapeHtml(row.availability_status || "Unknown")}</div></div>
           <div class="movement-item-actions"><button class="btn-secondary registry-track" data-file-number="${escapeHtml(row.pensionNo || row.employeeNo)}">Track</button><button class="btn-secondary registry-move" data-file-number="${escapeHtml(row.pensionNo || row.employeeNo)}" data-stage="${escapeHtml(row.registry_stage || "pending_processing")}">Move Out</button>${row.availability_status === "out" ? `<button class="btn-secondary registry-return" data-file-number="${escapeHtml(row.pensionNo || row.employeeNo)}" data-stage="${escapeHtml(row.registry_stage || "pending_processing")}">Return</button>` : ""}<button class="btn-secondary service-action" data-staff-id="${Number(row.staffdue_id)}" data-action="${row.availability_status === "not_availed" ? "avail" : row.registry_stage === "pending_processing" ? "create_pension_file" : row.registry_stage === "archives" ? "retrieve" : "archive"}">${row.availability_status === "not_availed" ? "Mark Availed" : row.registry_stage === "pending_processing" ? "Create Pension File" : row.registry_stage === "archives" ? "Retrieve" : "Archive"}</button></div>
         </article>`).join("")}</div>` : '<div class="app-state-message app-state-neutral">No service files match this registry.</div>';
-    } catch (error) { serviceFileResults.innerHTML = `<div class="app-state-message app-state-error">${escapeHtml(error.message)}</div>`; }
+      renderServiceFiles(rows);
+    } catch (error) { serviceFileResults.innerHTML = `<div class="app-state-message app-state-error">${escapeHtml(error.message)}</div>`; updateSelectedFileState(null); }
   }
   serviceFileForm?.addEventListener("submit", (event) => { event.preventDefault(); loadServiceFiles(); });
+  document.querySelectorAll("[data-registry-stage]").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const stage = tab.dataset.registryStage || "pending_processing";
+      const stageInput = document.getElementById("serviceFileStage");
+      if (stageInput) stageInput.value = stage;
+      document.querySelectorAll("[data-registry-stage]").forEach((item) => {
+        const active = item === tab;
+        item.classList.toggle("is-active", active);
+        item.setAttribute("aria-selected", String(active));
+      });
+      loadServiceFiles();
+    });
+  });
+  document.getElementById("detailsTrackFileBtn")?.addEventListener("click", async () => {
+    if (!selectedServiceFile) return;
+    closeOperationModal(serviceFileDetailsOverlay);
+    openOperationModal(trackerModalOverlay);
+    if (regNoInput) regNoInput.value=selectedServiceFile.employeeNo;
+    await loadMovements(selectedServiceFile.employeeNo,{openModal:false});
+  });
+  document.getElementById("detailsMoveFileBtn")?.addEventListener("click", () => {
+    closeOperationModal(serviceFileDetailsOverlay); openMoveFileBtn?.click();
+  });
+  document.getElementById("detailsReturnFileBtn")?.addEventListener("click", () => {
+    closeOperationModal(serviceFileDetailsOverlay); openReturnFileBtn?.click();
+  });
   serviceFileResults?.addEventListener("click", async (event) => {
     const trackButton=event.target.closest(".registry-track"); if(trackButton){if(regNoInput)regNoInput.value=trackButton.dataset.fileNumber;openOperationModal(trackerModalOverlay);await loadMovements(trackButton.dataset.fileNumber,{openModal:false});return;}
     const moveButton=event.target.closest(".registry-move"); if(moveButton){if(moveRegNoInput)moveRegNoInput.value=moveButton.dataset.fileNumber;document.getElementById("moveFileType").value="service";if(moveFromInput){moveFromInput.value=String(moveButton.dataset.stage||"Registry").replaceAll("_"," ");moveFromInput.dataset.registry=moveButton.dataset.stage||"pending_processing";}openOperationModal(movementModalOverlay);return;}
@@ -233,6 +403,8 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadMovements(regNo, options = {}) {
     const targetRegNo = String(regNo || "").trim();
     if (!targetRegNo || !historyModalBody) return;
+    if (historyRecordBtn) historyRecordBtn.disabled = true;
+    if (historyReturnBtn) historyReturnBtn.disabled = true;
 
     const shouldOpenModal = options.openModal !== false;
     lastLoadedRegNo = targetRegNo;
@@ -260,6 +432,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       const movements = Array.isArray(data.movements) ? data.movements.slice().sort(movementSort) : [];
+      const isOut = movements.some((movement) => !movement.returned_at);
+      if (historyRecordBtn) historyRecordBtn.disabled = isOut;
+      if (historyReturnBtn) historyReturnBtn.disabled = !isOut;
       setMoveFromValue(data.summary?.current_holder_office || "Front Desk");
       if (!movements.length) {
         historyModalBody.innerHTML = '<div class="app-state-message app-state-neutral">No movement history found.</div>';
@@ -499,20 +674,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (historyRecordBtn) {
     historyRecordBtn.addEventListener("click", () => {
+      if (historyRecordBtn.disabled || !lastLoadedRegNo) return;
       if (moveRegNoInput && lastLoadedRegNo) {
         moveRegNoInput.value = lastLoadedRegNo;
         setMoveFromValue(moveFromInput?.value || "Front Desk");
       }
       closeHistoryModal();
       openOperationModal(movementModalOverlay);
+      validateModalCustody("move");
       if (moveToInput) {
         moveToInput.focus();
       }
     });
   }
   historyReturnBtn?.addEventListener("click", () => {
+    if (historyReturnBtn.disabled || !lastLoadedRegNo) return;
     if (lastLoadedRegNo) document.getElementById("returnRegNo").value = lastLoadedRegNo;
-    closeHistoryModal(); openOperationModal(returnModalOverlay);
+    closeHistoryModal(); openOperationModal(returnModalOverlay); validateModalCustody("return");
   });
 
   if (regNoInput) {
@@ -666,6 +844,9 @@ document.addEventListener("DOMContentLoaded", () => {
     };
     if (!payload.regNo || !payload.delivered_by || !payload.received_by) {
       message.innerHTML = '<div class="app-state-message app-state-error">File number, deliverer, and receiving officer are required.</div>'; return;
+    }
+    if (!resolvedReceiveRecord || String(resolvedReceiveRecord.number).toUpperCase() !== payload.regNo.toUpperCase()) {
+      message.innerHTML = '<div class="app-state-message app-state-error">Wait for and select a valid related officer record before receiving this file.</div>'; return;
     }
     try {
       const data = await fetch("../backend/api/record_file_movement.php", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }).then((response) => response.json());

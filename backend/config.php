@@ -6603,6 +6603,7 @@ function ensureStaffDueExtendedColumns(mysqli $conn): void {
         'applicant_email' => "VARCHAR(120) DEFAULT NULL",
         'documents_uploaded' => "TINYINT(1) DEFAULT 0"
         ,'employeeNo' => "VARCHAR(80) DEFAULT NULL"
+        ,'pensionNo' => "VARCHAR(80) DEFAULT NULL"
         ,'ippsNo' => "VARCHAR(80) DEFAULT NULL"
         ,'rankPosition' => "VARCHAR(160) DEFAULT NULL"
         ,'rankName' => "VARCHAR(160) DEFAULT NULL"
@@ -6623,6 +6624,7 @@ function ensureStaffDueExtendedColumns(mysqli $conn): void {
         ,'village' => "VARCHAR(120) DEFAULT NULL"
         ,'alternateTelNo' => "VARCHAR(50) DEFAULT NULL"
         ,'maritalStatus' => "VARCHAR(50) DEFAULT NULL"
+        ,'dateOfDeath' => "DATE DEFAULT NULL"
         ,'service_file_status' => "VARCHAR(40) NOT NULL DEFAULT 'pending_processing'"
         ,'service_file_location' => "VARCHAR(160) DEFAULT NULL"
     ];
@@ -6637,6 +6639,33 @@ function ensureStaffDueExtendedColumns(mysqli $conn): void {
     $checked = true;
 }
 
+function ensureCanonicalOfficerIdentityColumns(mysqli $conn): void {
+    ensureStaffDueExtendedColumns($conn);
+    ensureFileMovementTables($conn);
+    $registryColumns = [
+        'employeeNo' => "VARCHAR(80) DEFAULT NULL",
+        'pensionNo' => "VARCHAR(80) DEFAULT NULL",
+        'ippsNo' => "VARCHAR(80) DEFAULT NULL",
+        'firstName' => "VARCHAR(100) DEFAULT NULL",
+        'middleName' => "VARCHAR(100) DEFAULT NULL",
+        'lastName' => "VARCHAR(100) DEFAULT NULL"
+    ];
+    foreach ($registryColumns as $column => $definition) {
+        $result = $conn->query("SHOW COLUMNS FROM tb_fileregistry LIKE '{$column}'");
+        if ($result && $result->num_rows === 0) $conn->query("ALTER TABLE tb_fileregistry ADD COLUMN {$column} {$definition}");
+    }
+
+    // Legacy staff regNo stores the generated PEN/... value. Recover the original
+    // employee number while retaining the pension number as its own identity.
+    $conn->query("UPDATE tb_staffdue SET pensionNo=COALESCE(NULLIF(TRIM(pensionNo),''),NULLIF(TRIM(regNo),'')), employeeNo=CASE WHEN COALESCE(NULLIF(TRIM(employeeNo),''),CASE WHEN UPPER(regNo) LIKE 'PEN/%' THEN SUBSTRING(regNo,5) ELSE regNo END) REGEXP '^[A-Z]/[0-9]+$' THEN CONCAT('P/',COALESCE(NULLIF(TRIM(employeeNo),''),SUBSTRING(regNo,5))) ELSE COALESCE(NULLIF(TRIM(employeeNo),''),CASE WHEN UPPER(regNo) LIKE 'PEN/%' THEN SUBSTRING(regNo,5) ELSE regNo END) END, ippsNo=COALESCE(NULLIF(TRIM(ippsNo),''),NULLIF(TRIM(computerNo),'')), lastName=COALESCE(NULLIF(TRIM(lastName),''),NULLIF(TRIM(sName),'')), firstName=COALESCE(NULLIF(TRIM(firstName),''),NULLIF(SUBSTRING_INDEX(TRIM(fName),' ',1),'')), middleName=COALESCE(NULLIF(TRIM(middleName),''),NULLIF(TRIM(SUBSTRING(TRIM(fName),LENGTH(SUBSTRING_INDEX(TRIM(fName),' ',1))+1)),''))");
+    $conn->query("UPDATE tb_fileregistry SET pensionNo=REPLACE(COALESCE(NULLIF(TRIM(pensionNo),''),NULLIF(TRIM(regNo),'')),'PEN/PEN/','PEN/'), regNo=REPLACE(regNo,'PEN/PEN/','PEN/'), employeeNo=NULL, ippsNo=COALESCE(NULLIF(TRIM(ippsNo),''),NULLIF(TRIM(computerNo),'')), lastName=COALESCE(NULLIF(TRIM(lastName),''),NULLIF(TRIM(sName),'')), firstName=COALESCE(NULLIF(TRIM(firstName),''),NULLIF(SUBSTRING_INDEX(TRIM(fName),' ',1),'')), middleName=COALESCE(NULLIF(TRIM(middleName),''),NULLIF(TRIM(SUBSTRING(TRIM(fName),LENGTH(SUBSTRING_INDEX(TRIM(fName),' ',1))+1)),''))");
+
+    foreach ([['tb_staffdue','idx_staffdue_employee_no','employeeNo'],['tb_staffdue','idx_staffdue_pension_no','pensionNo'],['tb_fileregistry','idx_registry_employee_no','employeeNo'],['tb_fileregistry','idx_registry_pension_no','pensionNo'],['tb_fileregistry','idx_registry_ipps_no','ippsNo']] as [$table,$index,$column]) {
+        $result=$conn->query("SHOW INDEX FROM {$table} WHERE Key_name='{$index}'");
+        if($result && $result->num_rows===0) $conn->query("ALTER TABLE {$table} ADD INDEX {$index} ({$column})");
+    }
+}
+
 /** Build the stable pension file number from the HRMIS employee number. */
 function pensionNumberFromEmployeeNumber(?string $employeeNumber): string {
     $value = strtoupper(trim((string)$employeeNumber));
@@ -6644,6 +6673,43 @@ function pensionNumberFromEmployeeNumber(?string $employeeNumber): string {
     $value = preg_replace('#^P/#i', '', $value);
     $value = trim((string)$value, "/ ");
     return $value === '' ? '' : 'PEN/' . $value;
+}
+
+/** Normalize HRMIS identity to either 123 or P/A/123. */
+function normalizeEmployeeNumber(?string $employeeNumber): string {
+    $value = strtoupper((string)preg_replace('/\s+/', '', trim((string)$employeeNumber)));
+    $value = (string)preg_replace('#^PEN/#', '', $value);
+    if (preg_match('#^[A-Z]/[1-9][0-9]*$#', $value)) $value = 'P/' . $value;
+    return $value;
+}
+
+function ensureSalaryScalesTable(mysqli $conn): void {
+    $conn->query("CREATE TABLE IF NOT EXISTS tb_salary_scales (salary_scale_id INT NOT NULL AUTO_INCREMENT,scale_code VARCHAR(30) NOT NULL,description VARCHAR(160) DEFAULT NULL,sort_order INT NOT NULL DEFAULT 0,is_active TINYINT(1) NOT NULL DEFAULT 1,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME DEFAULT NULL,PRIMARY KEY(salary_scale_id),UNIQUE KEY uq_salary_scale_code(scale_code),KEY idx_salary_scale_active(is_active,sort_order)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $codes=['U1E','U1E SC','U1EL','U1SE','U2','U2 SC','U2L','U2U','U3','U3 SC','U3U','U4','U4L','U4M','U4SC','U4U','U5','U5L','U5SC','U5U','U6','U6L','U6U','U7','U7L','U7M','U7U','U8','U8L','U8U'];
+    $stmt=$conn->prepare("INSERT IGNORE INTO tb_salary_scales(scale_code,description,sort_order,is_active) VALUES (?, 'HRMIS Uganda Prisons salary scale', ?, 1)");
+    foreach($codes as $index=>$code){$order=$index+1;$stmt->bind_param('si',$code,$order);$stmt->execute();}$stmt->close();
+}
+
+function ensureStaffReferenceTables(mysqli $conn): void {
+    $conn->query("CREATE TABLE IF NOT EXISTS tb_polregions (political_region_id INT NOT NULL AUTO_INCREMENT,region_name VARCHAR(100) NOT NULL,sort_order INT NOT NULL DEFAULT 0,is_active TINYINT(1) NOT NULL DEFAULT 1,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME DEFAULT NULL,PRIMARY KEY(political_region_id),UNIQUE KEY uq_political_region(region_name),KEY idx_political_region_active(is_active,sort_order)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $tables = [
+        'tb_employment_statuses' => ['id' => 'employment_status_id', 'value' => 'status_name'],
+        'tb_religions' => ['id' => 'religion_id', 'value' => 'religion_name'],
+        'tb_tribes' => ['id' => 'tribe_id', 'value' => 'tribe_name']
+    ];
+    foreach ($tables as $table => $meta) {
+        $conn->query("CREATE TABLE IF NOT EXISTS {$table} ({$meta['id']} INT NOT NULL AUTO_INCREMENT,{$meta['value']} VARCHAR(120) NOT NULL,sort_order INT NOT NULL DEFAULT 0,is_active TINYINT(1) NOT NULL DEFAULT 1,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME DEFAULT NULL,PRIMARY KEY ({$meta['id']}),UNIQUE KEY uq_reference_value ({$meta['value']}),KEY idx_reference_active (is_active,sort_order)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+    $seed = [
+        'tb_employment_statuses' => ['status_name', ['90 Days Normal Leave','Abandonment','Absconded','Accumulated Leave','Administrative Leave','Appointment on Probation Terminated','Confirmed','Contract','Contract expired','Deceased','Declined','Deserted','Discharged_CBE','Discharged_Indisplined','Discharged_on_medical_grounds','Discharged_on_request','Discharged_UBE','Dismissed','Duplicated','Early Retirement','Interdiction (Convict)','Interdiction (Disciplinary Case)','Interdiction (On Remand)','Joined as Warder','On Course','Permanent','Probation','Re-Instated','Resigned','Retired','Retired on medical grounds','Retired on Public interest','Salary Suspended','Sick Leave','Study Leave without pay','Terminated','Transferred Service']],
+        'tb_religions' => ['religion_name', ['Anglican','Atheist','Buddhist','Catholic','Christian','Isa Masiya','Muslim','Other','Pagan','Pentecostal','Seventh Day Adventist']],
+        'tb_tribes' => ['tribe_name', ['Acholi','Alur','Aringa','Athur','Babwisi','Bafumbira','Baganda','Bagisu','Bagungu','Bagwere','Bahororo','Bakenyi','Bakiga','Bakonzo','Bamba','Banyabindi','Banyala','Banyankore','Banyaruguru','Banyarwanda','Banyole','Banyoro','Baruuli','Basoga','Basongora','Batagwenda','Batooro','Batuku','Bokora','Chope','Ethur','Gimara','Itesot','Japadhola','Jonam','Kakwa','Karimojong','Kebu','Kuku','Kumam','Lango','Lugbara','Madi','Mvuba','Napore','Nubi','Pian','Pokot','Sabiny','Samia','Unknown']]
+    ];
+    foreach ($seed as $table => [$column,$values]) {
+        $stmt=$conn->prepare("INSERT IGNORE INTO {$table} ({$column},sort_order,is_active) VALUES (?,?,1)");
+        foreach($values as $index=>$value){$order=$index+1;$stmt->bind_param('si',$value,$order);$stmt->execute();}$stmt->close();
+    }
+    $regionStmt=$conn->prepare("INSERT IGNORE INTO tb_polregions(region_name,sort_order,is_active) VALUES (?,?,1)");foreach(['Central','Eastern','Northern','Western'] as $index=>$region){$order=$index+1;$regionStmt->bind_param('si',$region,$order);$regionStmt->execute();}$regionStmt->close();
 }
 
 function ensureStaffVerificationTables(mysqli $conn): void {
@@ -6696,6 +6762,23 @@ function ensurePensionBeneficiaryTables(mysqli $conn): void {
             KEY idx_beneficiary_staff (deceased_staffdue_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
+    $columns=[
+        'gender'=>"VARCHAR(20) DEFAULT NULL",'bank_name'=>"VARCHAR(120) DEFAULT NULL",
+        'bank_account'=>"VARCHAR(80) DEFAULT NULL",'bank_branch'=>"VARCHAR(120) DEFAULT NULL",
+        'earning_basis_date'=>"DATE DEFAULT NULL",'earning_expiry_date'=>"DATE DEFAULT NULL",
+        'last_earning_month'=>"DATE DEFAULT NULL",'earning_period_label'=>"VARCHAR(100) DEFAULT NULL"
+    ];
+    foreach($columns as $column=>$definition){$result=$conn->query("SHOW COLUMNS FROM tb_pension_beneficiaries LIKE '{$column}'");if($result&&$result->num_rows===0)$conn->query("ALTER TABLE tb_pension_beneficiaries ADD COLUMN {$column} {$definition}");}
+}
+
+function calculateBeneficiaryEarningPeriod(?string $retirementDate, ?string $dateOfDeath, bool $diedWhileServing=false, ?string $asOfDate=null): array {
+    $retirementDate=trim((string)$retirementDate);$dateOfDeath=trim((string)$dateOfDeath);$basis=$diedWhileServing?$dateOfDeath:$retirementDate;
+    if($basis===''||strtotime($basis)===false)return ['basis_date'=>null,'expiry_date'=>null,'last_earning_month'=>null,'remaining_months'=>0,'remaining_label'=>'Not available'];
+    $basisDate=new DateTimeImmutable($basis);$expiry=$basisDate->modify('+15 years');$expiryDay=(int)$expiry->format('j');
+    $lastMonth=$expiryDay>=15?$expiry->modify('last day of this month'):$expiry->modify('last day of previous month');
+    $asOf=new DateTimeImmutable($asOfDate&&strtotime($asOfDate)!==false?$asOfDate:'today');$from=$asOf->modify('first day of this month');$to=$lastMonth->modify('first day of this month');
+    $remainingMonths=$to<$from?0:(((int)$to->format('Y')-(int)$from->format('Y'))*12+(int)$to->format('n')-(int)$from->format('n')+1);$years=intdiv($remainingMonths,12);$months=$remainingMonths%12;
+    return ['basis_date'=>$basisDate->format('Y-m-d'),'expiry_date'=>$expiry->format('Y-m-d'),'last_earning_month'=>$lastMonth->format('Y-m-d'),'remaining_months'=>$remainingMonths,'remaining_label'=>$remainingMonths===0?'Earning period expired':trim(($years?"{$years} year".($years===1?'':'s'):'').($years&&$months?' ':'').($months?"{$months} month".($months===1?'':'s'):''))];
 }
 
 function ensureStaffDueBaseColumns(mysqli $conn): void {
@@ -7727,8 +7810,10 @@ function ensureFileMovementTables(mysqli $conn): void {
     $conn->query("
         CREATE TABLE IF NOT EXISTS tb_service_files (
             service_file_id INT NOT NULL AUTO_INCREMENT,
-            staffdue_id INT NOT NULL,
-            employeeNo VARCHAR(80) NOT NULL,
+            staffdue_id INT DEFAULT NULL,
+            registry_id INT DEFAULT NULL,
+            file_type VARCHAR(30) NOT NULL DEFAULT 'service',
+            employeeNo VARCHAR(80) DEFAULT NULL,
             pensionNo VARCHAR(80) DEFAULT NULL,
             registry_stage VARCHAR(40) NOT NULL DEFAULT 'pending_processing',
             shelf_reference VARCHAR(120) DEFAULT NULL,
@@ -7750,6 +7835,27 @@ function ensureFileMovementTables(mysqli $conn): void {
             KEY idx_service_availability (availability_status)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
+    $serviceFileColumns = [
+        'registry_id' => "INT DEFAULT NULL",
+        'file_type' => "VARCHAR(30) NOT NULL DEFAULT 'service'",
+        'registry_box_no' => "INT DEFAULT NULL"
+    ];
+    foreach ($serviceFileColumns as $column => $definition) {
+        $result = $conn->query("SHOW COLUMNS FROM tb_service_files LIKE '{$column}'");
+        if ($result && $result->num_rows === 0) $conn->query("ALTER TABLE tb_service_files ADD COLUMN {$column} {$definition}");
+    }
+    $conn->query("ALTER TABLE tb_service_files MODIFY staffdue_id INT DEFAULT NULL, MODIFY employeeNo VARCHAR(80) DEFAULT NULL");
+    $conn->query("DELETE FROM tb_service_files WHERE availability_status='not_availed' AND availed_at IS NULL AND pension_file_created_at IS NULL AND archived_at IS NULL");
+    $registryIndex = $conn->query("SHOW INDEX FROM tb_service_files WHERE Key_name='uq_service_file_registry'");
+    if ($registryIndex && $registryIndex->num_rows === 0) $conn->query("ALTER TABLE tb_service_files ADD UNIQUE KEY uq_service_file_registry (registry_id)");
+    $boxIndex = $conn->query("SHOW INDEX FROM tb_service_files WHERE Key_name='idx_service_registry_box'");
+    if ($boxIndex && $boxIndex->num_rows === 0) $conn->query("ALTER TABLE tb_service_files ADD INDEX idx_service_registry_box (registry_stage,registry_box_no)");
+    $unboxed = $conn->query("SELECT service_file_id,registry_stage FROM tb_service_files WHERE registry_box_no IS NULL AND registry_stage IN ('pending_processing','still_in_process') ORDER BY created_at,service_file_id");
+    if ($unboxed) while ($file=$unboxed->fetch_assoc()) {
+        $box=allocateServiceRegistryBox($conn,(string)$file['registry_stage'],(int)$file['service_file_id']);
+        $assign=$conn->prepare("UPDATE tb_service_files SET registry_box_no=? WHERE service_file_id=?");
+        $fileId=(int)$file['service_file_id'];$assign->bind_param('ii',$box,$fileId);$assign->execute();$assign->close();
+    }
 
     $columns = [
         'availability_status' => "VARCHAR(40) DEFAULT 'in_shelf'",
@@ -7788,6 +7894,12 @@ function ensureFileMovementTables(mysqli $conn): void {
         'deathNotifierContact' => "VARCHAR(80) DEFAULT NULL",
         'estateExpiryDate' => "DATE DEFAULT NULL",
         'estateStatus' => "VARCHAR(50) DEFAULT NULL"
+        ,'employeeNo' => "VARCHAR(80) DEFAULT NULL"
+        ,'pensionNo' => "VARCHAR(80) DEFAULT NULL"
+        ,'ippsNo' => "VARCHAR(80) DEFAULT NULL"
+        ,'firstName' => "VARCHAR(100) DEFAULT NULL"
+        ,'middleName' => "VARCHAR(100) DEFAULT NULL"
+        ,'lastName' => "VARCHAR(100) DEFAULT NULL"
     ];
 
     foreach ($registryColumns as $column => $definition) {
@@ -7905,6 +8017,17 @@ function ensureFileMovementTables(mysqli $conn): void {
     }
 
     $created = true;
+}
+
+/** Allocate the first active registry box with capacity; each box holds ten files. */
+function allocateServiceRegistryBox(mysqli $conn, string $stage, int $excludeServiceFileId = 0): ?int {
+    if (!in_array($stage, ['pending_processing', 'still_in_process'], true)) return null;
+    $stmt = $conn->prepare("SELECT registry_box_no,COUNT(*) file_count FROM tb_service_files WHERE registry_stage=? AND registry_box_no IS NOT NULL AND service_file_id<>? GROUP BY registry_box_no HAVING COUNT(*)<10 ORDER BY registry_box_no ASC LIMIT 1");
+    $stmt->bind_param('si',$stage,$excludeServiceFileId);$stmt->execute();$available=$stmt->get_result()->fetch_assoc();$stmt->close();
+    if ($available) return (int)$available['registry_box_no'];
+    $stmt=$conn->prepare("SELECT COALESCE(MAX(registry_box_no),0)+1 next_box FROM tb_service_files WHERE registry_stage=?");
+    $stmt->bind_param('s',$stage);$stmt->execute();$next=$stmt->get_result()->fetch_assoc();$stmt->close();
+    return max(1,(int)($next['next_box']??1));
 }
 
 function ensurePensionerDeathReportingTables(mysqli $conn): void {

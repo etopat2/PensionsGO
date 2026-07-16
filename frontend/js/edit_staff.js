@@ -12,6 +12,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const title = document.getElementById("title");
   const sName = document.getElementById("sName");
   const fName = document.getElementById("fName");
+  const middleName = document.getElementById("middleName");
   const gender = document.getElementById("gender");
   const prisonUnit = document.getElementById("prisonUnit");
   const nin = document.getElementById("NIN");
@@ -313,9 +314,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const validationRules = {
     bio: [
-      { field: regNo, message: "Bio Data is missing the file number.", isInvalid: () => !String(regNo?.value || "").trim() },
+      { field: regNo, message: "Bio Data is missing the employee number.", isInvalid: () => !String(regNo?.value || "").trim() },
       { field: title, message: "Bio Data is missing the title or rank.", isInvalid: () => !String(title?.value || "").trim() },
-      { field: sName, message: "Bio Data is missing the surname.", isInvalid: () => !String(sName?.value || "").trim() },
+      { field: sName, message: "Bio Data is missing the last name.", isInvalid: () => !String(sName?.value || "").trim() },
       { field: fName, message: "Bio Data is missing the first name.", isInvalid: () => !String(fName?.value || "").trim() },
       { field: gender, message: "Bio Data is missing gender.", isInvalid: () => !String(gender?.value || "").trim() },
       {
@@ -379,7 +380,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   const tabFieldGroups = {
-    bio: [regNo, computerNo, title, sName, fName, gender, prisonUnit, nin, telNo, birthDate, enlistmentDate, retirementDate, financialYear, retirementType],
+    bio: [regNo, computerNo, title, fName, middleName, sName, gender, prisonUnit, nin, telNo, birthDate, enlistmentDate, retirementDate, financialYear, retirementType],
     benefits: [monthlySalary, lengthOfService, annualSalary, reducedPension, fullPension, gratuity],
     contact: [address, tin, applicantEmail, nextOfKin, nextOfKinContact, bankName, bankAccount, bankBranch],
     documents: [docType, docFile],
@@ -646,11 +647,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const staff = data.record;
-      regNo.value = staff.regNo || "";
-      computerNo.value = staff.computerNo || staff.supplierNo || "";
+      regNo.value = staff.employeeNo || staff.regNo || "";
+      computerNo.value = staff.ippsNo || staff.computerNo || staff.supplierNo || "";
       title.value = staff.title || "";
-      sName.value = staff.sName || "";
-      fName.value = staff.fName || "";
+      sName.value = staff.lastName || staff.sName || "";
+      fName.value = staff.firstName || String(staff.fName || "").split(/\s+/)[0] || "";
+      if (middleName) middleName.value = staff.middleName || String(staff.fName || "").split(/\s+/).slice(1).join(" ");
       gender.value = staff.gender || "";
       prisonUnit.value = staff.prisonUnit || "";
       nin.value = normalizeNationalIdValue(staff.NIN || "");

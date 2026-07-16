@@ -373,9 +373,10 @@ async function initStaffDueController() {
       const cardStateClass = `card-state-${String(cardStatus.className || "").replace("chip-", "")}`;
       card.className = `staff-card ${cardStateClass}`.trim();
 
-      const name = formatFullName(staff.sName || "", staff.fName || "");
+      const name = [staff.firstName, staff.middleName, staff.lastName].filter(Boolean).join(" ")
+        || [staff.fName, staff.sName].filter(Boolean).join(" ");
       const rank = staff.title || "N/A";
-      const fileNumber = staff.regNo || "N/A";
+      const fileNumber = staff.employeeNo || staff.regNo || "N/A";
       const station = staff.prisonUnit || "N/A";
       const retirementDate = formatCardDate(staff.retirementDate);
       const retirementType = formatRetirementType(staff.retirementType);
@@ -682,37 +683,56 @@ async function initStaffDueController() {
         <input type="checkbox" data-verification-document="${escapeHtml(code)}">
         <span>${escapeHtml(label)}</span>
       </label>`).join("");
+    const officerName = [staff.firstName, staff.middleName, staff.lastName].filter(Boolean).join(" ") || formatFullName(staff.sName, staff.fName);
     actionModalBody.innerHTML = `
-      <section class="verification-identity" aria-label="Officer identification">
-        <div><span>Employee Number</span><strong>${escapeHtml(staff.employeeNo || "Not recorded")}</strong></div>
-        <div><span>Officer Names</span><strong>${escapeHtml([staff.firstName, staff.middleName, staff.lastName].filter(Boolean).join(" ") || formatFullName(staff.sName, staff.fName))}</strong></div>
-        <div><span>IPPS Number</span><strong>${escapeHtml(staff.ippsNo || staff.computerNo || "Not recorded")}</strong></div>
-        <div><span>Rank / Position</span><strong>${escapeHtml(staff.rankName || staff.positionName || staff.rankPosition || staff.title || "Not recorded")}</strong></div>
-      </section>
-      <div class="verification-workspace">
-      <div class="verification-controls">
-      <label class="modal-field">
-        <span>Status</span>
-        <select id="verifyStatusSelect">
-          <option value="verified">Verified</option>
-          <option value="queried">Queried</option>
-          <option value="rejected">Rejected</option>
-        </select>
-      </label>
-      <label class="modal-field">
-        <span>Mode of Retirement</span>
-        <select id="verifyRetirementTypeSelect"></select>
-      </label>
+      <div class="verification-shell">
+        <section class="verification-officer" aria-label="Officer identification">
+          <div class="verification-officer-primary">
+            <span>Officer being verified</span>
+            <strong>${escapeHtml(officerName || "Name not recorded")}</strong>
+            <small>${escapeHtml(staff.rankName || staff.positionName || staff.rankPosition || staff.title || "Rank / position not recorded")}</small>
+          </div>
+          <div class="verification-identity-chip"><span>Employee Number</span><strong>${escapeHtml(staff.employeeNo || staff.regNo || "Not recorded")}</strong></div>
+          <div class="verification-identity-chip"><span>IPPS Number</span><strong>${escapeHtml(staff.ippsNo || staff.computerNo || "Not recorded")}</strong></div>
+        </section>
+        <div class="verification-workspace">
+          <aside class="verification-controls" aria-label="Verification decision">
+            <div class="verification-section-heading">
+              <span class="verification-step">01</span>
+              <div><strong>Decision</strong><small>Set the review outcome</small></div>
+            </div>
+            <label class="modal-field compact-field">
+              <span>Application status</span>
+              <select id="verifyStatusSelect">
+                <option value="verified">Verified</option>
+                <option value="queried">Queried</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </label>
+            <label class="modal-field compact-field">
+              <span>Mode of retirement</span>
+              <select id="verifyRetirementTypeSelect"></select>
+            </label>
+            <label class="modal-field compact-field verification-reason" id="verifyReasonWrap" style="display:none;">
+              <span>Review reason</span>
+              <textarea id="verifyReasonInput" rows="2" placeholder="State the reason clearly"></textarea>
+            </label>
+          </aside>
+          <section class="verification-documents" aria-labelledby="verificationDocumentsTitle">
+            <div class="verification-documents-header">
+              <div class="verification-section-heading">
+                <span class="verification-step">02</span>
+                <div><strong id="verificationDocumentsTitle">Required application documents</strong><small>Confirm each original document sighted</small></div>
+              </div>
+              <span class="verification-progress" id="verificationProgress">0 of ${documents.length} confirmed</span>
+            </div>
+            <fieldset class="verification-checklist">
+              <legend class="sr-only">Required application documents</legend>
+              ${checklist}
+            </fieldset>
+          </section>
+        </div>
       </div>
-      <fieldset class="verification-checklist">
-        <legend>Required application documents</legend>
-        ${checklist}
-      </fieldset>
-      </div>
-      <label class="modal-field" id="verifyReasonWrap" style="display:none;">
-        <span>Reason</span>
-        <textarea id="verifyReasonInput" rows="3" placeholder="Provide reason"></textarea>
-      </label>
     `;
     const statusSelect = document.getElementById("verifyStatusSelect");
     const retirementSelect = document.getElementById("verifyRetirementTypeSelect");
@@ -725,6 +745,30 @@ async function initStaffDueController() {
     }).join("");
     retirementSelect.addEventListener("change", () => openVerifyModal({ ...staff, retirementType: retirementSelect.value }));
     const reasonWrap = document.getElementById("verifyReasonWrap");
+    const checklistInputs = [...document.querySelectorAll("[data-verification-document]")];
+    const checklistElement = actionModalBody.querySelector(".verification-checklist");
+    const checklistLabels = [...actionModalBody.querySelectorAll(".verification-check-item span")];
+    const sizeChecklistColumns = () => {
+      if (!checklistElement || !checklistLabels.length) return;
+      const widestText = Math.max(...checklistLabels.map((label) => Math.ceil(label.scrollWidth)));
+      const naturalBasis = Math.min(360, Math.max(180, widestText + 66));
+      const threeColumnFloor = checklistElement.clientWidth > 0
+        ? Math.floor((checklistElement.clientWidth - 16) / 3)
+        : 0;
+      const uniformBasis = Math.max(naturalBasis, threeColumnFloor);
+      checklistElement.style.setProperty("--verification-document-width", `${uniformBasis}px`);
+    };
+    sizeChecklistColumns();
+    window.requestAnimationFrame(sizeChecklistColumns);
+    const progress = document.getElementById("verificationProgress");
+    const updateChecklistProgress = () => {
+      const checked = checklistInputs.filter((input) => input.checked).length;
+      if (progress) {
+        progress.textContent = `${checked} of ${checklistInputs.length} confirmed`;
+        progress.classList.toggle("is-complete", checked === checklistInputs.length);
+      }
+    };
+    checklistInputs.forEach((input) => input.addEventListener("change", updateChecklistProgress));
     statusSelect.addEventListener("change", () => {
       const status = statusSelect.value;
       reasonWrap.style.display = status === "queried" || status === "rejected" ? "block" : "none";

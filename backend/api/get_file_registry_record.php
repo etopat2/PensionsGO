@@ -93,6 +93,11 @@ $deathTypeExpr = buildBenefitsRetirementTypeMatchSql(
 $stmt = $conn->prepare("
     SELECT
         fr.*,
+        COALESCE(NULLIF(fr.pensionNo,''),fr.regNo) AS pensionNo,
+        COALESCE(NULLIF(fr.ippsNo,''),fr.computerNo,sd.ippsNo,sd.computerNo) AS ippsNo,
+        COALESCE(NULLIF(fr.firstName,''),sd.firstName) AS firstName,
+        COALESCE(NULLIF(fr.middleName,''),sd.middleName) AS middleName,
+        COALESCE(NULLIF(fr.lastName,''),sd.lastName) AS lastName,
         sd.id AS staffdue_id,
         sd.prisonUnit AS station,
         COALESCE(fr.telNo, sd.telNo) AS telNo,
@@ -128,7 +133,7 @@ $stmt = $conn->prepare("
         {$periodToExpr} AS periodTo15yrs,
         {$periodFromExpr} AS periodFrom15yrs
     FROM tb_fileregistry fr
-    LEFT JOIN tb_staffdue sd ON sd.regNo = fr.regNo
+    LEFT JOIN tb_staffdue sd ON COALESCE(NULLIF(sd.pensionNo,''),sd.regNo)=COALESCE(NULLIF(fr.pensionNo,''),fr.regNo)
     LEFT JOIN tb_life_certificate_submissions lcs
       ON lcs.regNo = fr.regNo
      AND lcs.submission_year = YEAR(CURDATE())

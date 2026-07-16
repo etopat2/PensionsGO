@@ -62,7 +62,7 @@ function getDataImportDatasetDefinitions(mysqli $conn): array
             'accepted_formats' => ['csv', 'xlsx'],
             'requirements' => [
                 'Employee Number must be unique and is used as the HRMIS match key. Pension Number is generated automatically.',
-                'Title must already exist in Title Settings and Unit must already exist in Prison Units.',
+                  'Position represents either a uniformed rank or non-uniformed title and must already exist in Title Settings.',
                 'Mode of Retirement should use the approved retirement label where possible; supported legacy labels are still normalized during import.',
                 'Age and service retirement-policy checks are enforced during import whenever the supplied retirement profile requires them.',
                 'Blank imported values never overwrite existing populated values. They are treated as no-change.'
@@ -70,8 +70,7 @@ function getDataImportDatasetDefinitions(mysqli $conn): array
             'columns' => [
                 ['field' => 'employeeNo', 'label' => 'Employee Number', 'required' => true, 'aliases' => ['employeenumber', 'employee_no', 'employeeno', 'staffnumber', 'staffno', 'regno'], 'format' => 'HRMIS employee number', 'example' => 'P/A/123'],
                 ['field' => 'ippsNo', 'label' => 'IPPS Number', 'required' => false, 'aliases' => ['ippsnumber', 'ippsno', 'ipps_no', 'computerno', 'computer_number'], 'format' => 'Text', 'example' => 'IPPS-00981'],
-                ['field' => 'rankName', 'label' => 'Rank', 'required' => false, 'aliases' => ['rank', 'rankname'], 'format' => 'Uniformed rank', 'example' => 'Warder'],
-                ['field' => 'positionName', 'label' => 'Position', 'required' => false, 'aliases' => ['position', 'positionname', 'title'], 'format' => 'Non-uniformed position', 'example' => 'Records Officer'],
+                ['field' => 'positionName', 'label' => 'Position', 'required' => true, 'aliases' => ['position', 'positionname', 'title', 'rank', 'rankname'], 'format' => 'Existing title for a uniformed or non-uniformed officer', 'example' => 'Warder'],
                 ['field' => 'firstName', 'label' => 'First Name', 'required' => true, 'aliases' => ['firstname', 'first_name', 'fname', 'givenname'], 'format' => 'Text', 'example' => 'John'],
                 ['field' => 'middleName', 'label' => 'Middle Name', 'required' => false, 'aliases' => ['middlename', 'middle_name', 'othernames'], 'format' => 'Text', 'example' => 'Peter'],
                 ['field' => 'lastName', 'label' => 'Last Name', 'required' => false, 'aliases' => ['lastname', 'last_name', 'surname', 'sname'], 'format' => 'Text', 'example' => 'Okello'],
@@ -108,7 +107,7 @@ function getDataImportDatasetDefinitions(mysqli $conn): array
                 ['field' => 'appnStatus', 'label' => 'Application Status', 'required' => false, 'aliases' => ['appnstatus', 'applicationstatus'], 'format' => 'Pending, Verified, Queried, Rejected, Completed', 'example' => 'Pending']
             ],
             'template_rows' => [
-                ['P/A/123', 'IPPS-00981', 'Warder', '', 'John', 'Peter', 'Okello', 'Male', 'Luzira Upper Prison', 'CF1234567890AB', 'CM1234567890AB', 'U8', 'Active', 'Acholi', 'Gulu', 'Northern', 'Christian', 'Uganda', 'Laroo', 'Pece', 'Senior Quarters', '+256772000000', 'Married', 'officer@ugandaprisons.go.ug', '+256701234567', '1970-05-20', '1990-01-10', '2026-06-30', 'FY 2025/2026', 'Mandatory Retirement', '1250000', '360', '15000000', '650000', '820000', '25000000', 'Pending', 'Pending']
+                ['P/A/123', 'IPPS-00981', 'Warder', 'John', 'Peter', 'Okello', 'Male', 'Luzira Upper Prison', 'CF1234567890AB', 'CM1234567890AB', 'U8', 'Confirmed', 'Acholi', 'Gulu', 'Northern', 'Christian', 'Uganda', 'Laroo', 'Pece', 'Senior Quarters', '+256772000000', 'Married', 'officer@ugandaprisons.go.ug', '+256701234567', '1970-05-20', '1990-01-10', '2026-06-30', 'FY 2025/2026', 'Mandatory Retirement', '1250000', '360', '15000000', '650000', '820000', '25000000', 'Pending', 'Pending']
             ]
         ],
         'file_registry' => [
@@ -118,11 +117,11 @@ function getDataImportDatasetDefinitions(mysqli $conn): array
             'icon' => '&#128452;',
             'table' => 'tb_fileregistry',
             'key_column' => 'regNo',
-            'key_label' => 'File Number',
+            'key_label' => 'Pension Number',
             'case_insensitive_key' => false,
             'accepted_formats' => ['csv', 'xlsx'],
             'requirements' => [
-                'File Number is the primary match key for imports into the registry and must start with the PEN/ prefix.',
+                'Pension Number is the only personnel number stored in this registry and must start with the PEN/ prefix.',
                 'If Box Number is blank, the system allocates one automatically using the current boxing rules.',
                 'Mode of Retirement should use the approved retirement label where possible; supported legacy labels are still normalized during import.',
                 'Age and service retirement-policy checks are enforced during import whenever the supplied retirement profile requires them.',
@@ -130,12 +129,13 @@ function getDataImportDatasetDefinitions(mysqli $conn): array
                 'Imported payroll, life certificate, and pay type values are normalized to the system vocabulary.'
             ],
             'columns' => [
-                ['field' => 'regNo', 'label' => 'File Number', 'required' => true, 'aliases' => ['regno', 'filenumber', 'file_number'], 'format' => 'PEN/1 or PEN/A/1', 'example' => 'PEN/A/1'],
-                ['field' => 'computerNo', 'label' => 'Computer Number', 'required' => false, 'aliases' => ['computerno', 'computer_number'], 'format' => 'Text', 'example' => 'PC-00981'],
+                ['field' => 'regNo', 'label' => 'Pension Number', 'required' => true, 'aliases' => ['regno', 'filenumber', 'file_number', 'pensionnumber', 'pensionno'], 'format' => 'PEN/1 or PEN/A/1', 'example' => 'PEN/A/1'],
+                ['field' => 'ippsNo', 'label' => 'IPPS Number', 'required' => false, 'aliases' => ['ippsnumber','ippsno','ipps_no','computerno','computer_number'], 'format' => 'Text', 'example' => '737516'],
                 ['field' => 'supplierNo', 'label' => 'Supplier Number', 'required' => false, 'aliases' => ['supplierno', 'suppliernumber'], 'format' => 'Text', 'example' => 'SUP-001'],
                 ['field' => 'title', 'label' => 'Title', 'required' => false, 'aliases' => ['title', 'rank'], 'format' => 'Existing title', 'example' => 'Warder'],
-                ['field' => 'sName', 'label' => 'Surname', 'required' => true, 'aliases' => ['surname', 'sname', 'last_name'], 'format' => 'Text', 'example' => 'Okello'],
-                ['field' => 'fName', 'label' => 'First Name', 'required' => true, 'aliases' => ['firstname', 'first_name', 'fname'], 'format' => 'Text', 'example' => 'John'],
+                ['field' => 'firstName', 'label' => 'First Name', 'required' => true, 'aliases' => ['firstname','first_name','fname'], 'format' => 'Text', 'example' => 'John'],
+                ['field' => 'middleName', 'label' => 'Middle Name', 'required' => false, 'aliases' => ['middlename','middle_name','othernames'], 'format' => 'Text', 'example' => 'Peter'],
+                ['field' => 'lastName', 'label' => 'Last Name', 'required' => true, 'aliases' => ['lastname','last_name','surname','sname'], 'format' => 'Text', 'example' => 'Okello'],
                 ['field' => 'gender', 'label' => 'Gender', 'required' => false, 'aliases' => ['gender', 'sex'], 'format' => 'Male or Female', 'example' => 'Male'],
                 ['field' => 'livingStatus', 'label' => 'Living Status', 'required' => false, 'aliases' => ['livingstatus', 'status_of_life'], 'format' => 'Alive or Deceased', 'example' => 'Alive'],
                 ['field' => 'lifeCertificate', 'label' => 'Life Certificate', 'required' => false, 'aliases' => ['lifecertificate'], 'format' => 'Submitted, Not Submitted or Exempt', 'example' => 'Not Submitted'],
@@ -167,7 +167,7 @@ function getDataImportDatasetDefinitions(mysqli $conn): array
                 ['field' => 'other', 'label' => 'Other Notes', 'required' => false, 'aliases' => ['other', 'notes', 'remarks'], 'format' => 'Text', 'example' => 'Imported from legacy registry']
             ],
             'template_rows' => [
-                ['PEN/A/1', 'PC-00981', 'SUP-001', 'Warder', 'Okello', 'John', 'Male', 'Alive', 'Not Submitted', '', '1970-05-20', '1990-01-10', '2026-06-30', 'Mandatory Retirement', '1002003004', 'CF1234567890AB', 'Plot 1 Kampala Road', '+256701234567', 'john.okello@example.com', 'Mary Okello', '+256777000111', 'Stanbic Bank', '002345678901', 'Kampala Main', '1250000', '360', '15000000', '650000', '820000', '25000000', 'Not on Payroll', 'Pensioner', 'in_shelf', '', 'Imported from legacy registry']
+                ['PEN/A/1', '737516', 'SUP-001', 'Warder', 'John', 'Peter', 'Okello', 'Male', 'Alive', 'Not Submitted', '', '1970-05-20', '1990-01-10', '2026-06-30', 'Mandatory Retirement', '1002003004', 'CF1234567890AB', 'Plot 1 Kampala Road', '+256701234567', 'john.okello@example.com', 'Mary Okello', '+256777000111', 'Stanbic Bank', '002345678901', 'Kampala Main', '1250000', '360', '15000000', '650000', '820000', '25000000', 'Not on Payroll', 'Pensioner', 'in_shelf', '', 'Imported from legacy registry']
             ]
         ],
         'titles' => [
@@ -765,11 +765,21 @@ function importNormalizeFieldValue(mysqli $conn, string $datasetKey, string $fie
             return ['value' => $raw, 'error' => null];
 
         case 'title':
+        case 'positionName':
             $canonical = normalizeRegistryTitle($conn, $raw);
             if ($canonical === null) {
-                return ['value' => null, 'error' => 'Title does not exist in Title Settings.'];
+                return ['value' => null, 'error' => 'Position does not exist in Title Settings.'];
             }
             return ['value' => $canonical, 'error' => null];
+
+        case 'salaryScale':
+            ensureSalaryScalesTable($conn);$stmt=$conn->prepare('SELECT scale_code value FROM tb_salary_scales WHERE LOWER(scale_code)=LOWER(?) AND is_active=1 LIMIT 1');$stmt->bind_param('s',$raw);$stmt->execute();$match=$stmt->get_result()->fetch_assoc();$stmt->close();return ['value'=>$match['value']??null,'error'=>$match?null:'Salary Scale does not exist or is inactive in Settings.'];
+        case 'employmentStatus':
+        case 'tribe':
+        case 'religion':
+            ensureStaffReferenceTables($conn);$definition=['employmentStatus'=>['tb_employment_statuses','status_name','Employment Status'],'tribe'=>['tb_tribes','tribe_name','Tribe'],'religion'=>['tb_religions','religion_name','Religion']][$field];[$table,$column,$label]=$definition;$stmt=$conn->prepare("SELECT {$column} value FROM {$table} WHERE LOWER({$column})=LOWER(?) AND is_active=1 LIMIT 1");$stmt->bind_param('s',$raw);$stmt->execute();$match=$stmt->get_result()->fetch_assoc();$stmt->close();return ['value'=>$match['value']??null,'error'=>$match?null:"{$label} does not exist or is inactive in Settings."];
+        case 'homeDistrict':
+            $district=resolvePoliticalDistrictName($conn,$raw);return ['value'=>$district,'error'=>$district===null?'Home District does not exist in Political District Settings.':null];
 
         case 'gender':
             $gender = importNormalizeEnumValue($raw, ['Male', 'Female'], [
@@ -1187,12 +1197,15 @@ function importApplyCalculatedDatasetFields(string $datasetKey, array $values, a
                 $values['financialYear'] = importNormalizeFinancialYear('', $mandatoryDate);
             } catch (Throwable $ignored) {}
         }
-        $employeeNo = trim((string)($source['employeeNo'] ?? ''));
-        $values['regNo'] = pensionNumberFromEmployeeNumber($employeeNo);
+        $employeeNo = normalizeEmployeeNumber($source['employeeNo'] ?? '');
+        $values['employeeNo'] = $employeeNo;
+        $values['pensionNo'] = pensionNumberFromEmployeeNumber($employeeNo);
+        $values['regNo'] = $values['pensionNo'];
         $values['computerNo'] = trim((string)($source['ippsNo'] ?? ''));
         $rankPosition = trim((string)($source['rankName'] ?? '')) ?: trim((string)($source['positionName'] ?? ''));
         $values['rankPosition'] = $rankPosition;
         $values['title'] = $rankPosition;
+        if(trim((string)($values['homeDistrict']??''))!==''){$regionStmt=$conn->prepare('SELECT polRegion FROM tb_poldistricts WHERE polDistrict=? LIMIT 1');$regionStmt->bind_param('s',$values['homeDistrict']);$regionStmt->execute();$regionRow=$regionStmt->get_result()->fetch_assoc();$regionStmt->close();if($regionRow)$values['homeRegion']=trim((string)$regionRow['polRegion']);}
         $values['fName'] = trim(implode(' ', array_filter([$source['firstName'] ?? '', $source['middleName'] ?? ''], static fn($part) => trim((string)$part) !== '')));
         $values['sName'] = trim((string)($source['lastName'] ?? ''));
         $values['payType'] = deriveRegistryPayTypeFromProfile(
@@ -1208,6 +1221,10 @@ function importApplyCalculatedDatasetFields(string $datasetKey, array $values, a
     }
 
     if ($datasetKey === 'file_registry') {
+        $values['pensionNo'] = trim((string)($source['regNo'] ?? ''));
+        $values['computerNo'] = trim((string)($source['ippsNo'] ?? ''));
+        $values['sName'] = trim((string)($source['lastName'] ?? ''));
+        $values['fName'] = trim(implode(' ', array_filter([$source['firstName'] ?? '',$source['middleName'] ?? ''], static fn($part)=>trim((string)$part)!=='')));
         $values['livingStatus'] = deriveLivingStatusFromRetirementType(
             $source['retirementType'] ?? null,
             $source['livingStatus'] ?? 'Alive'
@@ -1302,7 +1319,7 @@ function importInsertRow(mysqli $conn, array $dataset, array $values): bool
     }
 
     if ($dataset['key'] === 'staff_due') {
-        foreach (['regNo', 'computerNo', 'title', 'rankPosition', 'fName', 'sName'] as $compatibilityField) {
+        foreach (['regNo', 'pensionNo', 'computerNo', 'title', 'rankPosition', 'fName', 'sName'] as $compatibilityField) {
             if (!in_array($compatibilityField, $columns, true) && !empty($values[$compatibilityField])) {
                 $columns[] = $compatibilityField;
                 $params[] = $values[$compatibilityField];
@@ -1327,6 +1344,9 @@ function importInsertRow(mysqli $conn, array $dataset, array $values): bool
     }
 
     if ($dataset['key'] === 'file_registry') {
+        foreach (['pensionNo','computerNo','sName','fName'] as $compatibilityField) {
+            if (!in_array($compatibilityField,$columns,true) && !empty($values[$compatibilityField])) { $columns[]=$compatibilityField; $params[]=$values[$compatibilityField]; }
+        }
         if (!in_array('dateOn15yrs', $columns, true)) {
             $columns[] = 'dateOn15yrs';
             $params[] = computeDateOn15Years($values['retirementDate'] ?? null);
