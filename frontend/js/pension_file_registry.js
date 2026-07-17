@@ -1687,7 +1687,7 @@ async function initPensionFileRegistryController() {
       const blob = await response.blob();
       const disposition = String(response.headers.get("content-disposition") || "");
       const fileNameMatch = disposition.match(/filename=\"?([^\";]+)\"?/i);
-      const fileName = fileNameMatch?.[1] || "file_registry_template.csv";
+      const fileName = fileNameMatch?.[1] || "file_registry_template.xlsx";
       const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = objectUrl;
@@ -2541,7 +2541,7 @@ async function initPensionFileRegistryController() {
 
   let registryMovementContext = null;
   function closeRegistryMovementModal() {
-    document.getElementById("registryMovementModal")?.classList.add("hidden");
+    closeModal(document.getElementById("registryMovementModal"));
     registryMovementContext=null;
   }
   async function openRegistryMovementModal(record) {
@@ -2553,7 +2553,8 @@ async function initPensionFileRegistryController() {
     const submit=document.getElementById("registryMovementSubmitBtn");
     const hint=document.getElementById("registryMovementCustodyHint");
     submit.disabled=true;hint.textContent="Checking file custody...";
-    modal.classList.remove("hidden");
+    const fileTypeSelect=document.getElementById("registryMovementFileType");if(fileTypeSelect)fileTypeSelect.value="pension";
+    openModal(modal);
     try {
       const data=await fetch(`../backend/api/get_file_custody.php?number=${encodeURIComponent(number)}&file_type=pension`,{credentials:"include",cache:"no-store"}).then((response)=>response.json());
       if(!data.exists) throw new Error("Pension file is not available in the registry.");
@@ -2659,6 +2660,18 @@ async function initPensionFileRegistryController() {
   }
 
   function bindCardActions(records) {
+    grid.querySelectorAll("[data-action='movement']").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = Number(btn.getAttribute("data-id"));
+        const record = records.find((row) => Number(row.id) === id) || null;
+        if (!record) {
+          showFeedbackModal("error", "File Movement", "Unable to identify the selected pension file.");
+          return;
+        }
+        await openRegistryMovementModal(record);
+      });
+    });
+
     grid.querySelectorAll("[data-action='details']").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const id = Number(btn.getAttribute("data-id"));
@@ -3833,12 +3846,6 @@ async function initPensionFileRegistryController() {
       }
     });
 
-    grid.querySelectorAll("[data-action='movement']").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const record=records.find((row)=>Number(row.id)===Number(btn.dataset.id));
-        if(record) openRegistryMovementModal(record);
-      });
-    });
   }
 
   if (addFileBtn) {
@@ -4126,6 +4133,10 @@ async function initPensionFileRegistryController() {
   bindRegistryEditFieldTracking();
   initEditTabs();
   await loadCards();
+  const requestedRecordId = Number(new URLSearchParams(window.location.search || "").get("open_record") || 0);
+  if (requestedRecordId > 0) {
+    await openDetailsModal(requestedRecordId);
+  }
   const refreshVisibleRegistry = () => { if (!document.hidden && !activeCardsController) loadCards(); };
   window.addEventListener("focus", refreshVisibleRegistry);
   window.addEventListener("pageshow", refreshVisibleRegistry);

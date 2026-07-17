@@ -885,6 +885,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const blob = await response.blob();
+      const signature = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
+      const isXlsxPackage = signature.length === 4 && signature[0] === 0x50 && signature[1] === 0x4b && signature[2] === 0x03 && signature[3] === 0x04;
+      if (!isXlsxPackage) {
+        throw new Error("The server did not return a valid Excel workbook. Please sign in again or contact an administrator.");
+      }
       const url = window.URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       const disposition = response.headers.get("content-disposition") || "";
@@ -928,7 +933,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         credentials: "include",
         body: formData
       });
-      const data = await response.json();
+      const responseText = await response.text();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (_error) {
+        throw new Error("The server returned an invalid upload response. Please retry; if the problem continues, contact an administrator.");
+      }
       if (!response.ok || !data.success) {
         throw new Error(data.message || "Unable to process the staff-due upload.");
       }

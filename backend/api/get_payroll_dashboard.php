@@ -259,6 +259,10 @@ if ($uploadedStmt) {
     $uploadedStmt->close();
 }
 
+$paymentReconciliation = ['successfulPayments'=>0,'successfulAmount'=>0.0,'paymentExceptions'=>0,'notInRegister'=>0];
+$paymentStmt=$conn->prepare("SELECT COUNT(*) AS total,COALESCE(SUM(amount_paid),0) AS amount,SUM(CASE WHEN reconciliation_status IN ('Partially Paid','Paid with Adjustment','Register Only','Needs Review') THEN 1 ELSE 0 END) AS exceptions,SUM(CASE WHEN reconciliation_status='Not in Register' THEN 1 ELSE 0 END) AS not_in_register FROM tb_payroll_payment_register_entries r INNER JOIN tb_payroll_upload_cycles c ON c.cycle_id=r.cycle_id WHERE c.payroll_year=? AND c.payroll_month=? AND COALESCE(c.is_deleted,0)=0");
+if($paymentStmt){$paymentStmt->bind_param('ii',$year,$month);$paymentStmt->execute();$paymentRow=$paymentStmt->get_result()->fetch_assoc();$paymentStmt->close();$paymentReconciliation=['successfulPayments'=>(int)($paymentRow['total']??0)-(int)($paymentRow['not_in_register']??0),'successfulAmount'=>(float)($paymentRow['amount']??0),'paymentExceptions'=>(int)($paymentRow['exceptions']??0),'notInRegister'=>(int)($paymentRow['not_in_register']??0)];}
+
 $cycles = [];
 $cycleStmt = $conn->prepare("
     SELECT
@@ -328,6 +332,10 @@ echo json_encode([
         'offPayroll' => (int)($summary['off_payroll_count'] ?? 0),
         'onPayrollAmount' => (float)($summary['on_payroll_amount'] ?? 0),
         'payrollUploadedAmount' => (float)$uploadedAmount
+        ,'successfulPayments' => $paymentReconciliation['successfulPayments']
+        ,'successfulPaymentAmount' => $paymentReconciliation['successfulAmount']
+        ,'paymentExceptions' => $paymentReconciliation['paymentExceptions']
+        ,'notInPaymentRegister' => $paymentReconciliation['notInRegister']
     ],
     'page' => $page,
     'limit' => $limit,

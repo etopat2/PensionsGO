@@ -14,10 +14,10 @@
   <link rel="stylesheet" href="css/menu.css?v=20260504d">
   <link rel="stylesheet" href="css/profile.css?v=20260504a">
   <link rel="stylesheet" href="css/overlay.css?v=20260504a">
-  <link rel="stylesheet" href="css/file_tracking.css?v=20260716g">
+  <link rel="stylesheet" href="css/file_tracking.css?v=20260716j">
   <script src="js/auth_bootstrap.js?v=20260606b"></script>
   <script type="module" src="js/main.js?v=20260713a"></script>
-  <script defer src="js/file_tracking.js?v=20260716g"></script>
+  <script defer src="js/file_tracking.js?v=20260717a"></script>
 </head>
 <body>
   <header id="dynamicHeader"></header>
@@ -33,8 +33,10 @@
       </nav>
       <form id="serviceFileFilter" class="file-track-form">
         <input type="hidden" id="serviceFileStage" value="pending_processing">
-        <input id="serviceFileSearch" placeholder="Employee/file number, name or box...">
-        <button class="btn-secondary" type="submit">Search</button>
+        <label class="service-filter-field service-filter-search"><span>Search files</span><input id="serviceFileSearch" placeholder="Employee number, name or position..."></label>
+        <label class="service-filter-field"><span>Box number</span><input id="serviceFileBox" type="number" min="1" step="1" placeholder="All boxes"></label>
+        <label class="service-filter-field"><span>Availability</span><select id="serviceFileAvailability"><option value="">All availability</option><option value="available">In registry</option><option value="out">Moved out</option><option value="archived">Archived</option></select></label>
+        <button class="btn-secondary service-filter-submit" type="submit">Apply Filters</button>
       </form>
       <div class="service-registry-actions">
         <button type="button" class="btn-secondary" id="openFileTrackerBtn">Track File</button>
@@ -44,6 +46,7 @@
       </div>
       <div class="selected-file-summary" id="selectedServiceFileSummary" aria-live="polite">Select a file card to view its details and available custody action.</div>
       <div id="serviceFileResults" class="file-track-results">Loading service files...</div>
+      <nav id="serviceFilePagination" class="service-file-pagination" aria-label="Service file pages"></nav>
     </section>
   </main>
 
@@ -126,13 +129,28 @@
   <div id="serviceFileDetailsOverlay" class="file-history-modal-overlay" style="display:none">
     <section class="file-track-card file-operation-modal service-file-details-modal" role="dialog" aria-modal="true" aria-labelledby="serviceFileDetailsTitle">
       <button type="button" class="file-history-close operation-modal-close" data-close-operation="serviceFileDetailsOverlay" aria-label="Close">&times;</button>
-      <h3 id="serviceFileDetailsTitle">Service File Details</h3>
+      <header class="service-details-heading"><span>Registry record</span><h3 id="serviceFileDetailsTitle">Service File Details</h3><p>Review file identity, storage and custody information.</p></header>
       <div id="serviceFileDetailsBody" class="service-file-details-body"></div>
       <div class="service-file-details-actions">
+        <button type="button" class="btn-secondary" id="detailsStaffRecordBtn">Open Staff Details</button>
+        <button type="button" class="btn-secondary" id="detailsPensionRecordBtn">Open Pension File Details</button>
         <button type="button" class="btn-secondary" id="detailsTrackFileBtn">Track History</button>
+        <button type="button" class="btn-secondary" id="detailsEditBoxBtn">Edit Box</button>
         <button type="button" class="btn-secondary action-move" id="detailsMoveFileBtn">Move File</button>
         <button type="button" class="btn-secondary action-return" id="detailsReturnFileBtn">Mark Returned</button>
       </div>
+    </section>
+  </div>
+
+  <div id="serviceFileBoxEditOverlay" class="file-history-modal-overlay" style="display:none">
+    <section class="file-track-card file-operation-modal service-box-edit-modal" role="dialog" aria-modal="true" aria-labelledby="serviceFileBoxEditTitle">
+      <button type="button" class="file-history-close operation-modal-close" data-close-operation="serviceFileBoxEditOverlay" aria-label="Close">&times;</button>
+      <header class="service-details-heading"><span>Storage allocation</span><h3 id="serviceFileBoxEditTitle">Edit Service File Box</h3><p id="serviceFileBoxEditSummary">Assign the selected file to a box in its current registry.</p></header>
+      <form id="serviceFileBoxEditForm" class="service-box-editor">
+        <label for="detailsServiceBox"><span>Box number</span><input id="detailsServiceBox" name="registry_box_no" type="number" min="1" step="1" placeholder="Enter box number" required></label>
+        <p>Each box can hold a maximum of 10 files. The allocation is validated before saving.</p>
+        <div class="service-box-edit-actions"><button type="button" class="btn-secondary" id="cancelServiceBoxEditBtn">Cancel</button><button type="submit" class="btn-secondary details-save-box">Save Box Allocation</button></div>
+      </form>
     </section>
   </div>
 

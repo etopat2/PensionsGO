@@ -24,6 +24,24 @@ document.addEventListener('DOMContentLoaded', () => {
   const detailExportXlsxBtn = document.getElementById('detailExportXlsxBtn');
   const detailEditMonthBtn = document.getElementById('detailEditMonthBtn');
   const detailSummary = document.getElementById('detailSummary');
+  const payrollSectionValidation = document.getElementById('payrollSectionValidation');
+  const payrollPaymentSummary = document.getElementById('payrollPaymentSummary');
+  const payrollClassifiedSectionButtons = document.getElementById('payrollClassifiedSectionButtons');
+  const openPaymentExceptionsBtn = document.getElementById('openPaymentExceptionsBtn');
+  const payrollAnalysisModal = document.getElementById('payrollAnalysisModal');
+  const payrollAnalysisModalTitle = document.getElementById('payrollAnalysisModalTitle');
+  const payrollAnalysisModalSubtitle = document.getElementById('payrollAnalysisModalSubtitle');
+  const payrollAnalysisSearch = document.getElementById('payrollAnalysisSearch');
+  const payrollAnalysisReviewFilter = document.getElementById('payrollAnalysisReviewFilter');
+  const payrollAnalysisMatchFilter = document.getElementById('payrollAnalysisMatchFilter');
+  const openCycleEntriesBtn = document.getElementById('openCycleEntriesBtn');
+  const payrollAnalysisResultSummary = document.getElementById('payrollAnalysisResultSummary');
+  const payrollAnalysisTableHead = document.getElementById('payrollAnalysisTableHead');
+  const payrollAnalysisTableBody = document.getElementById('payrollAnalysisTableBody');
+  const payrollAnalysisPageLabel = document.getElementById('payrollAnalysisPageLabel');
+  const payrollAnalysisPrev = document.getElementById('payrollAnalysisPrev');
+  const payrollAnalysisNext = document.getElementById('payrollAnalysisNext');
+  const payrollAnalysisModalClose = document.getElementById('payrollAnalysisModalClose');
   const detailSearch = document.getElementById('detailSearch');
   const detailRefreshBtn = document.getElementById('detailRefreshBtn');
   const detailTableBody = document.getElementById('detailTableBody');
@@ -215,7 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const blob = await response.blob();
-      const fileName = parseDownloadFilename(response.headers.get('Content-Disposition'), 'payroll_upload_template.csv');
+      const fileName = parseDownloadFilename(response.headers.get('Content-Disposition'), 'payroll_upload_template.xlsx');
       triggerBlobDownload(blob, fileName);
       appAlert('Payroll template download has started.', { title: 'Template Ready', type: 'success' });
     } catch (error) {
@@ -292,19 +310,19 @@ document.addEventListener('DOMContentLoaded', () => {
   function buildSummaryCards(summary) {
     if (!historySummaryCards) return;
     const cards = [
-      { label: 'Upload Cycles', value: Number(summary.totalCycles || 0), cls: 'total' },
-      { label: 'Uploaded Rows', value: Number(summary.totalRows || 0), cls: 'info' },
-      { label: 'Matched Rows', value: Number(summary.matchedRows || 0), cls: 'good' },
-      { label: 'Unmatched Rows', value: Number(summary.unmatchedRows || 0), cls: 'warn' },
-      { label: 'Matched Amount', value: formatUGX(summary.matchedAmount || 0), cls: 'good' },
-      { label: 'Unmatched Amount', value: formatUGX(summary.unmatchedAmount || 0), cls: 'warn' }
+      { label: 'Upload Cycles', value: Number(summary.totalCycles || 0), cls: 'total', kind:'cycles', status:'all' },
+      { label: 'Uploaded Rows', value: Number(summary.totalRows || 0), cls: 'info', kind:'rows', status:'all' },
+      { label: 'Matched Rows', value: Number(summary.matchedRows || 0), cls: 'good', kind:'rows', status:'matched' },
+      { label: 'Unmatched Rows', value: Number(summary.unmatchedRows || 0), cls: 'warn', kind:'rows', status:'unmatched' },
+      { label: 'Matched Amount', value: formatUGX(summary.matchedAmount || 0), cls: 'good', kind:'rows', status:'matched' },
+      { label: 'Unmatched Amount', value: formatUGX(summary.unmatchedAmount || 0), cls: 'warn', kind:'rows', status:'unmatched' }
     ];
 
     historySummaryCards.innerHTML = cards.map((item) => `
-      <article class="history-stat-card ${escapeHtml(item.cls)}">
+      <button type="button" class="history-stat-card analysis-card ${escapeHtml(item.cls)}" data-history-kind="${item.kind}" data-history-status="${item.status}" data-history-title="${escapeHtml(item.label)}">
         <span class="label">${escapeHtml(item.label)}</span>
         <span class="value">${escapeHtml(item.value)}</span>
-      </article>
+      </button>
     `).join('');
   }
 
@@ -484,20 +502,73 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderCycleSummary(summary) {
     if (!detailSummary) return;
     const cards = [
-      { label: 'Rows (Current Filter)', value: Number(summary.totalRows || 0) },
-      { label: 'Matched', value: Number(summary.matchedRows || 0) },
-      { label: 'Unmatched', value: Number(summary.unmatchedRows || 0) },
-      { label: 'Matched Amount', value: formatUGX(summary.matchedAmount || 0) },
-      { label: 'Unmatched Amount', value: formatUGX(summary.unmatchedAmount || 0) },
-      { label: 'Total Amount', value: formatUGX(summary.totalAmount || 0) }
+      { label: 'Rows (Current Filter)', value: Number(summary.totalRows || 0), status: 'all' },
+      { label: 'Matched', value: Number(summary.matchedRows || 0), status: 'matched' },
+      { label: 'Unmatched', value: Number(summary.unmatchedRows || 0), status: 'unmatched' },
+      { label: 'Matched Amount', value: formatUGX(summary.matchedAmount || 0), status: 'matched' },
+      { label: 'Unmatched Amount', value: formatUGX(summary.unmatchedAmount || 0), status: 'unmatched' },
+      { label: 'Total Amount', value: formatUGX(summary.totalAmount || 0), status: 'all' }
     ];
 
     detailSummary.innerHTML = cards.map((item) => `
-      <article class="detail-stat">
+      <button type="button" class="detail-stat analysis-card" data-analysis-dataset="payroll" data-analysis-status="${item.status}" data-analysis-title="${escapeHtml(item.label)}">
         <span class="label">${escapeHtml(item.label)}</span>
         <div class="value">${escapeHtml(item.value)}</div>
-      </article>
+      </button>
     `).join('');
+  }
+
+  function analysisAction(target, id, status) {
+    if (!state.canManage) return '';
+    if (String(status) === 'Approved') return `<button type="button" class="cycle-replace-btn" data-analysis-review="unapprove" data-analysis-target="${target}" data-analysis-id="${Number(id)}">Unapprove</button>`;
+    if (String(status) === 'Rejected') return `<button type="button" class="cycle-delete-btn" data-analysis-review="unreject" data-analysis-target="${target}" data-analysis-id="${Number(id)}">Unreject</button>`;
+    if (!['Pending Review', 'Needs Review'].includes(String(status))) return '';
+    return `<span class="cycle-tools"><button type="button" class="cycle-replace-btn" data-analysis-review="approve" data-analysis-target="${target}" data-analysis-id="${Number(id)}">Approve</button><button type="button" class="cycle-delete-btn" data-analysis-review="reject" data-analysis-target="${target}" data-analysis-id="${Number(id)}">Reject</button></span>`;
+  }
+
+  function renderPayrollAnalysis(data) {
+    const summaries = Array.isArray(data.section_summaries) ? data.section_summaries : [];
+    if (payrollSectionValidation) payrollSectionValidation.innerHTML = summaries.map((row) => `<button type="button" class="detail-stat analysis-card" data-analysis-dataset="${row.source_section === 'VALID_PAYMENTS' ? 'payroll' : 'classified'}" data-analysis-section="${escapeHtml(row.source_section || '')}" data-analysis-title="${escapeHtml(String(row.source_section || '').replaceAll('_',' '))}"><span class="label">${escapeHtml(String(row.source_section || '').replaceAll('_',' '))}</span><div class="value">${escapeHtml(String(row.extracted_count || 0))}</div><small>${escapeHtml(row.validation_status || '')}</small></button>`).join('') || '<p>No classified section summary is available.</p>';
+    const payments = Array.isArray(data.payment_summary) ? data.payment_summary : [];
+    if (payrollPaymentSummary) payrollPaymentSummary.innerHTML = payments.map((row) => `<button type="button" class="detail-stat analysis-card" data-analysis-dataset="payment" data-analysis-status="${escapeHtml(row.reconciliation_status || '')}" data-analysis-title="${escapeHtml(row.reconciliation_status || '')}"><span class="label">${escapeHtml(row.reconciliation_status || '')}</span><div class="value">${escapeHtml(String(row.total || 0))}</div><small>${escapeHtml(formatUGX(row.amount_paid || 0))}</small></button>`).join('') || '<p>No parsed payment register is attached.</p>';
+    const sections = summaries.filter(row => row.source_section !== 'VALID_PAYMENTS' && Number(row.extracted_count || 0) > 0).map(row => row.source_section);
+    if (payrollClassifiedSectionButtons) payrollClassifiedSectionButtons.innerHTML = sections.map(section => `<button type="button" class="btn-action analysis-section-button" data-analysis-dataset="classified" data-analysis-section="${escapeHtml(section)}" data-analysis-title="${escapeHtml(section.replaceAll('_',' '))}">${escapeHtml(section.replaceAll('_',' '))}</button>`).join('') || '<span>No review sections in this cycle.</span>';
+  }
+
+  const analysisModalState = { dataset:'', section:'', status:'', title:'', page:1, totalPages:1, timer:null };
+  function analysisColumns() {
+    if (analysisModalState.dataset === 'history_cycles') return [['cycle_id','Cycle ID'],['payroll_month','Month'],['payroll_year','Year'],['financial_year_label','Financial Year'],['quarter_label','Quarter'],['source_file_original_name','Source File'],['uploaded_by_name','Uploaded By'],['created_at','Uploaded']];
+    if (analysisModalState.dataset === 'history_rows') return [['supplierNo','Supplier No.'],['beneficiary_name','Beneficiary'],['invoice_number','Invoice'],['amount','Amount','money'],['matched_regNo','Matched File'],['is_matched','Match Status','match'],['payroll_month','Month'],['payroll_year','Year']];
+    if (analysisModalState.dataset === 'payment') return [['invoice_number','Invoice'],['supplierNo','Supplier No.'],['supplier_name','Beneficiary'],['payment_date','Payment Date'],['amount_paid','Amount Paid','money'],['amount_variance','Variance','money'],['eft_number','EFT No.'],['bank_name','Bank'],['account_number_masked','Account'],['reconciliation_status','Status'],['match_confidence','Confidence','percent'],['review_status','Review']];
+    if (analysisModalState.dataset === 'payroll') return [['supplierNo','Supplier No.'],['beneficiary_name','Beneficiary'],['invoice_number','Invoice'],['amount','Amount','money'],['matched_regNo','Matched File'],['is_matched','Match Status','match']];
+    if (analysisModalState.section === 'RECOVERY') return [['supplierNo','Supplier No.'],['appeared_amount','Pension','money'],['recovery_amount','Recovery Amount','money'],['payable_amount','Balance Payable','money'],['reason','Recovery %age','recoveryPercent'],['beneficiary_name','Name'],['review_status','Review']];
+    return [['supplierNo','Supplier No.'],['beneficiary_name','Beneficiary'],['invoice_number','Invoice'],['appeared_amount','Amount','money'],['reason','Reason / Detail'],['matched_regNo','Registry Match'],['review_status','Review']];
+  }
+  function formatAnalysisCell(row, column) { const [key,,kind]=column; if(kind==='money')return formatUGX(row[key]||0);if(kind==='percent')return `${row[key]||0}%`;if(kind==='recoveryPercent'){const raw=String(row[key]||'');const match=raw.match(/^([0-9.]+)(.*)$/);if(!match)return raw||'-';const numeric=Number(match[1]);return `${numeric<=1?(numeric*100).toFixed(2).replace(/\.00$/,''):numeric}%${match[2]||''}`;}if(kind==='match')return Number(row[key])===1?'Matched':'Unmatched';return row[key]??'-'; }
+  async function loadAnalysisModal() {
+    const isHistory=analysisModalState.dataset.startsWith('history_');
+    const params=isHistory?new URLSearchParams({kind:analysisModalState.dataset==='history_cycles'?'cycles':'rows',status:analysisModalState.status||'all',page:analysisModalState.page,limit:20,year:historyYear?.value||'',month:historyMonth?.value||'',financial_year:historyFinancialYear?.value||'',quarter:historyQuarter?.value||'',search:payrollAnalysisSearch?.value.trim()||historySearch?.value.trim()||''}):new URLSearchParams({cycle_id:state.selectedCycleId,dataset:analysisModalState.dataset,page:analysisModalState.page,limit:20});
+    if(analysisModalState.section)params.set('section',analysisModalState.section);if(analysisModalState.status)params.set('status',analysisModalState.status);if(payrollAnalysisSearch?.value.trim())params.set('search',payrollAnalysisSearch.value.trim());if(payrollAnalysisReviewFilter?.value)params.set('review_status',payrollAnalysisReviewFilter.value);
+    payrollAnalysisTableBody.innerHTML='<tr><td>Loading records...</td></tr>';
+    const response=await fetch(`../backend/api/${isHistory?'get_payroll_history_summary_records.php':'get_payroll_analysis_records.php'}?${params}`,{credentials:'include',cache:'no-store'});const data=await response.json();if(!response.ok||!data.success)throw new Error(data.message||'Unable to load records.');
+    if(!isHistory&&analysisModalState.dataset!=='payroll'){
+      const selectedReview=payrollAnalysisReviewFilter.value;
+      const statuses=Array.isArray(data.available_review_statuses)?data.available_review_statuses:[];
+      payrollAnalysisReviewFilter.innerHTML=`<option value="">All available statuses (${statuses.reduce((sum,item)=>sum+Number(item.count||0),0)})</option>${statuses.map(item=>`<option value="${escapeHtml(item.status||'')}">${escapeHtml(item.status||'')} (${Number(item.count||0)})</option>`).join('')}`;
+      payrollAnalysisReviewFilter.value=statuses.some(item=>item.status===selectedReview)?selectedReview:'';
+    }
+    const columns=analysisColumns();payrollAnalysisTableHead.innerHTML=`<tr>${columns.map(c=>`<th>${escapeHtml(c[1])}</th>`).join('')}<th>Action</th></tr>`;
+    payrollAnalysisTableBody.innerHTML=data.rows.length?data.rows.map(row=>`<tr>${columns.map(c=>`<td>${escapeHtml(formatAnalysisCell(row,c))}</td>`).join('')}<td>${analysisModalState.dataset==='payroll'?'':analysisAction(analysisModalState.dataset,row.classified_entry_id||row.register_entry_id,row.review_status)}</td></tr>`).join(''):`<tr><td colspan="${columns.length+1}">No records match these filters.</td></tr>`;
+    analysisModalState.totalPages=Number(data.total_pages||1);payrollAnalysisPageLabel.textContent=`Page ${data.page} of ${data.total_pages}`;payrollAnalysisPrev.disabled=data.page<=1;payrollAnalysisNext.disabled=data.page>=data.total_pages;payrollAnalysisResultSummary.textContent=`${data.total} record(s) • ${formatUGX(data.total_amount||0)}`;
+  }
+  function openAnalysisModal(config){Object.assign(analysisModalState,config,{page:1});const history=config.dataset.startsWith('history_');payrollAnalysisModalTitle.textContent=config.title||'Payroll records';payrollAnalysisModalSubtitle.textContent=history?'Filtered using the payroll history controls currently selected on the page.':'Filtered to the selected summary and current payroll cycle.';payrollAnalysisSearch.value='';payrollAnalysisReviewFilter.innerHTML='<option value="">Loading available statuses...</option>';payrollAnalysisMatchFilter.value=config.status||'all';payrollAnalysisReviewFilter.classList.toggle('hidden',config.dataset==='payroll'||history);payrollAnalysisMatchFilter.classList.toggle('hidden',config.dataset!=='payroll');payrollAnalysisModal.classList.remove('hidden');document.body.classList.add('modal-open');loadAnalysisModal().catch(error=>appAlert(error.message));}
+
+  async function loadPayrollAnalysis() {
+    if (!state.selectedCycleId) return;
+    const response = await fetch(`../backend/api/get_payroll_cycle_analysis.php?cycle_id=${encodeURIComponent(state.selectedCycleId)}`, { credentials: 'include', cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.message || 'Unable to load payroll analysis.');
+    renderPayrollAnalysis(data);
   }
 
   function renderDetailsRows(rows) {
@@ -885,6 +956,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       renderCycleSummary(data.filteredSummary || {});
       renderDetailsRows(Array.isArray(data.rows) ? data.rows : []);
+      await loadPayrollAnalysis();
 
       state.detailTotalPages = Number(data.totalPages || 1);
       if (detailPageLabel) {
@@ -901,6 +973,45 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   }
+
+  document.addEventListener('click', async (event) => {
+    const historyCard=event.target.closest('[data-history-kind]');
+    if(historyCard){openAnalysisModal({dataset:historyCard.dataset.historyKind==='cycles'?'history_cycles':'history_rows',section:'',status:historyCard.dataset.historyStatus||'all',title:historyCard.dataset.historyTitle||'Payroll history'});return;}
+    const analysisCard = event.target.closest('[data-analysis-dataset]:not([data-analysis-review])');
+    if (analysisCard) {
+      openAnalysisModal({dataset:analysisCard.dataset.analysisDataset,section:analysisCard.dataset.analysisSection||'',status:analysisCard.dataset.analysisStatus||'',title:analysisCard.dataset.analysisTitle||'Payroll records'});
+      return;
+    }
+    const button = event.target.closest('[data-analysis-review]');
+    if (!button) return;
+    const decision = button.dataset.analysisReview;
+    const target = button.dataset.analysisTarget;
+    const id = Number(button.dataset.analysisId || 0);
+    if (!id || !state.canManage) return;
+    button.disabled = true;
+    try {
+      const response = await fetch('../backend/api/review_payroll_analysis_entry.php', { method:'POST', credentials:'include', headers:{'Content-Type':'application/json'}, body:JSON.stringify({target,id,decision}) });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Unable to save review decision.');
+      appAlert(data.message, { title:'Review Saved', type:'success' });
+      await loadPayrollAnalysis();
+      if (!payrollAnalysisModal.classList.contains('hidden')) await loadAnalysisModal();
+    } catch (error) {
+      appAlert(error.message || 'Unable to save review decision.');
+      button.disabled = false;
+    }
+  });
+
+  openPaymentExceptionsBtn?.addEventListener('click',()=>openAnalysisModal({dataset:'payment',section:'',status:'exceptions',title:'Payment Reconciliation Exceptions'}));
+  openCycleEntriesBtn?.addEventListener('click',()=>openAnalysisModal({dataset:'payroll',section:'',status:'all',title:'Payroll Cycle Records'}));
+  function closeAnalysisModal(){payrollAnalysisModal.classList.add('hidden');document.body.classList.remove('modal-open');}
+  payrollAnalysisModalClose?.addEventListener('click',closeAnalysisModal);
+  payrollAnalysisModal?.addEventListener('click',event=>{if(event.target===payrollAnalysisModal)closeAnalysisModal();});
+  payrollAnalysisSearch?.addEventListener('input',()=>{clearTimeout(analysisModalState.timer);analysisModalState.timer=setTimeout(()=>{analysisModalState.page=1;loadAnalysisModal();},220);});
+  payrollAnalysisReviewFilter?.addEventListener('change',()=>{analysisModalState.page=1;loadAnalysisModal();});
+  payrollAnalysisMatchFilter?.addEventListener('change',()=>{analysisModalState.status=payrollAnalysisMatchFilter.value;analysisModalState.page=1;loadAnalysisModal();});
+  payrollAnalysisPrev?.addEventListener('click',()=>{if(analysisModalState.page>1){analysisModalState.page--;loadAnalysisModal();}});
+  payrollAnalysisNext?.addEventListener('click',()=>{if(analysisModalState.page<analysisModalState.totalPages){analysisModalState.page++;loadAnalysisModal();}});
 
   function bindEvents() {
     const currentYear = new Date().getFullYear();

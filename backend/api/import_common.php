@@ -88,10 +88,10 @@ function getDataImportDatasetDefinitions(mysqli $conn): array
                 ['field' => 'subCounty', 'label' => 'Sub County', 'required' => false, 'aliases' => ['subcounty', 'sub_county'], 'format' => 'Text', 'example' => 'Laroo'],
                 ['field' => 'parish', 'label' => 'Parish', 'required' => false, 'aliases' => ['parish'], 'format' => 'Text', 'example' => 'Pece'],
                 ['field' => 'village', 'label' => 'Village', 'required' => false, 'aliases' => ['village'], 'format' => 'Text', 'example' => 'Senior Quarters'],
-                ['field' => 'alternateTelNo', 'label' => 'Alternative Phone Number', 'required' => false, 'aliases' => ['tel2', 'telephone2', 'alternatephone'], 'format' => 'Phone number', 'example' => '+256772000000'],
                 ['field' => 'maritalStatus', 'label' => 'Marital Status', 'required' => false, 'aliases' => ['maritalstatus', 'marital_status'], 'format' => 'Text', 'example' => 'Married'],
                 ['field' => 'applicant_email', 'label' => 'Email Address', 'required' => false, 'aliases' => ['email', 'emailaddress', 'applicantemail'], 'format' => 'Email', 'example' => 'officer@ugandaprisons.go.ug'],
                 ['field' => 'telNo', 'label' => 'Phone Number', 'required' => false, 'aliases' => ['telno', 'tel1', 'telephone1', 'phone', 'phone_number', 'contact'], 'format' => 'International or Uganda local', 'example' => '+256701234567'],
+                ['field' => 'alternateTelNo', 'label' => 'Alternative Phone Number', 'required' => false, 'aliases' => ['tel2', 'telephone2', 'alternatephone'], 'format' => 'Phone number', 'example' => '+256772000000'],
                 ['field' => 'birthDate', 'label' => 'Date of Birth', 'required' => false, 'aliases' => ['birthdate', 'dateofbirth', 'dob'], 'format' => 'YYYY-MM-DD', 'example' => '1970-05-20'],
                 ['field' => 'enlistmentDate', 'label' => 'Date of Enlistment', 'required' => false, 'aliases' => ['enlistmentdate', 'dateofenlistment', 'enrollment', 'enrolment'], 'format' => 'YYYY-MM-DD', 'example' => '1990-01-10'],
                 ['field' => 'retirementDate', 'label' => 'Date of Retirement', 'required' => false, 'aliases' => ['retirementdate', 'dateofretirement'], 'format' => 'YYYY-MM-DD', 'example' => '2026-06-30'],
@@ -107,7 +107,7 @@ function getDataImportDatasetDefinitions(mysqli $conn): array
                 ['field' => 'appnStatus', 'label' => 'Application Status', 'required' => false, 'aliases' => ['appnstatus', 'applicationstatus'], 'format' => 'Pending, Verified, Queried, Rejected, Completed', 'example' => 'Pending']
             ],
             'template_rows' => [
-                ['P/A/123', 'IPPS-00981', 'Warder', 'John', 'Peter', 'Okello', 'Male', 'Luzira Upper Prison', 'CF1234567890AB', 'CM1234567890AB', 'U8', 'Confirmed', 'Acholi', 'Gulu', 'Northern', 'Christian', 'Uganda', 'Laroo', 'Pece', 'Senior Quarters', '+256772000000', 'Married', 'officer@ugandaprisons.go.ug', '+256701234567', '1970-05-20', '1990-01-10', '2026-06-30', 'FY 2025/2026', 'Mandatory Retirement', '1250000', '360', '15000000', '650000', '820000', '25000000', 'Pending', 'Pending']
+                ['P/A/123', 'IPPS-00981', 'Warder', 'John', 'Peter', 'Okello', 'Male', 'Luzira Upper Prison', 'CF1234567890AB', 'CM1234567890AB', 'U8', 'Confirmed', 'Acholi', 'Gulu', 'Northern', 'Christian', 'Uganda', 'Laroo', 'Pece', 'Senior Quarters', 'Married', 'officer@ugandaprisons.go.ug', '+256701234567', '+256772000000', '1970-05-20', '1990-01-10', '2026-06-30', 'FY 2025/2026', 'Mandatory Retirement', '1250000', '360', '15000000', '650000', '820000', '25000000', 'Pending', 'Pending']
             ]
         ],
         'file_registry' => [
@@ -497,13 +497,13 @@ function importParseXlsxRows(string $path): array
             if ($type === 's') {
                 $sharedIndex = (int)($cellNode->v ?? 0);
                 $value = (string)($sharedStrings[$sharedIndex] ?? '');
-            } elseif ($type === 'inlineStr') {
-                if (isset($cellNode->is->t)) {
-                    $value = (string)$cellNode->is->t;
-                } elseif (isset($cellNode->is->r)) {
-                    foreach ($cellNode->is->r as $run) {
-                        $runNode = $mainNs ? $run->children($mainNs) : $run;
-                        $value .= (string)($runNode->t ?? '');
+            } elseif ($type === 'inlinestr') {
+                // Cells reached through a default-namespace child iterator can
+                // lose their XPath context on some PHP/SimpleXML builds.
+                $inlineXml = (string)$cell->asXML();
+                if (preg_match_all('/<t(?:\s[^>]*)?>(.*?)<\/t>/s', $inlineXml, $inlineMatches)) {
+                    foreach ($inlineMatches[1] as $inlineText) {
+                        $value .= html_entity_decode(strip_tags((string)$inlineText), ENT_QUOTES | ENT_XML1, 'UTF-8');
                     }
                 }
             } else {
@@ -1081,7 +1081,7 @@ function importBuildMappedRow(mysqli $conn, array $dataset, array $row, array $h
         $normalized[$field] = $result['value'];
     }
 
-    $normalized = importApplyCalculatedDatasetFields($dataset['key'], $normalized);
+    $normalized = importApplyCalculatedDatasetFields($conn, $dataset['key'], $normalized);
 
     if (in_array($dataset['key'], ['staff_due', 'file_registry'], true)) {
         $policyAssessment = validateRetirementPolicyProfile(
@@ -1141,7 +1141,7 @@ function importValidateFileRegistryDeathContacts(array $incomingValues, ?array $
     return $errors;
 }
 
-function importApplyCalculatedDatasetFields(string $datasetKey, array $values, array $fallback = []): array
+function importApplyCalculatedDatasetFields(mysqli $conn, string $datasetKey, array $values, array $fallback = []): array
 {
     if (!in_array($datasetKey, ['file_registry', 'staff_due'], true)) {
         return $values;
@@ -1305,7 +1305,7 @@ function importFetchExistingRow(mysqli $conn, array $dataset, $keyValue): ?array
 
 function importInsertRow(mysqli $conn, array $dataset, array $values): bool
 {
-    $values = importApplyCalculatedDatasetFields($dataset['key'], $values);
+    $values = importApplyCalculatedDatasetFields($conn, $dataset['key'], $values);
 
     $columns = [];
     $params = [];
@@ -1456,7 +1456,7 @@ function importInsertRow(mysqli $conn, array $dataset, array $values): bool
 
 function importMergeExistingRow(mysqli $conn, array $dataset, array $existingRow, array $incomingValues, array &$mergedFields, array &$conflictFields): bool
 {
-    $incomingValues = importApplyCalculatedDatasetFields($dataset['key'], $incomingValues, $existingRow);
+    $incomingValues = importApplyCalculatedDatasetFields($conn, $dataset['key'], $incomingValues, $existingRow);
     $updates = [];
 
     foreach ($dataset['columns'] as $column) {

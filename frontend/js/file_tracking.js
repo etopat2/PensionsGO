@@ -31,8 +31,11 @@ document.addEventListener("DOMContentLoaded", () => {
   let trackerSuggestions = [];
   let trackerRequestSeq = 0;
   let movementRefreshInFlight = false;
+  let serviceFileFilterTimer = null;
+  let serviceFilesRequestSeq = 0;
   const serviceFileForm = document.getElementById("serviceFileFilter");
   const serviceFileResults = document.getElementById("serviceFileResults");
+  const serviceFilePagination = document.getElementById("serviceFilePagination");
   const trackerModalOverlay = document.getElementById("trackerModalOverlay");
   const movementModalOverlay = document.getElementById("movementModalOverlay");
   const receiveModalOverlay = document.getElementById("receiveModalOverlay");
@@ -42,11 +45,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const selectedServiceFileSummary = document.getElementById("selectedServiceFileSummary");
   const serviceFileDetailsOverlay = document.getElementById("serviceFileDetailsOverlay");
   const serviceFileDetailsBody = document.getElementById("serviceFileDetailsBody");
+  const serviceFileBoxEditOverlay = document.getElementById("serviceFileBoxEditOverlay");
+  const serviceFileBoxEditForm = document.getElementById("serviceFileBoxEditForm");
   const moveFileSubmitBtn = document.getElementById("moveFileSubmitBtn");
   const returnFileSubmitBtn = document.getElementById("returnFileSubmitBtn");
   const moveFileCustodyHint = document.getElementById("moveFileCustodyHint");
   const returnFileCustodyHint = document.getElementById("returnFileCustodyHint");
   let selectedServiceFile = null;
+  let serviceFilePage = 1;
+  let canEditServiceFileBoxes = false;
   const openOperationModal = (overlay) => { if (overlay) { overlay.style.display = "flex"; document.body.classList.add("file-history-modal-open"); } };
   const closeOperationModal = (overlay) => { if (overlay) { overlay.style.display = "none"; if (!isHistoryModalOpen) document.body.classList.remove("file-history-modal-open"); } };
   document.getElementById("openFileTrackerBtn")?.addEventListener("click", () => openOperationModal(trackerModalOverlay));
@@ -118,7 +125,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const isOut = hasFile && file.availability_status === "out";
     if (selectedServiceFileSummary) {
       selectedServiceFileSummary.textContent = hasFile
-        ? `${file.employeeNo} selected · ${isOut ? "File is out — return is available" : "File is in registry custody — move is available"}`
+        ? `${file.employeeNo} selected · ${isOut ? "File is out — return is available" : "File is in registry custody"}`
         : "Select a file card to view its details and available custody action.";
       selectedServiceFileSummary.classList.toggle("has-selection", hasFile);
     }
@@ -154,16 +161,21 @@ document.addEventListener("DOMContentLoaded", () => {
     updateSelectedFileState(file);
     const isOut = file.availability_status === "out";
     const isArchive = file.registry_stage === "archives";
-    serviceFileDetailsBody.innerHTML = `<div class="service-details-grid"><div><span>Employee / File Number</span><strong>${escapeHtml(file.employeeNo)}</strong></div><div><span>Officer</span><strong>${escapeHtml([file.firstName,file.middleName,file.lastName].filter(Boolean).join(" "))}</strong></div><div><span>Registry</span><strong>${escapeHtml(String(file.registry_stage).replaceAll("_"," "))}</strong></div><div><span>Storage</span><strong>${isArchive ? "Transferred to Archives" : `Box ${escapeHtml(file.registry_box_no || "Pending")}`}</strong></div><div><span>Custody</span><strong>${isOut ? "Out" : "In registry"}</strong></div></div>`;
+    const position = file.displayPosition || file.rankName || file.positionName || file.rankPosition || "Position not recorded";
+    serviceFileDetailsBody.innerHTML = `<div class="service-details-identity"><div><span class="service-details-number">${escapeHtml(file.employeeNo)}</span><strong>${escapeHtml([file.firstName,file.middleName,file.lastName].filter(Boolean).join(" ") || "Officer name unavailable")}</strong><small>${escapeHtml(position)}</small></div><span class="service-details-status ${isOut ? "is-out" : "is-in"}">${isOut ? "File moved out" : isArchive ? "Archived" : "In registry custody"}</span></div><div class="service-details-grid"><div><span>Registry</span><strong>${escapeHtml(String(file.registry_stage).replaceAll("_"," "))}</strong></div><div><span>Storage</span><strong>${isArchive ? "Transferred to Archives" : `Box ${escapeHtml(file.registry_box_no || "Pending allocation")}`}</strong></div><div><span>Custody</span><strong>${isOut ? escapeHtml(file.current_holder || "Out of registry") : "Registry"}</strong></div><div><span>IPPS / Pension Link</span><strong>${escapeHtml(file.pensionNo || "Pension file not created")}</strong></div></div>`;
+    document.getElementById("detailsStaffRecordBtn").hidden = !Number(file.staffdue_id);
+    document.getElementById("detailsPensionRecordBtn").hidden = !Number(file.pension_registry_id);
+    document.getElementById("detailsEditBoxBtn").hidden = isArchive || !canEditServiceFileBoxes;
     document.getElementById("detailsMoveFileBtn").hidden = isOut;
     document.getElementById("detailsReturnFileBtn").hidden = !isOut;
     openOperationModal(serviceFileDetailsOverlay);
   }
 
-  function renderServiceFiles(rows) {
+  function renderServiceFiles(rows, pagination = {}) {
     if (!serviceFileResults) return;
     if (!rows.length) {
-      serviceFileResults.innerHTML = '<div class="app-state-message app-state-neutral">No files have been registered in this service registry.</div>';
+      serviceFileResults.innerHTML = '<div class="app-state-message app-state-neutral">No service files match the current registry and filters.</div>';
+      if (serviceFilePagination) serviceFilePagination.innerHTML = "";
       updateSelectedFileState(null);
       return;
     }
@@ -175,9 +187,9 @@ document.addEventListener("DOMContentLoaded", () => {
       return `<article class="service-file-record${isSelected ? " is-selected" : ""}" tabindex="0" role="button" aria-pressed="${isSelected}" data-select-service-file="${Number(row.service_file_id)}">
         <div class="service-file-record-header"><span class="service-file-number">${escapeHtml(row.employeeNo || "Employee number unavailable")}</span><span class="service-custody ${row.availability_status === "out" ? "is-out" : "is-in"}">${escapeHtml(custody)}</span></div>
         <strong class="service-file-name">${escapeHtml([row.firstName,row.middleName,row.lastName].filter(Boolean).join(" ") || "Officer name unavailable")}</strong>
-        <span class="service-file-rank">${escapeHtml(row.rankName || row.positionName || row.rankPosition || "Rank not recorded")}</span>
+        <span class="service-file-rank">${escapeHtml(row.displayPosition || row.rankName || row.positionName || row.rankPosition || "Position not recorded")}</span>
         <div class="service-file-location"><span>${escapeHtml(boxText)}</span>${!isArchive ? `<small>Maximum 10 files per box</small>` : ""}</div>
-        <div class="movement-item-actions"><button class="btn-secondary registry-track" data-file-number="${escapeHtml(row.employeeNo)}">Track history</button><button class="btn-secondary card-custody-action ${row.availability_status === "out" ? "action-return" : "action-move"}" data-service-id="${Number(row.service_file_id)}">${row.availability_status === "out" ? "Mark Returned" : "Move File"}</button>${row.staffdue_id ? `<button class="btn-secondary service-action" data-staff-id="${Number(row.staffdue_id)}" data-action="${row.registry_stage === "pending_processing" ? "create_pension_file" : row.registry_stage === "archives" ? "retrieve" : "archive"}">${row.registry_stage === "pending_processing" ? "Advance file" : row.registry_stage === "archives" ? "Retrieve" : "Send to Archives"}</button>` : ""}</div>
+        <div class="movement-item-actions"><button class="btn-secondary registry-track" data-file-number="${escapeHtml(row.employeeNo)}">Track history</button><button class="btn-secondary card-custody-action ${row.availability_status === "out" ? "action-return" : "action-move"}" data-service-id="${Number(row.service_file_id)}">${row.availability_status === "out" ? "Mark Returned" : "Move File"}</button>${row.staffdue_id ? `<button class="btn-secondary service-action" data-staff-id="${Number(row.staffdue_id)}" data-action="${row.registry_stage === "pending_processing" ? "create_pension_file" : row.registry_stage === "archives" ? "retrieve" : "archive"}">${row.registry_stage === "pending_processing" ? "Advance to Processing" : row.registry_stage === "archives" ? "Retrieve" : "Send to Archives"}</button>` : ""}</div>
       </article>`;
     }).join("")}</div>`;
     serviceFileResults.querySelectorAll("[data-select-service-file]").forEach((card) => {
@@ -196,17 +208,32 @@ document.addEventListener("DOMContentLoaded", () => {
         (row.availability_status === "out" ? openReturnFileBtn : openMoveFileBtn)?.click();
       });
     });
+    if (serviceFilePagination) {
+      const page = Number(pagination.page || 1);
+      const totalPages = Number(pagination.total_pages || 1);
+      const total = Number(pagination.total || rows.length);
+      serviceFilePagination.innerHTML = `<span class="service-page-summary">${total} file${total === 1 ? "" : "s"} &middot; Page ${page} of ${totalPages}</span><div class="service-page-buttons"><button type="button" class="btn-secondary" data-service-page="${page - 1}" ${page <= 1 ? "disabled" : ""}>Previous</button><button type="button" class="btn-secondary" data-service-page="${page + 1}" ${page >= totalPages ? "disabled" : ""}>Next</button></div>`;
+      serviceFilePagination.querySelectorAll("[data-service-page]").forEach((button) => button.addEventListener("click", () => {
+        serviceFilePage = Number(button.dataset.servicePage || 1);
+        loadServiceFiles();
+      }));
+    }
   }
 
-  async function loadServiceFiles() {
+  async function loadServiceFiles({ forceSearch = false } = {}) {
     if (!serviceFileResults) return;
-    const params = new URLSearchParams({ stage: document.getElementById("serviceFileStage")?.value || "", search: document.getElementById("serviceFileSearch")?.value.trim() || "" });
+    const rawSearch = document.getElementById("serviceFileSearch")?.value.trim() || "";
+    const search = forceSearch || rawSearch.length >= 3 ? rawSearch : "";
+    const requestSeq = ++serviceFilesRequestSeq;
+    const params = new URLSearchParams({ stage: document.getElementById("serviceFileStage")?.value || "", search, box: document.getElementById("serviceFileBox")?.value || "", availability: document.getElementById("serviceFileAvailability")?.value || "", page: String(serviceFilePage), per_page: "12" });
     serviceFileResults.innerHTML = '<div class="app-state-message app-state-neutral">Loading service files...</div>';
     updateSelectedFileState(null);
     try {
       const response = await fetch(`../backend/api/service_files.php?${params}`, { credentials: "include" });
       const data = await response.json();
+      if (requestSeq !== serviceFilesRequestSeq) return;
       if (!data.success) throw new Error(data.message || "Unable to load service files.");
+      canEditServiceFileBoxes = Boolean(data.permissions?.can_edit_box);
       const rows = data.records || [];
       serviceFileResults.innerHTML = rows.length ? `<div class="service-file-card-grid">${rows.map((row) => `
         <article class="movement-item">
@@ -215,15 +242,36 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="movement-meta">${escapeHtml(String(row.registry_stage || "").replaceAll("_", " "))} · Shelf ${escapeHtml(row.shelf_reference || "Not indexed")} · ${escapeHtml(row.availability_status || "Unknown")}</div></div>
           <div class="movement-item-actions"><button class="btn-secondary registry-track" data-file-number="${escapeHtml(row.pensionNo || row.employeeNo)}">Track</button><button class="btn-secondary registry-move" data-file-number="${escapeHtml(row.pensionNo || row.employeeNo)}" data-stage="${escapeHtml(row.registry_stage || "pending_processing")}">Move Out</button>${row.availability_status === "out" ? `<button class="btn-secondary registry-return" data-file-number="${escapeHtml(row.pensionNo || row.employeeNo)}" data-stage="${escapeHtml(row.registry_stage || "pending_processing")}">Return</button>` : ""}<button class="btn-secondary service-action" data-staff-id="${Number(row.staffdue_id)}" data-action="${row.availability_status === "not_availed" ? "avail" : row.registry_stage === "pending_processing" ? "create_pension_file" : row.registry_stage === "archives" ? "retrieve" : "archive"}">${row.availability_status === "not_availed" ? "Mark Availed" : row.registry_stage === "pending_processing" ? "Create Pension File" : row.registry_stage === "archives" ? "Retrieve" : "Archive"}</button></div>
         </article>`).join("")}</div>` : '<div class="app-state-message app-state-neutral">No service files match this registry.</div>';
-      renderServiceFiles(rows);
-    } catch (error) { serviceFileResults.innerHTML = `<div class="app-state-message app-state-error">${escapeHtml(error.message)}</div>`; updateSelectedFileState(null); }
+      renderServiceFiles(rows, data.pagination || {});
+    } catch (error) { if (requestSeq !== serviceFilesRequestSeq) return; serviceFileResults.innerHTML = `<div class="app-state-message app-state-error">${escapeHtml(error.message)}</div>`; if (serviceFilePagination) serviceFilePagination.innerHTML = ""; updateSelectedFileState(null); }
   }
-  serviceFileForm?.addEventListener("submit", (event) => { event.preventDefault(); loadServiceFiles(); });
+  serviceFileForm?.addEventListener("submit", (event) => { event.preventDefault(); clearTimeout(serviceFileFilterTimer); serviceFilePage = 1; loadServiceFiles({ forceSearch: true }); });
+  document.getElementById("serviceFileSearch")?.addEventListener("input", (event) => {
+    clearTimeout(serviceFileFilterTimer);
+    const length = event.target.value.trim().length;
+    serviceFileFilterTimer = window.setTimeout(() => {
+      serviceFilePage = 1;
+      loadServiceFiles();
+    }, length === 0 ? 0 : 300);
+  });
+  document.getElementById("serviceFileAvailability")?.addEventListener("change", () => {
+    clearTimeout(serviceFileFilterTimer);
+    serviceFilePage = 1;
+    loadServiceFiles();
+  });
+  document.getElementById("serviceFileBox")?.addEventListener("change", () => {
+    clearTimeout(serviceFileFilterTimer);
+    serviceFilePage = 1;
+    loadServiceFiles();
+  });
   document.querySelectorAll("[data-registry-stage]").forEach((tab) => {
     tab.addEventListener("click", () => {
       const stage = tab.dataset.registryStage || "pending_processing";
       const stageInput = document.getElementById("serviceFileStage");
       if (stageInput) stageInput.value = stage;
+      serviceFilePage = 1;
+      const boxInput = document.getElementById("serviceFileBox");
+      if (boxInput) { boxInput.disabled = stage === "archives"; if (stage === "archives") boxInput.value = ""; }
       document.querySelectorAll("[data-registry-stage]").forEach((item) => {
         const active = item === tab;
         item.classList.toggle("is-active", active);
@@ -239,6 +287,45 @@ document.addEventListener("DOMContentLoaded", () => {
     if (regNoInput) regNoInput.value=selectedServiceFile.employeeNo;
     await loadMovements(selectedServiceFile.employeeNo,{openModal:false});
   });
+  document.getElementById("detailsStaffRecordBtn")?.addEventListener("click", () => {
+    const staffId = Number(selectedServiceFile?.staffdue_id || 0);
+    if (staffId) window.location.href = `view_staff.html?id=${encodeURIComponent(staffId)}`;
+  });
+  document.getElementById("detailsPensionRecordBtn")?.addEventListener("click", () => {
+    const registryId = Number(selectedServiceFile?.pension_registry_id || 0);
+    if (registryId) window.location.href = `pension_file_registry.html?open_record=${encodeURIComponent(registryId)}`;
+  });
+  document.getElementById("detailsEditBoxBtn")?.addEventListener("click", () => {
+    if (!selectedServiceFile || !canEditServiceFileBoxes || selectedServiceFile.registry_stage === "archives") return;
+    document.getElementById("detailsServiceBox").value = selectedServiceFile.registry_box_no || "";
+    document.getElementById("serviceFileBoxEditSummary").textContent = `${selectedServiceFile.employeeNo} · ${[selectedServiceFile.firstName, selectedServiceFile.middleName, selectedServiceFile.lastName].filter(Boolean).join(" ") || "Officer"}`;
+    closeOperationModal(serviceFileDetailsOverlay);
+    openOperationModal(serviceFileBoxEditOverlay);
+    window.setTimeout(() => document.getElementById("detailsServiceBox")?.focus(), 0);
+  });
+  document.getElementById("cancelServiceBoxEditBtn")?.addEventListener("click", () => {
+    closeOperationModal(serviceFileBoxEditOverlay);
+    if (selectedServiceFile) openServiceFileDetails(selectedServiceFile);
+  });
+  serviceFileBoxEditForm?.addEventListener("submit", async (event) => {
+    if (!selectedServiceFile) return;
+    event.preventDefault();
+    const button = event.target.querySelector("button[type='submit']");
+    const boxNo = Number(event.target.elements.registry_box_no.value || 0);
+    if (button) { button.disabled = true; button.textContent = "Saving..."; }
+    try {
+      const response = await fetch("../backend/api/service_files.php", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update_box", service_file_id: Number(selectedServiceFile.service_file_id), registry_box_no: boxNo }) });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || "Unable to update the box allocation.");
+      selectedServiceFile.registry_box_no = data.registry_box_no;
+      closeOperationModal(serviceFileBoxEditOverlay);
+      showFeedbackModal("success", "Box Allocation Updated", data.message);
+      await loadServiceFiles();
+    } catch (error) {
+      showFeedbackModal("error", "Box Allocation", error.message || "Unable to update the box allocation.");
+      if (button) { button.disabled = false; button.textContent = "Save Box"; }
+    }
+  });
   document.getElementById("detailsMoveFileBtn")?.addEventListener("click", () => {
     closeOperationModal(serviceFileDetailsOverlay); openMoveFileBtn?.click();
   });
@@ -250,8 +337,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const moveButton=event.target.closest(".registry-move"); if(moveButton){if(moveRegNoInput)moveRegNoInput.value=moveButton.dataset.fileNumber;document.getElementById("moveFileType").value="service";if(moveFromInput){moveFromInput.value=String(moveButton.dataset.stage||"Registry").replaceAll("_"," ");moveFromInput.dataset.registry=moveButton.dataset.stage||"pending_processing";}openOperationModal(movementModalOverlay);return;}
     const returnButton=event.target.closest(".registry-return"); if(returnButton){document.getElementById("returnRegNo").value=returnButton.dataset.fileNumber;document.getElementById("returnDestination").value=returnButton.dataset.stage||"pending_processing";openOperationModal(returnModalOverlay);return;}
     const button = event.target.closest(".service-action"); if (!button) return;
-    const response = await fetch("../backend/api/service_files.php", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ staffdue_id: Number(button.dataset.staffId), action: button.dataset.action }) });
-    const data = await response.json(); showFeedbackModal(data.success ? "success" : "error", "Service File", data.message); if (data.success) loadServiceFiles();
+    const originalLabel=button.textContent;button.disabled=true;button.textContent="Updating...";
+    try { const response = await fetch("../backend/api/service_files.php", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ staffdue_id: Number(button.dataset.staffId), action: button.dataset.action }) });
+      const data = await response.json(); if(!response.ok||!data.success)throw new Error(data.message||"Unable to update the service file.");showFeedbackModal("success", "Service File", data.message);await loadServiceFiles();
+    } catch(error) { showFeedbackModal("error","Service File",error.message||"Unable to update the service file.");button.disabled=false;button.textContent=originalLabel; }
   });
   loadServiceFiles();
   let isHistoryModalOpen = false;
@@ -345,10 +434,12 @@ document.addEventListener("DOMContentLoaded", () => {
           const name = String(file.name || "Unknown").trim();
           const title = String(file.title || "N/A").trim();
           const availability = String(file.availability_status || "in_shelf").trim();
+          const fileType = String(file.file_type_label || (file.file_type === "service" ? "Service File" : "Pension File"));
+          const registry = String(file.registry_label || "Registry");
           return `
             <button type="button" class="file-match-item" data-reg="${escapeHtml(regNo)}">
               <span class="file-match-primary">${escapeHtml(regNo)} - ${escapeHtml(name)}</span>
-              <span class="file-match-meta">${escapeHtml(title)} | ${escapeHtml(availability)}</span>
+              <span class="file-match-meta">${escapeHtml(fileType)} | ${escapeHtml(registry)} | ${escapeHtml(title)} | ${escapeHtml(availability)}</span>
             </button>
           `;
         }).join("")}

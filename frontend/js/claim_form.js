@@ -399,7 +399,7 @@
       const plainMatch = header.match(/filename="?([^";]+)"?/i);
       const fileName = utf8Match?.[1]
         ? decodeURIComponent(utf8Match[1])
-        : (plainMatch?.[1] || 'claims_upload_template.csv');
+        : (plainMatch?.[1] || 'claims_upload_template.xlsx');
 
       const objectUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');

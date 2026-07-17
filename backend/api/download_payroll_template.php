@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/xlsx_upload_template.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -19,15 +20,12 @@ if (!currentUserHasPermission($conn, 'payroll.upload')) {
     exit;
 }
 
-$filename = 'payroll_upload_template_' . date('Ymd_His') . '.csv';
-
-header('Content-Type: text/csv; charset=utf-8');
-header('Content-Disposition: attachment; filename="' . $filename . '"');
-header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-
-$output = fopen('php://output', 'w');
-fputcsv($output, ['Supplier Number', 'Beneficiary Name', 'Amount']);
-fputcsv($output, ['SUP-10021', 'ASP EXAMPLE BENEFICIARY', '1450000']);
-fclose($output);
+$filename = 'payroll_upload_template_' . date('Ymd_His') . '.xlsx';
+sendUploadTemplateXlsx(
+    ['Supplier Number', 'Beneficiary Name', 'Amount'],
+    [['SUP-10021', 'ASP EXAMPLE BENEFICIARY', '1450000']],
+    'Payroll Upload',
+    $filename
+);
 
 $conn->close();

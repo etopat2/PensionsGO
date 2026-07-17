@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/xlsx_upload_template.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -18,17 +19,8 @@ if (!currentUserHasPermission($conn, 'claims.arrears.manage')) {
 }
 
 $columns = [
-    'regNo',
-    'claim_type',
-    'period_year',
-    'period_month',
-    'expected_amount',
-    'start_period',
-    'end_period',
-    'reason',
-    'notes',
-    'source_type',
-    'claim_status'
+    'Pension Number', 'Claim Type', 'Period Year', 'Period Month', 'Expected Amount',
+    'Start Period', 'End Period', 'Reason', 'Notes', 'Source Type', 'Claim Status'
 ];
 
 $sampleRegNo = 'UPS/RET/0001';
@@ -45,19 +37,6 @@ $rows = [
 ];
 
 $timestamp = date('Ymd_His');
-$filename = 'claims_upload_template_' . $timestamp . '.csv';
-
-header('Content-Type: text/csv; charset=utf-8');
-header('Content-Disposition: attachment; filename="' . $filename . '"');
-
-$out = fopen('php://output', 'w');
-if ($out === false) {
-    exit;
-}
-
-fputcsv($out, $columns);
-foreach ($rows as $row) {
-    fputcsv($out, $row);
-}
-fclose($out);
+$filename = 'claims_upload_template_' . $timestamp . '.xlsx';
+sendUploadTemplateXlsx($columns, $rows, 'Claims Upload', $filename);
 $conn->close();

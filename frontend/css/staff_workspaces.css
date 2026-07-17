@@ -759,7 +759,7 @@
 .workspace-modal-panel {
   position: relative;
   width: min(880px, 96vw);
-  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -800,6 +800,16 @@
   width: auto;
   text-align: initial;
   box-shadow: 0 -10px 18px rgba(0, 0, 0, 0.08);
+}
+
+#staffDueBulkUploadModal .workspace-modal-footer {
+  display: flex;
+  visibility: visible;
+  opacity: 1;
+  transform: none;
+  animation: none;
+  min-height: 64px;
+  flex: 0 0 auto;
 }
 
 .workspace-modal-header {

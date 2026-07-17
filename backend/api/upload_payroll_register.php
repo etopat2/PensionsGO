@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/payroll_payment_register_common.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -107,6 +108,15 @@ if (!move_uploaded_file((string)$registerFile['tmp_name'], $storedRegisterAbsolu
     exit;
 }
 
+try {
+    $parsedRegister = parsePayrollPaymentRegisterPdf($storedRegisterAbsolutePath);
+    enforceParsedRowLimit($conn, count($parsedRegister['entries'] ?? []), 'Payment register PDF');
+} catch (Throwable $parseError) {
+    @unlink($storedRegisterAbsolutePath);
+    echo json_encode(['success'=>false,'message'=>'Unable to read payment register PDF: '.$parseError->getMessage()]);
+    exit;
+}
+
 $cycleId = (int)($cycle['cycle_id'] ?? 0);
 $oldRegisterRelativePath = trim((string)($cycle['payment_register_file'] ?? ''));
 $existingNotes = trim((string)($cycle['notes'] ?? ''));
@@ -152,6 +162,8 @@ try {
         throw new RuntimeException('Payment register was not updated.');
     }
 
+    $reconciliationStats = reconcilePayrollPaymentRegister($conn, $cycleId, $parsedRegister['entries'] ?? []);
+
     $conn->commit();
 
     uploadPayrollRegisterDeleteFileIfSafe($oldRegisterRelativePath, $storedRegisterRelativePath);
@@ -172,7 +184,8 @@ try {
 
     echo json_encode([
         'success' => true,
-        'message' => 'Payment register uploaded successfully.',
+        'message' => 'Payment register uploaded and reconciled successfully.',
+        'reconciliation' => $reconciliationStats,
         'cycle' => [
             'cycleId' => $cycleId,
             'year' => $payrollYear,

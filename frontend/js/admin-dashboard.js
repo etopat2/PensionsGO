@@ -13403,7 +13403,7 @@ AdminDashboard.prototype.openDataImportModal = function (datasetKey) {
                             <h4>Template & Source File</h4>
                             <p>Download the official template, populate it, then upload the completed file for validation or import.</p>
                         </div>
-                        <button class="action-btn secondary" type="button" data-import-template-download="${this.escapeHtml(dataset.key)}">Download CSV Template</button>
+                        <button class="action-btn secondary" type="button" data-import-template-download="${this.escapeHtml(dataset.key)}">Download Excel Template</button>
                     </div>
                     <div class="form-grid">
                         <div class="form-field form-span">

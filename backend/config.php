@@ -5130,6 +5130,11 @@ function ensureUserPermissionsTable(mysqli $conn): void {
 
 function getPermissionCatalog(): array {
     return [
+        'service_files.edit' => [
+            'label' => 'Edit Service File Registries',
+            'description' => 'Allow editing service-file registry storage details, including box allocation.',
+            'default_roles' => ['admin', 'clerk', 'data_entry', 'writeup_officer']
+        ],
         'registry.edit' => [
             'label' => 'Edit Pension Registry',
             'description' => 'Allow editing pension file registry records.',
@@ -9747,6 +9752,9 @@ function ensurePayrollManagementTables(mysqli $conn): void {
             supplierNo varchar(50) NOT NULL,
             beneficiary_name varchar(150) DEFAULT NULL,
             amount decimal(14,2) NOT NULL DEFAULT 0,
+            invoice_number varchar(100) DEFAULT NULL,
+            source_section varchar(50) DEFAULT NULL,
+            source_row_number int(11) DEFAULT NULL,
             matched_regNo varchar(50) DEFAULT NULL,
             matched_registry_id int(11) DEFAULT NULL,
             is_matched tinyint(1) NOT NULL DEFAULT 0,
@@ -9754,7 +9762,103 @@ function ensurePayrollManagementTables(mysqli $conn): void {
             PRIMARY KEY (entry_id),
             KEY idx_payroll_entries_cycle (cycle_id),
             KEY idx_payroll_entries_supplier (supplierNo),
+            KEY idx_payroll_entries_invoice (invoice_number),
             KEY idx_payroll_entries_match (matched_regNo)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+
+    $entryColumnDefinitions = [
+        'invoice_number' => "varchar(100) DEFAULT NULL",
+        'source_section' => "varchar(50) DEFAULT NULL",
+        'source_row_number' => "int(11) DEFAULT NULL"
+    ];
+    foreach ($entryColumnDefinitions as $column => $definition) {
+        $columnResult = $conn->query("SHOW COLUMNS FROM tb_payroll_upload_entries LIKE '{$column}'");
+        if ($columnResult && $columnResult->num_rows === 0) {
+            $conn->query("ALTER TABLE tb_payroll_upload_entries ADD COLUMN {$column} {$definition}");
+        }
+        if ($columnResult) $columnResult->close();
+    }
+    $invoiceIndexResult = $conn->query("SHOW INDEX FROM tb_payroll_upload_entries WHERE Key_name = 'idx_payroll_entries_invoice'");
+    if ($invoiceIndexResult && $invoiceIndexResult->num_rows === 0) {
+        $conn->query("ALTER TABLE tb_payroll_upload_entries ADD KEY idx_payroll_entries_invoice (invoice_number)");
+    }
+    if ($invoiceIndexResult) $invoiceIndexResult->close();
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS tb_payroll_classified_entries (
+            classified_entry_id int(11) NOT NULL AUTO_INCREMENT,
+            cycle_id int(11) NOT NULL,
+            source_section varchar(50) NOT NULL,
+            source_sheet varchar(100) NOT NULL DEFAULT 'Payroll',
+            source_row_number int(11) DEFAULT NULL,
+            supplierNo varchar(50) DEFAULT NULL,
+            beneficiary_name varchar(255) DEFAULT NULL,
+            invoice_number varchar(100) DEFAULT NULL,
+            appeared_amount decimal(14,2) NOT NULL DEFAULT 0,
+            payable_amount decimal(14,2) NOT NULL DEFAULT 0,
+            recovery_amount decimal(14,2) NOT NULL DEFAULT 0,
+            reason text DEFAULT NULL,
+            matched_regNo varchar(50) DEFAULT NULL,
+            matched_registry_id int(11) DEFAULT NULL,
+            review_status enum('Observed','Pending Review','Approved','Rejected') NOT NULL DEFAULT 'Observed',
+            reviewed_by varchar(100) DEFAULT NULL,
+            reviewed_at datetime DEFAULT NULL,
+            created_at timestamp NOT NULL DEFAULT current_timestamp(),
+            PRIMARY KEY (classified_entry_id),
+            KEY idx_payroll_classified_cycle_section (cycle_id, source_section),
+            KEY idx_payroll_classified_supplier (supplierNo),
+            KEY idx_payroll_classified_invoice (invoice_number),
+            KEY idx_payroll_classified_review (review_status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS tb_payroll_section_summaries (
+            section_summary_id int(11) NOT NULL AUTO_INCREMENT,
+            cycle_id int(11) NOT NULL,
+            source_section varchar(50) NOT NULL,
+            reported_count int(11) DEFAULT NULL,
+            extracted_count int(11) NOT NULL DEFAULT 0,
+            reported_appeared_amount decimal(14,2) DEFAULT NULL,
+            extracted_appeared_amount decimal(14,2) NOT NULL DEFAULT 0,
+            reported_payable_amount decimal(14,2) DEFAULT NULL,
+            extracted_payable_amount decimal(14,2) NOT NULL DEFAULT 0,
+            validation_status enum('Matched','Variance','Not Reported') NOT NULL DEFAULT 'Not Reported',
+            validation_note varchar(500) DEFAULT NULL,
+            created_at timestamp NOT NULL DEFAULT current_timestamp(),
+            PRIMARY KEY (section_summary_id),
+            UNIQUE KEY uniq_payroll_section_cycle (cycle_id, source_section)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS tb_payroll_payment_register_entries (
+            register_entry_id int(11) NOT NULL AUTO_INCREMENT,
+            cycle_id int(11) NOT NULL,
+            supplierNo varchar(50) DEFAULT NULL,
+            supplier_name varchar(255) DEFAULT NULL,
+            invoice_number varchar(100) DEFAULT NULL,
+            payment_date date DEFAULT NULL,
+            amount_paid decimal(14,2) NOT NULL DEFAULT 0,
+            eft_number varchar(100) DEFAULT NULL,
+            bank_name varchar(180) DEFAULT NULL,
+            account_number_masked varchar(80) DEFAULT NULL,
+            matched_payroll_entry_id int(11) DEFAULT NULL,
+            matched_regNo varchar(50) DEFAULT NULL,
+            reconciliation_status enum('Paid in Full','Partially Paid','Paid with Adjustment','Not in Register','Register Only','Needs Review') NOT NULL DEFAULT 'Needs Review',
+            amount_variance decimal(14,2) NOT NULL DEFAULT 0,
+            match_confidence decimal(5,2) NOT NULL DEFAULT 0,
+            review_status enum('Auto Matched','Needs Review','Approved','Rejected') NOT NULL DEFAULT 'Needs Review',
+            review_note varchar(500) DEFAULT NULL,
+            source_page int(11) DEFAULT NULL,
+            created_at timestamp NOT NULL DEFAULT current_timestamp(),
+            PRIMARY KEY (register_entry_id),
+            KEY idx_payment_register_cycle (cycle_id),
+            KEY idx_payment_register_invoice (invoice_number),
+            KEY idx_payment_register_supplier (supplierNo),
+            KEY idx_payment_register_status (reconciliation_status),
+            KEY idx_payment_register_payroll_match (matched_payroll_entry_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
 
@@ -13938,5 +14042,3 @@ function buildImportReviewRowFromSource(array $headers, array $sourceRow, array 
 
     return $reviewRow;
 }
-
-?>

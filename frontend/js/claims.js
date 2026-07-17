@@ -1524,7 +1524,7 @@
         throw new Error(message);
       }
       const blob = await response.blob();
-      const fileName = parseExportFilename(response.headers.get('Content-Disposition'), fallbackTitle, 'csv');
+      const fileName = parseExportFilename(response.headers.get('Content-Disposition'), fallbackTitle, 'xlsx');
       triggerBlobDownload(blob, fileName);
       showFeedback(successMessage, 'success');
     } catch (error) {

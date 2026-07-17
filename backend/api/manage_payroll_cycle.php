@@ -91,6 +91,12 @@ if ($action === 'delete') {
         $deleteStatusStmt->execute();
         $deleteStatusStmt->close();
 
+        foreach (['tb_payroll_payment_register_entries', 'tb_payroll_classified_entries', 'tb_payroll_section_summaries'] as $relatedTable) {
+            $relatedStmt = $conn->prepare("DELETE FROM {$relatedTable} WHERE cycle_id = ?");
+            if (!$relatedStmt) throw new RuntimeException('Unable to prepare payroll analysis cleanup.');
+            $relatedStmt->bind_param('i', $cycleId); $relatedStmt->execute(); $relatedStmt->close();
+        }
+
         $deleteEntriesStmt = $conn->prepare("
             DELETE FROM tb_payroll_upload_entries
             WHERE cycle_id = ?

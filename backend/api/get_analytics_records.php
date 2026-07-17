@@ -667,6 +667,25 @@ function ar_build_spec(mysqli $conn, string $source, string $label): array
 {
     $labelKey = ar_key($label);
 
+    if ($source === 'payrollPaymentExceptions') {
+        ensurePayrollManagementTables($conn);
+        $period = ar_label_payroll_period($conn, $label);
+        $year = (int)$period['year']; $month = (int)$period['month'];
+        return [
+            'title' => $label,
+            'from' => 'tb_payroll_payment_register_entries r INNER JOIN tb_payroll_upload_cycles c ON c.cycle_id=r.cycle_id',
+            'pk' => 'r.register_entry_id',
+            'detail_table' => 'tb_payroll_payment_register_entries',
+            'detail_pk' => 'register_entry_id',
+            'date_column' => 'r.payment_date',
+            'where' => ["c.payroll_year={$year}", "c.payroll_month={$month}", "COALESCE(c.is_deleted,0)=0", "r.reconciliation_status<>'Paid in Full'"],
+            'search' => ['r.supplierNo','r.supplier_name','r.invoice_number','r.eft_number','r.bank_name','r.matched_regNo','r.reconciliation_status'],
+            'columns' => ['register_entry_id'=>'ID','supplierNo'=>'Supplier No.','supplier_name'=>'Beneficiary','invoice_number'=>'Invoice','amount_paid'=>'Amount Paid','amount_variance'=>'Variance','reconciliation_status'=>'Result','match_confidence'=>'Confidence','review_status'=>'Review'],
+            'select' => 'r.register_entry_id,r.supplierNo,r.supplier_name,r.invoice_number,r.payment_date,r.amount_paid,r.amount_variance,r.eft_number,r.bank_name,r.account_number_masked,r.matched_regNo,r.reconciliation_status,r.match_confidence,r.review_status',
+            'order' => 'r.register_entry_id DESC'
+        ];
+    }
+
     if ($source === 'lifeCertCards') {
         return ar_build_spec($conn, 'lifeCertAnalyticsBars', ar_clean($label));
     }

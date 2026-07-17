@@ -396,7 +396,7 @@ function parseSuspensionXlsxWorksheet(string $xmlText, array $sharedStrings): ar
             if ($cellType === 's') {
                 $sharedIndex = (int)($cellNode->v ?? 0);
                 $value = (string)($sharedStrings[$sharedIndex] ?? '');
-            } elseif ($cellType === 'inlineStr') {
+            } elseif ($cellType === 'inlinestr') {
                 if (isset($cellNode->is->t)) {
                     $value = (string)$cellNode->is->t;
                 } elseif (isset($cellNode->is->r)) {
@@ -460,7 +460,7 @@ function normalizeSuspensionRows(array $rows): array {
         return strtolower(trim((string)$value));
     }, $rows[0]);
 
-    $idxRegNo = findSuspensionHeaderIndex($header, ['regno', 'filenumber', 'file', 'registrynumber', 'registryno']);
+    $idxRegNo = findSuspensionHeaderIndex($header, ['regno', 'filenumber', 'file', 'registrynumber', 'registryno', 'pensionno', 'pensionnumber']);
     $idxSupplier = findSuspensionHeaderIndex($header, ['supplierno', 'supplier', 'suppliernumber', 'suppno']);
     $idxName = findSuspensionHeaderIndex($header, ['name', 'beneficiary', 'beneficiaryname', 'pensionername']);
     $idxAmount = findSuspensionHeaderIndex($header, ['amount', 'arrears', 'value', 'missedamount', 'suspendedamount']);

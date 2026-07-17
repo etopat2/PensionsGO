@@ -1,6 +1,8 @@
 <?php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/payroll_source_common.php';
+require_once __DIR__ . '/payroll_payment_register_common.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -155,6 +157,11 @@ try {
     $rows = $parsed['rows'] ?? [];
     $reviewRows = $parsed['review_rows'] ?? [];
     $reviewColumns = $parsed['review_columns'] ?? [];
+    if (($parsed['source_format'] ?? '') === 'government_multi_section') {
+        $workbookSheets = payrollReadXlsxSheets($storedPayrollAbsolutePath);
+        $classifiedData = extractGovernmentPayrollClassifiedData($workbookSheets['Payroll'] ?? []);
+        $classifiedData['entries'] = array_merge($classifiedData['entries'], extractGovernmentPayrollStatistics($workbookSheets['Statistics'] ?? []));
+    } else $classifiedData = ['entries' => [], 'summaries' => []];
 } catch (Throwable $parseError) {
     @unlink($storedPayrollAbsolutePath);
     if ($storedRegisterAbsolutePath) {
@@ -253,8 +260,8 @@ try {
 
     $insertEntryStmt = $conn->prepare("
         INSERT INTO tb_payroll_upload_entries
-        (cycle_id, supplierNo, beneficiary_name, amount, matched_regNo, matched_registry_id, is_matched)
-        VALUES (?, ?, ?, ?, NULL, NULL, 0)
+        (cycle_id, supplierNo, beneficiary_name, amount, invoice_number, source_section, source_row_number, matched_regNo, matched_registry_id, is_matched)
+        VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, 0)
     ");
     if (!$insertEntryStmt) {
         throw new RuntimeException('Unable to insert replacement payroll entries');
@@ -263,12 +270,22 @@ try {
         $supplierNo = $row['supplierNo'];
         $beneficiaryName = $row['beneficiary'];
         $amount = $row['amount'];
-        $insertEntryStmt->bind_param("issd", $cycleId, $supplierNo, $beneficiaryName, $amount);
+        $invoiceNumber = trim((string)($row['invoice_number'] ?? '')) ?: null;
+        $sourceSection = trim((string)($row['source_section'] ?? '')) ?: null;
+        $sourceRowNumber = (int)($row['row_number'] ?? 0) ?: null;
+        $insertEntryStmt->bind_param("issdssi", $cycleId, $supplierNo, $beneficiaryName, $amount, $invoiceNumber, $sourceSection, $sourceRowNumber);
         $insertEntryStmt->execute();
     }
     $insertEntryStmt->close();
 
     $stats = applyPayrollCycleToRegistry($conn, $cycleId, $payrollYear, $payrollMonth);
+    $sectionStats = storeGovernmentPayrollClassifiedData($conn, $cycleId, $classifiedData);
+    $registerForReconciliation = $storedRegisterAbsolutePath ?: ($oldRegisterFile !== '' ? (__DIR__ . '/../' . ltrim($oldRegisterFile, '/\\')) : null);
+    $paymentStats = null;
+    if ($registerForReconciliation && is_file($registerForReconciliation)) {
+        $parsedRegister = parsePayrollPaymentRegisterPdf($registerForReconciliation);
+        $paymentStats = reconcilePayrollPaymentRegister($conn, $cycleId, $parsedRegister['entries'] ?? []);
+    }
     $conn->commit();
 
     replaceDeletePayrollFileIfSafe($oldSourceFile, $storedPayrollRelativePath);
@@ -446,7 +463,7 @@ function replaceParseXlsxRows(string $absolutePath): array {
             if ($cellType === 's') {
                 $sharedIndex = (int)($valueNode->v ?? 0);
                 $value = (string)($sharedStrings[$sharedIndex] ?? '');
-            } elseif ($cellType === 'inlineStr') {
+            } elseif ($cellType === 'inlinestr') {
                 if (isset($valueNode->is->t)) {
                     $value = (string)$valueNode->is->t;
                 }
@@ -468,6 +485,9 @@ function replaceNormalizeRows(array $rows): array {
     if (empty($rows)) {
         return ['rows' => [], 'review_rows' => [], 'review_columns' => []];
     }
+
+    $governmentSchedule = normalizeGovernmentPayrollScheduleRows($rows);
+    if ($governmentSchedule !== null) return $governmentSchedule;
 
     $displayHeaders = array_map(static function ($value, int $index): string {
         $label = trim((string)$value);

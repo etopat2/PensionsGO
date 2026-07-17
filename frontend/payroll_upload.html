@@ -18,12 +18,12 @@
   <link rel="stylesheet" href="css/menu.css?v=20260504d" />
   <link rel="stylesheet" href="css/overlay.css?v=20260504a" />
   <link rel="stylesheet" href="css/auth.css?v=20260504a" />
-  <link rel="stylesheet" href="css/payroll_upload.css?v=20260504a" />
+  <link rel="stylesheet" href="css/payroll_upload.css?v=20260717d" />
 
   <script src="js/auth_bootstrap.js?v=20260606b"></script>
   <script type="module" src="js/main.js?v=20260713a"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script defer src="js/payroll_upload.js?v=20260216e"></script>
+  <script defer src="js/payroll_upload.js?v=20260717e"></script>
 </head>
 <body>
   <main class="payroll-history-main">
@@ -34,7 +34,7 @@
           <p>Drill down each upload to review matched and unmatched rows for correction workflows.</p>
         </div>
         <div class="payroll-history-header-actions">
-          <a href="dashboard.html" class="btn-action btn-history-back">Back to Dashboard</a>
+          <a href="dashboard.html?section=payrollSection" class="btn-action btn-history-back">Back to Dashboard</a>
         </div>
       </header>
 
@@ -120,42 +120,16 @@
             </header>
 
             <section class="detail-summary" id="detailSummary"></section>
+            <button type="button" id="openCycleEntriesBtn" class="btn-action analysis-exception-button">View Payroll Cycle Records</button>
 
-            <section class="detail-filters">
-              <div class="status-tabs" role="tablist" aria-label="Entry status filter">
-                <button type="button" class="status-tab active" data-status="all">All</button>
-                <button type="button" class="status-tab" data-status="matched">Matched</button>
-                <button type="button" class="status-tab" data-status="unmatched">Unmatched</button>
-              </div>
-
-              <input type="text" id="detailSearch" placeholder="Supplier no, beneficiary, file no..." />
-              <button type="button" class="btn-action" id="detailRefreshBtn">Refresh</button>
+            <section class="payroll-reconciliation-analysis">
+              <div class="detail-header"><div><h3>Payroll Sections & Payment Reconciliation</h3><p>Classified exceptions remain review-only until an authorized officer approves them.</p></div></div>
+              <div id="payrollSectionValidation" class="detail-summary"></div>
+              <div id="payrollPaymentSummary" class="detail-summary"></div>
+              <div class="analysis-launch-group"><h4>Classified payroll sections requiring review</h4><div id="payrollClassifiedSectionButtons" class="analysis-launch-buttons"></div></div>
+              <div class="analysis-launch-group"><button type="button" id="openPaymentExceptionsBtn" class="btn-action analysis-exception-button">Payment Reconciliation Exceptions</button></div>
             </section>
 
-            <div class="detail-table-wrap">
-              <table class="detail-table">
-                <thead>
-                  <tr>
-                    <th>Supplier Number</th>
-                    <th>Beneficiary (Upload)</th>
-                    <th>Amount (UGX)</th>
-                    <th>Status</th>
-                    <th>Matched File</th>
-                    <th>Registry Name</th>
-                    <th>Reason</th>
-                  </tr>
-                </thead>
-                <tbody id="detailTableBody">
-                  <tr><td colspan="7">Loading cycle details...</td></tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div class="panel-pagination">
-              <span id="detailPageLabel">Page 1 of 1</span>
-              <button type="button" class="btn-action" id="detailPrevBtn">Previous</button>
-              <button type="button" class="btn-action" id="detailNextBtn">Next</button>
-            </div>
           </div>
         </article>
       </section>
@@ -170,7 +144,7 @@
       </header>
       <div class="payroll-modal-body">
         <p class="replace-cycle-note">
-          Upload a corrected payroll file to replace the selected cycle. The cycle period is retained and rows are re-matched to registry records.
+          Upload a corrected normalized file or original government XLSX schedule. Section (E) VALID PAYMENTS is extracted automatically; the cycle period is retained and rows are re-matched to registry records.
         </p>
         <div id="replaceCycleContext" class="replace-cycle-context"></div>
 
@@ -189,6 +163,25 @@
             <button type="submit" class="btn-action btn-replace" id="replaceCycleSubmitBtn">Replace Payroll</button>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="payrollAnalysisModal" class="payroll-modal hidden" role="dialog" aria-modal="true" aria-labelledby="payrollAnalysisModalTitle">
+    <div class="payroll-modal-panel payroll-analysis-modal-panel">
+      <header class="payroll-modal-header">
+        <div><h3 id="payrollAnalysisModalTitle">Payroll records</h3><p id="payrollAnalysisModalSubtitle" class="analysis-modal-subtitle"></p></div>
+        <button type="button" class="payroll-modal-close" id="payrollAnalysisModalClose" aria-label="Close">&times;</button>
+      </header>
+      <div class="payroll-modal-body analysis-modal-body">
+        <div class="analysis-modal-filters">
+          <input type="search" id="payrollAnalysisSearch" placeholder="Search supplier, name, invoice or reference..." />
+          <select id="payrollAnalysisMatchFilter" class="hidden"><option value="all">All records</option><option value="matched">Matched</option><option value="unmatched">Unmatched</option></select>
+          <select id="payrollAnalysisReviewFilter"><option value="">All available statuses</option></select>
+        </div>
+        <div id="payrollAnalysisResultSummary" class="analysis-result-summary"></div>
+        <div class="detail-table-wrap"><table class="detail-table analysis-modal-table"><thead id="payrollAnalysisTableHead"></thead><tbody id="payrollAnalysisTableBody"></tbody></table></div>
+        <div class="panel-pagination"><span id="payrollAnalysisPageLabel">Page 1 of 1</span><button type="button" class="btn-action" id="payrollAnalysisPrev">Previous</button><button type="button" class="btn-action" id="payrollAnalysisNext">Next</button></div>
       </div>
     </div>
   </div>
@@ -237,5 +230,3 @@
   </div>
 </body>
 </html>
-
-

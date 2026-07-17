@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/import_common.php';
+require_once __DIR__ . '/xlsx_upload_template.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -29,7 +30,7 @@ if (!$dataset) {
 }
 
 $timestamp = date('Ymd_His');
-$filename = 'file_registry_template_' . $timestamp . '.csv';
+$filename = 'file_registry_template_' . $timestamp . '.xlsx';
 $templateRows = $dataset['template_rows'];
 
 $titleResult = $conn->query("SELECT title_name FROM tb_titles WHERE is_active = 1 ORDER BY title_name ASC LIMIT 1");
@@ -39,17 +40,5 @@ if (!empty($templateRows[0]) && $title !== '') {
 }
 
 header_remove('Content-Type');
-header('Content-Type: text/csv; charset=utf-8');
-header('Content-Disposition: attachment; filename="' . $filename . '"');
-
-$out = fopen('php://output', 'w');
-if ($out === false) {
-    exit;
-}
-
-fputcsv($out, array_map(static fn($column) => $column['field'], $dataset['columns']));
-foreach ($templateRows as $row) {
-    fputcsv($out, $row);
-}
-fclose($out);
+sendUploadTemplateXlsx(array_column($dataset['columns'], 'label'), $templateRows, 'Pension File Registry Upload', $filename);
 $conn->close();

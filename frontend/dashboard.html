@@ -37,7 +37,7 @@
         if (document.getElementById('dashboardControllerScript')) return;
         var script = document.createElement('script');
         script.id = 'dashboardControllerScript';
-        script.src = 'js/dashboard.js?v=20260709a';
+        script.src = 'js/dashboard.js?v=20260717c';
         script.defer = true;
         document.head.appendChild(script);
       };
@@ -372,7 +372,7 @@
             <input type="text" id="payrollSearch" placeholder="File no, name, supplier no...">
             <button type="button" class="btn-action" id="payrollRefreshBtn">Refresh</button>
           </div>
-          <p>Upload payroll source files and payment register PDFs each month, then track matched registry status against uploaded payroll totals.</p>
+          <p>Upload monthly payroll source files to track registry payroll presence. Payment register PDFs are parsed automatically to confirm successful payments, amount variances and payment exceptions.</p>
           <div class="cards-container" id="payrollCards"></div>
           <div class="section-analytics-grid">
             <article class="analytics-panel analytics-panel-emphasis">
@@ -1888,7 +1888,7 @@
       <div class="dashboard-data-modal-body payroll-upload-modal-body">
         <div class="dashboard-data-modal-summary payroll-upload-summary-card">
           <h4>Payroll Source Upload</h4>
-          <p>Upload the monthly payroll CSV or XLSX file for reconciliation. The system matches supplier numbers to the pension file registry, updates payroll status for the active cycle, and automatically downloads any unmatched or invalid rows for review.</p>
+          <p>Upload a normalized CSV/XLSX template or the original government XLSX pension schedule. For government schedules, Section (E) VALID PAYMENTS is detected automatically and matched to the pension file registry by supplier number.</p>
         </div>
         <form id="payrollUploadModalForm" class="dashboard-form-grid" novalidate>
           <label class="dashboard-form-field">
@@ -1902,7 +1902,7 @@
           <label class="dashboard-form-field dashboard-form-field-full">
             <span>Payroll Source File</span>
             <input type="file" id="payrollUploadFile" accept=".csv,.xlsx,.xlxl" required>
-            <small>Accepted formats: CSV and XLSX.</small>
+            <small>Accepted formats: CSV and XLSX. Legacy .xls schedules must first be saved as .xlsx.</small>
           </label>
           <label class="dashboard-form-field dashboard-form-field-full">
             <span>Upload Notes</span>
@@ -1931,7 +1931,7 @@
       <div class="dashboard-data-modal-body payroll-upload-modal-body">
         <div class="dashboard-data-modal-summary payroll-upload-summary-card">
           <h4>Payment Register Attachment</h4>
-          <p>Select the payroll month and year that already has a payroll upload, then attach the signed payment register PDF. The latest active payroll cycle for that period will be updated.</p>
+          <p>Select a month with an existing payroll upload, then attach the signed payment register PDF. Supplier, invoice, payment, EFT, bank and masked-account details are extracted and reconciled automatically.</p>
         </div>
         <form id="payrollRegisterUploadForm" class="dashboard-form-grid" novalidate>
           <label class="dashboard-form-field">

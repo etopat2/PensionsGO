@@ -228,6 +228,12 @@ function parseGratuityScheduleWorksheet(string $xmlText, array $sharedStrings): 
             $value = '';
             if ($type === 's') {
                 $value = (string)($sharedStrings[(int)($cell->v ?? 0)] ?? '');
+            } elseif ($type === 'inlinestr') {
+                if (isset($cell->is->t)) {
+                    $value = (string)$cell->is->t;
+                } elseif (isset($cell->is->r)) {
+                    foreach ($cell->is->r as $run) $value .= (string)($run->t ?? '');
+                }
             } else {
                 $value = trim((string)($cell->v ?? ''));
             }

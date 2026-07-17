@@ -25,13 +25,13 @@
   
   <link rel="stylesheet" href="../frontend/css/forms.css?v=20260602a" />
   <link rel="stylesheet" href="../frontend/css/add_staff.css?v=20260716c" />
-  <link rel="stylesheet" href="../frontend/css/staff_workspaces.css?v=20260504b" />
+  <link rel="stylesheet" href="../frontend/css/staff_workspaces.css?v=20260716a" />
 
   <script defer src="../frontend/js/modules/filterable_select.js?v=20260429a"></script>
   <script src="js/auth_bootstrap.js?v=20260606b"></script>
   <script type="module" src="../frontend/js/main.js?v=20260713a"></script>
   <script defer src="../frontend/js/modules/retirement-types.js"></script>
-  <script defer src="../frontend/js/add_staff.js?v=20260716c"></script>
+  <script defer src="../frontend/js/add_staff.js?v=20260716e"></script>
 </head>
 
 <body>
@@ -150,6 +150,7 @@
                   <span>Tel No</span>
                   <input type="text" id="telNo" name="telNo" placeholder="+256700123456 or 0770123456" />
                 </label>
+                <label class="form-group edit-field"><span>Alternative Phone Number</span><input name="alternateTelNo" placeholder="+256700123456 or 0770123456" /></label>
 
                 <label class="form-group edit-field">
                   <span>Birth Date</span>
@@ -164,7 +165,6 @@
                 <label class="form-group edit-field"><span>Sub County</span><input name="subCounty" /></label>
                 <label class="form-group edit-field"><span>Parish</span><input name="parish" /></label>
                 <label class="form-group edit-field"><span>Village</span><input name="village" /></label>
-                <label class="form-group edit-field"><span>Alternative Phone Number</span><input name="alternateTelNo" /></label>
                 <label class="form-group edit-field"><span>Email Address</span><input type="email" name="applicant_email" /></label>
                 <label class="form-group edit-field"><span>Marital Status</span><input name="maritalStatus" /></label>
                 <label class="form-group edit-field"><span>TIN</span><input name="TIN" data-text-case="upper" /></label>
@@ -375,11 +375,11 @@
           </div>
           <div id="staffDueBulkUploadReport" class="registry-bulk-upload-report hidden"></div>
         </div>
-        <footer class="workspace-modal-footer">
+        <div class="workspace-modal-footer" role="group" aria-label="Bulk upload actions">
           <button type="button" class="workspace-btn ghost" data-close-modal="staff-due-bulk">Close</button>
           <button type="button" class="workspace-btn secondary" id="staffDueBulkDryRunBtn">Run Dry Check</button>
           <button type="submit" class="workspace-btn primary" id="staffDueBulkImportBtn">Import Data</button>
-        </footer>
+        </div>
       </form>
     </section>
   </div>

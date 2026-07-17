@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/import_common.php';
+require_once __DIR__ . '/xlsx_upload_template.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -27,7 +28,7 @@ if (!isset($definitions[$datasetKey])) {
 
 $dataset = $definitions[$datasetKey];
 $timestamp = date('Ymd_His');
-$filename = $datasetKey . '_template_' . $timestamp . '.csv';
+$filename = $datasetKey . '_template_' . $timestamp . '.xlsx';
 
 $templateRows = $dataset['template_rows'];
 if ($datasetKey === 'staff_due' || $datasetKey === 'file_registry') {
@@ -61,17 +62,5 @@ if ($datasetKey === 'users') {
     }
 }
 
-header('Content-Type: text/csv; charset=utf-8');
-header('Content-Disposition: attachment; filename="' . $filename . '"');
-
-$out = fopen('php://output', 'w');
-if ($out === false) {
-    exit;
-}
-
-fputcsv($out, array_map(static fn($column) => $column['field'], $dataset['columns']));
-foreach ($templateRows as $row) {
-    fputcsv($out, $row);
-}
-fclose($out);
+sendUploadTemplateXlsx(array_column($dataset['columns'], 'label'), $templateRows, ucwords(str_replace('_', ' ', $datasetKey)) . ' Upload', $filename);
 $conn->close();

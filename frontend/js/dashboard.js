@@ -5859,6 +5859,20 @@ function initDashboardController() {
           value: `${String(resolvedMonth).padStart(2, "0")}/${resolvedYear}`,
           helper: `${payrollFinancialYear?.value || "All financial years"} ${payrollQuarter?.value || "all quarters"} currently in view.`,
           tone: "info"
+        },
+        {
+          label: "Successfully Paid",
+          value: formatCurrencyUGX(summary.successfulPaymentAmount || 0),
+          helper: `${pluralize(summary.successfulPayments || 0, "payment")} extracted from the payment register PDF.`,
+          tone: "success"
+        },
+        {
+          label: "Payment Exceptions",
+          value: Number(summary.paymentExceptions || 0) + Number(summary.notInPaymentRegister || 0),
+          helper: `${pluralize(summary.notInPaymentRegister || 0, "payroll invoice")} not found in the successful-payment register.`,
+          tone: Number(summary.paymentExceptions || 0) + Number(summary.notInPaymentRegister || 0) > 0 ? "warning" : "success",
+          analyticsSource: "payrollPaymentExceptions",
+          analyticsLabel: `Payment Exceptions (${String(resolvedYear)}-${String(resolvedMonth).padStart(2, "0")})`
         }
       ]);
 
@@ -6064,7 +6078,7 @@ function initDashboardController() {
       appAlert("You do not have permission to download the payroll template.");
       return;
     }
-    triggerCurrentTabDownload("../backend/api/download_payroll_template.php", "payroll_upload_template.csv");
+    triggerCurrentTabDownload("../backend/api/download_payroll_template.php", "payroll_upload_template.xlsx");
   }
 
   function downloadImportReviewExport(reviewExport, fallbackName = "import_review.csv") {
@@ -9750,8 +9764,11 @@ function initDashboardController() {
       applyFeedbackMenuVisibility();
       applyDataManagementVisibility(accessRole);
       
-      // Render the visible first section before hydrating the rest of the dashboard.
-      await renderDashboardSection("claimsSection", { force: true, reason: "initial-visible-section" });
+      // Honor direct links from focused workspaces such as payroll upload history.
+      const requestedSection = new URLSearchParams(window.location.search).get('section');
+      const initialSection = document.getElementById(requestedSection || '') ? requestedSection : 'claimsSection';
+      switchSection(initialSection);
+      await renderDashboardSection(initialSection, { force: true, reason: "initial-visible-section" });
       if (!canViewFeedbackSection()) {
         setFeedbackAccessNotice(false);
       }

@@ -936,5 +936,4 @@ class SessionManager
         }
     }
 }
-?>
 

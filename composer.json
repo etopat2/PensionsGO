@@ -1,0 +1,14 @@
+{
+  "name": "uganda-prisons/pension-app",
+  "description": "Runtime dependencies for the PensionApp PHP application.",
+  "type": "project",
+  "license": "proprietary",
+  "require": {
+    "php": ">=8.0",
+    "smalot/pdfparser": "^2.12.5"
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "sort-packages": true
+  }
+}

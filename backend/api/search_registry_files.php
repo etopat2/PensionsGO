@@ -1,70 +1,22 @@
 <?php
-header('Content-Type: application/json');
-require_once __DIR__ . '/../config.php';
-
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-if (!isset($_SESSION['userId'])) {
-    echo json_encode(['success' => false, 'message' => 'Authentication required']);
-    exit;
-}
-
-if (function_exists('ensureFileMovementTables')) {
-    ensureFileMovementTables($conn);
-}
-
-$term = trim((string)($_GET['q'] ?? ''));
-$limit = (int)($_GET['limit'] ?? 15);
-if ($limit <= 0 || $limit > 50) {
-    $limit = 15;
-}
-
-if ($term === '') {
-    echo json_encode(['success' => true, 'files' => []]);
-    exit;
-}
-
-$like = '%' . $term . '%';
-$sql = "
-    SELECT regNo, sName, fName, computerNo, title, availability_status
-    FROM tb_fileregistry
-    WHERE COALESCE(is_deleted, 0) = 0
-      AND (
-       regNo LIKE ?
-       OR computerNo LIKE ?
-       OR title LIKE ?
-       OR sName LIKE ?
-       OR fName LIKE ?
-       OR CONCAT_WS(' ', sName, fName) LIKE ?
-       OR CONCAT_WS(' ', fName, sName) LIKE ?
-      )
-    ORDER BY regNo ASC
-    LIMIT ?
-";
-
-$stmt = $conn->prepare($sql);
-if (!$stmt) {
-    echo json_encode(['success' => false, 'message' => 'Failed to search registry']);
-    exit;
-}
-
-$stmt->bind_param("sssssssi", $like, $like, $like, $like, $like, $like, $like, $limit);
-$stmt->execute();
-$result = $stmt->get_result();
-$files = [];
-while ($row = $result->fetch_assoc()) {
-    $files[] = [
-        'regNo' => $row['regNo'],
-        'name' => trim(($row['sName'] ?? '') . ' ' . ($row['fName'] ?? '')),
-        'computerNo' => $row['computerNo'],
-        'title' => $row['title'] ?? '',
-        'availability_status' => $row['availability_status'] ?? 'in_shelf'
-    ];
-}
-$stmt->close();
-
-echo json_encode(['success' => true, 'files' => $files]);
-$conn->close();
-?>
+header('Content-Type: application/json; charset=utf-8');
+require_once __DIR__.'/../config.php';
+if(!isset($_SESSION['userId'])){http_response_code(401);echo json_encode(['success'=>false,'message'=>'Authentication required']);exit;}
+$term=trim((string)($_GET['q']??''));$limit=max(1,min(50,(int)($_GET['limit']??15)));if($term===''){echo json_encode(['success'=>true,'files'=>[]]);exit;}
+$normalized=strtoupper((string)preg_replace('/\s+/','',$term));$serviceCanonical=$normalized;$pensionCanonical=$normalized;
+if(str_starts_with($normalized,'PEN/')){$tail=substr($normalized,4);$serviceCanonical=preg_match('#^[A-Z]/[0-9]+$#',$tail)?'P/'.$tail:$tail;$pensionCanonical='PEN/'.$tail;}
+elseif(str_starts_with($normalized,'P/')){$tail=substr($normalized,2);$serviceCanonical='P/'.$tail;$pensionCanonical='PEN/'.$tail;}
+elseif(preg_match('#^[A-Z]/[0-9]+$#',$normalized)){$serviceCanonical='P/'.$normalized;$pensionCanonical='PEN/'.$normalized;}
+elseif(preg_match('#^[0-9]+$#',$normalized)){$serviceCanonical=$normalized;$pensionCanonical='PEN/'.$normalized;}
+$serviceFirst=str_starts_with($normalized,'P/')&&!str_starts_with($normalized,'PEN/');$pensionFirst=str_starts_with($normalized,'PEN/');$sourceOrder=$pensionFirst?['pension','service']:['service','pension'];
+$rows=[];$seen=[];
+$append=function(array $row,string $type,int $matchScore)use(&$rows,&$seen,$serviceFirst,$pensionFirst){$number=trim((string)($row['regNo']??''));if($number==='')return;$key=$type.'|'.strtoupper($number);if(isset($seen[$key]))return;$seen[$key]=true;$sourcePriority=($serviceFirst&&$type==='service')||($pensionFirst&&$type==='pension')?0:($serviceFirst||$pensionFirst?10:0);$row['file_type']=$type;$row['file_type_label']=$type==='service'?'Service File':'Pension File';$row['registry_label']=$type==='service'?ucwords(str_replace('_',' ',(string)($row['registry_stage']??'service registry'))):'Pension File Registry';$row['_score']=$sourcePriority+$matchScore;$rows[]=$row;};
+$runPriority=function(string $type)use($conn,$term,$normalized,$serviceCanonical,$pensionCanonical,$limit,$append){
+  if($type==='service'){$prefix=$serviceCanonical.'%';$sql="SELECT sf.employeeNo regNo,TRIM(CONCAT_WS(' ',COALESCE(NULLIF(sd.firstName,''),SUBSTRING_INDEX(sd.fName,' ',1)),NULLIF(sd.middleName,''),COALESCE(NULLIF(sd.lastName,''),sd.sName))) name,COALESCE(NULLIF(sd.positionName,''),NULLIF(sd.rankPosition,''),sd.title,'') title,COALESCE(NULLIF(sd.ippsNo,''),sd.computerNo,'') computerNo,sf.availability_status,sf.registry_stage,CASE WHEN sf.employeeNo=? THEN 0 WHEN sf.employeeNo=? THEN 1 ELSE 2 END match_score FROM tb_service_files sf LEFT JOIN tb_staffdue sd ON sd.id=sf.staffdue_id WHERE sf.file_type='service' AND (sf.employeeNo=? OR sf.employeeNo=? OR sf.employeeNo LIKE ?) ORDER BY match_score,sf.employeeNo LIMIT ?";$stmt=$conn->prepare($sql);$stmt->bind_param('sssssi',$normalized,$serviceCanonical,$normalized,$serviceCanonical,$prefix,$limit);
+  }else{$prefix=$pensionCanonical.'%';$sql="SELECT COALESCE(NULLIF(fr.pensionNo,''),fr.regNo) regNo,TRIM(CONCAT_WS(' ',COALESCE(NULLIF(fr.firstName,''),SUBSTRING_INDEX(fr.fName,' ',1)),NULLIF(fr.middleName,''),COALESCE(NULLIF(fr.lastName,''),fr.sName))) name,COALESCE(fr.title,'') title,COALESCE(NULLIF(fr.ippsNo,''),fr.computerNo,'') computerNo,fr.availability_status,'pension_file_registry' registry_stage,CASE WHEN fr.pensionNo=? OR fr.regNo=? THEN 0 WHEN fr.pensionNo=? OR fr.regNo=? THEN 1 ELSE 2 END match_score FROM tb_fileregistry fr WHERE COALESCE(fr.is_deleted,0)=0 AND (fr.pensionNo=? OR fr.regNo=? OR fr.pensionNo LIKE ? OR fr.regNo LIKE ?) ORDER BY match_score,regNo LIMIT ?";$stmt=$conn->prepare($sql);$stmt->bind_param('ssssssssi',$normalized,$normalized,$pensionCanonical,$pensionCanonical,$pensionCanonical,$normalized,$prefix,$prefix,$limit);}
+  if(!$stmt)return;$stmt->execute();$result=$stmt->get_result();while($row=$result->fetch_assoc()){$score=(int)$row['match_score'];unset($row['match_score']);$append($row,$type,$score);}$stmt->close();
+};
+foreach($sourceOrder as $type)$runPriority($type);
+if(count($rows)<$limit){$contains='%'.$term.'%';$compactContains='%'.$normalized.'%';$remaining=$limit-count($rows);foreach($sourceOrder as $type){if($remaining<=0)break;if($type==='service'){$sql="SELECT sf.employeeNo regNo,TRIM(CONCAT_WS(' ',COALESCE(NULLIF(sd.firstName,''),SUBSTRING_INDEX(sd.fName,' ',1)),NULLIF(sd.middleName,''),COALESCE(NULLIF(sd.lastName,''),sd.sName))) name,COALESCE(NULLIF(sd.positionName,''),NULLIF(sd.rankPosition,''),sd.title,'') title,COALESCE(NULLIF(sd.ippsNo,''),sd.computerNo,'') computerNo,sf.availability_status,sf.registry_stage FROM tb_service_files sf LEFT JOIN tb_staffdue sd ON sd.id=sf.staffdue_id WHERE sf.file_type='service' AND (UPPER(sf.employeeNo) LIKE ? OR sd.ippsNo LIKE ? OR sd.computerNo LIKE ? OR sd.title LIKE ? OR sd.rankPosition LIKE ? OR sd.positionName LIKE ? OR sd.firstName LIKE ? OR sd.middleName LIKE ? OR sd.lastName LIKE ? OR sd.fName LIKE ? OR sd.sName LIKE ?) ORDER BY sf.employeeNo LIMIT ?";$stmt=$conn->prepare($sql);$stmt->bind_param('sssssssssssi',$compactContains,$contains,$contains,$contains,$contains,$contains,$contains,$contains,$contains,$contains,$contains,$remaining);}else{$sql="SELECT COALESCE(NULLIF(fr.pensionNo,''),fr.regNo) regNo,TRIM(CONCAT_WS(' ',COALESCE(NULLIF(fr.firstName,''),SUBSTRING_INDEX(fr.fName,' ',1)),NULLIF(fr.middleName,''),COALESCE(NULLIF(fr.lastName,''),fr.sName))) name,COALESCE(fr.title,'') title,COALESCE(NULLIF(fr.ippsNo,''),fr.computerNo,'') computerNo,fr.availability_status,'pension_file_registry' registry_stage FROM tb_fileregistry fr WHERE COALESCE(fr.is_deleted,0)=0 AND (UPPER(COALESCE(NULLIF(fr.pensionNo,''),fr.regNo)) LIKE ? OR fr.ippsNo LIKE ? OR fr.computerNo LIKE ? OR fr.title LIKE ? OR fr.firstName LIKE ? OR fr.middleName LIKE ? OR fr.lastName LIKE ? OR fr.fName LIKE ? OR fr.sName LIKE ?) ORDER BY regNo LIMIT ?";$stmt=$conn->prepare($sql);$stmt->bind_param('sssssssssi',$compactContains,$contains,$contains,$contains,$contains,$contains,$contains,$contains,$contains,$remaining);}if(!$stmt)continue;$stmt->execute();$result=$stmt->get_result();while($row=$result->fetch_assoc())$append($row,$type,5);$stmt->close();$remaining=$limit-count($rows);}}
+usort($rows,static fn($a,$b)=>($a['_score']<=>$b['_score'])?:strnatcasecmp((string)$a['regNo'],(string)$b['regNo']));$rows=array_slice($rows,0,$limit);foreach($rows as &$row)unset($row['_score']);unset($row);
+echo json_encode(['success'=>true,'files'=>$rows,'search'=>['normalized'=>$normalized,'service_candidate'=>$serviceCanonical,'pension_candidate'=>$pensionCanonical]]);

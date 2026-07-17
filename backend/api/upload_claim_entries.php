@@ -153,7 +153,7 @@ function claimsParseXlsxRows(string $path): array {
             if ($type === 's') {
                 $idx = (int)($cellNode->v ?? 0);
                 $value = (string)($sharedStrings[$idx] ?? '');
-            } elseif ($type === 'inlineStr') {
+            } elseif ($type === 'inlinestr') {
                 if (isset($cellNode->is->t)) {
                     $value = (string)$cellNode->is->t;
                 } elseif (isset($cellNode->is->r)) {
@@ -196,7 +196,7 @@ function normalizeClaimFileRows(array $rows): array {
         return -1;
     };
 
-    $idxReg = $getIdx(['regno', 'fileno', 'filenumber', 'file', 'registryno', 'registryno']);
+    $idxReg = $getIdx(['regno', 'fileno', 'filenumber', 'file', 'registryno', 'pensionno', 'pensionnumber']);
     $idxClaim = $getIdx(['claimtype', 'type']);
     $idxYear = $getIdx(['periodyear', 'year']);
     $idxMonth = $getIdx(['periodmonth', 'month']);

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/xlsx_upload_template.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -28,15 +29,12 @@ if ($supplierResult) {
     }
 }
 
-$filename = 'arrears_payments_template_' . date('Ymd_His') . '.csv';
-
-header('Content-Type: text/csv; charset=utf-8');
-header('Content-Disposition: attachment; filename="' . $filename . '"');
-header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-
-$output = fopen('php://output', 'w');
-fputcsv($output, ['Supplier Number', 'Claim Type', 'Amount', 'Payment Date', 'Reference Number', 'Notes']);
-fputcsv($output, [$sampleSupplierNo, 'Pension Arrears', '1450000', date('Y-m-d'), 'PAY-APR-001', 'Optional payment batch note']);
-fclose($output);
+$filename = 'arrears_payments_template_' . date('Ymd_His') . '.xlsx';
+sendUploadTemplateXlsx(
+    ['Supplier Number', 'Claim Type', 'Amount', 'Payment Date', 'Reference Number', 'Notes'],
+    [[$sampleSupplierNo, 'Pension Arrears', '1450000', date('Y-m-d'), 'PAY-APR-001', 'Optional payment batch note']],
+    'Arrears Payments Upload',
+    $filename
+);
 
 $conn->close();

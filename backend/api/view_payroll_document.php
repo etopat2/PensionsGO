@@ -121,12 +121,33 @@ logPayrollAudit($conn, [
     ]
 ]);
 
+// Binary Office/PDF files must start at byte zero. Some shared bootstrap files or
+// server extensions may leave output buffering active; even one leading newline
+// makes Excel report an otherwise valid XLSX package as corrupt.
+while (ob_get_level() > 0) {
+    ob_end_clean();
+}
+if (function_exists('ini_set')) {
+    @ini_set('zlib.output_compression', '0');
+}
+session_write_close();
+
 header('Content-Type: ' . $mime);
 header('Content-Length: ' . filesize($absolutePath));
 header('X-Content-Type-Options: nosniff');
-header('Content-Disposition: ' . $disposition . '; filename="' . addslashes($safeName) . '"');
+header('Content-Transfer-Encoding: binary');
+header(
+    'Content-Disposition: ' . $disposition
+    . '; filename="' . str_replace(['"', "\r", "\n"], ['', '', ''], $safeName) . '"'
+    . "; filename*=UTF-8''" . rawurlencode($safeName)
+);
 header('Cache-Control: private, max-age=120');
 
-readfile($absolutePath);
+$stream = fopen($absolutePath, 'rb');
+if ($stream === false) {
+    http_response_code(500);
+    exit;
+}
+fpassthru($stream);
+fclose($stream);
 exit;
-?>

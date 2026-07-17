@@ -26,7 +26,7 @@
         if (document.getElementById('registryControllerScript')) return;
         var script = document.createElement('script');
         script.id = 'registryControllerScript';
-        script.src = 'js/pension_file_registry.js?v=20260716d';
+        script.src = 'js/pension_file_registry.js?v=20260716f';
         script.defer = true;
         document.head.appendChild(script);
       };
@@ -458,7 +458,7 @@
                   <h4>Template &amp; Source File</h4>
                   <p>Use the official template so the system can validate and merge records correctly.</p>
                 </div>
-                <button type="button" class="btn-secondary" id="registryBulkDownloadTemplateBtn">Download CSV Template</button>
+                <button type="button" class="btn-secondary" id="registryBulkDownloadTemplateBtn">Download Excel Template</button>
               </div>
               <label class="edit-field">
                 <span>Import File</span>
@@ -604,6 +604,7 @@
       <form id="registryMovementForm" class="registry-modal-body registry-movement-form">
         <div id="registryMovementIdentity" class="registry-movement-identity"></div>
         <input type="hidden" id="registryMovementRegNo">
+        <label class="edit-field"><span>File Type</span><select id="registryMovementFileType" disabled><option value="pension" selected>Pension File</option></select></label>
         <div id="registryMoveFields" class="registry-movement-fields">
           <label class="edit-field"><span>Destination Office or Officer</span><input id="registryMoveDestination" required></label>
           <label class="edit-field"><span>Purpose of Movement</span><input id="registryMoveReason" placeholder="Reason file is required"></label>
