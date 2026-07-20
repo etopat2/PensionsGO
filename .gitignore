@@ -7,3 +7,4 @@ backend/exports/*
 !backend/exports/.htaccess
 backend/logs/*
 !backend/logs/.htaccess
+temp/*

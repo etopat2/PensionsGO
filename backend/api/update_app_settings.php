@@ -54,6 +54,13 @@ try {
         'currency' => 'UGX',
         'session_timeout_minutes' => '30',
         'grace_period_minutes' => '5',
+        'life_certificate_followup_enabled' => '1',
+        'life_certificate_submission_deadline_month' => '5',
+        'life_certificate_submission_deadline_day' => '31',
+        'life_certificate_grace_period_days' => '61',
+        'life_certificate_suspension_referrals_enabled' => '1',
+        'life_certificate_suspension_min_retirement_years' => '15',
+        'life_certificate_min_contact_attempts_before_suspension' => '1',
         'task_due_business_days' => '3',
         'task_grace_business_days' => '0',
         'task_alerts_enabled' => '1',
@@ -277,6 +284,8 @@ try {
 
     $boolKeys = [
         'maintenance_mode',
+        'life_certificate_followup_enabled',
+        'life_certificate_suspension_referrals_enabled',
         'allow_multiple_devices',
         'auto_logout_on_conflict',
         'task_skip_weekends',
@@ -405,6 +414,11 @@ try {
     $intKeys = [
         'session_timeout_minutes',
         'grace_period_minutes',
+        'life_certificate_submission_deadline_month',
+        'life_certificate_submission_deadline_day',
+        'life_certificate_grace_period_days',
+        'life_certificate_suspension_min_retirement_years',
+        'life_certificate_min_contact_attempts_before_suspension',
         'task_due_business_days',
         'task_grace_business_days',
         'task_alert_due_soon_hours',
@@ -742,6 +756,16 @@ try {
 
             if ($key === 'payroll_reconcile_debounce_seconds') {
                 $value = max(15, min(900, $value));
+            } elseif ($key === 'life_certificate_submission_deadline_month') {
+                $value = max(1, min(12, $value));
+            } elseif ($key === 'life_certificate_submission_deadline_day') {
+                $value = max(1, min(31, $value));
+            } elseif ($key === 'life_certificate_grace_period_days') {
+                $value = max(0, min(366, $value));
+            } elseif ($key === 'life_certificate_suspension_min_retirement_years') {
+                $value = max(0, min(100, $value));
+            } elseif ($key === 'life_certificate_min_contact_attempts_before_suspension') {
+                $value = max(0, min(20, $value));
             } elseif ($key === 'task_alert_due_soon_hours') {
                 $value = max(1, min(168, $value));
             } elseif ($key === 'task_alert_stalled_hours') {

@@ -2005,6 +2005,42 @@ CREATE TABLE IF NOT EXISTS `tb_users` (
   `is_active` tinyint(1) NOT NULL DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+CREATE TABLE IF NOT EXISTS `tb_life_certificate_followup_cases` (
+  `case_id` int(11) NOT NULL AUTO_INCREMENT,
+  `reg_no` varchar(50) NOT NULL,
+  `compliance_year` int(11) NOT NULL,
+  `status` enum('Open','Complied','Suspension Submitted','Suspended','Closed') NOT NULL DEFAULT 'Open',
+  `suspension_status` enum('Not Eligible','Eligible','Submitted','Suspended','Reinstated') NOT NULL DEFAULT 'Not Eligible',
+  `suspension_submitted_at` datetime DEFAULT NULL,
+  `suspension_submitted_by` varchar(100) DEFAULT NULL,
+  `suspension_reason` text DEFAULT NULL,
+  `closed_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`case_id`),
+  UNIQUE KEY `uniq_lcf_case` (`reg_no`,`compliance_year`),
+  KEY `idx_lcf_case_year_status` (`compliance_year`,`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `tb_life_certificate_correspondence` (
+  `correspondence_id` int(11) NOT NULL AUTO_INCREMENT,
+  `case_id` int(11) NOT NULL,
+  `channel` enum('Phone Call','SMS','Email','Letter','Home Visit','Next of Kin','Other') NOT NULL,
+  `attempted_at` datetime NOT NULL,
+  `contact_person` varchar(160) DEFAULT NULL,
+  `contact_value` varchar(160) DEFAULT NULL,
+  `outcome` enum('Reached - Will Comply','Reached - Submitted','Reached - Unable to Comply','No Answer','Wrong Number','Phone Off','Message Left','Letter Delivered','Letter Returned','Reported Deceased','Other') NOT NULL,
+  `reach_status` enum('Successful','Unsuccessful') NOT NULL,
+  `response_notes` text NOT NULL,
+  `follow_up_date` date DEFAULT NULL,
+  `recorded_by` varchar(100) NOT NULL,
+  `recorded_by_name` varchar(160) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`correspondence_id`),
+  KEY `idx_lcf_correspondence_case` (`case_id`,`attempted_at`),
+  CONSTRAINT `fk_lcf_correspondence_case` FOREIGN KEY (`case_id`) REFERENCES `tb_life_certificate_followup_cases` (`case_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 --
 --
 

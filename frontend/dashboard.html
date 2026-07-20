@@ -20,7 +20,7 @@
   <link rel="stylesheet" href="css/overlay.css?v=20260504a" />
   <link rel="stylesheet" href="css/auth.css?v=20260504a" />
   <link rel="stylesheet" href="css/menu.css?v=20260504d" />
-  <link rel="stylesheet" href="css/dashboard.css?v=20260613a" />
+  <link rel="stylesheet" href="css/dashboard.css?v=20260718c" />
   <link rel="stylesheet" href="css/broadcast_popup.css?v=20260504a" />
   <link rel="stylesheet" href="css/public_chat.css?v=20260714x" />
 
@@ -37,7 +37,7 @@
         if (document.getElementById('dashboardControllerScript')) return;
         var script = document.createElement('script');
         script.id = 'dashboardControllerScript';
-        script.src = 'js/dashboard.js?v=20260717c';
+        script.src = 'js/dashboard.js?v=20260718c';
         script.defer = true;
         document.head.appendChild(script);
       };
@@ -254,7 +254,8 @@
         </section>
         <!-- Life Certificate Section -->
         <section id="lifeCertSection" class="dashboard-section">
-          <h2>Life Certificate Submissions</h2>
+          <h2>Life Certificate Compliance &amp; Assurance</h2>
+          <p class="section-lead">Manage annual compliance, the June–July grace-period outreach, correspondence evidence, and controlled payroll-suspension referrals.</p>
           <div class="filter-group lifecert-toolbar">
             <label for="lifeCertYear">Year:</label>
             <select id="lifeCertYear">
@@ -284,6 +285,10 @@
           </div>
           <p>Track annual submissions. "Not Submitted" resets automatically every new year unless submitted for that year.</p>
           <div class="cards-container" id="lifeCertCards"></div>
+          <div class="life-cert-followup-heading">
+            <div><h3>Follow-up &amp; Flagging</h3><p id="lifeCertFollowupPhase">Loading annual workflow phase...</p></div>
+          </div>
+          <div class="cards-container life-cert-followup-cards" id="lifeCertFollowupCards"></div>
           <div class="section-analytics-grid">
             <article class="analytics-panel analytics-panel-emphasis">
               <div class="analytics-panel-header">
@@ -1872,6 +1877,43 @@
         <button type="button" class="btn-action btn-secondary" id="summaryReportWordBtn">Export Word</button>
         <button type="button" class="btn-action" id="summaryReportPdfBtn">Export PDF</button>
       </div>
+    </div>
+  </div>
+
+  <div class="dashboard-data-modal" id="lifeCertFollowupModal" aria-hidden="true">
+    <div class="dashboard-data-modal-backdrop" data-life-followup-close="1"></div>
+    <div class="dashboard-data-modal-panel life-followup-modal-panel" role="dialog" aria-modal="true" aria-labelledby="lifeCertFollowupModalTitle">
+      <div class="dashboard-data-modal-header">
+        <div><p class="dashboard-data-modal-eyebrow">Life Certificate Compliance &amp; Assurance</p><h3 id="lifeCertFollowupModalTitle">Pensioner Follow-up Record</h3></div>
+        <button type="button" class="dashboard-data-modal-close" id="lifeCertFollowupCloseBtn">Close</button>
+      </div>
+      <div class="dashboard-data-modal-body">
+        <div class="dashboard-data-modal-summary"><h4 id="lifeCertFollowupSubject">Selected pensioner</h4><div class="dashboard-data-modal-summary-grid" id="lifeCertFollowupMeta"></div></div>
+        <div class="life-followup-tabs" role="tablist">
+          <button type="button" class="btn-action active" data-life-tab="correspondence">Record Correspondence</button>
+          <button type="button" class="btn-action btn-secondary" data-life-tab="history">Audit History</button>
+          <button type="button" class="btn-action btn-secondary" data-life-tab="suspension">Suspension Referral</button>
+        </div>
+        <section data-life-panel="correspondence">
+          <div class="dashboard-form-grid">
+            <label class="dashboard-form-field"><span>Channel</span><select id="lifeFollowupChannel"><option>Phone Call</option><option>SMS</option><option>Email</option><option>Letter</option><option>Home Visit</option><option>Next of Kin</option><option>Other</option></select></label>
+            <label class="dashboard-form-field"><span>Attempt date &amp; time</span><input type="datetime-local" id="lifeFollowupAttemptedAt"></label>
+            <label class="dashboard-form-field"><span>Person contacted</span><input id="lifeFollowupContactPerson" placeholder="Pensioner, next of kin, representative"></label>
+            <label class="dashboard-form-field"><span>Contact used</span><input id="lifeFollowupContactValue" placeholder="Telephone, email, address or letter reference"></label>
+            <label class="dashboard-form-field"><span>Outcome</span><select id="lifeFollowupOutcome"><option>Reached - Will Comply</option><option>Reached - Submitted</option><option>Reached - Unable to Comply</option><option>No Answer</option><option>Wrong Number</option><option>Phone Off</option><option>Message Left</option><option>Letter Delivered</option><option>Letter Returned</option><option>Reported Deceased</option><option>Other</option></select></label>
+            <label class="dashboard-form-field"><span>Next follow-up</span><input type="date" id="lifeFollowupNextDate"></label>
+            <label class="dashboard-form-field dashboard-form-field-full"><span>Attempt report and notes</span><textarea id="lifeFollowupNotes" rows="4" required placeholder="Record what was said, response received, evidence/reference, commitments and next action."></textarea></label>
+          </div>
+          <div class="dashboard-data-modal-actions"><button type="button" class="btn-action" id="lifeFollowupSaveBtn">Save Correspondence Record</button></div>
+        </section>
+        <section data-life-panel="history" hidden><div class="life-followup-history" id="lifeFollowupHistory"></div></section>
+        <section data-life-panel="suspension" hidden>
+          <div class="dashboard-data-modal-summary"><h4>Payroll Suspension Recommendation</h4><p id="lifeSuspensionEligibility">Eligibility is being assessed.</p></div>
+          <label class="dashboard-form-field dashboard-form-field-full"><span>Recommendation rationale</span><textarea id="lifeSuspensionReason" rows="4" placeholder="Summarise non-compliance and outreach evidence supporting referral."></textarea></label>
+          <div class="dashboard-data-modal-actions"><button type="button" class="btn-action btn-danger" id="lifeSuspensionSubmitBtn">Submit for Payroll Suspension</button></div>
+        </section>
+      </div>
+      <div class="dashboard-data-modal-footer"><button type="button" class="btn-action btn-secondary" id="lifeCertFollowupDoneBtn">Done</button></div>
     </div>
   </div>
 

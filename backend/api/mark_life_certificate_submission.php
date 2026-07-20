@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/life_certificate_followup_common.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -19,6 +20,7 @@ if (!currentUserHasPermission($conn, 'registry.life_certificate.submit')) {
 
 ensureFileMovementTables($conn);
 ensureLifeCertificateTables($conn);
+ensureLifeCertificateFollowupTables($conn);
 
 $payload = json_decode(file_get_contents('php://input'), true);
 if (!is_array($payload)) {
@@ -105,6 +107,27 @@ if ($year === (int)date('Y')) {
         $updateCurrent->close();
     }
 }
+
+$closeCase = $conn->prepare("
+    UPDATE tb_life_certificate_followup_cases
+    SET status = 'Complied',
+        suspension_status = CASE WHEN suspension_status IN ('Submitted','Suspended') THEN 'Reinstated' ELSE suspension_status END,
+        closed_at = NOW()
+    WHERE reg_no = ? AND compliance_year = ?
+");
+if ($closeCase) {
+    $closeCase->bind_param('si', $regNo, $year);
+    $closeCase->execute();
+    $closeCase->close();
+}
+
+$actor = lifeCertificateFollowupActor();
+logAuditEvent($conn, [
+    'actor_id' => $actor['id'], 'actor_name' => $actor['name'], 'actor_role' => $actor['role'],
+    'action' => 'life_certificate_submission_recorded', 'entity_type' => 'life_certificate',
+    'entity_id' => $regNo . ':' . $year,
+    'details' => ['reg_no' => $regNo, 'year' => $year, 'notes' => $notes]
+]);
 
 echo json_encode([
     'success' => true,

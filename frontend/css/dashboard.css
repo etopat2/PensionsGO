@@ -1905,6 +1905,23 @@ footer{
   flex-wrap: wrap;
 }
 
+.section-lead { color: var(--muted-text, #64748b); margin-top: -.45rem; }
+.life-cert-followup-heading { display:flex; justify-content:space-between; align-items:end; margin:1.25rem 0 .65rem; }
+.life-cert-followup-heading h3 { margin:0 0 .2rem; }
+.life-cert-followup-heading p { margin:0; color:var(--muted-text, #64748b); }
+.life-cert-followup-cards { grid-template-columns:repeat(auto-fit,minmax(175px,1fr)); }
+.clickable-card { cursor:pointer; transition:transform .15s ease, box-shadow .15s ease; }
+.clickable-card:hover,.clickable-card:focus-visible { transform:translateY(-2px); box-shadow:0 10px 24px rgba(15,23,42,.14); outline:2px solid rgba(37,99,235,.28); }
+.life-cert-row-actions { display:flex; flex-wrap:wrap; gap:.4rem; }
+.life-followup-modal-panel { width:min(980px,94vw); }
+.life-followup-tabs { display:flex; flex-wrap:wrap; gap:.5rem; margin:1rem 0; border-bottom:1px solid #e2e8f0; padding-bottom:.8rem; }
+.life-followup-history { display:grid; gap:.75rem; }
+.life-followup-history-item { border:1px solid #e2e8f0; border-left:4px solid #2563eb; border-radius:10px; padding:.85rem 1rem; background:#fff; }
+.life-followup-history-item > div { display:flex; justify-content:space-between; gap:1rem; }
+.life-followup-history-item p { margin:.5rem 0; white-space:pre-wrap; }
+.life-followup-history-item small { color:#64748b; }
+.btn-danger { background:#b91c1c !important; color:#fff !important; }
+
 @media (max-width: 840px) {
   .lifecert-toolbar .life-cert-export-actions {
     width: 100%;

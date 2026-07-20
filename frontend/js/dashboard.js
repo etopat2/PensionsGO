@@ -329,6 +329,12 @@ function initDashboardController() {
   const lifeCertMarkRegNo = document.getElementById("lifeCertMarkRegNo");
   const lifeCertMarkNotes = document.getElementById("lifeCertMarkNotes");
   const lifeCertMarkBtn = document.getElementById("lifeCertMarkBtn");
+  const lifeCertFollowupCards = document.getElementById("lifeCertFollowupCards");
+  const lifeCertFollowupPhase = document.getElementById("lifeCertFollowupPhase");
+  const lifeCertFollowupModal = document.getElementById("lifeCertFollowupModal");
+  const lifeCertFollowupSubject = document.getElementById("lifeCertFollowupSubject");
+  const lifeCertFollowupMeta = document.getElementById("lifeCertFollowupMeta");
+  const lifeFollowupHistory = document.getElementById("lifeFollowupHistory");
   const payrollMonth = document.getElementById("payrollMonth");
   const payrollYear = document.getElementById("payrollYear");
   const payrollFinancialYear = document.getElementById("payrollFinancialYear");
@@ -365,7 +371,7 @@ function initDashboardController() {
   const payrollRecentCycles = document.getElementById("payrollRecentCycles");
   const payrollHistoryLinkWrap = document.getElementById("payrollHistoryLinkWrap");
 
-  const lifeCertState = { page: 1, limit: 20, totalPages: 1, canMark: false, searchTimer: null };
+  const lifeCertState = { page: 1, limit: 20, totalPages: 1, canMark: false, canFollowup: false, canSuspend: false, searchTimer: null, rows: [], currentRow: null, phase: null };
   const payrollState = { page: 1, limit: 20, totalPages: 1, canUpload: false, searchTimer: null, latestMonth: "", latestYear: "" };
   const pensionersState = { cache: null, fetchedAt: 0, pending: null };
   const generalStatisticsState = { cache: null, fetchedAt: 0, pending: null };
@@ -948,6 +954,7 @@ function initDashboardController() {
     search: "",
     dateFrom: "",
     dateTo: "",
+    year: "",
     searchTimer: null,
     listController: null,
     countController: null,
@@ -1084,6 +1091,7 @@ function initDashboardController() {
     analyticsRecordsState.search = "";
     analyticsRecordsState.dateFrom = "";
     analyticsRecordsState.dateTo = "";
+    analyticsRecordsState.year = /lifeCert|life certificate|certificate/i.test(`${source} ${label}`) ? String(lifeCertYear?.value || new Date().getFullYear()) : "";
     analyticsRecordsState.availableColumns = {};
     analyticsRecordsState.columnsLoading = null;
     document.getElementById("analyticsRecordsSearch").value = "";
@@ -1125,7 +1133,8 @@ function initDashboardController() {
       analyticsRecordsState.limit,
       analyticsRecordsState.search,
       analyticsRecordsState.dateFrom,
-      analyticsRecordsState.dateTo
+      analyticsRecordsState.dateTo,
+      analyticsRecordsState.year
     ].join("|");
     body.innerHTML = `<tr><td colspan="8"><div class="analytics-records-loading">Loading records...</div></td></tr>`;
     const params = new URLSearchParams({
@@ -1136,6 +1145,7 @@ function initDashboardController() {
       search: analyticsRecordsState.search,
       date_from: analyticsRecordsState.dateFrom,
       date_to: analyticsRecordsState.dateTo,
+      year: analyticsRecordsState.year,
       fast: "1"
     });
     try {
@@ -1156,7 +1166,8 @@ function initDashboardController() {
         analyticsRecordsState.limit,
         analyticsRecordsState.search,
         analyticsRecordsState.dateFrom,
-        analyticsRecordsState.dateTo
+        analyticsRecordsState.dateTo,
+        analyticsRecordsState.year
       ].join("|")) {
         return;
       }
@@ -1190,7 +1201,8 @@ function initDashboardController() {
       limit: String(analyticsRecordsState.limit),
       search: analyticsRecordsState.search,
       date_from: analyticsRecordsState.dateFrom,
-      date_to: analyticsRecordsState.dateTo
+      date_to: analyticsRecordsState.dateTo,
+      year: analyticsRecordsState.year
     });
     try {
       const response = await fetch(`../backend/api/get_analytics_records.php?${params.toString()}`, {
@@ -1208,7 +1220,8 @@ function initDashboardController() {
         analyticsRecordsState.limit,
         analyticsRecordsState.search,
         analyticsRecordsState.dateFrom,
-        analyticsRecordsState.dateTo
+        analyticsRecordsState.dateTo,
+        analyticsRecordsState.year
       ].join("|");
       if (requestKey && requestKey !== currentKey) return;
       analyticsRecordsState.totalRows = Number(data.pagination?.totalRows || analyticsRecordsState.totalRows || 0);
@@ -1229,14 +1242,23 @@ function initDashboardController() {
     if (!analyticsRecordsState.rows.length) {
       body.innerHTML = `<tr><td colspan="${columns.length + 1}">No records found for this analytics bucket.</td></tr>`;
     } else {
+      const lifeCertificateContext = /lifeCert|life certificate|certificate|follow-up|followup/i.test(`${analyticsRecordsState.source} ${analyticsRecordsState.label} ${analyticsRecordsState.title}`);
       body.innerHTML = analyticsRecordsState.rows.map((row) => `
         <tr>
           ${columns.map(([key]) => `<td>${escapeHtml(formatAnalyticsCellValue(row[key], key))}</td>`).join("")}
-          <td><button type="button" class="btn-action btn-secondary analytics-record-detail-btn" data-record-id="${escapeHtml(row.__record_id || "")}">View</button></td>
+          <td><div class="life-cert-row-actions"><button type="button" class="btn-action btn-secondary analytics-record-detail-btn" data-record-id="${escapeHtml(row.__record_id || "")}">View</button>${lifeCertificateContext && (row.regNo || row.__record_id) ? `<button type="button" class="btn-action analytics-life-followup-btn" data-record-id="${escapeHtml(row.__record_id || "")}">Follow-up Action</button>` : ""}</div></td>
         </tr>
       `).join("");
       body.querySelectorAll(".analytics-record-detail-btn").forEach((button) => {
         button.addEventListener("click", () => loadAnalyticsRecordDetail(button.dataset.recordId || ""));
+      });
+      body.querySelectorAll(".analytics-life-followup-btn").forEach((button) => {
+        button.addEventListener("click", (event) => {
+          event.preventDefault(); event.stopPropagation();
+          const sourceRow = analyticsRecordsState.rows.find((item) => String(item.__record_id || "") === String(button.dataset.recordId || ""));
+          if (!sourceRow) return;
+          openLifeFollowupModal({ ...sourceRow, regNo: sourceRow.regNo || sourceRow.__record_id, name: sourceRow.registry_name || sourceRow.name || sourceRow.staff_name || "Pensioner", retirementDate: String(sourceRow.retirementDate || "").replace(/\s+/g, "-"), lifeCertificateStatus: /submitted/i.test(analyticsRecordsState.label) && !/not submitted/i.test(analyticsRecordsState.label) ? "Submitted" : "Not Submitted", contactAttempts: Number(sourceRow.contactAttempts || 0), followupStatus: sourceRow.followupStatus || "Open" });
+        });
       });
     }
     renderAnalyticsRecordsFooter(false);
@@ -1325,6 +1347,7 @@ function initDashboardController() {
           </div>
           <div class="analytics-detail-tabs" id="analyticsRecordDetailTabs" role="tablist" aria-label="Record detail sections"></div>
           <div class="analytics-detail-panels" id="analyticsRecordDetailGrid"></div>
+          <div class="dashboard-data-modal-actions" id="analyticsRecordDetailActions"></div>
         </div>
       `;
       document.body.appendChild(modal);
@@ -1335,6 +1358,13 @@ function initDashboardController() {
     }
     document.getElementById("analyticsRecordDetailTitle").textContent = title || "Record Detail";
     renderAnalyticsDetailTabs(record);
+    const detailActions = document.getElementById("analyticsRecordDetailActions");
+    const detailRegNo = record?.regNo || record?.reg_no || record?.registry?.regNo || record?.registry?.reg_no || "";
+    const lifeCertificateContext = /lifeCert|life certificate|certificate|follow-up|followup/i.test(`${analyticsRecordsState.source} ${analyticsRecordsState.label} ${title || ""}`);
+    if (detailActions) {
+      detailActions.innerHTML = lifeCertificateContext && detailRegNo ? '<button type="button" class="btn-action" id="analyticsDetailLifeFollowupBtn">Open Follow-up Action</button>' : "";
+      document.getElementById("analyticsDetailLifeFollowupBtn")?.addEventListener("click", () => openLifeFollowupModal({ ...record, regNo: detailRegNo, name: record.registry_name || record.name || record.staff_name || "Pensioner", lifeCertificateStatus: /submitted/i.test(analyticsRecordsState.label) && !/not submitted/i.test(analyticsRecordsState.label) ? "Submitted" : "Not Submitted" }));
+    }
     modal.classList.add("open");
     modal.setAttribute("aria-hidden", "false");
   }
@@ -5544,6 +5574,70 @@ function initDashboardController() {
   }
 
   // Life Certificate
+  function closeLifeFollowupModal() {
+    if (!lifeCertFollowupModal) return;
+    lifeCertFollowupModal.classList.remove("open");
+    lifeCertFollowupModal.setAttribute("aria-hidden", "true");
+  }
+
+  function switchLifeFollowupTab(tab) {
+    document.querySelectorAll("[data-life-panel]").forEach((panel) => { panel.hidden = panel.dataset.lifePanel !== tab; });
+    document.querySelectorAll("[data-life-tab]").forEach((btn) => {
+      const active = btn.dataset.lifeTab === tab;
+      btn.classList.toggle("active", active);
+      btn.classList.toggle("btn-secondary", !active);
+    });
+  }
+
+  async function openLifeFollowupModal(row) {
+    if (!lifeCertFollowupModal || !row) return;
+    ["analyticsRecordsModal", "analyticsRecordDetailModal"].forEach((id) => {
+      const analyticsModal = document.getElementById(id);
+      analyticsModal?.classList.remove("open");
+      analyticsModal?.setAttribute("aria-hidden", "true");
+    });
+    lifeCertState.currentRow = row;
+    const year = Number(lifeCertYear?.value || new Date().getFullYear());
+    lifeCertFollowupSubject.textContent = `${row.name || "Pensioner"} — ${row.regNo || ""}`;
+    lifeCertFollowupMeta.innerHTML = [
+      ["Compliance year", year], ["Certificate", row.lifeCertificateStatus], ["Telephone", row.telNo || "Not recorded"],
+      ["Retirement date", row.retirementDate || "Not recorded"], ["Contact attempts", row.contactAttempts || 0], ["Case status", row.followupStatus || "Open"]
+    ].map(([label, value]) => `<div class="dashboard-data-modal-summary-item"><span>${escapeHtml(label)}</span><strong>${escapeHtml(String(value ?? "--"))}</strong></div>`).join("");
+    const attemptedAt = document.getElementById("lifeFollowupAttemptedAt");
+    if (attemptedAt) { const now = new Date(); now.setMinutes(now.getMinutes() - now.getTimezoneOffset()); attemptedAt.value = now.toISOString().slice(0, 16); }
+    lifeFollowupHistory.innerHTML = '<div class="analytics-empty-state">Loading correspondence history...</div>';
+    lifeCertFollowupModal.classList.add("open"); lifeCertFollowupModal.setAttribute("aria-hidden", "false"); switchLifeFollowupTab("correspondence");
+    try {
+      const response = await fetch(`../backend/api/life_certificate_followup.php?year=${year}&regNo=${encodeURIComponent(row.regNo)}`, { credentials: "include", cache: "no-store" });
+      const data = await response.json();
+      const history = Array.isArray(data.history) ? data.history : [];
+      lifeFollowupHistory.innerHTML = history.length ? history.map((item) => `<article class="life-followup-history-item"><div><strong>${escapeHtml(item.outcome)}</strong><span class="status-badge">${escapeHtml(item.reachStatus)}</span></div><p>${escapeHtml(item.notes)}</p><small>${escapeHtml(item.channel)} · ${escapeHtml(item.attemptedAt)} · Recorded by ${escapeHtml(item.recordedBy || "Unknown")}${item.followUpDate ? ` · Follow up ${escapeHtml(item.followUpDate)}` : ""}</small></article>`).join("") : '<div class="analytics-empty-state">No correspondence attempts have been recorded.</div>';
+      const cutoff = new Date(`${data.phase?.graceEnd || `${year}-07-31`}T23:59:59`); cutoff.setFullYear(cutoff.getFullYear() - Number(data.phase?.minimumRetirementYears ?? 15));
+      const eligible = data.phase?.code === "post_grace" && row.lifeCertificateStatus === "Not Submitted" && row.retirementDate && new Date(row.retirementDate) <= cutoff;
+      document.getElementById("lifeSuspensionEligibility").textContent = eligible ? `Eligible: configured grace period ended ${data.phase.graceEnd}, certificate remains outstanding, and retirement was at least ${data.phase.minimumRetirementYears} years ago.` : `Not currently eligible. Grace must end (${data.phase?.graceEnd || "not configured"}), the certificate must remain outstanding, retirement must be at least ${data.phase?.minimumRetirementYears ?? 15} years ago, and ${data.phase?.minimumContactAttempts ?? 1} contact attempt(s) must be recorded.`;
+      document.getElementById("lifeSuspensionSubmitBtn").disabled = !(eligible && lifeCertState.canSuspend) || data.case?.suspensionStatus === "Submitted";
+    } catch (error) { lifeFollowupHistory.innerHTML = '<div class="analytics-empty-state">Unable to load correspondence history.</div>'; }
+  }
+
+  async function saveLifeFollowup(action) {
+    const row = lifeCertState.currentRow; if (!row) return;
+    const payload = { action, regNo: row.regNo, year: Number(lifeCertYear?.value || new Date().getFullYear()) };
+    if (action === "add_correspondence") Object.assign(payload, { channel: document.getElementById("lifeFollowupChannel").value, attemptedAt: document.getElementById("lifeFollowupAttemptedAt").value.replace("T", " "), contactPerson: document.getElementById("lifeFollowupContactPerson").value.trim(), contactValue: document.getElementById("lifeFollowupContactValue").value.trim(), outcome: document.getElementById("lifeFollowupOutcome").value, followUpDate: document.getElementById("lifeFollowupNextDate").value, notes: document.getElementById("lifeFollowupNotes").value.trim() });
+    else payload.reason = document.getElementById("lifeSuspensionReason").value.trim();
+    try { const response = await fetch("../backend/api/life_certificate_followup.php", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || "Unable to save action"); notifyDashboard("success", data.message, "Life Certificate Follow-up"); if (action === "add_correspondence") document.getElementById("lifeFollowupNotes").value = ""; await renderLifeCertificates(); await openLifeFollowupModal(lifeCertState.rows.find(item => item.regNo === row.regNo) || row); } catch (error) { appAlert(error.message || "Unable to save follow-up action."); }
+  }
+
+  async function renderLifeFollowupSummary(selectedYear) {
+    if (!lifeCertFollowupCards) return;
+    try {
+      const response = await fetch(`../backend/api/life_certificate_followup.php?year=${selectedYear}`, { credentials: "include", cache: "no-store" }); const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message);
+      const s = data.summary || {}; lifeCertState.canFollowup = !!data.canManage; lifeCertState.canSuspend = !!data.canSubmitSuspension; lifeCertState.phase = data.phase;
+      lifeCertFollowupPhase.textContent = `${data.phase.label}. Submission deadline: ${data.phase.deadline}; grace period ends: ${data.phase.graceEnd} (${data.phase.graceDays} days).`;
+      const cards = [["Defaulting after May",s.defaulters,"red"],["Contacted",s.contacted,"blue"],["Not yet contacted",s.not_contacted,"orange"],["Successful reach-outs",s.successful_attempts,"green"],["Unsuccessful reach-outs",s.unsuccessful_attempts,"red"],["Complied after contact",s.complied_after_contact,"teal"],["Potential suspension pool",s.suspension_eligible,"purple"],["Submitted for suspension",s.suspension_submitted,"orange"]];
+      lifeCertFollowupCards.innerHTML = ""; cards.forEach(([label,value,tone]) => { const card=createCard(label,Number(value||0),"","","","",tone); card.classList.add("clickable-card"); card.tabIndex=0; const drill=()=>{ lifeCertStatusFilter.value=label==="Complied after contact"?"submitted":"not_submitted"; lifeCertState.page=1; renderLifeCertificates(); document.querySelector("#lifeCertTableBody")?.scrollIntoView({behavior:"smooth",block:"start"}); }; card.addEventListener("click",drill); card.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" ")drill();}); lifeCertFollowupCards.appendChild(card); });
+    } catch (error) { lifeCertFollowupPhase.textContent = "Unable to load follow-up workflow statistics."; }
+  }
+
   async function renderLifeCertificates() {
     if (!lifeCertCards || !lifeCertTableBody) return;
 
@@ -5582,10 +5676,11 @@ function initDashboardController() {
       const eligibleLifeCertCount = Number(summary.eligible || 0);
       const lifeCertPortfolioCount = Number(summary.total || 0);
       lifeCertCards.innerHTML = "";
-      lifeCertCards.appendChild(createCard(`Submitted (${selectedYear})`, Number(summary.submitted || 0), "", "", "", "", "green"));
-      lifeCertCards.appendChild(createCard(`Not Submitted (${selectedYear})`, Number(summary.notSubmitted || 0), "", "", "", "", "red"));
-      lifeCertCards.appendChild(createCard(`Exempt (${selectedYear})`, Number(summary.exempt || 0), "", "", "", "", "teal"));
-      lifeCertCards.appendChild(createCard(`Expected (${selectedYear})`, eligibleLifeCertCount, "", "", "", "", "blue"));
+      lifeCertCards.appendChild(createCard(`Submitted (${selectedYear})`, Number(summary.submitted || 0), "", "", "", "", "green", { analyticsSource: "lifeCertCards" }));
+      lifeCertCards.appendChild(createCard(`Not Submitted (${selectedYear})`, Number(summary.notSubmitted || 0), "", "", "", "", "red", { analyticsSource: "lifeCertCards" }));
+      lifeCertCards.appendChild(createCard(`Exempt (${selectedYear})`, Number(summary.exempt || 0), "", "", "", "", "teal", { analyticsSource: "lifeCertCards" }));
+      lifeCertCards.appendChild(createCard(`Expected (${selectedYear})`, eligibleLifeCertCount, "", "", "", "", "blue", { analyticsSource: "lifeCertCards" }));
+      Array.from(lifeCertCards.children).forEach((card) => card.classList.add("clickable-card"));
 
       renderAnalyticsBarList(lifeCertAnalyticsBars, [
         {
@@ -5612,6 +5707,7 @@ function initDashboardController() {
       ]);
 
       const rows = Array.isArray(data.rows) ? data.rows : [];
+      lifeCertState.rows = rows;
       renderAnalyticsStatGrid(lifeCertInsightGrid, [
         {
           label: "Compliance Rate",
@@ -5663,7 +5759,7 @@ function initDashboardController() {
               <td>${escapeHtml(row.livingStatus || "")}</td>
               <td>${statusBadge(row.lifeCertificateStatus || "Not Submitted")}</td>
               <td>${escapeHtml(row.submittedAt || "N/A")}</td>
-              <td>${canMarkRow ? `<button type="button" class="btn-action btn-import life-cert-mark-row" data-regno="${escapeHtml(row.regNo || "")}">Mark Submitted</button>` : "-"}</td>
+              <td><div class="life-cert-row-actions">${canMarkRow ? `<button type="button" class="btn-action btn-import life-cert-mark-row" data-regno="${escapeHtml(row.regNo || "")}">Mark Submitted</button>` : ""}${String(row.lifeCertificateStatus)==="Not Submitted" ? `<button type="button" class="btn-action life-cert-followup-row" data-regno="${escapeHtml(row.regNo || "")}">Follow-up (${Number(row.contactAttempts||0)})</button>` : ""}</div></td>
             </tr>
           `;
         }).join("");
@@ -5711,6 +5807,7 @@ function initDashboardController() {
         label: "Life Certificate Export",
         fileName: data.export.file_name || ""
       });
+      await renderLifeFollowupSummary(selectedYear);
     } catch (error) {
       console.error("Life certificate export failed:", error);
       notifyDashboard("error", error.message || "Unable to export life certificate records.", "Life Certificate");
@@ -8960,6 +9057,16 @@ function initDashboardController() {
   if (lifeCertMarkBtn) {
     lifeCertMarkBtn.addEventListener("click", () => submitLifeCertificate());
   }
+  if (lifeCertTableBody) {
+    lifeCertTableBody.addEventListener("click", (event) => {
+      const button = event.target.closest(".life-cert-followup-row");
+      if (!button) return;
+      event.preventDefault(); event.stopPropagation();
+      const row = lifeCertState.rows.find((item) => String(item.regNo || "") === String(button.dataset.regno || ""));
+      if (!row) { notifyDashboard("error", "The selected pensioner record is no longer available. Refresh and try again.", "Life Certificate Follow-up"); return; }
+      openLifeFollowupModal(row);
+    });
+  }
   if (lifeCertExportXlsxBtn) {
     lifeCertExportXlsxBtn.addEventListener("click", () => exportLifeCertificates("xlsx"));
   }
@@ -8969,6 +9076,11 @@ function initDashboardController() {
   if (lifeCertExportCsvBtn) {
     lifeCertExportCsvBtn.addEventListener("click", () => exportLifeCertificates("csv"));
   }
+  document.querySelectorAll("[data-life-tab]").forEach((btn) => btn.addEventListener("click", () => switchLifeFollowupTab(btn.dataset.lifeTab)));
+  [document.getElementById("lifeCertFollowupCloseBtn"), document.getElementById("lifeCertFollowupDoneBtn")].forEach((btn) => btn?.addEventListener("click", closeLifeFollowupModal));
+  lifeCertFollowupModal?.querySelector("[data-life-followup-close]")?.addEventListener("click", closeLifeFollowupModal);
+  document.getElementById("lifeFollowupSaveBtn")?.addEventListener("click", () => saveLifeFollowup("add_correspondence"));
+  document.getElementById("lifeSuspensionSubmitBtn")?.addEventListener("click", () => saveLifeFollowup("submit_suspension"));
 
   [payrollMonth, payrollYear, payrollFinancialYear, payrollQuarter, payrollStatusFilter].forEach((el) => {
     if (!el) return;

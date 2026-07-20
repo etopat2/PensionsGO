@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/life_certificate_followup_common.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -19,6 +20,7 @@ if ($role === 'pensioner') {
 
 ensureFileMovementTables($conn);
 ensureLifeCertificateTables($conn);
+ensureLifeCertificateFollowupTables($conn);
 if (function_exists('ensureFileRegistryPerformanceIndexes')) {
     ensureFileRegistryPerformanceIndexes($conn);
 }
@@ -167,15 +169,23 @@ $dataSql = "
         COALESCE(fr.telNo, '') AS telNo,
         COALESCE(fr.payType, 'Pensioner') AS payType,
         COALESCE(fr.livingStatus, 'Alive') AS livingStatus,
+        fr.retirementDate,
         COALESCE(sd.prisonUnit, '') AS station,
         {$statusExpr} AS life_certificate_status,
         lcs.submitted_at,
-        lcs.submitted_by
+        lcs.submitted_by,
+        COALESCE(lfc.status, 'Open') AS followup_status,
+        COALESCE(lfc.suspension_status, 'Not Eligible') AS suspension_status,
+        COALESCE(lfx.attempt_count, 0) AS contact_attempts,
+        COALESCE(lfx.success_count, 0) AS successful_attempts,
+        COALESCE(lfx.failure_count, 0) AS unsuccessful_attempts
     FROM tb_fileregistry fr
     LEFT JOIN tb_staffdue sd ON sd.regNo = fr.regNo
     LEFT JOIN tb_life_certificate_submissions lcs
       ON lcs.regNo = fr.regNo
      AND lcs.submission_year = ?
+    LEFT JOIN tb_life_certificate_followup_cases lfc ON lfc.reg_no = fr.regNo AND lfc.compliance_year = ?
+    LEFT JOIN (SELECT case_id, COUNT(*) attempt_count, SUM(reach_status='Successful') success_count, SUM(reach_status='Unsuccessful') failure_count FROM tb_life_certificate_correspondence GROUP BY case_id) lfx ON lfx.case_id=lfc.case_id
     {$dataWhere}
     ORDER BY
       CASE {$statusExpr}
@@ -192,8 +202,11 @@ if (!$dataStmt) {
     echo json_encode(['success' => false, 'message' => 'Unable to prepare list query']);
     exit;
 }
-$listTypes = $dataTypes . "ii";
-$listParams = $dataParams;
+$listTypes = "ii" . substr($dataTypes, 1) . "ii";
+$listParams = [$dataParams[0], $year];
+foreach (array_slice($dataParams, 1) as $value) {
+    $listParams[] = $value;
+}
 $listParams[] = $limit;
 $listParams[] = $offset;
 $listBind = [$listTypes];
@@ -215,9 +228,15 @@ while ($row = $res->fetch_assoc()) {
         'telNo' => $row['telNo'] ?? '',
         'payType' => $row['payType'] ?? 'Pensioner',
         'livingStatus' => $row['livingStatus'] ?? 'Alive',
+        'retirementDate' => $row['retirementDate'] ?? null,
         'lifeCertificateStatus' => $row['life_certificate_status'] ?? 'Not Submitted',
         'submittedAt' => $row['submitted_at'] ?? null,
-        'submittedBy' => $row['submitted_by'] ?? null
+        'submittedBy' => $row['submitted_by'] ?? null,
+        'followupStatus' => $row['followup_status'] ?? 'Open',
+        'suspensionStatus' => $row['suspension_status'] ?? 'Not Eligible',
+        'contactAttempts' => (int)($row['contact_attempts'] ?? 0),
+        'successfulAttempts' => (int)($row['successful_attempts'] ?? 0),
+        'unsuccessfulAttempts' => (int)($row['unsuccessful_attempts'] ?? 0)
     ];
 }
 $dataStmt->close();

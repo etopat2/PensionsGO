@@ -982,6 +982,9 @@ function ar_build_spec(mysqli $conn, string $source, string $label): array
             $spec['where'][] = "NOT EXISTS (SELECT 1 FROM tb_life_certificate_submissions lcs WHERE lcs.regNo=fr.regNo AND lcs.submission_year={$year})";
         } elseif ($cleanLabelKey === 'exempt') {
             $spec['where'][] = "(LOWER(TRIM(COALESCE(fr.livingStatus,'')))='deceased' OR LOWER(REPLACE(REPLACE(REPLACE(COALESCE(fr.payType,''),'-',''),' ',''),'_','')) IN ('oneoffpayment','oneoff','oneoffpayout','oneoffpay','gratuityonly'))";
+        } elseif ($cleanLabelKey === 'expected') {
+            $spec['where'][] = "LOWER(TRIM(COALESCE(fr.livingStatus,'')))='alive'";
+            $spec['where'][] = "LOWER(REPLACE(REPLACE(REPLACE(COALESCE(fr.payType,''),'-',''),' ',''),'_','')) NOT IN ('oneoffpayment','oneoff','oneoffpayout','oneoffpay','gratuityonly')";
         }
         return $spec;
     }

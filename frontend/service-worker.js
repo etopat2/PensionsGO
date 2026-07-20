@@ -1,5 +1,5 @@
 const FALLBACK_APP_VERSION = '1.0.0-dev';
-const ASSET_REVISION = '20260714n';
+const ASSET_REVISION = '20260720b';
 try {
   importScripts('../backend/api/pwa_version.php');
 } catch (error) {

@@ -309,7 +309,7 @@ function getRequestAuthority(): string {
     return '';
 }
 
-/* 1Ã¯Â¸ÂÃ¢Æ’Â£ DATABASE CONNECTION */
+/* DATABASE CONNECTION */
 $host = appEnv('PENSIONAPP_DB_HOST', defined('PENSIONAPP_DB_HOST') ? PENSIONAPP_DB_HOST : 'localhost');
 $user = appEnv('PENSIONAPP_DB_USER', defined('PENSIONAPP_DB_USER') ? PENSIONAPP_DB_USER : 'root');
 $password = appEnv('PENSIONAPP_DB_PASSWORD', defined('PENSIONAPP_DB_PASSWORD') ? PENSIONAPP_DB_PASSWORD : '');
@@ -5159,6 +5159,16 @@ function getPermissionCatalog(): array {
             'label' => 'Submit Life Certificate',
             'description' => 'Allow recording life certificate submissions and beneficiary profile updates.',
             'default_roles' => ['admin', 'clerk', 'data_entry', 'oc_pen', 'writeup_officer']
+        ],
+        'registry.life_certificate.followup' => [
+            'label' => 'Manage Life Certificate Follow-up',
+            'description' => 'Allow officers to record beneficiary correspondence, outcomes, notes, and compliance follow-up cases.',
+            'default_roles' => ['admin', 'clerk', 'data_entry', 'oc_pen', 'writeup_officer']
+        ],
+        'registry.life_certificate.suspension' => [
+            'label' => 'Submit Life Certificate Payroll Suspension',
+            'description' => 'Allow eligible defaulting cases to be submitted for payroll suspension after the July grace period.',
+            'default_roles' => ['admin', 'oc_pen', 'dep_oc', 'deputy_oc', 'deputy_oc_pen', 'deputy_oc_pension']
         ],
         'registry.delete_request' => [
             'label' => 'Request Registry Delete',

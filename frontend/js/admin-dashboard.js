@@ -1153,6 +1153,9 @@ class AdminDashboard {
                         <p class="section-subtitle">Maintain official staff titles by category and level to power accurate workflows.</p>
                     </div>
                     <div class="settings-actions">
+                        <button class="action-btn secondary" id="printTitlesBtn" type="button">Print</button>
+                        <button class="action-btn secondary" id="exportTitlesXlsxBtn" type="button">Export Excel</button>
+                        <button class="action-btn secondary" id="exportTitlesPdfBtn" type="button">Export PDF</button>
                         <button class="action-btn secondary" id="refreshTitlesBtn" type="button">Refresh</button>
                         <button class="action-btn" id="addTitleBtn" type="button">Add Title</button>
                     </div>
@@ -1994,6 +1997,22 @@ class AdminDashboard {
                                 <span>Currency</span>
                                 <input type="text" name="currency" placeholder="UGX">
                             </label>
+                        </div>
+                    </section>
+
+                    <section class="settings-card">
+                        <div class="settings-card-header">
+                            <h3>Life Certificate Compliance &amp; Assurance</h3>
+                            <p>Set the annual submission deadline, outreach grace period, and safeguards for payroll-suspension referrals.</p>
+                        </div>
+                        <div class="settings-fields">
+                            <div class="settings-toggle"><div><div class="toggle-title">Enable Follow-up Workflow</div><div class="toggle-subtitle">Show outreach cases and allow authorized officers to record correspondence after the deadline.</div></div><label class="switch"><input type="checkbox" name="life_certificate_followup_enabled"><span class="slider"></span></label></div>
+                            <label class="settings-field"><span>Submission Deadline Month</span><select name="life_certificate_submission_deadline_month"><option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select></label>
+                            <label class="settings-field"><span>Submission Deadline Day</span><input type="number" name="life_certificate_submission_deadline_day" min="1" max="31" step="1"><small class="field-help">Automatically restricted to the final valid day for the selected month.</small></label>
+                            <label class="settings-field"><span>Grace Period (days)</span><input type="number" name="life_certificate_grace_period_days" min="0" max="366" step="1"><small class="field-help">Default 61 days converts a 31 May deadline to a 31 July grace-period end.</small></label>
+                            <div class="settings-toggle"><div><div class="toggle-title">Enable Suspension Referrals</div><div class="toggle-subtitle">Allow authorized decision officers to submit qualifying cases after the configured grace period.</div></div><label class="switch"><input type="checkbox" name="life_certificate_suspension_referrals_enabled"><span class="slider"></span></label></div>
+                            <label class="settings-field"><span>Minimum Years Since Retirement</span><input type="number" name="life_certificate_suspension_min_retirement_years" min="0" max="100" step="1"></label>
+                            <label class="settings-field"><span>Required Contact Attempts</span><input type="number" name="life_certificate_min_contact_attempts_before_suspension" min="0" max="20" step="1"><small class="field-help">Prevents referral until this many audited correspondence attempts exist.</small></label>
                         </div>
                     </section>
 
@@ -6697,6 +6716,9 @@ class AdminDashboard {
         const clearBtn = document.getElementById('clearTitleFilters');
         const addBtn = document.getElementById('addTitleBtn');
         const refreshBtn = document.getElementById('refreshTitlesBtn');
+        const printBtn = document.getElementById('printTitlesBtn');
+        const exportXlsxBtn = document.getElementById('exportTitlesXlsxBtn');
+        const exportPdfBtn = document.getElementById('exportTitlesPdfBtn');
 
         if (searchInput) {
             searchInput.addEventListener('input', () => this.applyTitleFilters());
@@ -6725,6 +6747,11 @@ class AdminDashboard {
         if (refreshBtn) {
             refreshBtn.addEventListener('click', () => this.loadTitleSettings());
         }
+        if (printBtn) {
+            printBtn.addEventListener('click', () => this.printTitleSettings());
+        }
+        exportXlsxBtn?.addEventListener('click', () => this.exportTitleSettings('xlsx'));
+        exportPdfBtn?.addEventListener('click', () => this.exportTitleSettings('pdf'));
 
         const tableBody = document.getElementById('titleSettingsTableBody');
         if (tableBody) {
@@ -7630,6 +7657,13 @@ class AdminDashboard {
             date_format: getString('date_format'),
             time_format: getString('time_format'),
             currency: getString('currency'),
+            life_certificate_followup_enabled: getBool('life_certificate_followup_enabled'),
+            life_certificate_submission_deadline_month: getNumber('life_certificate_submission_deadline_month'),
+            life_certificate_submission_deadline_day: getNumber('life_certificate_submission_deadline_day'),
+            life_certificate_grace_period_days: getNumber('life_certificate_grace_period_days'),
+            life_certificate_suspension_referrals_enabled: getBool('life_certificate_suspension_referrals_enabled'),
+            life_certificate_suspension_min_retirement_years: getNumber('life_certificate_suspension_min_retirement_years'),
+            life_certificate_min_contact_attempts_before_suspension: getNumber('life_certificate_min_contact_attempts_before_suspension'),
             log_retention_days: getNumber('log_retention_days'),
             enable_notifications: getBool('enable_notifications'),
             staff_login_enabled: getBool('staff_login_enabled'),
@@ -8490,6 +8524,45 @@ class AdminDashboard {
                 </tr>
             `;
         }).join('');
+    }
+
+    getTitleReportRows() {
+        return Array.isArray(this.titleSettings?.filtered) ? this.titleSettings.filtered : [];
+    }
+
+    async exportTitleSettings(format = 'xlsx') {
+        const rows = this.getTitleReportRows();
+        if (!rows.length) {
+            this.showNotification('There are no title records to export for the current filters.', 'info');
+            return;
+        }
+        const params = new URLSearchParams({ format, search: document.getElementById('titleSearchInput')?.value?.trim() || '', category: document.getElementById('titleCategoryFilter')?.value || '', level: document.getElementById('titleLevelFilter')?.value || '', status: document.getElementById('titleStatusFilter')?.value || '' });
+        try {
+            const response = await fetch(`../backend/api/export_titles.php?${params}`, { credentials: 'include', cache: 'no-store' });
+            const data = await this.safeJson(response, { success: false });
+            if (!response.ok || !data.success || !data.export?.download_url) throw new Error(data.message || 'Unable to generate titles export.');
+            const link = document.createElement('a'); link.href = data.export.download_url; link.download = data.export.file_name || ''; document.body.appendChild(link); link.click(); link.remove();
+            this.showNotification(data.message || `${String(format).toUpperCase()} export generated.`, 'success');
+        } catch (error) {
+            this.showNotification(error.message || 'Unable to export title records.', 'error');
+        }
+    }
+
+    printTitleSettings() {
+        const rows = this.getTitleReportRows();
+        if (!rows.length) {
+            this.showNotification('There are no title records to print for the current filters.', 'info');
+            return;
+        }
+        const printWindow = window.open('', '_blank', 'width=1000,height=760');
+        if (!printWindow) {
+            this.showNotification('Allow popups to open the titles print preview.', 'warning');
+            return;
+        }
+        const generatedAt = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date());
+        const tableRows = rows.map((title, index) => `<tr><td>${index + 1}</td><td>${this.escapeHtml(title.title_name || '')}</td><td>${this.escapeHtml(this.formatTitleCategory(title.category))}</td><td>${this.escapeHtml(this.formatTitleLevel(title.level))}</td><td>${title.is_active ? 'Active' : 'Inactive'}</td></tr>`).join('');
+        printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Title Settings Report</title><style>body{font-family:Arial,sans-serif;color:#172033;margin:32px}h1{margin:0 0 6px;font-size:24px}.meta{color:#5c677d;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #cfd6e4;padding:8px;text-align:left}th{background:#6d1116;color:#fff}tr:nth-child(even){background:#f6f7fa}@page{size:A4 portrait;margin:14mm}@media print{body{margin:0}}</style></head><body><h1>Official Titles Report</h1><div class="meta">Generated ${this.escapeHtml(generatedAt)} · ${rows.length} filtered record${rows.length === 1 ? '' : 's'}</div><table><thead><tr><th>#</th><th>Title</th><th>Category</th><th>Level</th><th>Status</th></tr></thead><tbody>${tableRows}</tbody></table><script>window.addEventListener('load',()=>{window.print();});<\/script></body></html>`);
+        printWindow.document.close();
     }
 
     async loadBankSettings() {

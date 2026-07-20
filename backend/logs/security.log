@@ -438,3 +438,5 @@
 [2026-06-14 20:00:33] unknown: Admin session terminated due to failed re-authentication (User: unknown, IP: ::1)
 [2026-06-14 20:00:34] unknown: Admin session terminated due to failed re-authentication (User: unknown, IP: ::1)
 [2026-06-14 20:00:35] unknown: Admin session terminated due to failed re-authentication (User: unknown, IP: ::1)
+[2026-07-20 20:36:42] unknown: Admin dashboard locked due to inactivity (User: unknown, IP: ::1)
+[2026-07-20 20:54:14] unknown: Admin dashboard unlocked after re-authentication (User: unknown, IP: ::1)
